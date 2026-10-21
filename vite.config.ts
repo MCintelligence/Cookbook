@@ -14,7 +14,8 @@ export default defineConfig({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
         // Precache the fonts and the search engine too, so everything works with no connection.
-        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,aff,dic}'] },
+        // The grammar engine's WebAssembly is about 20 MB, above Workbox's usual limit.
+        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,aff,dic}'], maximumFileSizeToCacheInBytes: 32 * 1024 * 1024 },
         manifest: {
           name: 'Cookbook',
           short_name: 'Cookbook',
@@ -31,7 +32,10 @@ export default defineConfig({
       }),
   ],
   // SQLite finds its .wasm file next to its own module, which pre-bundling would break.
-  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  // Harper's the same, for the grammar engine.
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm', 'harper.js'] },
+  // The proofreader's worker loads the grammar engine only when it is first needed.
+  worker: { format: 'es' },
   clearScreen: false,
   server: { port: 1420, strictPort: true },
   envPrefix: ['VITE_', 'TAURI_ENV_'],

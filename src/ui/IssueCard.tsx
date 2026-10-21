@@ -24,9 +24,17 @@ export function useSuggestions(issue: FoundIssue | null, proof: Proofreader): st
   return found;
 }
 
+/** How a fix reads on its button, including the ones that only change spaces. */
+export function fixLabel(problem: string, fix: string): string {
+  if (fix === '') return problem.trim() ? `Remove “${problem.trim()}”` : 'Remove the space';
+  if (fix.trim() === '') return fix.length === 1 ? 'One space' : 'Spaces';
+  return fix;
+}
+
 /** What can be done about an issue: its fixes, then adding the word to the dictionary or ignoring it. */
 export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor; issue: FoundIssue; proof: Proofreader; onDone?: () => void }) {
   const suggestions = useSuggestions(issue, proof);
+  const [why, setWhy] = useState(false);
   const done = (fn: () => void) => () => {
     fn();
     onDone?.();
@@ -38,7 +46,7 @@ export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor;
         {suggestions?.length === 0 && <span className="issue-quiet">No suggestions.</span>}
         {suggestions?.map((s) => (
           <button key={s} className="issue-fix" onClick={done(() => applySuggestion(editor, issue, s))}>
-            {s}
+            {fixLabel(issue.word, s)}
           </button>
         ))}
       </div>
@@ -48,10 +56,16 @@ export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor;
             Add to dictionary
           </button>
         )}
-        <button className="pill" onClick={done(() => proof.ignore(issue.word))}>
+        <button className="pill" onClick={done(() => proof.ignore(issue))}>
           Ignore
         </button>
+        {issue.issue.why && (
+          <button className="pill" aria-expanded={why} onClick={() => setWhy(!why)}>
+            Why?
+          </button>
+        )}
       </div>
+      {why && <p className="issue-why">{issue.issue.why}</p>}
     </>
   );
 }

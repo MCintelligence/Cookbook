@@ -36,6 +36,37 @@ The kitchen smelled of cornbread and black pepper before anyone was awake.
 
 Folders and files sort by name in natural order ("Chapter 2" before "Chapter 10").
 
+Inside a scene, styles are written so the file still reads well anywhere:
+
+```markdown
+The kitchen smelled of **cornbread** and *black pepper*.
+
+::: letter
+Dear June, the pie wants more nutmeg than you think.
+:::
+
+* * *
+
+[She'll never let me read it,]{.thought} she thought.
+
+- [ ] find Lou's hymn
+```
+
+Plain paragraphs use the Body style. `::: name` blocks use a named paragraph style, `**strong**`, `*emphasis*` and `[text]{.name}` are character styles, `* * *` is a scene break, and `- [ ]` is a checklist item. The styles themselves live in `styles.json` in the book folder.
+
+## Typing shortcuts
+
+| Type | You get |
+| --- | --- |
+| `- ` at the start of a line | a list |
+| `-TD ` at the start of a line | a checklist |
+| `**text**`, `*text*`, `_text_` | Strong, Emphasis, Underline (also ⌘B, ⌘I, ⌘U) |
+| `--` | an em dash |
+| `"` and `'` | curly quotes |
+| `* * *` on its own line | a scene break |
+
+Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
 ## Running it
 
 You need Node 22. For the desktop app you also need Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your system.
@@ -44,7 +75,7 @@ You need Node 22. For the desktop app you also need Rust and the [Tauri prerequi
 npm install
 npm run dev          # browser version at http://localhost:1420
 npm run tauri dev    # desktop app
-npm test             # storage tests
+npm test             # storage, format and editor tests
 npm run build        # production web build, including the offline service worker
 ```
 

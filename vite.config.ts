@@ -13,6 +13,8 @@ export default defineConfig({
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
+        // Precache the fonts too, so the page looks right with no connection.
+        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
         manifest: {
           name: 'Cookbook',
           short_name: 'Cookbook',

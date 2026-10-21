@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { plainText } from '../editor/markdown';
-import { type CookbookDocument, akaOf, cardFieldsOf, portraitOf } from '../storage/document';
+import { type CookbookDocument } from '../storage/document';
+import { CardPreview } from './CardPreview';
 
 export interface PeekTarget {
   path: string;
@@ -11,22 +11,21 @@ interface Props {
   loadCard: (path: string) => Promise<CookbookDocument>;
   loadPicture: (path: string) => Promise<string>;
   onOpen: (path: string) => void;
+  onPin: (path: string) => void;
 }
 
 const HOVER_MS = 350;
 const LEAVE_MS = 250;
 const LONG_PRESS_MS = 450;
-const KIND_LABEL: Record<string, string> = { character: 'Character', setting: 'Setting', research: 'Research' };
 
 /**
  * Peeks at a Pantry card from a linked name in the text: hover on a desktop,
  * press and hold on a touch screen. Cast chips open it with a click. It reads
  * the card from its file, so it is always current.
  */
-export function NamePeek({ loadCard, loadPicture, onOpen }: Props) {
+export function NamePeek({ loadCard, loadPicture, onOpen, onPin }: Props) {
   const [target, setTarget] = useState<PeekTarget | null>(null);
   const [card, setCard] = useState<CookbookDocument | null>(null);
-  const [picture, setPicture] = useState<string | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -96,19 +95,6 @@ export function NamePeek({ loadCard, loadPicture, onOpen }: Props) {
     };
   }, [target?.path, loadCard]);
 
-  const portrait = card ? portraitOf(card.fields) : null;
-  useEffect(() => {
-    setPicture(null);
-    if (!portrait) return;
-    let url: string | null = null;
-    let live = true;
-    loadPicture(portrait).then((u) => (live ? setPicture((url = u)) : URL.revokeObjectURL(u)), () => {});
-    return () => {
-      live = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [portrait, loadPicture]);
-
   // Below the name, or above it when there is no room, and never off the side of the window.
   useLayoutEffect(() => {
     if (!target || !box.current) return setPos(null);
@@ -117,12 +103,9 @@ export function NamePeek({ loadCard, loadPicture, onOpen }: Props) {
     const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
     const top = r.bottom + 8 + height > window.innerHeight - 12 ? Math.max(12, r.top - 8 - height) : r.bottom + 8;
     setPos({ left, top });
-  }, [target, card, picture]);
+  }, [target, card]);
 
   if (!target) return null;
-  const fields = card ? cardFieldsOf(card.fields).filter(([, v]) => v.trim()).slice(0, 3) : [];
-  const aka = card ? akaOf(card.fields) : [];
-  const opening = card ? plainText(card.body).replace(/\s+/g, ' ').trim() : '';
 
   return (
     <div
@@ -139,25 +122,7 @@ export function NamePeek({ loadCard, loadPicture, onOpen }: Props) {
     >
       {card ? (
         <>
-          <div className="peek-head">
-            {picture && <img className="peek-picture" src={picture} alt="" />}
-            <div>
-              <span className="peek-kind">{KIND_LABEL[card.kind] ?? 'Card'}</span>
-              <strong className="peek-title">{card.title}</strong>
-              {aka.length > 0 && <span className="peek-aka">Also {aka.join(', ')}</span>}
-            </div>
-          </div>
-          {fields.length > 0 && (
-            <dl className="peek-fields">
-              {fields.map(([k, v]) => (
-                <div key={k}>
-                  <dt>{k.charAt(0).toUpperCase() + k.slice(1)}</dt>
-                  <dd>{v}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          {opening && <p className="peek-text">{opening.length > 180 ? `${opening.slice(0, 180).trimEnd()}…` : opening}</p>}
+          <CardPreview card={card} loadPicture={loadPicture} />
           <div className="peek-actions">
             <button
               className="pill pill-accent"
@@ -167,6 +132,15 @@ export function NamePeek({ loadCard, loadPicture, onOpen }: Props) {
               }}
             >
               Open in Pantry
+            </button>
+            <button
+              className="pill"
+              onClick={() => {
+                setTarget(null);
+                onPin(target.path);
+              }}
+            >
+              Pin beside draft
             </button>
           </div>
         </>

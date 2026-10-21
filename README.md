@@ -107,6 +107,16 @@ Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a 
 
 Every character's and setting's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. The card above each scene shows chips for the characters and settings it names, and each character or setting card lists the scenes it appears in, in Bookshelf order.
 
+### The Pantry shelf and pins
+
+Press ⌘J, click "Pantry shelf" in the footer, or type @ while writing to open the Pantry shelf: a quick search over every card, with the cards named in the open scene listed first. Its search covers names, nicknames and what's written inside cards. For the highlighted card you can:
+
+- Insert its name (Enter). After @, the name replaces the @, and typing towards a nickname inserts that nickname.
+- Pin it beside the draft (⌘Enter).
+- Open it in the Pantry (⌘⇧Enter).
+
+Pinned cards stay in the right-hand drawer, above Seasonings, until you unpin them. They're remembered for each book on this device. A name's peek can pin its card too.
+
 ## Starting points and goals
 
 A new book can start as a novel (chapters of scenes, plus a main character and setting in the Pantry), a short story, or nonfiction (chapters of sections, plus a note for sources). Under the Bookshelf, "New scene from template" offers a blank scene, a chapter opener or a letter. Under the Pantry, the same button makes character, setting and research cards.

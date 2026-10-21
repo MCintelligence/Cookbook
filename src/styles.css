@@ -190,6 +190,21 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* Linked names, peeks and cast chips */
 .cb-name { text-decoration: underline dotted color-mix(in srgb, #a84a28 55%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: help; }
 .cb-name[data-kind='setting'] { text-decoration-color: color-mix(in srgb, #6f8f4e 65%, transparent); }
+/* Proofreader underlines: spelling crimson, grammar blue, style purple. The page is always paper, so the colours are fixed. */
+.cb-issue { --issue: #c2264b; text-decoration: underline wavy var(--issue); text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-skip-ink: none; cursor: pointer; }
+.cb-issue-grammar { --issue: #2f6fb5; }
+.cb-issue-style { --issue: #7d4fb0; text-decoration-style: solid; text-decoration-thickness: 2px; }
+.issue-card { --issue: #c2264b; position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(90, 58, 34, 0.24); }
+.issue-spelling { --issue: #c2264b; }
+.issue-grammar { --issue: #2f6fb5; }
+.issue-style { --issue: #7d4fb0; }
+.issue-kind { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--issue); }
+.issue-message { margin: 0; font-size: 14px; }
+.issue-fixes { display: flex; flex-wrap: wrap; gap: 6px; }
+.issue-fix { min-height: 32px; padding: 0 12px; border-radius: 16px; border: none; background: color-mix(in srgb, var(--issue) 14%, var(--card)); color: var(--text); font-family: 'Literata', Georgia, serif; font-size: 14px; font-weight: 600; }
+.issue-fix:hover { background: color-mix(in srgb, var(--issue) 24%, var(--card)); }
+.issue-quiet { font-size: 13px; color: var(--muted); }
+.issue-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .card-details { flex-wrap: wrap; }
 .card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
 .cast-chip { min-height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line-strong); background: var(--paper); color: #3b2a20; font-size: 12px; font-weight: 700; }
@@ -327,6 +342,16 @@ button.seas-quote:hover { color: var(--accent); }
 .seas-meter span { background: var(--accent); }
 .seas-toggle { min-height: 34px; border-radius: 17px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 13px; font-weight: 700; }
 .seas-toggle[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+.seas-dialect { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--sidebar); }
+.seas-dialect button { flex: 1; min-height: 30px; border: none; border-radius: 7px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; }
+.seas-dialect button[aria-checked='true'] { background: var(--paper); color: #3b2a20; box-shadow: 0 1px 2px rgba(122, 82, 50, 0.18); }
+.seas-issue { border-left: 3px solid var(--issue); }
+.seas-issue .seas-quote { font-weight: 600; color: var(--text); font-size: 13px; }
+.seas-issue-word { font-family: 'Literata', Georgia, serif; font-weight: 700; color: var(--issue); }
+.seas-dictionary summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
+.seas-words { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.seas-word { display: inline-flex; align-items: center; gap: 2px; padding-left: 9px; border-radius: 13px; background: var(--bg); font-size: 13px; }
+.seas-word button { border: none; background: transparent; color: var(--muted); min-width: 26px; min-height: 26px; }
 
 /* Your books */
 .lib-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(59, 42, 32, 0.28); display: flex; align-items: flex-start; justify-content: center; padding: 72px 16px 16px; }
@@ -411,4 +436,7 @@ button.seas-quote:hover { color: var(--accent); }
   .seasonings-button .badge { margin-left: 4px; font-size: 11px; }
   .find { width: 200px; }
   .find-pop { width: min(420px, calc(100vw - 32px)); }
+  /* On a phone the suggestion card rises from the bottom, within reach of a thumb. */
+  .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: 16px 16px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+  .issue-fix, .issue-actions .pill { min-height: 44px; }
 }

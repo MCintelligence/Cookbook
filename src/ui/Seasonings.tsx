@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
   addNoteAnchor,
@@ -17,6 +17,10 @@ import {
   todos,
   type SeasoningsRequest,
 } from '../editor/seasonings';
+import { DIALECTS } from '../proofread/check';
+import { type FoundIssue, issuesOf, selectIssue } from '../proofread/plugin';
+import { type Proofreader } from '../proofread/useProofreader';
+import { IssueActions } from './IssueCard';
 
 export type SeasoningsTab = 'all' | 'proofread' | 'notes' | 'footnotes' | 'dialogue';
 
@@ -41,6 +45,7 @@ interface Props {
   request: (SeasoningsRequest & { at: number }) | null;
   onRequest: (r: SeasoningsRequest) => void;
   onClose: () => void;
+  proof: Proofreader;
 }
 
 /** How many things Seasonings has for the writer, for the badge on its button. */
@@ -53,8 +58,9 @@ export function useSeasoningsCount(editor: Editor | null, notes: Notes): number 
   return new Set([...Object.keys(notes), ...anchored.ids]).size + anchored.footnotes;
 }
 
-export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose }: Props) {
+export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose, proof }: Props) {
   const panel = useRef<HTMLDivElement>(null);
+  const [openIssue, setOpenIssue] = useState<string | null>(null);
   const scene = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -66,6 +72,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
         todos: todos(doc),
         dialogue: dialogueStats(doc),
         focus: isDialogueFocus(editor.state),
+        issues: issuesOf(editor.state),
       };
     },
   });
@@ -121,10 +128,55 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
       </div>
 
       {show('proofread') && (
-        <Section title="Proofread">
-          <div className="seas-card seas-quiet">
-            The proofreader is still in the oven. It will check spelling, grammar and style right here on this device.
+        <Section title="Proofread" count={scene.issues.length}>
+          <div className="seas-card seas-proof-settings">
+            <div className="seas-dialect" role="radiogroup" aria-label="Spelling">
+              {DIALECTS.map((d) => (
+                <button key={d.id} role="radio" aria-checked={proof.dialect === d.id} onClick={() => proof.setDialect(d.id)}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+            <span className="seas-hint">Checked on this device. Story names from the Pantry are always spelt right.</span>
           </div>
+          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix in the spelling here.</div>}
+          {scene.issues.map((i) => {
+            const key = issueKey(i);
+            return (
+              <div className={`seas-card seas-issue issue-${i.issue.kind}`} key={key}>
+                <button
+                  className="seas-quote"
+                  aria-expanded={openIssue === key}
+                  onClick={() => {
+                    setOpenIssue(openIssue === key ? null : key);
+                    selectIssue(editor, i);
+                  }}
+                >
+                  <span className="seas-issue-word">{i.word}</span> {i.issue.message}
+                </button>
+                {openIssue === key && <IssueActions editor={editor} issue={i} proof={proof} onDone={() => setOpenIssue(null)} />}
+              </div>
+            );
+          })}
+          <details className="seas-card seas-dictionary">
+            <summary>
+              Your dictionary · {proof.words.length} {proof.words.length === 1 ? 'word' : 'words'}
+            </summary>
+            {proof.words.length === 0 ? (
+              <span className="seas-hint">Words you add from a spelling card are kept in dictionary.txt in the book folder.</span>
+            ) : (
+              <div className="seas-words">
+                {[...proof.words].sort((a, b) => a.localeCompare(b, 'en')).map((w) => (
+                  <span className="seas-word" key={w}>
+                    {w}
+                    <button aria-label={`Remove ${w} from your dictionary`} onClick={() => proof.removeWord(w)}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </details>
         </Section>
       )}
 
@@ -205,6 +257,8 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
     </aside>
   );
 }
+
+const issueKey = (i: FoundIssue) => `${i.from}:${i.issue.rule}:${i.word}`;
 
 function Section({ title, count, detail, action, children }: { title: string; count?: number; detail?: string; action?: ReactNode; children: ReactNode }) {
   return (

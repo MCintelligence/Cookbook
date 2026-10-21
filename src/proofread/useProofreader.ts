@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
 import { type StorageAdapter } from '../storage/adapter';
-import { type Dialect, ignoreKey } from './check';
+import { type Dialect } from './check';
 import { WorkerChecker } from './client';
-import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview } from './plugin';
-import { type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
+import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
+import { BOOK_WIDE, type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
 
 export interface Proofreader {
   dialect: Dialect;
@@ -13,8 +13,14 @@ export interface Proofreader {
   words: string[];
   addWord: (word: string) => void;
   removeWord: (word: string) => void;
-  /** Leaves an issue alone in the open scene: that word, or for grammar and style, that rule on that text. */
-  ignore: (issue: FoundIssue) => void;
+  /** Leaves an issue alone just here, or everywhere in the book. */
+  ignore: (issue: FoundIssue, scope: 'once' | 'always') => void;
+  /** How many things are ignored in the book, and a way to bring them all back. */
+  ignoredCount: number;
+  clearIgnored: () => void;
+  /** Rule groups switched off (see rules.ts). */
+  off: string[];
+  setRuleOn: (rule: string, on: boolean) => void;
   suggest: (word: string) => Promise<string[]>;
 }
 
@@ -23,6 +29,9 @@ interface Options {
   /** The book's chosen spelling, if it has one. */
   dialect: Dialect | undefined;
   onDialect: (dialect: Dialect) => void;
+  /** Rule groups the book has switched off. */
+  off: string[] | undefined;
+  onOff: (off: string[]) => void;
   editor: Editor | null;
   /** The open scene or card, whose ignored words apply. */
   docId: string | null;
@@ -34,7 +43,7 @@ interface Options {
 }
 
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, names, review, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, onOff, editor, docId, names, review, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -96,9 +105,15 @@ export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, 
   }, [editor, review]);
 
   const sceneIgnored = docId ? ignored[docId] : undefined;
+  const bookIgnored = ignored[BOOK_WIDE];
   useEffect(() => {
-    if (editor) setIgnored(editor, sceneIgnored ?? []);
-  }, [editor, sceneIgnored]);
+    if (editor) setIgnored(editor, [...(bookIgnored ?? []), ...(sceneIgnored ?? [])]);
+  }, [editor, sceneIgnored, bookIgnored]);
+
+  const off = useMemo(() => offRules ?? [], [offRules]);
+  useEffect(() => {
+    if (editor) setRulesOff(editor, off);
+  }, [editor, off]);
 
   const saveWords = useCallback(
     (next: string[]) => {
@@ -118,15 +133,23 @@ export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, 
         if (!words.includes(word)) saveWords([...words, word]);
       },
       removeWord: (word) => saveWords(words.filter((w) => w !== word)),
-      ignore: (issue) => {
-        if (!docId) return;
-        const key = ignoreKey(issue.issue, issue.word);
-        const next = { ...ignored, [docId]: [...new Set([...(ignored[docId] ?? []), key])] };
+      ignore: (issue, scope) => {
+        const where = scope === 'always' ? BOOK_WIDE : docId;
+        if (!where) return;
+        const key = scope === 'always' ? issue.key : issue.once;
+        const next = { ...ignored, [where]: [...new Set([...(ignored[where] ?? []), key])] };
         setIgnoredWords(next);
         if (fs) saveIgnored(fs, next).catch(() => {});
       },
+      ignoredCount: Object.values(ignored).reduce((n, keys) => n + keys.length, 0),
+      clearIgnored: () => {
+        setIgnoredWords({});
+        if (fs) saveIgnored(fs, {}).catch(() => {});
+      },
+      off,
+      setRuleOn: (rule, on) => onOff(on ? off.filter((r) => r !== rule) : [...new Set([...off, rule])]),
       suggest: (word) => checker.current?.suggest(word) ?? Promise.resolve([]),
     }),
-    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs],
+    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, onOff],
   );
 }

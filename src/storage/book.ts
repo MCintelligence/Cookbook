@@ -34,6 +34,8 @@ export interface BookInfo {
   dailyGoal?: number;
   /** American or British spelling, for the proofreader. */
   dialect?: 'en-US' | 'en-GB';
+  /** Proofreader checks the writer switched off. */
+  proofreadOff?: string[];
 }
 
 export const DEFAULT_DAILY_GOAL = 1000;
@@ -71,6 +73,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     created: info.created ?? '',
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
     ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
+    ...(Array.isArray(info.proofreadOff) && { proofreadOff: info.proofreadOff.filter((r): r is string => typeof r === 'string') }),
   };
 }
 

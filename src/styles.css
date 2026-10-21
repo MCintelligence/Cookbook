@@ -208,6 +208,8 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .issue-fix:hover { background: color-mix(in srgb, var(--issue) 24%, var(--card)); }
 .issue-quiet { font-size: 13px; color: var(--muted); }
 .issue-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.issue-off { align-self: flex-start; border: none; background: transparent; padding: 0; font-size: 12px; font-weight: 700; color: var(--muted); }
+.issue-off:hover { color: var(--accent); }
 .issue-why { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); font-size: 13px; line-height: 1.45; color: var(--muted); }
 .card-details { flex-wrap: wrap; }
 .card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
@@ -353,6 +355,13 @@ button.seas-quote:hover { color: var(--accent); }
 .seas-issue { border-left: 3px solid var(--issue); }
 .seas-issue .seas-quote { font-weight: 600; color: var(--text); font-size: 13px; }
 .seas-issue-word { font-family: 'Literata', Georgia, serif; font-weight: 700; color: var(--issue); }
+.seas-kinds { display: flex; gap: 6px; }
+.seas-kind { flex: 1; min-height: 34px; border-radius: 17px; border: 1px solid color-mix(in srgb, var(--issue) 40%, transparent); background: var(--card); color: var(--text); font-size: 13px; }
+.seas-kind strong { color: var(--issue); }
+.seas-kind[aria-pressed='true'] { background: color-mix(in srgb, var(--issue) 16%, var(--card)); border-color: var(--issue); }
+.seas-rules { border: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.seas-rules legend { padding: 0; margin-bottom: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.seas-link { border: none; background: transparent; padding: 0; font: inherit; font-weight: 700; color: var(--accent); text-decoration: underline; }
 .seas-dictionary summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); }
 .seas-words { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .seas-word { display: inline-flex; align-items: center; gap: 2px; padding-left: 9px; border-radius: 13px; background: var(--bg); font-size: 13px; }

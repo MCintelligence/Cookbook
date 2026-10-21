@@ -8,7 +8,7 @@ import { cookbookExtensions } from '../editor/extensions';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from '../editor/markdown';
 import { type Issue, checkSpelling } from './check';
 import { type Checker } from './client';
-import { applySuggestion, drawnSet, forgetWord, issueAt, issuesOf, setChecker, setIgnored, setReview } from './plugin';
+import { applySuggestion, drawnSet, forgetWord, issueAt, issuesOf, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
 
 const speller = nspell({ aff: readFileSync('public/dictionaries/en-US.aff'), dic: readFileSync('public/dictionaries/en-US.dic') });
 const names = ['Mama Lou'];
@@ -130,6 +130,21 @@ describe('proofreading in the editor', () => {
     setIgnored(editor, []);
     setReview(editor, false);
     expect(shown(editor)).toEqual(['Teh']);
+  });
+
+  it('can ignore one occurrence, and switch checks off', async () => {
+    const editor = make('Ate a apple. Ate a orange.');
+    setChecker(editor, checker().c);
+    setReview(editor, true);
+    await settle();
+    const [first] = issuesOf(editor.state);
+    setIgnored(editor, [first!.once]);
+    expect(issuesOf(editor.state).map((i) => i.from)).toEqual([18]);
+    setIgnored(editor, []);
+    setRulesOff(editor, ['grammar']);
+    expect(shown(editor)).toEqual([]);
+    setRulesOff(editor, []);
+    expect(shown(editor)).toEqual(['a', 'a']);
   });
 
   it('stops underlining when switched off', async () => {

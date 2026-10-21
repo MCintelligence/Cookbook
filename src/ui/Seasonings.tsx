@@ -18,7 +18,8 @@ import {
   todos,
   type SeasoningsRequest,
 } from '../editor/seasonings';
-import { DIALECTS } from '../proofread/check';
+import { DIALECTS, type IssueKind } from '../proofread/check';
+import { RULE_GROUPS } from '../proofread/rules';
 import { type FoundIssue, issuesOf, selectIssue } from '../proofread/plugin';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
@@ -63,6 +64,7 @@ export function useSeasoningsCount(editor: Editor | null, notes: Notes): number 
 export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose, proof }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const [openIssue, setOpenIssue] = useState<string | null>(null);
+  const [kindFilter, setKindFilter] = useState<IssueKind | null>(null);
   const scene = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -151,7 +153,25 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
             <span className="seas-hint">Spelling, grammar and style are checked on this device. Story names from the Pantry are always spelt right.</span>
           </div>
           {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix here. Spelling, grammar and style all look good.</div>}
-          {scene.issues.map((i) => {
+          {scene.issues.length > 0 && (
+            <div className="seas-kinds" role="group" aria-label="Show">
+              {KINDS.map((k) => {
+                const n = scene.issues.filter((i) => i.issue.kind === k.id).length;
+                return (
+                  <button
+                    key={k.id}
+                    className={`seas-kind issue-${k.id}`}
+                    aria-pressed={kindFilter === k.id}
+                    disabled={n === 0}
+                    onClick={() => setKindFilter(kindFilter === k.id ? null : k.id)}
+                  >
+                    <strong>{n}</strong> {k.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {scene.issues.filter((i) => !kindFilter || i.issue.kind === kindFilter).map((i) => {
             const key = issueKey(i);
             return (
               <div className={`seas-card seas-issue issue-${i.issue.kind}`} key={key}>
@@ -169,6 +189,32 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
               </div>
             );
           })}
+          <details className="seas-card seas-dictionary">
+            <summary>Checks</summary>
+            {RULE_GROUPS.map((g) => (
+              <fieldset className="seas-rules" key={g.title}>
+                <legend>{g.title}</legend>
+                {g.rules.map((r) => (
+                  <label className="seas-todo" key={r.id}>
+                    <input type="checkbox" checked={!proof.off.includes(r.id)} onChange={(e) => proof.setRuleOn(r.id, e.target.checked)} />
+                    <span>{r.label}</span>
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+            <span className="seas-hint">
+              Grammar and style are checked while Seasonings is open; spelling all the time.
+              {proof.ignoredCount > 0 && (
+                <>
+                  {' '}
+                  {proof.ignoredCount} ignored.{' '}
+                  <button className="seas-link" onClick={proof.clearIgnored}>
+                    Show them again
+                  </button>
+                </>
+              )}
+            </span>
+          </details>
           <details className="seas-card seas-dictionary">
             <summary>
               Your dictionary · {proof.words.length} {proof.words.length === 1 ? 'word' : 'words'}
@@ -290,6 +336,12 @@ const shortQuote = (text: string) => {
   const ws = t.split(/\s+/);
   return ws.length > 6 ? `${ws.slice(0, 6).join(' ')}…` : t;
 };
+
+const KINDS: { id: IssueKind; label: string }[] = [
+  { id: 'spelling', label: 'spelling' },
+  { id: 'grammar', label: 'grammar' },
+  { id: 'style', label: 'style' },
+];
 
 const issueKey = (i: FoundIssue) => `${i.from}:${i.issue.rule}:${i.word}`;
 

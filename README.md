@@ -149,6 +149,8 @@ Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running o
 
 Style notes are purple and also appear only while reviewing. They are Cookbook's own checks (`src/proofread/style.ts`): adverbs, simpler words, passive voice, crutch words, echoes, clichés and redundancies are underlined, and hard, very hard and sticky sentences are tinted. Adverbs and crutch words inside dialogue are left alone, since that's how people talk. The Proofread tab shows the scene's grade level (the Automated Readability Index, as Hemingway uses).
 
+You're in charge of all of it. Every check can be switched off for the book, from the Proofread tab or with “Stop checking…” on a card, and the choice is saved in `book.json`. Ignore leaves one issue alone where it is; Ignore everywhere leaves that rule on those words alone in the whole book. The Proofread tab counts the scene's spelling, grammar and style issues, can show one kind at a time, and can bring back everything you ignored.
+
 The word lists come from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) (MIT and BSD); their licences are in `public/dictionaries/`.
 
 ## Running it

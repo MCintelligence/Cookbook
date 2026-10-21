@@ -38,6 +38,7 @@ import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setName
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
+import { Manuscript } from './ui/Manuscript';
 import {
   type BookLocation,
   DEFAULT_BOOK,
@@ -143,6 +144,8 @@ export function App() {
   /** The Pantry shelf, and where the @ that opened it is. */
   const [shelf, setShelf] = useState<{ at: number | null } | null>(null);
   const [pins, setPinsState] = useState<string[]>([]);
+  /** The Bookshelf being read as one manuscript, or null while writing. */
+  const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -371,6 +374,7 @@ export function App() {
     if (p.startsWith(PANTRY + '/')) setTab('pantry');
     else if (p.startsWith(BOOKSHELF + '/')) setTab('book');
     const opened = await readDocument(fs, p);
+    setManuscript(null);
     docRef.current = opened;
     savedWords.current = sceneWords(opened);
     setUndoLog(await readUndoLog(fs, opened.id));
@@ -493,6 +497,12 @@ export function App() {
     const updated = withField(base, key, value);
     setDoc(updated);
     scheduleSave(updated);
+  };
+
+  const readManuscript = async () => {
+    if (!fs) return;
+    await flushSave();
+    setManuscript(await readTree(fs, BOOKSHELF, order.current));
   };
 
   const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
@@ -754,6 +764,11 @@ export function App() {
           onRename={(p, title) => void renameInTree(p, title)}
         />
         )}
+        {tab === 'book' && (
+          <button className="ms-open" aria-pressed={manuscript !== null} onClick={() => (manuscript ? setManuscript(null) : void readManuscript())}>
+            {manuscript ? 'Back to writing' : 'Read the whole manuscript'}
+          </button>
+        )}
         <TemplateMenu
           label={tab === 'book' ? 'New scene from template' : 'New card from template'}
           templates={tab === 'book' ? SCENE_TEMPLATES : CARD_TEMPLATES}
@@ -767,56 +782,62 @@ export function App() {
             {error}
           </p>
         )}
-        {doc && path && doc.kind === 'scene' && (
-          <CardDetails
-            status={statusOf(doc.fields)}
-            synopsis={synopsisOf(doc.fields)}
-            onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)}
-            onSynopsis={(text) => setCardField('synopsis', text)}
-            cast={cast}
-          />
-        )}
-        {doc && path && doc.kind !== 'scene' && (
-          <PantryCard
-            doc={doc}
-            choices={cardChoices}
-            incoming={incoming}
-            appearsIn={appearsIn}
-            loadPicture={loadPicture}
-            onChange={(next) => {
-              setDoc(next);
-              scheduleSave(next);
-            }}
-            onPickPortrait={(file) => void pickPortrait(file)}
-            onOpen={(p) => void select(p)}
-          />
-        )}
-        {doc && path ? (
-          <article className="cb-page" key={path}>
-            <input
-              className="scene-title"
-              aria-label={doc.kind === 'scene' ? 'Scene title' : 'Card name'}
-              value={doc.title}
-              onChange={(e) => {
-                const next = { ...(docRef.current ?? doc), title: e.target.value };
+        {manuscript && fs ? (
+          <Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} />
+        ) : (
+          <>
+          {doc && path && doc.kind === 'scene' && (
+            <CardDetails
+              status={statusOf(doc.fields)}
+              synopsis={synopsisOf(doc.fields)}
+              onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)}
+              onSynopsis={(text) => setCardField('synopsis', text)}
+              cast={cast}
+            />
+          )}
+          {doc && path && doc.kind !== 'scene' && (
+            <PantryCard
+              doc={doc}
+              choices={cardChoices}
+              incoming={incoming}
+              appearsIn={appearsIn}
+              loadPicture={loadPicture}
+              onChange={(next) => {
                 setDoc(next);
                 scheduleSave(next);
               }}
+              onPickPortrait={(file) => void pickPortrait(file)}
+              onOpen={(p) => void select(p)}
             />
-            <PageEditor
-              initialBody={doc.body}
-              undoLog={undoLog}
-              onRecorder={onRecorder}
-              nextStyle={nextStyle}
-              onReady={setEditor}
-              onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
-              onSeasonings={showInSeasonings}
-            />
-            <PageFootnotes editor={editor} />
-            <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
-          </article>
-        ) : (
-          <p className="empty">Pick a scene from the Bookshelf to start writing.</p>
+          )}
+          {doc && path ? (
+            <article className="cb-page" key={path}>
+              <input
+                className="scene-title"
+                aria-label={doc.kind === 'scene' ? 'Scene title' : 'Card name'}
+                value={doc.title}
+                onChange={(e) => {
+                  const next = { ...(docRef.current ?? doc), title: e.target.value };
+                  setDoc(next);
+                  scheduleSave(next);
+                }}
+              />
+              <PageEditor
+                initialBody={doc.body}
+                undoLog={undoLog}
+                onRecorder={onRecorder}
+                nextStyle={nextStyle}
+                onReady={setEditor}
+                onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
+                onSeasonings={showInSeasonings}
+              />
+              <PageFootnotes editor={editor} />
+              <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
+            </article>
+          ) : (
+            <p className="empty">Pick a scene from the Bookshelf to start writing.</p>
+          )}
+          </>
         )}
       </main>
 

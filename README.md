@@ -86,6 +86,8 @@ Drag a card or folder to reorder it, or drop it onto a folder to move it inside.
 
 The open scene's status and synopsis are on the card above the page, so they never end up in the manuscript.
 
+"Read the whole manuscript", under the Bookshelf, shows every scene in order as one document, under its chapter headings, with the total words and an estimated reading time. Click a scene's title to go back to writing in it.
+
 ## The Pantry
 
 The Pantry holds characters, settings and research. Each section can hold your own folders, nested as deep as you like, and cards drag between them like scenes do. The Pantry has its own search, which also looks at nicknames and fields, plus filters for each section.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type StorageAdapter } from './storage/adapter';
+import { type StorageAdapter, parentOf } from './storage/adapter';
 import {
   BOOKSHELF,
   PANTRY,
@@ -8,7 +8,9 @@ import {
   type TreeNode,
   createBook,
   createDocument,
+  fileAfter,
   fileNameFor,
+  moveToTrash,
   openBook,
   readDocument,
   readTree,
@@ -31,7 +33,11 @@ import {
 import { type ParagraphStyle, type StyleSheet, defaultStyles, loadStyles, paragraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles/styles';
 import { PageEditor } from './editor/PageEditor';
 import { type SeasoningsRequest } from './editor/seasonings';
+import { type UndoLog, type UndoRecorder, readUndoLog, writeUndoLog } from './editor/undoLog';
+import { undoDepth } from '@tiptap/pm/history';
+import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/scenes';
 import { BookLibrary } from './ui/BookLibrary';
+import { SceneBreakActions } from './ui/SceneBreakActions';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes } from './ui/PageFootnotes';
 import { type Notes, Seasonings, type SeasoningsTab, useSeasoningsCount } from './ui/Seasonings';
@@ -45,6 +51,8 @@ const SAVE_DELAY_MS = 600;
 /** The search index is cheap to rebuild, so it is written back less often than scenes. */
 const INDEX_SAVE_DELAY_MS = 5000;
 const NOT_A_BOOK = 'This folder is not a Cookbook book.';
+/** The undo log is bigger than the scene, so it is written at most this often while typing. */
+const UNDO_SAVE_INTERVAL_MS = 10_000;
 
 /** Notes to self live in the scene's front matter, keyed by the id of their anchor in the text. */
 function readNotes(doc: CookbookDocument | null): Notes {
@@ -111,6 +119,7 @@ export function App() {
    */
   const openAt = async (target: BookLocation, mode: { create?: string; adopt?: boolean } = {}) => {
     await flushSave();
+    await saveUndoNow();
     await saveIndexNow();
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
@@ -226,6 +235,26 @@ export function App() {
     void refreshTree();
   }, [refreshTree]);
 
+  const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
+  const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
+
+  const onRecorder = useCallback(
+    (r: UndoRecorder | null) => {
+      const scene = docRef.current;
+      recorder.current = r && fs && scene ? { recorder: r, fs, id: scene.id, saved: r.version, at: Date.now() } : null;
+    },
+    [fs],
+  );
+
+  const saveUndoNow = useCallback(async () => {
+    const r = recorder.current;
+    if (!r || r.recorder.version === r.saved) return;
+    const version = r.recorder.version;
+    await writeUndoLog(r.fs, r.id, r.recorder.toJSON()).catch(() => {});
+    r.saved = version;
+    r.at = Date.now();
+  }, []);
+
   const flushSave = useCallback(async () => {
     window.clearTimeout(saveTimer.current);
     const save = pendingSave.current;
@@ -236,7 +265,7 @@ export function App() {
   useEffect(() => {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
     const onHide = () => {
-      void flushSave();
+      void flushSave().then(saveUndoNow);
       void saveIndexNow();
     };
     window.addEventListener('pagehide', onHide);
@@ -245,7 +274,7 @@ export function App() {
       window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onHide);
     };
-  }, [flushSave, saveIndexNow]);
+  }, [flushSave, saveIndexNow, saveUndoNow]);
 
   const scheduleSave = (next: CookbookDocument) => {
     if (!fs || !path) return;
@@ -258,6 +287,7 @@ export function App() {
         current.index.upsert(toIndexed(target, next, await fs.stamp(target)));
         indexChanged();
       }
+      if (recorder.current && Date.now() - recorder.current.at > UNDO_SAVE_INTERVAL_MS) await saveUndoNow();
     };
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => void flushSave(), SAVE_DELAY_MS);
@@ -266,10 +296,12 @@ export function App() {
   const select = async (p: string) => {
     if (!fs) return;
     await flushSave();
+    await saveUndoNow();
     if (p.startsWith(PANTRY + '/')) setTab('pantry');
     else if (p.startsWith(BOOKSHELF + '/')) setTab('book');
     const opened = await readDocument(fs, p);
     docRef.current = opened;
+    setUndoLog(await readUndoLog(fs, opened.id));
     setPath(p);
     setDoc(opened);
   };
@@ -283,6 +315,42 @@ export function App() {
     indexChanged();
     await refreshTree();
     await select(p);
+  };
+
+  const next = path ? fileAfter(tree, path) : null;
+
+  /** Turns everything after a scene break into a new scene that comes right after this one. */
+  const splitScene = async (pos: number) => {
+    const scene = docRef.current;
+    if (!fs || !path || !editor || !scene) return;
+    const moved = splitAtBreak(editor, pos);
+    if (moved === null) return;
+    const { stay, go } = partitionNotes(readNotes(scene), moved);
+    setNotes(stay);
+    await flushSave();
+    const title = `${scene.title}, part 2`;
+    const p = await createDocument(fs, parentOf(path), title, scene.kind);
+    const created = await readDocument(fs, p);
+    await writeDocument(fs, p, { ...created, body: moved, fields: Object.keys(go).length > 0 ? { notes: go } : {} });
+    index.current?.index.upsert(toIndexed(p, { ...created, body: moved }, await fs.stamp(p)));
+    indexChanged();
+    await refreshTree();
+  };
+
+  /** Adds the next scene in this folder to the end of this one, and puts its file in the trash. */
+  const mergeNext = async () => {
+    const scene = docRef.current;
+    if (!fs || !path || !editor || !scene || !next) return;
+    await flushSave();
+    const incoming = await readDocument(fs, next.path);
+    const merged = mergeNotes(readNotes(scene), scene.body, readNotes(incoming), incoming.body);
+    appendScene(editor, merged.text);
+    setNotes(merged.notes);
+    await flushSave();
+    await moveToTrash(fs, next.path);
+    index.current?.index.remove(next.path);
+    indexChanged();
+    await refreshTree();
   };
 
   const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
@@ -314,6 +382,7 @@ export function App() {
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
+  const undoSteps = useEditorState({ editor, selector: ({ editor }) => (editor ? undoDepth(editor.state) : 0) }) ?? 0;
   const words = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? countWords(editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ')) : 0),
@@ -395,12 +464,15 @@ export function App() {
             />
             <PageEditor
               initialBody={doc.body}
+              undoLog={undoLog}
+              onRecorder={onRecorder}
               nextStyle={nextStyle}
               onReady={setEditor}
               onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
               onSeasonings={showInSeasonings}
             />
             <PageFootnotes editor={editor} />
+            <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
           </article>
         ) : (
           <p className="empty">Pick a scene from the Bookshelf to start writing.</p>
@@ -448,6 +520,7 @@ export function App() {
       <footer className="footer">
         <span>{doc ? `${(words ?? 0).toLocaleString('en')} words` : ''}</span>
         <span>
+          {doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing · ` : ''}
           {doc ? 'US Letter · 100% · ' : ''}
           {where}
         </span>

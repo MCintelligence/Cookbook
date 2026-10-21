@@ -20,7 +20,7 @@ My Book/
     characters/
     settings/
     research/
-  .cookbook/       search index (index.sqlite) and undo history; safe to delete, Cookbook rebuilds it
+  .cookbook/       hidden: search index, undo history and trash (see below)
 ```
 
 Every scene and card is a Markdown file with a small YAML header:
@@ -72,6 +72,14 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
 Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
+## Undo, splitting and merging
+
+Undo reaches back past closing a scene or the app. Each scene's changes are logged in `.cookbook/undo/`, and opening the scene replays them, so ⌘Z picks up where you left off. If a scene's file was changed in another app, its undo history starts fresh; your text is never touched.
+
+Click a scene break (`* * *`) to split the scene there, so everything after it becomes a new scene right after this one, or to merge the next scene into this one. A merged scene's file goes to `.cookbook/trash/` rather than being deleted. Its notes and footnotes come along.
+
+Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and you only lose undo history and the trash.
 
 ## Seasonings
 

@@ -70,7 +70,9 @@ export async function readTree(fs: StorageAdapter, folder: string): Promise<Tree
   const entries = (await fs.list(folder)).filter(
     (e) => isVisible(e.name) && (e.kind === 'folder' || e.name.endsWith('.md')),
   );
-  entries.sort((a, b) => (a.kind === b.kind ? collator.compare(a.name, b.name) : a.kind === 'folder' ? -1 : 1));
+  // Compare names without ".md", so "Supper" comes before "Supper, part 2".
+  const stem = (name: string) => name.replace(/\.md$/, '');
+  entries.sort((a, b) => (a.kind === b.kind ? collator.compare(stem(a.name), stem(b.name)) : a.kind === 'folder' ? -1 : 1));
   return Promise.all(
     entries.map(async (e) => {
       const path = joinPath(folder, e.name);
@@ -118,4 +120,22 @@ export function* walkFiles(nodes: TreeNode[]): Generator<TreeNode> {
     if (node.kind === 'file') yield node;
     else yield* walkFiles(node.children ?? []);
   }
+}
+
+/** The file that follows `path` in its folder, if any. */
+export function fileAfter(nodes: TreeNode[], path: string): TreeNode | null {
+  const i = nodes.findIndex((n) => n.path === path);
+  if (i !== -1) return nodes.slice(i + 1).find((n) => n.kind === 'file') ?? null;
+  const folder = nodes.find((n) => n.kind === 'folder' && path.startsWith(n.path + '/'));
+  return folder ? fileAfter(folder.children ?? [], path) : null;
+}
+
+/** Moves a file into the hidden trash rather than deleting it, so nothing is ever lost by a click. */
+export async function moveToTrash(fs: StorageAdapter, path: string, now = new Date()): Promise<string> {
+  const trash = joinPath(HIDDEN_FOLDER, 'trash');
+  await fs.makeFolder(trash);
+  const stamp = now.toISOString().replace(/[:.]/g, '-');
+  const target = joinPath(trash, `${stamp} ${baseName(path)}`);
+  await fs.rename(path, target);
+  return target;
 }

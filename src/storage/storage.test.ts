@@ -10,6 +10,8 @@ import {
   readDocument,
   readTree,
   writeDocument,
+  fileAfter,
+  moveToTrash,
 } from './book';
 import { BookIndex, INDEX_FILE, MATCH_END, MATCH_START, countWords, loadIndex, refreshIndex, saveIndex, toFtsQuery } from './index';
 
@@ -195,5 +197,29 @@ describe('hidden index', () => {
 
   it('turns typed words into a safe prefix query', () => {
     expect(toFtsQuery('Mama "Lou" OR*')).toBe('"mama"* "lou"* "or"*');
+  });
+});
+
+describe('scene order and trash', () => {
+  it('puts a continued scene right after the original', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    await fs.makeFolder('bookshelf/Chapter 1');
+    for (const t of ['Supper, part 2', 'Supper', 'Breakfast', 'Supper 10', 'Supper 9']) await createDocument(fs, 'bookshelf/Chapter 1', t);
+    const tree = await readTree(fs, 'bookshelf');
+    expect(tree[0]!.children!.map((n) => n.name)).toEqual(['Breakfast.md', 'Supper.md', 'Supper 9.md', 'Supper 10.md', 'Supper, part 2.md']);
+    expect(fileAfter(tree, 'bookshelf/Chapter 1/Supper.md')?.name).toBe('Supper 9.md');
+    expect(fileAfter(tree, 'bookshelf/Chapter 1/Supper, part 2.md')).toBeNull();
+    expect(fileAfter(tree, 'bookshelf/Elsewhere.md')).toBeNull();
+  });
+
+  it('moves files to the hidden trash instead of deleting them', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const p = await createDocument(fs, 'bookshelf', 'Gone');
+    const to = await moveToTrash(fs, p, new Date('2026-10-21T12:00:00Z'));
+    expect(to).toBe('.cookbook/trash/2026-10-21T12-00-00-000Z Gone.md');
+    expect(await fs.exists(p)).toBe(false);
+    expect(await fs.exists(to)).toBe(true);
   });
 });

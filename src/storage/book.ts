@@ -1,5 +1,6 @@
-import { type StorageAdapter, joinPath, baseName } from './adapter';
+import { type StorageAdapter, joinPath, baseName, parentOf } from './adapter';
 import { type CookbookDocument, type DocumentKind, newId, parseDocument, serializeDocument } from './document';
+import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder, sortEntries } from './order';
 
 /**
  * A book is a plain folder the writer owns:
@@ -14,8 +15,8 @@ import { type CookbookDocument, type DocumentKind, newId, parseDocument, seriali
  *       research/
  *     .cookbook/         hidden index and undo history; always safe to delete
  *
- * Folders and files sort by name using natural order ("2" before "10"), so a
- * writer can reorder by renaming, even outside the app.
+ * The order of scenes and folders is kept in order.json (see order.ts).
+ * Anything it does not list sorts by name in natural order ("2" before "10").
  */
 export const BOOK_FILE = 'book.json';
 export const HIDDEN_FOLDER = '.cookbook';
@@ -80,28 +81,98 @@ export async function saveBookInfo(fs: StorageAdapter, info: BookInfo): Promise<
   await fs.writeText(BOOK_FILE, JSON.stringify({ ...existing, ...info }, null, 2) + '\n');
 }
 
-const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
-
 function isVisible(name: string): boolean {
   return !name.startsWith('.') && !name.endsWith('.cookbook-tmp');
 }
 
-/** The Bookshelf or Pantry as a tree, folders first. */
-export async function readTree(fs: StorageAdapter, folder: string): Promise<TreeNode[]> {
+/** The Bookshelf or Pantry as a tree, in the writer's order. */
+export async function readTree(fs: StorageAdapter, folder: string, order: Order = {}): Promise<TreeNode[]> {
   const entries = (await fs.list(folder)).filter(
     (e) => isVisible(e.name) && (e.kind === 'folder' || e.name.endsWith('.md')),
   );
-  // Compare names without ".md", so "Supper" comes before "Supper, part 2".
-  const stem = (name: string) => name.replace(/\.md$/, '');
-  entries.sort((a, b) => (a.kind === b.kind ? collator.compare(stem(a.name), stem(b.name)) : a.kind === 'folder' ? -1 : 1));
   return Promise.all(
-    entries.map(async (e) => {
+    sortEntries(entries, order[folder]).map(async (e) => {
       const path = joinPath(folder, e.name);
       return e.kind === 'folder'
-        ? { name: e.name, path, kind: e.kind, children: await readTree(fs, path) }
+        ? { name: e.name, path, kind: e.kind, children: await readTree(fs, path, order) }
         : { name: e.name, path, kind: e.kind };
     }),
   );
+}
+
+/** What a folder holds, in order. `root` is the folder the tree was read from. */
+export function childrenOf(nodes: TreeNode[], root: string, folder: string): TreeNode[] {
+  if (folder === root) return nodes;
+  for (const n of nodes) {
+    if (n.kind !== 'folder') continue;
+    if (n.path === folder) return n.children ?? [];
+    if (folder.startsWith(n.path + '/')) return childrenOf(n.children ?? [], n.path, folder);
+  }
+  return [];
+}
+
+/**
+ * Moves a scene or folder to `index` among what `folder` holds now (counting
+ * the item itself if it is already there). The file is renamed only when
+ * another one in the new folder has its name.
+ */
+export async function moveItem(
+  fs: StorageAdapter,
+  order: Order,
+  tree: TreeNode[],
+  root: string,
+  from: string,
+  folder: string,
+  index: number,
+): Promise<{ path: string; order: Order }> {
+  if (folder === from || folder.startsWith(from + '/')) throw new Error('A folder cannot go inside itself.');
+  const current = childrenOf(tree, root, folder).map((n) => n.name);
+  let name = baseName(from);
+  let path = from;
+  let next = order;
+  if (parentOf(from) === folder) {
+    const was = current.indexOf(name);
+    if (was !== -1 && was < index) index--;
+  } else {
+    name = await freeName(fs, folder, name);
+    path = joinPath(folder, name);
+    await fs.rename(from, path);
+    next = moveFolderKeys(forgetItem(next, from), from, path);
+  }
+  next = placeItem(next, folder, current, name, index);
+  await saveOrder(fs, next);
+  return { path, order: next };
+}
+
+/** Renames a folder in place, keeping its spot. */
+export async function renameFolder(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, from: string, title: string): Promise<{ path: string; order: Order }> {
+  const folder = parentOf(from);
+  const wanted = fileNameFor(title);
+  if (wanted === baseName(from)) return { path: from, order };
+  const name = await freeName(fs, folder, wanted);
+  const current = childrenOf(tree, root, folder).map((n) => (n.path === from ? name : n.name));
+  const path = joinPath(folder, name);
+  await fs.rename(from, path);
+  const next = placeItem(moveFolderKeys(order, from, path), folder, current, name, current.indexOf(name));
+  await saveOrder(fs, next);
+  return { path, order: next };
+}
+
+/** Puts a newly made scene, card or folder right after `after`, or at the end of its folder. */
+export async function placeNew(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, path: string, after: string | null): Promise<Order> {
+  const folder = parentOf(path);
+  const current = childrenOf(tree, root, folder).map((n) => n.name).filter((n) => n !== baseName(path));
+  const at = after && parentOf(after) === folder ? current.indexOf(baseName(after)) + 1 : current.length;
+  const next = placeItem(order, folder, current, baseName(path), at > 0 ? at : current.length);
+  await saveOrder(fs, next);
+  return next;
+}
+
+/** Makes a new folder, named "New folder" (or "New folder 2"…), and returns its path. */
+export async function createFolder(fs: StorageAdapter, parent: string, title = 'New folder'): Promise<string> {
+  const path = joinPath(parent, await freeName(fs, parent, fileNameFor(title)));
+  await fs.makeFolder(path);
+  return path;
 }
 
 export async function readDocument(fs: StorageAdapter, path: string): Promise<CookbookDocument> {

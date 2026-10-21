@@ -9,16 +9,21 @@ import {
   createBook,
   DEFAULT_DAILY_GOAL,
   createDocument,
+  createFolder,
   fileAfter,
   fileNameFor,
+  moveItem,
   moveToTrash,
   openBook,
+  placeNew,
   readDocument,
   readTree,
+  renameFolder,
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument } from './storage/document';
+import { type CookbookDocument, type SceneStatus, statusOf, synopsisOf, withField } from './storage/document';
+import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { plainText } from './editor/markdown';
@@ -52,6 +57,7 @@ import { type Notes, Seasonings, type SeasoningsTab, useSeasoningsCount } from '
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { Tree } from './ui/Tree';
+import { CardDetails } from './ui/CardDetails';
 
 type Tab = 'book' | 'pantry';
 
@@ -116,6 +122,8 @@ export function App() {
   const index = useRef<{ fs: StorageAdapter; index: BookIndex } | null>(null);
   const indexTimer = useRef<number | undefined>(undefined);
   const [indexVersion, setIndexVersion] = useState(0);
+  const order = useRef<Order>({});
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -161,6 +169,7 @@ export function App() {
     setBook(info);
     setSheet(await loadStyles(nextFs));
     setHistory(await loadHistory(nextFs));
+    order.current = await loadOrder(nextFs);
     setFs(nextFs);
     setWhere(nextWhere);
     setLocation(target);
@@ -245,9 +254,10 @@ export function App() {
     })().catch((e: unknown) => setError(String(e)));
   }, []);
 
+  const root = tab === 'book' ? BOOKSHELF : PANTRY;
   const refreshTree = useCallback(async () => {
-    if (fs) setTree(await readTree(fs, tab === 'book' ? BOOKSHELF : PANTRY));
-  }, [fs, tab]);
+    if (fs) setTree(await readTree(fs, root, order.current));
+  }, [fs, root]);
 
   useEffect(() => {
     void refreshTree();
@@ -356,6 +366,7 @@ export function App() {
   const addFrom = async (template: DocTemplate, folder: string) => {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
+    if (p.startsWith(root + '/')) order.current = await placeNew(fs, order.current, tree, root, p, path);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
@@ -377,6 +388,7 @@ export function App() {
     await flushSave().finally(() => (movingWords.current = false));
     const title = `${scene.title}, part 2`;
     const p = await createDocument(fs, parentOf(path), title, scene.kind);
+    if (p.startsWith(root + '/')) order.current = await placeNew(fs, order.current, tree, root, p, path);
     const created = await readDocument(fs, p);
     await writeDocument(fs, p, { ...created, body: moved, fields: Object.keys(go).length > 0 ? { notes: go } : {} });
     index.current?.index.upsert(toIndexed(p, { ...created, body: moved }, await fs.stamp(p)));
@@ -399,6 +411,63 @@ export function App() {
     index.current?.index.remove(next.path);
     indexChanged();
     await refreshTree();
+  };
+
+  /** Keeps the open scene, the index and closed folders pointing at a file or folder that moved. */
+  const followMove = (from: string, to: string) => {
+    if (from === to) return;
+    index.current?.index.move(from, to);
+    indexChanged();
+    const moved = (p: string) => p === from || p.startsWith(from + '/');
+    if (path && moved(path)) setPath(to + path.slice(from.length));
+  };
+
+  const moveInTree = async (from: string, folder: string, at: number) => {
+    if (!fs) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      const moved = await moveItem(fs, order.current, tree, root, from, folder, at);
+      order.current = moved.order;
+      followMove(from, moved.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    await refreshTree();
+  };
+
+  /** A new folder goes beside the folder of the scene being written, and its name is ready to type. */
+  const addFolder = async () => {
+    if (!fs) return;
+    const here = path && path.startsWith(root + '/') ? parentOf(path) : root;
+    const parent = here === root ? root : parentOf(here);
+    const created = await createFolder(fs, parent);
+    order.current = await placeNew(fs, order.current, tree, root, created, here === root ? path : here);
+    await refreshTree();
+    setRenaming(created);
+  };
+
+  const renameInTree = async (from: string, title: string | null) => {
+    setRenaming(null);
+    if (!fs || title === null) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      const renamed = await renameFolder(fs, order.current, tree, root, from, title);
+      order.current = renamed.order;
+      followMove(from, renamed.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    await refreshTree();
+  };
+
+  const setCardField = (key: string, value: unknown) => {
+    const base = docRef.current ?? doc;
+    if (!base) return;
+    const updated = withField(base, key, value);
+    setDoc(updated);
+    scheduleSave(updated);
   };
 
   const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
@@ -426,6 +495,8 @@ export function App() {
   };
   const seasoningsCount = useSeasoningsCount(editor, notes);
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
+  // Cards are read from the index, so they follow it like search does.
+  const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
@@ -486,11 +557,28 @@ export function App() {
         </div>
         <div className="section-label">
           <span>{tab === 'book' ? 'Bookshelf' : 'Pantry'}</span>
-          <button className="ghost" onClick={() => void addScene()}>
-            {tab === 'book' ? 'New scene' : 'New card'}
-          </button>
+          <span className="section-actions">
+            <button className="ghost" onClick={() => void addFolder()}>
+              New folder
+            </button>
+            <button className="ghost" onClick={() => void addScene()}>
+              {tab === 'book' ? 'New scene' : 'New card'}
+            </button>
+          </span>
         </div>
-        <Tree nodes={tree} selected={path} onSelect={select} />
+        <Tree
+          nodes={tree}
+          root={root}
+          selected={path}
+          cards={cards}
+          live={doc && path ? { path, words: words ?? 0 } : null}
+          collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${root}`}
+          renaming={renaming}
+          onSelect={select}
+          onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+          onStartRename={setRenaming}
+          onRename={(p, title) => void renameInTree(p, title)}
+        />
         <TemplateMenu
           label={tab === 'book' ? 'New scene from template' : 'New card from template'}
           templates={tab === 'book' ? SCENE_TEMPLATES : CARD_TEMPLATES}
@@ -503,6 +591,14 @@ export function App() {
           <p role="alert" className="error">
             {error}
           </p>
+        )}
+        {doc && path && doc.kind === 'scene' && (
+          <CardDetails
+            status={statusOf(doc.fields)}
+            synopsis={synopsisOf(doc.fields)}
+            onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)}
+            onSynopsis={(text) => setCardField('synopsis', text)}
+          />
         )}
         {doc && path ? (
           <article className="cb-page" key={path}>

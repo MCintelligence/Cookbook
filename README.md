@@ -20,7 +20,7 @@ My Book/
     characters/
     settings/
     research/
-  .cookbook/       search index and undo history; safe to delete, Cookbook rebuilds it
+  .cookbook/       search index (index.sqlite) and undo history; safe to delete, Cookbook rebuilds it
 ```
 
 Every scene and card is a Markdown file with a small YAML header:
@@ -89,7 +89,11 @@ npm test             # storage, format and editor tests
 npm run build        # production web build, including the offline service worker
 ```
 
-In the browser, books are kept in the browser's private storage. In the desktop app they live in the app's data folder for now; choosing any folder on disk comes in Phase 1.
+Click the book's title in the top bar to see your books, start a new one or open a book folder. In the desktop app a book can live in any folder. In the browser, books are kept in the browser's private storage, and Chrome and Edge can also open a real folder on your computer.
+
+## Search
+
+The search box in the top bar finds and replaces in the open scene, and lists every other scene and Pantry card that matches. Words match from their start and by stem, so “corn” finds “cornbread” and “run” finds “running”. The index is SQLite with full-text search, kept in `.cookbook/index.sqlite`; opening a book only rereads the files that changed since last time.
 
 ## Project layout
 

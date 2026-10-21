@@ -372,3 +372,22 @@ function serializeInline(nodes: NodeJSON[]): string {
   while (stack.length > 0) out += close(stack.pop()!);
   return out;
 }
+
+/** The words of a scene without any markup, one block per line; footnotes follow the text they belong to. */
+export function plainText(markdown: string): string {
+  const lines: string[] = [];
+  const walk = (node: NodeJSON, line: string[]): void => {
+    if (node.type === 'text') line.push(node.text ?? '');
+    else if (node.type === 'footnote') line.push(` ${String(node.attrs?.text ?? '')} `);
+    else for (const child of node.content ?? []) walk(child, line);
+  };
+  const block = (node: NodeJSON): void => {
+    if (node.type === 'paragraph') {
+      const line: string[] = [];
+      walk(node, line);
+      lines.push(line.join(''));
+    } else for (const child of node.content ?? []) block(child);
+  };
+  block(parseMarkdown(markdown));
+  return lines.join('\n');
+}

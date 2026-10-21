@@ -13,8 +13,8 @@ export default defineConfig({
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
-        // Precache the fonts too, so the page looks right with no connection.
-        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
+        // Precache the fonts and the search engine too, so everything works with no connection.
+        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm}'] },
         manifest: {
           name: 'Cookbook',
           short_name: 'Cookbook',
@@ -30,6 +30,8 @@ export default defineConfig({
         },
       }),
   ],
+  // SQLite finds its .wasm file next to its own module, which pre-bundling would break.
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
   clearScreen: false,
   server: { port: 1420, strictPort: true },
   envPrefix: ['VITE_', 'TAURI_ENV_'],

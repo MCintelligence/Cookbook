@@ -63,6 +63,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .brand-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 22px; }
 .crumb { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb-book { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; padding: 4px 6px; margin: 0 -2px; border-radius: 8px; color: inherit; font-size: inherit; }
+.crumb-book:hover { background: var(--sidebar); color: var(--text); }
 
 .top-actions { display: flex; align-items: center; gap: 10px; }
 .seasonings-button { min-height: 44px; padding: 0 10px; border: none; background: transparent; color: var(--muted); font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; border-radius: 10px; }
@@ -82,6 +84,16 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .find-replace span { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .find-replace input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-size: 14px; }
 .find-hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+.find-results { border-top: 1px solid var(--line); margin: 2px -10px 0; padding: 8px 10px 0; max-height: 50vh; overflow: auto; }
+.find-results-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 0 4px 6px; }
+.find-results ul { list-style: none; margin: 0; padding: 0; }
+.find-hit { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: none; background: transparent; padding: 8px; border-radius: 10px; }
+.find-hit:hover, .find-hit:focus-visible { background: var(--sidebar); }
+.find-hit-head { display: flex; justify-content: space-between; gap: 8px; }
+.find-hit-title { font-weight: 700; font-size: 14px; }
+.find-hit-kind { font-size: 11px; font-weight: 700; color: var(--muted); }
+.find-hit-snippet { font-family: 'Literata', Georgia, serif; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.find-hit-snippet mark { background: var(--find); color: var(--text); border-radius: 2px; }
 .pill { height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line-strong); background: var(--paper); font-size: 13px; font-weight: 700; white-space: nowrap; }
 .pill-accent { border: none; background: var(--accent); color: var(--on-accent); }
 .chip { height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--paper); font-size: 12px; font-weight: 700; }
@@ -175,6 +187,32 @@ button.seas-quote:hover { color: var(--accent); }
 .seas-meter span { background: var(--accent); }
 .seas-toggle { min-height: 34px; border-radius: 17px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 13px; font-weight: 700; }
 .seas-toggle[aria-pressed='true'] { background: var(--accent); color: var(--on-accent); }
+
+/* Your books */
+.lib-backdrop { position: fixed; inset: 0; z-index: 10; background: rgba(59, 42, 32, 0.28); display: flex; align-items: flex-start; justify-content: center; padding: 72px 16px 16px; }
+.lib { width: min(480px, 100%); max-height: calc(100vh - 96px); overflow: auto; background: var(--paper); color: var(--text); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 24px 60px rgba(90, 58, 34, 0.28); padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.lib-head { display: flex; justify-content: space-between; align-items: center; }
+.lib-head h2 { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 600; }
+.lib-close { border: none; background: transparent; font-size: 24px; line-height: 1; color: var(--muted); min-width: 44px; min-height: 44px; margin: -10px -10px -10px 0; }
+.lib-error { margin: 0; padding: 8px 12px; border-radius: 10px; background: #fbe7e2; color: #8f2a14; font-size: 14px; }
+.lib-error:empty { display: none; }
+.lib-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lib-list li { display: flex; align-items: center; gap: 4px; }
+.lib-book { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; border: 1px solid transparent; background: transparent; padding: 8px 12px; border-radius: 12px; }
+.lib-book:hover { background: var(--sidebar); }
+.lib-book[aria-current='true'] { border-color: var(--line-strong); background: var(--bar); }
+.lib-book-title { font-family: 'Fraunces', Georgia, serif; font-size: 17px; font-weight: 600; }
+.lib-book-where { font-size: 12px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-forget { border: none; background: transparent; color: var(--muted); font-size: 18px; min-width: 36px; min-height: 36px; border-radius: 10px; opacity: 0.6; }
+.lib-forget:hover { opacity: 1; background: var(--sidebar); }
+.lib-new { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 14px; }
+.lib-new label { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lib-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.lib-new input { flex: 1; min-width: 160px; height: 36px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--field); padding: 0 10px; font-size: 15px; }
+.lib-new input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.lib-open-folder { align-self: flex-start; border: none; background: transparent; color: var(--accent); font-weight: 700; font-size: 14px; padding: 4px 0; }
+.lib-adopt p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
+.lib-adopt code { font-size: 12px; background: var(--sidebar); padding: 1px 4px; border-radius: 4px; }
 
 .empty, .error { color: var(--muted); }
 .error { color: #c2264b; }

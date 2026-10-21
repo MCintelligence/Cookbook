@@ -6,7 +6,7 @@ import { type Entry, type StorageAdapter, joinPath, parentOf, baseName } from '.
  * app asks for it when a book is first created.
  */
 export class OpfsAdapter implements StorageAdapter {
-  private constructor(private root: FileSystemDirectoryHandle) {}
+  constructor(private root: FileSystemDirectoryHandle) {}
 
   static async open(bookFolder: string): Promise<OpfsAdapter> {
     let dir = await navigator.storage.getDirectory();
@@ -26,17 +26,37 @@ export class OpfsAdapter implements StorageAdapter {
   }
 
   async readText(path: string): Promise<string> {
-    const dir = await this.folder(parentOf(path));
-    const file = await (await dir.getFileHandle(baseName(path))).getFile();
-    return file.text();
+    return (await this.file(path)).text();
   }
 
-  async writeText(path: string, text: string): Promise<void> {
+  writeText(path: string, text: string): Promise<void> {
+    return this.write(path, text);
+  }
+
+  async readBytes(path: string): Promise<Uint8Array> {
+    return new Uint8Array(await (await this.file(path)).arrayBuffer());
+  }
+
+  writeBytes(path: string, data: Uint8Array): Promise<void> {
+    return this.write(path, data as Uint8Array<ArrayBuffer>);
+  }
+
+  async stamp(path: string): Promise<string> {
+    const file = await this.file(path);
+    return `${file.lastModified}:${file.size}`;
+  }
+
+  private async file(path: string): Promise<File> {
+    const dir = await this.folder(parentOf(path));
+    return (await dir.getFileHandle(baseName(path))).getFile();
+  }
+
+  private async write(path: string, data: string | Uint8Array<ArrayBuffer>): Promise<void> {
     const dir = await this.folder(parentOf(path));
     const handle = await dir.getFileHandle(baseName(path), { create: true });
     // createWritable writes to a swap file and only replaces the original on close.
     const writable = await handle.createWritable();
-    await writable.write(text);
+    await writable.write(data);
     await writable.close();
   }
 

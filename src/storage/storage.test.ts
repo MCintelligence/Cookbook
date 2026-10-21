@@ -11,7 +11,7 @@ import {
   readTree,
   writeDocument,
 } from './book';
-import { MemoryIndex, countWords, rebuildIndex } from './index';
+import { BookIndex, INDEX_FILE, MATCH_END, MATCH_START, countWords, loadIndex, refreshIndex, saveIndex, toFtsQuery } from './index';
 
 describe('document format', () => {
   it('round-trips front matter and body', () => {
@@ -118,22 +118,82 @@ describe('hidden index', () => {
     expect(countWords('')).toBe(0);
   });
 
-  it('rebuilds from the files and searches by kind', async () => {
+  it('builds from the files and searches by kind', async () => {
     const fs = new MemoryAdapter();
     await createBook(fs, 'Book');
     const lou = await createDocument(fs, 'pantry/characters', 'Mama Lou', 'character');
     const porch = await createDocument(fs, 'pantry/settings', "Lou's porch", 'setting');
     const scene = await createDocument(fs, 'bookshelf', 'Sunday Dinner');
-    await writeDocument(fs, scene, { ...(await readDocument(fs, scene)), body: 'Lou stirred the greens.' });
+    await writeDocument(fs, scene, { ...(await readDocument(fs, scene)), body: '**Lou** stirred the [greens]{.thought}.^[Collards.]\n' });
 
-    const index = new MemoryIndex();
-    expect(await rebuildIndex(fs, index)).toBe(3);
+    const index = await BookIndex.open();
+    expect(await refreshIndex(fs, index)).toBe(3);
 
-    const all = await index.search('lou');
-    expect(all.map((d) => d.path)).toEqual([porch, lou, scene]);
-    const pantryOnly = await index.search('lou', { kinds: ['character', 'setting', 'research'] });
-    expect(pantryOnly.map((d) => d.path)).toEqual([porch, lou]);
-    expect(await index.search('lou greens')).toHaveLength(1);
-    expect(await index.search('   ')).toEqual([]);
+    const all = index.search('lou');
+    expect(all.map((d) => d.path).sort()).toEqual([lou, porch, scene].sort());
+    // Title matches rank above text matches.
+    expect(all[all.length - 1]!.path).toBe(scene);
+    const pantryOnly = index.search('lou', { kinds: ['character', 'setting', 'research'] });
+    expect(pantryOnly.map((d) => d.path).sort()).toEqual([lou, porch].sort());
+    // Markup is not indexed; footnotes are.
+    expect(index.search('lou greens')).toMatchObject([{ path: scene, snippet: `${MATCH_START}Lou${MATCH_END} stirred the ${MATCH_START}greens${MATCH_END}. Collards. ` }]);
+    expect(index.search('collard')).toHaveLength(1);
+    expect(index.search('thought')).toEqual([]);
+    expect(index.search('   ')).toEqual([]);
+  });
+
+  it('finds word stems and ignores accents', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const scene = await createDocument(fs, 'bookshelf', 'Café');
+    await writeDocument(fs, scene, { ...(await readDocument(fs, scene)), body: 'She was running late.\n' });
+    const index = await BookIndex.open();
+    await refreshIndex(fs, index);
+    expect(index.search('runs')).toHaveLength(1);
+    expect(index.search('cafe')).toHaveLength(1);
+    expect(index.search('"; drop table docs; --')).toEqual([]);
+  });
+
+  it('only rereads changed files, and forgets deleted ones', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const a = await createDocument(fs, 'bookshelf', 'One');
+    await createDocument(fs, 'bookshelf', 'Two');
+    const index = await BookIndex.open();
+    expect(await refreshIndex(fs, index)).toBe(2);
+    expect(await refreshIndex(fs, index)).toBe(0);
+    await writeDocument(fs, a, { ...(await readDocument(fs, a)), body: 'Peach cobbler.\n' });
+    await fs.remove('bookshelf/Two.md');
+    expect(await refreshIndex(fs, index)).toBe(2);
+    expect(index.size()).toBe(1);
+    expect(index.search('cobbler')).toHaveLength(1);
+  });
+
+  it('saves to the hidden folder and opens again', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const a = await createDocument(fs, 'bookshelf', 'Sweet potato pie');
+    const index = await BookIndex.open();
+    await refreshIndex(fs, index);
+    await saveIndex(fs, index);
+    expect(await fs.exists(INDEX_FILE)).toBe(true);
+
+    const again = await loadIndex(fs);
+    expect(again.search('potato').map((h) => h.path)).toEqual([a]);
+    expect(await refreshIndex(fs, again)).toBe(0);
+  });
+
+  it('starts over when the saved index is damaged', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    await createDocument(fs, 'bookshelf', 'One');
+    await fs.writeBytes(INDEX_FILE, new Uint8Array([1, 2, 3, 4]));
+    const index = await loadIndex(fs);
+    expect(index.size()).toBe(0);
+    expect(await refreshIndex(fs, index)).toBe(1);
+  });
+
+  it('turns typed words into a safe prefix query', () => {
+    expect(toFtsQuery('Mama "Lou" OR*')).toBe('"mama"* "lou"* "or"*');
   });
 });

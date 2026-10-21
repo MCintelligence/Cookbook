@@ -2,7 +2,7 @@ import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, readDocument, readTree, walkFiles } from './book';
-import { type CookbookDocument, type DocumentKind } from './document';
+import { type CookbookDocument, type DocumentKind, type SceneStatus, statusOf, synopsisOf } from './document';
 
 /**
  * The hidden index: everything that can be worked out again from the files
@@ -12,7 +12,7 @@ import { type CookbookDocument, type DocumentKind } from './document';
  * that changed since last time. Deleting it is always safe.
  */
 export const INDEX_FILE = joinPath(HIDDEN_FOLDER, 'index.sqlite');
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export interface IndexedDocument {
   path: string;
@@ -20,10 +20,15 @@ export interface IndexedDocument {
   title: string;
   kind: DocumentKind;
   words: number;
+  synopsis: string;
+  status: SceneStatus;
   /** The words of the file without markup. */
   text: string;
   stamp: string;
 }
+
+/** What the Bookshelf shows on each card. */
+export type CardSummary = Pick<IndexedDocument, 'title' | 'kind' | 'words' | 'synopsis' | 'status'>;
 
 export interface SearchOptions {
   kinds?: DocumentKind[];
@@ -47,7 +52,17 @@ export function countWords(text: string): number {
 
 export function toIndexed(path: string, doc: CookbookDocument, stamp: string): IndexedDocument {
   const text = plainText(doc.body);
-  return { path, id: doc.id, title: doc.title, kind: doc.kind, words: countWords(text), text, stamp };
+  return {
+    path,
+    id: doc.id,
+    title: doc.title,
+    kind: doc.kind,
+    words: countWords(text),
+    synopsis: synopsisOf(doc.fields),
+    status: statusOf(doc.fields),
+    text,
+    stamp,
+  };
 }
 
 /** Each word must start a word in the title or text, so "corn" finds "cornbread". */
@@ -89,7 +104,7 @@ export class BookIndex {
     }
     const db = new sqlite3.oo1.DB(':memory:');
     db.exec(`
-      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, stamp text);
+      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, stamp text);
       create virtual table docs_fts using fts5(title, text, tokenize = 'porter unicode61 remove_diacritics 2');
       pragma user_version = ${SCHEMA_VERSION};
     `);
@@ -100,8 +115,8 @@ export class BookIndex {
     this.db.transaction(() => {
       this.removeRow(doc.path);
       this.db.exec({
-        sql: 'insert into docs (path, id, title, kind, words, stamp) values (?, ?, ?, ?, ?, ?)',
-        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.stamp],
+        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, stamp) values (?, ?, ?, ?, ?, ?, ?, ?)',
+        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, doc.stamp],
       });
       const rowid = this.db.selectValue('select last_insert_rowid()') as number;
       this.db.exec({ sql: 'insert into docs_fts (rowid, title, text) values (?, ?, ?)', bind: [rowid, doc.title, doc.text] });
@@ -117,6 +132,20 @@ export class BookIndex {
     if (rowid === undefined) return;
     this.db.exec({ sql: 'delete from docs_fts where rowid = ?', bind: [rowid] });
     this.db.exec({ sql: 'delete from docs where rowid = ?', bind: [rowid] });
+  }
+
+  /** Follows a file or folder that moved, so its files keep their place in the index. */
+  move(from: string, to: string): void {
+    this.db.exec({
+      sql: "update docs set path = ? || substr(path, ?) where path = ? or substr(path, 1, ?) = ?",
+      bind: [to, from.length + 1, from, from.length + 1, from + '/'],
+    });
+  }
+
+  /** Path to what the Bookshelf shows, for every indexed file. */
+  cards(): Map<string, CardSummary> {
+    const rows = this.db.selectArrays('select path, title, kind, words, synopsis, status from docs') as [string, string, DocumentKind, number, string, SceneStatus][];
+    return new Map(rows.map(([path, title, kind, words, synopsis, status]) => [path, { title, kind, words, synopsis, status }]));
   }
 
   /** Path to stamp, for every indexed file. */

@@ -15,6 +15,7 @@ Each book is an ordinary folder you can open in any text editor, back up, or kee
 ```
 My Book/
   book.json        title, format version and daily word goal
+  order.json       the order of scenes and folders
   writing-history.csv  words written and deleted each day
   bookshelf/       scenes, in nested folders (parts, chapters)
   pantry/
@@ -31,11 +32,13 @@ Every scene and card is a Markdown file with a small YAML header:
 id: 7c1f0d2e-…
 title: Sunday Dinner
 kind: scene
+status: simmering
+synopsis: June burns the rice; nobody says a word.
 ---
 The kitchen smelled of cornbread and black pepper before anyone was awake.
 ```
 
-Folders and files sort by name in natural order ("Chapter 2" before "Chapter 10").
+`order.json` lists what each folder holds, in order. Anything it doesn't list, such as a file you added in another app, comes after the listed ones in natural name order ("Chapter 2" before "Chapter 10"), so a lost or hand-edited `order.json` never hides anything.
 
 Inside a scene, styles are written so the file still reads well anywhere:
 
@@ -73,6 +76,14 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
 Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
+## The Bookshelf
+
+Scenes sit on the Bookshelf as small recipe cards showing the title, a status dot (not started, simmering or done), the word count and the synopsis. Folders nest to any depth, show the total words inside, and open or close with a click. Double-click a folder to rename it; "New folder" adds one beside the chapter you're in.
+
+Drag a card or folder to reorder it, or drop it onto a folder to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused card. Moving never renames a file unless the new folder already has one with the same name.
+
+The open scene's status and synopsis are on the card above the page, so they never end up in the manuscript.
 
 ## Starting points and goals
 

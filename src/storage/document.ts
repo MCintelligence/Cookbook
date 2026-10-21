@@ -59,3 +59,27 @@ export function serializeDocument(doc: CookbookDocument): string {
 export function newId(): string {
   return globalThis.crypto.randomUUID();
 }
+
+/** Where a scene is up to. Kept as `status` in the front matter; no status means not started. */
+export type SceneStatus = 'not-started' | 'simmering' | 'done';
+
+export const STATUSES: { id: SceneStatus; label: string }[] = [
+  { id: 'not-started', label: 'Not started' },
+  { id: 'simmering', label: 'Simmering' },
+  { id: 'done', label: 'Done' },
+];
+
+export function statusOf(fields: Record<string, unknown>): SceneStatus {
+  return STATUSES.some((s) => s.id === fields.status) ? (fields.status as SceneStatus) : 'not-started';
+}
+
+/** A line or two on what happens, kept as `synopsis` in the front matter. */
+export function synopsisOf(fields: Record<string, unknown>): string {
+  return typeof fields.synopsis === 'string' ? fields.synopsis : '';
+}
+
+/** Sets or clears one front matter field, leaving the rest alone. */
+export function withField(doc: CookbookDocument, key: string, value: unknown): CookbookDocument {
+  const { [key]: _old, ...fields } = doc.fields;
+  return { ...doc, fields: value === undefined || value === '' ? fields : { ...fields, [key]: value } };
+}

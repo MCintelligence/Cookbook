@@ -12,3 +12,13 @@ describe('Pantry shelf', () => {
     expect(bestName(june, 'ruth')).toBeNull();
   });
 });
+
+describe('manuscript', () => {
+  it('estimates reading time at 250 words a minute', async () => {
+    const { readingTime } = await import('./Manuscript');
+    expect(readingTime(20)).toBe('1 min');
+    expect(readingTime(5_000)).toBe('20 min');
+    expect(readingTime(90_000)).toBe('6 h');
+    expect(readingTime(80_000)).toBe('5 h 20 min');
+  });
+});

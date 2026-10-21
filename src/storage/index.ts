@@ -2,7 +2,7 @@ import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, readDocument, readTree, walkFiles } from './book';
-import { type CookbookDocument, type DocumentKind, type SceneStatus, statusOf, synopsisOf } from './document';
+import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, relationshipsOf, statusOf, synopsisOf } from './document';
 
 /**
  * The hidden index: everything that can be worked out again from the files
@@ -12,7 +12,7 @@ import { type CookbookDocument, type DocumentKind, type SceneStatus, statusOf, s
  * that changed since last time. Deleting it is always safe.
  */
 export const INDEX_FILE = joinPath(HIDDEN_FOLDER, 'index.sqlite');
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 export interface IndexedDocument {
   path: string;
@@ -22,13 +22,23 @@ export interface IndexedDocument {
   words: number;
   synopsis: string;
   status: SceneStatus;
+  /** Other names a Pantry card goes by. */
+  aka: string[];
+  relationships: Relationship[];
   /** The words of the file without markup. */
   text: string;
   stamp: string;
 }
 
 /** What the Bookshelf shows on each card. */
-export type CardSummary = Pick<IndexedDocument, 'title' | 'kind' | 'words' | 'synopsis' | 'status'>;
+export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka'>;
+
+/** A relationship another card has with this one, such as Ruth's "Mother of" on June's card. */
+export interface IncomingRelationship {
+  path: string;
+  title: string;
+  as: string;
+}
 
 export interface SearchOptions {
   kinds?: DocumentKind[];
@@ -51,15 +61,20 @@ export function countWords(text: string): number {
 }
 
 export function toIndexed(path: string, doc: CookbookDocument, stamp: string): IndexedDocument {
-  const text = plainText(doc.body);
+  const body = plainText(doc.body);
+  // A Pantry card's names and fields are searchable too, so "baker" finds the character whose role it is.
+  const extra = doc.kind === 'scene' ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc.fields).map(([, v]) => v)].filter(Boolean);
+  const text = extra.length > 0 ? `${body}\n${extra.join('\n')}` : body;
   return {
     path,
     id: doc.id,
     title: doc.title,
     kind: doc.kind,
-    words: countWords(text),
+    words: countWords(body),
     synopsis: synopsisOf(doc.fields),
     status: statusOf(doc.fields),
+    aka: akaOf(doc.fields),
+    relationships: relationshipsOf(doc.fields).filter((r) => r.to),
     text,
     stamp,
   };
@@ -104,7 +119,9 @@ export class BookIndex {
     }
     const db = new sqlite3.oo1.DB(':memory:');
     db.exec(`
-      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, stamp text);
+      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, stamp text);
+      create table links (from_path text not null, to_id text not null, label text);
+      create index links_to on links (to_id);
       create virtual table docs_fts using fts5(title, text, tokenize = 'porter unicode61 remove_diacritics 2');
       pragma user_version = ${SCHEMA_VERSION};
     `);
@@ -115,11 +132,14 @@ export class BookIndex {
     this.db.transaction(() => {
       this.removeRow(doc.path);
       this.db.exec({
-        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, stamp) values (?, ?, ?, ?, ?, ?, ?, ?)',
-        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, doc.stamp],
+        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.stamp],
       });
       const rowid = this.db.selectValue('select last_insert_rowid()') as number;
       this.db.exec({ sql: 'insert into docs_fts (rowid, title, text) values (?, ?, ?)', bind: [rowid, doc.title, doc.text] });
+      for (const r of doc.relationships) {
+        this.db.exec({ sql: 'insert into links (from_path, to_id, label) values (?, ?, ?)', bind: [doc.path, r.to, r.as] });
+      }
     });
   }
 
@@ -130,22 +150,35 @@ export class BookIndex {
   private removeRow(path: string): void {
     const rowid = this.db.selectValue('select rowid from docs where path = ?', [path]) as number | undefined;
     if (rowid === undefined) return;
+    this.db.exec({ sql: 'delete from links where from_path = ?', bind: [path] });
     this.db.exec({ sql: 'delete from docs_fts where rowid = ?', bind: [rowid] });
     this.db.exec({ sql: 'delete from docs where rowid = ?', bind: [rowid] });
   }
 
   /** Follows a file or folder that moved, so its files keep their place in the index. */
   move(from: string, to: string): void {
-    this.db.exec({
-      sql: "update docs set path = ? || substr(path, ?) where path = ? or substr(path, 1, ?) = ?",
-      bind: [to, from.length + 1, from, from.length + 1, from + '/'],
+    const bind = [to, from.length + 1, from, from.length + 1, from + '/'];
+    this.db.transaction(() => {
+      this.db.exec({ sql: 'update docs set path = ? || substr(path, ?) where path = ? or substr(path, 1, ?) = ?', bind });
+      this.db.exec({ sql: 'update links set from_path = ? || substr(from_path, ?) where from_path = ? or substr(from_path, 1, ?) = ?', bind });
     });
+  }
+
+  /** The relationships other cards have with the card whose id this is. */
+  incoming(id: string): IncomingRelationship[] {
+    const rows = this.db.selectArrays(
+      'select d.path, d.title, l.label from links l join docs d on d.path = l.from_path where l.to_id = ? order by d.title',
+      [id],
+    ) as [string, string, string][];
+    return rows.map(([path, title, as]) => ({ path, title, as }));
   }
 
   /** Path to what the Bookshelf shows, for every indexed file. */
   cards(): Map<string, CardSummary> {
-    const rows = this.db.selectArrays('select path, title, kind, words, synopsis, status from docs') as [string, string, DocumentKind, number, string, SceneStatus][];
-    return new Map(rows.map(([path, title, kind, words, synopsis, status]) => [path, { title, kind, words, synopsis, status }]));
+    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka from docs') as [string, string, string, DocumentKind, number, string, SceneStatus, string][];
+    return new Map(
+      rows.map(([path, id, title, kind, words, synopsis, status, aka]) => [path, { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[] }]),
+    );
   }
 
   /** Path to stamp, for every indexed file. */

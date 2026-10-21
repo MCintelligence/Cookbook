@@ -13,6 +13,8 @@ interface Props {
   live: { path: string; words: number } | null;
   /** Where to remember which folders are closed. */
   collapseKey: string;
+  /** Folders that stay put, with the names to show for them: they can't be dragged or renamed. */
+  locked?: Map<string, string>;
   /** The folder whose name is being edited. */
   renaming: string | null;
   onSelect: (path: string) => void;
@@ -70,12 +72,12 @@ export function Tree(props: Props) {
     }
   };
 
-  // Words per scene and folder, with the open scene counted as it is now.
+  // Words per scene and folder, with the open scene counted as it is now. Pantry cards aren't counted.
   const words = useMemo(() => {
     const totals = new Map<string, number>();
     const count = (n: TreeNode): number => {
       const w =
-        n.kind === 'file' ? (live?.path === n.path ? live.words : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
+        n.kind === 'file' ? (cards.get(n.path)?.kind !== 'scene' ? 0 : live?.path === n.path ? live.words : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
       totals.set(n.path, w);
       return w;
     };
@@ -112,7 +114,7 @@ export function Tree(props: Props) {
   };
 
   const begin = (e: ReactPointerEvent, node: TreeNode, label: string) => {
-    if (e.button !== 0 || props.renaming) return;
+    if (e.button !== 0 || props.renaming || props.locked?.has(node.path)) return;
     const touch = e.pointerType !== 'mouse';
     const x0 = e.clientX;
     const y0 = e.clientY;
@@ -198,9 +200,10 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, onSelect, onMove, onStartRename, onRename } = shared;
+  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename } = shared;
+  const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
-  const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : node.name;
+  const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : (locked?.get(node.path) ?? node.name);
   const open = node.kind === 'folder' && !collapsed.has(node.path);
   const children = node.children ?? [];
   const marker = drop?.row === node.path ? ` drop-${drop.where}` : '';
@@ -216,7 +219,7 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
     onPointerDown: (e: ReactPointerEvent) => begin(e, node, label),
     onContextMenu: (e: React.MouseEvent) => dragging && e.preventDefault(),
     onKeyDown: (e: ReactKeyboardEvent) => {
-      if (!e.altKey) return;
+      if (!e.altKey || fixed) return;
       if (e.key === 'ArrowUp' && index > 0) onMove(node.path, parent, index - 1);
       else if (e.key === 'ArrowDown' && index < siblings - 1) onMove(node.path, parent, index + 2);
       else return;
@@ -226,6 +229,8 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
 
   if (node.kind === 'file') {
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
+    // Scenes show their synopsis; Pantry cards show the other names they go by.
+    const subtitle = card?.kind === 'scene' ? card.synopsis : card && card.aka.length > 0 ? `Also ${card.aka.join(', ')}` : '';
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         <button {...rowProps} className={`tree-card${marker}`} onClick={() => !justDragged.current && onSelect(node.path)}>
@@ -234,7 +239,7 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
             <span className="tree-card-title">{label}</span>
             {total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>
-          {card?.synopsis && <span className="tree-card-synopsis">{card.synopsis}</span>}
+          {subtitle && <span className="tree-card-synopsis">{subtitle}</span>}
         </button>
       </li>
     );
@@ -248,9 +253,9 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
         <button
           {...rowProps}
           className={`tree-folder${marker}`}
-          title="Double-click to rename"
+          title={fixed ? undefined : 'Double-click to rename'}
           onClick={() => !justDragged.current && toggle(node.path)}
-          onDoubleClick={() => onStartRename(node.path)}
+          onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span aria-hidden="true" className="chevron">
             {open ? '▾' : '▸'}

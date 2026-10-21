@@ -118,7 +118,7 @@ describe('recipe cards', () => {
     await writeDocument(fs, p, { ...withField(withField(doc, 'status', 'done'), 'synopsis', 'Grits again.'), body: 'One two three.' });
     const index = await BookIndex.open();
     await refreshIndex(fs, index);
-    expect(index.cards().get(p)).toEqual({ title: 'Supper', kind: 'scene', words: 3, synopsis: 'Grits again.', status: 'done' });
+    expect(index.cards().get(p)).toMatchObject({ title: 'Supper', kind: 'scene', words: 3, synopsis: 'Grits again.', status: 'done', aka: [] });
     index.move('bookshelf/Chapter 1', 'bookshelf/Part/Chapter 1');
     expect(index.cards().has('bookshelf/Part/Chapter 1/Supper.md')).toBe(true);
     expect(index.cards().has('bookshelf/Chapter 10/x.md')).toBe(false);

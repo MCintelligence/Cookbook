@@ -63,6 +63,7 @@ import { FindBox } from './ui/FindBox';
 import { PageFootnotes } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
+import { UpdateBanner } from './ui/UpdateBanner';
 import { type Notes, Seasonings, type SeasoningsTab, useSeasoningsCount } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
@@ -697,6 +698,11 @@ export function App() {
     if (wasTyping) editor?.commands.focus();
   };
   const drawerOpen = (seasoningsOpen && !!doc) || pins.length > 0;
+  const saveEverything = useCallback(async () => {
+    await flushSave();
+    await saveUndoNow();
+    await saveIndexNow();
+  }, [flushSave, saveUndoNow, saveIndexNow]);
 
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
@@ -799,6 +805,7 @@ export function App() {
       </nav>
 
       <main className="desk">
+        <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <p role="alert" className="error">
             {error}

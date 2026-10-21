@@ -393,6 +393,9 @@ button.seas-quote:hover { color: var(--accent); }
 .lib-adopt p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; }
 .lib-adopt code { font-size: 12px; background: var(--sidebar); padding: 1px 4px; border-radius: 4px; }
 
+.update { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 auto 14px; max-width: 760px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card); box-shadow: 0 4px 14px rgba(90, 58, 34, 0.12); font-size: 14px; }
+.update-text { flex: 1 1 260px; }
+.update-notes { flex-basis: 100%; margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; color: var(--muted); }
 .empty, .error { color: var(--muted); }
 .error { color: #c2264b; }
 

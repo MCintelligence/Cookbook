@@ -83,3 +83,47 @@ export function withField(doc: CookbookDocument, key: string, value: unknown): C
   const { [key]: _old, ...fields } = doc.fields;
   return { ...doc, fields: value === undefined || value === '' ? fields : { ...fields, [key]: value } };
 }
+
+// ---------- Pantry cards ----------
+
+/** A link from one card to another, read as "<as> <the other card>", like "Mother of June". */
+export interface Relationship {
+  to: string;
+  as: string;
+}
+
+/** Front matter keys Cookbook uses itself; everything else on a card is one of the writer's fields. */
+const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships']);
+
+/** The writer's own fields on a card, like role, age and wants, in order. */
+export function cardFieldsOf(fields: Record<string, unknown>): [string, string][] {
+  return Object.entries(fields)
+    .filter(([key, value]) => !RESERVED.has(key) && (typeof value === 'string' || typeof value === 'number' || value === null))
+    .map(([key, value]) => [key, value === null ? '' : String(value)]);
+}
+
+/** Replaces the writer's fields, keeping Cookbook's own keys where they were. */
+export function withCardFields(doc: CookbookDocument, entries: [string, string][]): CookbookDocument {
+  const kept = Object.entries(doc.fields).filter(([key, value]) => RESERVED.has(key) || !(typeof value === 'string' || typeof value === 'number' || value === null));
+  return { ...doc, fields: Object.fromEntries([...entries, ...kept]) };
+}
+
+/** Other names the card goes by. Written as a YAML list, but a comma-separated line is read too. */
+export function akaOf(fields: Record<string, unknown>): string[] {
+  const raw = fields.aka;
+  const list = Array.isArray(raw) ? raw.map(String) : typeof raw === 'string' ? raw.split(',') : [];
+  return list.map((s) => s.trim()).filter(Boolean);
+}
+
+export function relationshipsOf(fields: Record<string, unknown>): Relationship[] {
+  const raw = fields.relationships;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+    .map((r) => ({ to: typeof r.to === 'string' ? r.to : '', as: typeof r.as === 'string' ? r.as : '' }));
+}
+
+/** Where the card's picture is, relative to the book folder. */
+export function portraitOf(fields: Record<string, unknown>): string | null {
+  return typeof fields.portrait === 'string' && fields.portrait ? fields.portrait : null;
+}

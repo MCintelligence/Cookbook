@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type StorageAdapter, parentOf } from './storage/adapter';
+import { type StorageAdapter, joinPath, parentOf } from './storage/adapter';
 import {
   BOOKSHELF,
   PANTRY,
+  PANTRY_SECTIONS,
+  childrenOf,
   type BookInfo,
   type TreeNode,
   createBook,
@@ -58,8 +60,15 @@ import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { Tree } from './ui/Tree';
 import { CardDetails } from './ui/CardDetails';
+import { type CardChoice, PantryCard } from './ui/PantryCard';
+import { type PantryView, PantryBar, PantryResults } from './ui/PantryBar';
+import { shrinkPicture } from './ui/pictures';
+import { SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
 
 type Tab = 'book' | 'pantry';
+
+/** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
+const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
 
 const SAVE_DELAY_MS = 600;
 /** The search index is cheap to rebuild, so it is written back less often than scenes. */
@@ -124,6 +133,8 @@ export function App() {
   const [indexVersion, setIndexVersion] = useState(0);
   const order = useRef<Order>({});
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [pantryView, setPantryView] = useState<PantryView>('all');
+  const [pantryQuery, setPantryQuery] = useState('');
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -255,8 +266,11 @@ export function App() {
   }, []);
 
   const root = tab === 'book' ? BOOKSHELF : PANTRY;
+  /** The folder the sidebar shows: the Bookshelf, the whole Pantry, or one Pantry section. */
+  const viewRoot = tab === 'pantry' && pantryView !== 'all' ? joinPath(PANTRY, pantryView) : root;
   const refreshTree = useCallback(async () => {
-    if (fs) setTree(await readTree(fs, root, order.current));
+    // The Pantry's sections come in their usual order unless the writer has listed them otherwise.
+    if (fs) setTree(await readTree(fs, root, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current }));
   }, [fs, root]);
 
   useEffect(() => {
@@ -357,10 +371,11 @@ export function App() {
   };
 
   const addScene = (template?: DocTemplate) => {
-    const chosen = template ?? (tab === 'book' ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES[0]!);
-    // New scenes go in the folder of the scene being written, so they land in the same chapter.
-    const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    return addFrom(chosen, folder);
+    // New scenes and cards go in the folder of the one being written, so they land in the same chapter.
+    const folder = path && path.startsWith(viewRoot + '/') ? parentOf(path) : viewRoot;
+    if (tab === 'book') return addFrom(template ?? SCENE_TEMPLATES[0]!, folder);
+    const section = pantryView !== 'all' ? pantryView : ((path && sectionOf(path)) ?? 'characters');
+    return addFrom(template ?? CARD_TEMPLATES.find((t) => t.folder === section)!, folder);
   };
 
   const addFrom = async (template: DocTemplate, folder: string) => {
@@ -439,8 +454,9 @@ export function App() {
   /** A new folder goes beside the folder of the scene being written, and its name is ready to type. */
   const addFolder = async () => {
     if (!fs) return;
-    const here = path && path.startsWith(root + '/') ? parentOf(path) : root;
-    const parent = here === root ? root : parentOf(here);
+    const here = path && path.startsWith(viewRoot + '/') ? parentOf(path) : viewRoot;
+    // In the Pantry, folders go inside the section; the sections themselves stay as they are.
+    const parent = tab === 'pantry' ? (here === PANTRY ? joinPath(PANTRY, 'characters') : here) : here === root ? root : parentOf(here);
     const created = await createFolder(fs, parent);
     order.current = await placeNew(fs, order.current, tree, root, created, here === root ? path : here);
     await refreshTree();
@@ -497,6 +513,38 @@ export function App() {
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
+  const pantryHits = useMemo(() => {
+    if (tab !== 'pantry' || !pantryQuery.trim()) return null;
+    const kinds = pantryView === 'all' ? PANTRY_SECTIONS.map((s) => SECTION_KIND[s]) : [SECTION_KIND[pantryView]];
+    return index.current?.index.search(pantryQuery, { kinds, limit: 40 }) ?? [];
+  }, [tab, pantryQuery, pantryView, indexVersion]);
+  const cardChoices = useMemo<CardChoice[]>(
+    () =>
+      [...cards]
+        .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
+        .map(([p, c]) => ({ id: c.id, title: c.title, path: p }))
+        .filter((c) => c.id !== doc?.id)
+        .sort((a, b) => a.title.localeCompare(b.title, 'en')),
+    [cards, doc?.id],
+  );
+  const incoming = useMemo(() => (doc && doc.kind !== 'scene' ? (index.current?.index.incoming(doc.id) ?? []) : []), [doc?.id, doc?.kind, indexVersion]);
+  const loadPicture = useCallback(
+    async (p: string) => {
+      if (!fs) throw new Error('No book is open.');
+      return URL.createObjectURL(new Blob([(await fs.readBytes(p)).slice()], { type: pictureType(p) }));
+    },
+    [fs],
+  );
+  const pickPortrait = async (file: File) => {
+    const base = docRef.current ?? doc;
+    if (!fs || !base) return;
+    try {
+      const { data, type } = await shrinkPicture(file);
+      setCardField('portrait', await savePicture(fs, base.title, data, type));
+    } catch (e) {
+      setError(`Couldn’t add that picture: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
@@ -556,7 +604,7 @@ export function App() {
           </button>
         </div>
         <div className="section-label">
-          <span>{tab === 'book' ? 'Bookshelf' : 'Pantry'}</span>
+          <span>{tab === 'book' ? 'Bookshelf' : pantryView === 'all' ? 'Pantry' : SECTION_LABEL[pantryView]}</span>
           <span className="section-actions">
             <button className="ghost" onClick={() => void addFolder()}>
               New folder
@@ -566,9 +614,14 @@ export function App() {
             </button>
           </span>
         </div>
+        {tab === 'pantry' && <PantryBar view={pantryView} onView={setPantryView} query={pantryQuery} onQuery={setPantryQuery} />}
+        {pantryHits ? (
+          <PantryResults hits={pantryHits} selected={path} onOpen={select} />
+        ) : (
         <Tree
-          nodes={tree}
-          root={root}
+          nodes={viewRoot === root ? tree : childrenOf(tree, root, viewRoot)}
+          root={viewRoot}
+          locked={tab === 'pantry' ? PANTRY_FOLDERS : undefined}
           selected={path}
           cards={cards}
           live={doc && path ? { path, words: words ?? 0 } : null}
@@ -579,6 +632,7 @@ export function App() {
           onStartRename={setRenaming}
           onRename={(p, title) => void renameInTree(p, title)}
         />
+        )}
         <TemplateMenu
           label={tab === 'book' ? 'New scene from template' : 'New card from template'}
           templates={tab === 'book' ? SCENE_TEMPLATES : CARD_TEMPLATES}
@@ -600,11 +654,25 @@ export function App() {
             onSynopsis={(text) => setCardField('synopsis', text)}
           />
         )}
+        {doc && path && doc.kind !== 'scene' && (
+          <PantryCard
+            doc={doc}
+            choices={cardChoices}
+            incoming={incoming}
+            loadPicture={loadPicture}
+            onChange={(next) => {
+              setDoc(next);
+              scheduleSave(next);
+            }}
+            onPickPortrait={(file) => void pickPortrait(file)}
+            onOpen={(p) => void select(p)}
+          />
+        )}
         {doc && path ? (
           <article className="cb-page" key={path}>
             <input
               className="scene-title"
-              aria-label="Scene title"
+              aria-label={doc.kind === 'scene' ? 'Scene title' : 'Card name'}
               value={doc.title}
               onChange={(e) => {
                 const next = { ...(docRef.current ?? doc), title: e.target.value };

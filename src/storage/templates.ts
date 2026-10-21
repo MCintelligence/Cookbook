@@ -69,7 +69,9 @@ export const CARD_TEMPLATES: DocTemplate[] = [
 
 /** Writes a new scene or card from a template and returns its path. */
 export async function createFromTemplate(fs: StorageAdapter, folder: string, template: DocTemplate, title = template.title): Promise<string> {
-  const target = template.folder ? joinPath(PANTRY, template.folder) : folder;
+  // A card goes in its Pantry section, or in a folder of the writer's inside that section.
+  const section = template.folder ? joinPath(PANTRY, template.folder) : null;
+  const target = section && folder !== section && !folder.startsWith(section + '/') ? section : folder;
   await fs.makeFolder(target);
   const path = await createDocument(fs, target, title, template.kind);
   const doc = await readDocument(fs, path);

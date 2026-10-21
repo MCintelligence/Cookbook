@@ -78,11 +78,10 @@ export function moveFolderKeys(order: Order, from: string, to: string): Order {
   return next;
 }
 
-/** A name that is free in `folder`, adding " 2", " 3"… before ".md" when needed. */
-export async function freeName(fs: StorageAdapter, folder: string, name: string): Promise<string> {
-  const isFile = name.endsWith('.md');
-  const base = stem(name);
+/** A name that is free in `folder`, adding " 2", " 3"… before the extension (".md" unless given) when needed. */
+export async function freeName(fs: StorageAdapter, folder: string, name: string, extension = name.endsWith('.md') ? '.md' : ''): Promise<string> {
+  const base = extension && name.endsWith(extension) ? name.slice(0, -extension.length) : name;
   let candidate = name;
-  for (let n = 2; await fs.exists(joinPath(folder, candidate)); n++) candidate = `${base} ${n}${isFile ? '.md' : ''}`;
+  for (let n = 2; await fs.exists(joinPath(folder, candidate)); n++) candidate = `${base} ${n}${extension}`;
   return candidate;
 }

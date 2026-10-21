@@ -22,6 +22,7 @@ My Book/
     characters/
     settings/
     research/
+  pictures/        portraits for Pantry cards
   .cookbook/       hidden: search index, undo history and trash (see below)
 ```
 
@@ -84,6 +85,23 @@ Scenes sit on the Bookshelf as small recipe cards showing the title, a status do
 Drag a card or folder to reorder it, or drop it onto a folder to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused card. Moving never renames a file unless the new folder already has one with the same name.
 
 The open scene's status and synopsis are on the card above the page, so they never end up in the manuscript.
+
+## The Pantry
+
+The Pantry holds characters, settings and research. Each section can hold your own folders, nested as deep as you like, and cards drag between them like scenes do. The Pantry has its own search, which also looks at nicknames and fields, plus filters for each section.
+
+A card opens on the same page as a scene, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants, fears, or any you add) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
+
+```yaml
+aka: [Mama J]
+role: Pastry cook
+portrait: pictures/Ruth.jpg
+relationships:
+  - to: 7c1f0d2e-…   # June's id
+    as: Mother of
+```
+
+Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
 
 ## Starting points and goals
 

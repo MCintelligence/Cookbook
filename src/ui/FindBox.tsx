@@ -158,7 +158,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit }: Props) {
 }
 
 /** Shows a search snippet with the matched words highlighted. */
-function Snippet({ text }: { text: string }) {
+export function Snippet({ text }: { text: string }) {
   const parts = text.split(MATCH_START);
   return (
     <span className="find-hit-snippet">

@@ -187,6 +187,30 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .pc-incoming { font-size: 13px; color: var(--muted); gap: 6px; }
 .pc-link { border: none; background: transparent; padding: 0; color: var(--accent); font-weight: 700; font-size: 13px; }
 
+/* Linked names, peeks and cast chips */
+.cb-name { text-decoration: underline dotted color-mix(in srgb, #a84a28 55%, transparent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; cursor: help; }
+.cb-name[data-kind='setting'] { text-decoration-color: color-mix(in srgb, #6f8f4e 65%, transparent); }
+.card-details { flex-wrap: wrap; }
+.card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.cast-chip { min-height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line-strong); background: var(--paper); color: #3b2a20; font-size: 12px; font-weight: 700; }
+.cast-chip::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #a84a28; vertical-align: 1px; }
+.cast-chip.cast-setting::before { border-radius: 2px; background: #6f8f4e; }
+.cast-chip:hover { border-color: #a84a28; }
+.peek { position: fixed; z-index: 30; width: 300px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(90, 58, 34, 0.24); font-family: 'Nunito', sans-serif; }
+.peek-head { display: flex; gap: 12px; align-items: center; }
+.peek-head > div { display: flex; flex-direction: column; min-width: 0; }
+.peek-picture { width: 52px; height: 64px; flex: none; object-fit: cover; border-radius: 6px; }
+.peek-kind { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.peek-title { font-size: 17px; }
+.peek-aka { font-size: 12px; color: var(--muted); }
+.peek-fields { margin: 0; display: flex; flex-direction: column; gap: 3px; }
+.peek-fields div { display: flex; gap: 8px; font-size: 13px; }
+.peek-fields dt { flex: 0 0 72px; color: var(--muted); font-weight: 700; font-size: 12px; }
+.peek-fields dd { margin: 0; font-family: 'Literata', Georgia, serif; }
+.peek-text { margin: 0; font-family: 'Literata', Georgia, serif; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.peek-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.pc-quiet { font-size: 13px; color: var(--muted); }
+
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
 .desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: #3b2a20; border: 1px solid #eadcc5; border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 #e6d6bd, 0 12px 28px rgba(122, 82, 50, 0.08); }

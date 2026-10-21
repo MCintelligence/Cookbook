@@ -8,6 +8,7 @@ import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
 import { BODY_STYLE } from './markdown';
 import { FindExtension } from './findPlugin';
+import { LinkedNames } from './names';
 import { DialogueFocus, Footnote, Note, type SeasoningsRequest } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
@@ -220,5 +221,6 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Gapcursor,
     FindExtension,
     DialogueFocus,
+    LinkedNames,
   ];
 }

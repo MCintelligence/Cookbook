@@ -103,6 +103,10 @@ relationships:
 
 Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
 
+### Linked names
+
+Every character's and setting's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. The card above each scene shows chips for the characters and settings it names, and each character or setting card lists the scenes it appears in, in Bookshelf order.
+
 ## Starting points and goals
 
 A new book can start as a novel (chapters of scenes, plus a main character and setting in the Pantry), a short story, or nonfiction (chapters of sections, plus a note for sources). Under the Bookshelf, "New scene from template" offers a blank scene, a chapter opener or a letter. Under the Pantry, the same button makes character, setting and research cards.

@@ -190,6 +190,6 @@ src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android
 2. Bookshelf and Pantry: chapters and scenes, character and setting cards, linked names.
 3. Seasonings v1: spelling, grammar and style checks on the device.
 4. Mobile apps.
-5. Signed updates for the app and the proofreader's word lists.
+5. Signed updates for the desktop app (see [RELEASING.md](RELEASING.md)).
 6. Optional on-device AI suggestions.
 7. Release.

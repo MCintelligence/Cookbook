@@ -1,13 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Lets the app read and write books in its own data folder and in folders the writer picks.",
+  "description": "Lets the app read and write books in its own data folder and in folders the writer picks, and install signed updates.",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "dialog:allow-open",
+    "updater:default",
+    "process:allow-restart",
     "dialog:allow-save",
     "fs:default",
     "fs:allow-mkdir",

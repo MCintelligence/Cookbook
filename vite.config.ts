@@ -8,9 +8,16 @@ const inTauri = Boolean(process.env.TAURI_ENV_PLATFORM);
 export default defineConfig({
   plugins: [
     react(),
+    // The desktop app updates through Tauri, so its build gets an empty stand-in for the service worker.
+    inTauri && {
+      name: 'no-service-worker',
+      resolveId: (id: string) => (id === 'virtual:pwa-register' ? '\0pwa-register-stub' : null),
+      load: (id: string) => (id === '\0pwa-register-stub' ? 'export function registerSW() { return () => Promise.resolve(); }' : null),
+    },
     // The service worker is only for the browser build; the native apps update through Tauri.
     !inTauri &&
       VitePWA({
+        // A new version waits until the writer chooses "Update and restart" (see UpdateBanner).
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
         // Precache the fonts and the search engine too, so everything works with no connection.

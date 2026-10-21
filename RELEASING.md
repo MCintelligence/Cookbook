@@ -52,6 +52,10 @@ You need Node.js on your own computer: version 22 or newer (any current version 
    git push origin v0.1.0
    ```
 
+   Or skip the terminal: on GitHub, open **Actions › Release › Run workflow**,
+   leave the branch on `main`, write the notes, and run it. The tag is made
+   from the version on `main` when you publish the draft.
+
 3. The Release workflow builds and signs the app for macOS (Apple silicon and
    Intel), Windows and Linux (AppImage, .deb and .rpm), and uploads them, with
    `latest.json` for the updater, to a **draft** release.
@@ -75,3 +79,15 @@ The update signature proves an update came from this project. It is separate
 from Apple's and Microsoft's own code signing, which stops macOS Gatekeeper
 and Windows SmartScreen warning on the first install. Those need paid
 developer accounts and can be added to the Release workflow later.
+
+Until then the Mac app is signed ad hoc (`signingIdentity: "-"`), which Apple
+silicon Macs need to run it at all. The first time it is opened, macOS says it
+can't check the app for malware. To open it anyway:
+
+1. Drag Cookbook from the `.dmg` to Applications and open it once. Click **Done**.
+2. Open **System Settings › Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the message about Cookbook. Confirm with your password.
+
+After that it opens normally, and updates install without asking again.
+On Windows, SmartScreen may say it protected your PC: click **More info**,
+then **Run anyway**.

@@ -1,11 +1,18 @@
 name: Release
 
-# Push a version tag (git tag -a v0.1.0 -m "What's new…" && git push origin v0.1.0)
-# to build, sign and upload the desktop apps to a draft GitHub release.
+# Push a version tag (git tag -a v0.1.0 -m "What's new…" && git push origin v0.1.0),
+# or run this workflow from the Actions tab with the release notes, to build,
+# sign and upload the desktop apps to a draft GitHub release. A run from the
+# Actions tab tags main's version when the draft is published.
 # Nothing reaches anyone until the draft is published. See RELEASING.md.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      notes:
+        description: What's new in this version (shown in the app)
+        required: true
 
 permissions:
   contents: write
@@ -40,22 +47,33 @@ jobs:
           fi
 
       - name: Check the tag matches the app's version
+        id: tag
         shell: bash
         run: |
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          elif [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::The tag is $GITHUB_REF_NAME but the app's version is $version. Run: npm run set-version -- ${GITHUB_REF_NAME#v}"
             exit 1
+          else
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Read the release notes from the tag
+      - name: Read the release notes
         id: notes
         shell: bash
+        env:
+          NOTES: ${{ inputs.notes }}
         run: |
-          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
           {
             echo 'body<<END_OF_NOTES'
-            git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d'
+            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+              printf '%s\n' "$NOTES"
+            else
+              git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+              git tag -l --format='%(contents)' "$GITHUB_REF_NAME" | sed '/-----BEGIN PGP SIGNATURE-----/,$d'
+            fi
             echo 'END_OF_NOTES'
           } >> "$GITHUB_OUTPUT"
 
@@ -83,8 +101,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Cookbook ${{ github.ref_name }}
+          tagName: ${{ steps.tag.outputs.tag }}
+          releaseName: Cookbook ${{ steps.tag.outputs.tag }}
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           args: ${{ matrix.args }}

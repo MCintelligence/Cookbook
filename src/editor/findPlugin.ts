@@ -3,6 +3,7 @@ import { type Node as PMNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { type FindOptions, findInText } from './find';
+import { textMap, toRange } from './textmap';
 
 export interface FindState {
   query: string;
@@ -22,8 +23,8 @@ export function findMatches(doc: PMNode, query: string, options: FindOptions): {
   if (!query) return out;
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
-    // Text offsets map straight to positions because blocks hold only text.
-    for (const [a, b] of findInText(node.textContent, query, options)) out.push({ from: pos + 1 + a, to: pos + 1 + b });
+    const map = textMap(node, pos);
+    for (const [a, b] of findInText(map.text, query, options)) out.push(toRange(map, a, b));
     return false;
   });
   return out;

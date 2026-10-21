@@ -49,10 +49,14 @@ Dear June, the pie wants more nutmeg than you think.
 
 [She'll never let me read it,]{.thought} she thought.
 
+The [church had burned]{.note #n1} that summer.^[Blessed Assurance.]
+
 - [ ] find Lou's hymn
 ```
 
 Plain paragraphs use the Body style. `::: name` blocks use a named paragraph style, `**strong**`, `*emphasis*` and `[text]{.name}` are character styles, `* * *` is a scene break, and `- [ ]` is a checklist item. The styles themselves live in `styles.json` in the book folder.
+
+`^[text]` is a footnote, written where its number goes. `[text]{.note #n1}` marks the words a note to yourself is about; the note itself sits in the scene's header, under `notes:`, so it never ends up in the manuscript.
 
 ## Typing shortcuts
 
@@ -64,8 +68,14 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `--` | an em dash |
 | `"` and `'` | curly quotes |
 | `* * *` on its own line | a scene break |
+| ⌘⌥M (Ctrl+Alt+M) | a note to yourself on the selected words |
+| ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
 Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
+## Seasonings
+
+The Seasonings button in the top bar opens everything for reviewing a scene, in this order: the proofreader (coming in Phase 3), your notes and the scene's checklist, footnotes, and dialogue. Dialogue shows how much of the scene is spoken and can fade the narration so only the speech stands out.
 
 ## Running it
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type NodeJSON, parseInline, parseMarkdown, serializeMarkdown } from './markdown';
+import { type NodeJSON, markKey, parseInline, parseMarkdown, serializeMarkdown } from './markdown';
 
 const t = (text: string, ...styles: string[]): NodeJSON =>
   styles.length ? { type: 'text', text, marks: styles.map((style) => ({ type: 'charStyle', attrs: { style } })) } : { type: 'text', text };
@@ -158,12 +158,47 @@ describe('round trips', () => {
       expect(plain(doc)).toBe(pieces.map((x) => x.text).join(''));
       const styled = (d: NodeJSON) =>
         (d.content?.[0]?.content ?? []).flatMap((x) =>
-          [...(x.text ?? '')].map((ch) => (/\s/.test(ch) ? '' : (x.marks ?? []).map((m) => m.attrs.style).sort().join(','))),
+          [...(x.text ?? '')].map((ch) => (/\s/.test(ch) ? '' : (x.marks ?? []).map(markKey).sort().join(','))),
         );
       const expected = pieces.flatMap((x) =>
-        [...(x.text ?? '')].map((ch) => (/\s/.test(ch) ? '' : (x.marks ?? []).map((m) => m.attrs.style).sort().join(','))),
+        [...(x.text ?? '')].map((ch) => (/\s/.test(ch) ? '' : (x.marks ?? []).map(markKey).sort().join(','))),
       );
       expect(styled(doc)).toEqual(expected);
     }
+  });
+});
+
+describe('notes and footnotes', () => {
+  const note = (text: string, id: string): NodeJSON => ({ type: 'text', text, marks: [{ type: 'note', attrs: { id } }] });
+
+  it('reads a note anchor', () => {
+    expect(parseInline('See [the pie]{.note #n1} here')).toEqual([t('See '), note('the pie', 'n1'), t(' here')]);
+  });
+
+  it('keeps character styles inside a note', () => {
+    const doc = parseMarkdown('[a **pie**]{.note #n2}');
+    expect(serializeMarkdown(doc)).toBe('[a **pie**]{.note #n2}\n');
+  });
+
+  it('reads an inline footnote', () => {
+    expect(parseInline('Cornbread.^[Lou’s recipe, 1962.] Then')).toEqual([
+      t('Cornbread.'),
+      { type: 'footnote', attrs: { text: 'Lou’s recipe, 1962.' } },
+      t(' Then'),
+    ]);
+  });
+
+  it('round-trips footnotes with brackets and stars in them', () => {
+    const md = 'Pie^[a \\[note\\] with \\*stars\\*] and *more*.';
+    expect(serializeMarkdown(parseMarkdown(md))).toBe(md + '\n');
+    expect(parseInline(md)[1]).toEqual({ type: 'footnote', attrs: { text: 'a [note] with *stars*' } });
+  });
+
+  it('leaves a lone caret alone', () => {
+    expect(parseInline('2^3 is eight')).toEqual([t('2^3 is eight')]);
+  });
+
+  it('ignores ids on other classes', () => {
+    expect(parseInline('[x]{.thought #n1}')).toEqual([t('[x]{.thought #n1}')]);
   });
 });

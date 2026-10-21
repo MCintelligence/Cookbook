@@ -13,16 +13,14 @@
  *   - [ ] a checklist item      (- [x] when ticked)
  *
  *   **strong**  *emphasis*  [any character style]{.thought}
+ *   [text a note is attached to]{.note #n1}   ^[an inline footnote]
  *
  * Every literal *, [, ] and \ is escaped, so every unescaped one is markup.
  * Both functions work on ProseMirror JSON and need no editor, so they run in
  * tests and on any platform.
  */
 
-export interface MarkJSON {
-  type: 'charStyle';
-  attrs: { style: string };
-}
+export type MarkJSON = { type: 'charStyle'; attrs: { style: string } } | { type: 'note'; attrs: { id: string } };
 
 export interface NodeJSON {
   type: string;
@@ -36,6 +34,18 @@ export const BODY_STYLE = 'body';
 const SCENE_BREAK = '* * *';
 const FENCE = ':::';
 const STAR_STYLES: Record<string, number> = { strong: 2, emphasis: 1 };
+const NOTE_PREFIX = 'note#';
+
+/** Marks are handled internally as string keys: a style id, or note#<id>. */
+export function markKey(m: MarkJSON): string {
+  return m.type === 'note' ? NOTE_PREFIX + m.attrs.id : m.attrs.style;
+}
+
+function keyToMark(key: string): MarkJSON {
+  return key.startsWith(NOTE_PREFIX)
+    ? { type: 'note', attrs: { id: key.slice(NOTE_PREFIX.length) } }
+    : { type: 'charStyle', attrs: { style: key } };
+}
 
 // ---------- parsing ----------
 
@@ -117,7 +127,8 @@ type Token =
   | { kind: 'text'; text: string }
   | { kind: 'stars'; count: number; left: number; canOpen: boolean; canClose: boolean }
   | { kind: 'open' }
-  | { kind: 'close'; style: string };
+  | { kind: 'close'; style: string; raw: string }
+  | { kind: 'footnote'; text: string };
 
 function tokenize(src: string): Token[] {
   const tokens: Token[] = [];
@@ -145,6 +156,22 @@ function tokenize(src: string): Token[] {
       i = j;
       continue;
     }
+    if (ch === '^' && src[i + 1] === '[') {
+      // An inline footnote runs to the first unescaped ].
+      let j = i + 2;
+      let note = '';
+      while (j < src.length && src[j] !== ']') {
+        if (src[j] === '\\' && j + 1 < src.length) j++;
+        note += src[j];
+        j++;
+      }
+      if (j < src.length) {
+        pushText();
+        tokens.push({ kind: 'footnote', text: note });
+        i = j + 1;
+        continue;
+      }
+    }
     if (ch === '[') {
       pushText();
       tokens.push({ kind: 'open' });
@@ -152,10 +179,10 @@ function tokenize(src: string): Token[] {
       continue;
     }
     if (ch === ']') {
-      const m = /^\]\{\.([A-Za-z0-9_-]+)\}/.exec(src.slice(i));
-      if (m) {
+      const m = /^\]\{\.([A-Za-z0-9_-]+)(?: #([A-Za-z0-9_-]+))?\}/.exec(src.slice(i));
+      if (m && (m[2] === undefined || m[1] === 'note')) {
         pushText();
-        tokens.push({ kind: 'close', style: m[1]! });
+        tokens.push({ kind: 'close', style: m[2] === undefined ? m[1]! : NOTE_PREFIX + m[2], raw: m[0] });
         i += m[0].length;
         continue;
       }
@@ -209,27 +236,27 @@ export function parseInline(src: string): NodeJSON[] {
   const push = (text: string, i: number) => {
     if (!text) return;
     const styles = spans.filter((s) => s.from < i && i < s.to).map((s) => s.style);
-    const marks = [...new Set(styles)].sort(compareStyles).map((style) => ({ type: 'charStyle' as const, attrs: { style } }));
+    const marks = [...new Set(styles)].sort(compareStyles).map(keyToMark);
     const prev = out[out.length - 1];
-    if (prev && sameMarks(prev.marks, marks)) prev.text += text;
+    if (prev?.type === 'text' && sameMarks(prev.marks, marks)) prev.text += text;
     else out.push(marks.length > 0 ? { type: 'text', text, marks } : { type: 'text', text });
   };
   tokens.forEach((t, i) => {
     if (t.kind === 'text') push(t.text, i);
     else if (t.kind === 'stars') push('*'.repeat(t.left), i);
-    else if (literal.has(i)) push(t.kind === 'open' ? '[' : `]{.${t.style}}`, i);
+    else if (t.kind === 'footnote') out.push({ type: 'footnote', attrs: { text: t.text } });
+    else if (literal.has(i)) push(t.kind === 'open' ? '[' : t.raw, i);
   });
   return out;
 }
 
 function sameMarks(a: MarkJSON[] | undefined, b: MarkJSON[]): boolean {
-  const x = (a ?? []).map((m) => m.attrs.style).join(' ');
-  return x === b.map((m) => m.attrs.style).join(' ');
+  return (a ?? []).map(markKey).join(' ') === b.map(markKey).join(' ');
 }
 
-/** Bracket styles wrap outermost, then strong, then emphasis. */
+/** Notes wrap outermost, then bracket styles, then strong, then emphasis. */
 function compareStyles(a: string, b: string): number {
-  const rank = (s: string) => STAR_STYLES[s] === undefined ? 0 : 3 - STAR_STYLES[s]!;
+  const rank = (s: string) => (s.startsWith(NOTE_PREFIX) ? -1 : STAR_STYLES[s] === undefined ? 0 : 3 - STAR_STYLES[s]!);
   return rank(a) - rank(b) || a.localeCompare(b);
 }
 
@@ -291,14 +318,21 @@ interface Piece {
   text: string;
   styles: string[];
   space: boolean;
+  footnote?: string;
 }
 
 function serializeInline(nodes: NodeJSON[]): string {
   // Split whitespace off the edges of each text run so delimiters always touch words.
   const pieces: Piece[] = [];
   for (const n of nodes) {
+    if (n.type === 'footnote') {
+      // Footnotes sit inside whatever styles surround them, so they keep the run going.
+      const prev = pieces[pieces.length - 1];
+      pieces.push({ text: '', styles: prev && !prev.space ? prev.styles : [], space: false, footnote: String(n.attrs?.text ?? '') });
+      continue;
+    }
     if (n.type !== 'text' || !n.text) continue;
-    const styles = [...new Set((n.marks ?? []).map((m) => m.attrs.style))].sort(compareStyles);
+    const styles = [...new Set((n.marks ?? []).map(markKey))].sort(compareStyles);
     for (const part of n.text.split(/(\s+)/)) {
       if (part) pieces.push({ text: part, styles, space: /^\s+$/.test(part) });
     }
@@ -312,9 +346,18 @@ function serializeInline(nodes: NodeJSON[]): string {
 
   let out = '';
   const stack: string[] = [];
-  const close = (style: string) => (STAR_STYLES[style] ? '*'.repeat(STAR_STYLES[style]!) : `]{.${style}}`);
+  const close = (style: string) =>
+    STAR_STYLES[style]
+      ? '*'.repeat(STAR_STYLES[style]!)
+      : style.startsWith(NOTE_PREFIX)
+        ? `]{.note #${style.slice(NOTE_PREFIX.length)}}`
+        : `]{.${style}}`;
   const open = (style: string) => (STAR_STYLES[style] ? '*'.repeat(STAR_STYLES[style]!) : '[');
   for (const p of pieces) {
+    if (p.footnote !== undefined) {
+      out += `^[${escapeText(p.footnote)}]`;
+      continue;
+    }
     let keep = 0;
     while (keep < stack.length && p.styles.includes(stack[keep]!)) keep++;
     while (stack.length > keep) out += close(stack.pop()!);

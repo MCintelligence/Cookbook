@@ -4,6 +4,20 @@ import { Editor } from '@tiptap/core';
 import { cookbookExtensions, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
+import {
+  addNoteAnchor,
+  deleteFootnote,
+  dialogueSpans,
+  dialogueStats,
+  footnotes,
+  insertFootnote,
+  noteAnchors,
+  removeNoteAnchor,
+  setDialogueFocus,
+  setFootnoteText,
+  setTodoChecked,
+  todos,
+} from './seasonings';
 
 const editors: Editor[] = [];
 afterEach(() => editors.splice(0).forEach((e) => e.destroy()));
@@ -121,5 +135,76 @@ describe('find and replace', () => {
     expect(md(editor)).toBe('Mama Lou asked.\n\nLouise and Mama Lou.\n');
     // Matches follow the edit: "lou" now appears inside each replacement.
     expect(getFind(editor.state).matches).toHaveLength(2);
+  });
+
+  it('finds words on both sides of a footnote', () => {
+    const editor = make('Cornbread.^[Lou’s recipe.] Lou baked.');
+    setFindQuery(editor, 'Lou', { matchCase: true, wholeWord: true });
+    stepFind(editor, 1);
+    const { from, to } = editor.state.selection;
+    expect(editor.state.doc.textBetween(from, to)).toBe('Lou');
+  });
+});
+
+describe('notes', () => {
+  it('anchors a note to the selected words', () => {
+    const editor = make('The church had burned that summer.');
+    editor.commands.setTextSelection({ from: 5, to: 22 });
+    expect(addNoteAnchor(editor, ['n1'])).toBe('n2');
+    expect(md(editor)).toBe('The [church had burned]{.note #n2} that summer.\n');
+    expect(noteAnchors(editor.state.doc)).toMatchObject([{ id: 'n2', quote: 'church had burned' }]);
+  });
+
+  it('does not stretch a note when typing after it', () => {
+    const editor = make('[pie]{.note #n1}');
+    editor.commands.focus('end');
+    type(editor, ' crust');
+    expect(md(editor)).toBe('[pie]{.note #n1} crust\n');
+  });
+
+  it('removes a note anchor but keeps the words and other styles', () => {
+    const editor = make('[**hot** pie]{.note #n1} and [tea]{.note #n2}');
+    removeNoteAnchor(editor, 'n1');
+    expect(md(editor)).toBe('**hot** pie and [tea]{.note #n2}\n');
+  });
+});
+
+describe('footnotes', () => {
+  it('inserts, fills and deletes a footnote at the cursor', () => {
+    const editor = make('One. Two.');
+    editor.commands.setTextSelection(5);
+    expect(insertFootnote(editor)).toBe(0);
+    setFootnoteText(editor, 0, 'First\nline.');
+    editor.commands.focus('end');
+    expect(insertFootnote(editor)).toBe(1);
+    setFootnoteText(editor, 1, 'Second [one].');
+    expect(md(editor)).toBe('One.^[First line.] Two.^[Second \\[one\\].]\n');
+    expect(footnotes(editor.state.doc).map((f) => f.text)).toEqual(['First line.', 'Second [one].']);
+    deleteFootnote(editor, 0);
+    expect(md(editor)).toBe('One. Two.^[Second \\[one\\].]\n');
+  });
+});
+
+describe('scene checklist', () => {
+  it('lists and ticks checklist items', () => {
+    const editor = make('- [ ] find the hymn\n- [x] done');
+    const list = todos(editor.state.doc);
+    expect(list.map((t) => [t.text, t.checked])).toEqual([['find the hymn', false], ['done', true]]);
+    setTodoChecked(editor, list[0]!.pos, true);
+    expect(md(editor)).toBe('- [x] find the hymn\n- [x] done\n');
+  });
+});
+
+describe('dialogue focus', () => {
+  it('measures and marks the dialogue', () => {
+    const editor = make('“You writing about me again?” Lou asked.\n\nShe stirred the pot.');
+    expect(dialogueStats(editor.state.doc)).toEqual({ dialogueWords: 5, totalWords: 11 });
+    const [span] = dialogueSpans(editor.state.doc);
+    expect(editor.state.doc.textBetween(span!.from, span!.to)).toBe('“You writing about me again?”');
+    setDialogueFocus(editor, true);
+    expect(editor.view.dom.classList.contains('cb-dialogue-focus')).toBe(true);
+    expect([...editor.view.dom.querySelectorAll('.cb-narration')].map((e) => e.textContent)).toEqual([' Lou asked.', 'She stirred the pot.']);
+    setDialogueFocus(editor, false);
+    expect(editor.view.dom.classList.contains('cb-dialogue-focus')).toBe(false);
   });
 });

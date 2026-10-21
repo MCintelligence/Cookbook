@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
 import { type FoundIssue, applySuggestion, issueAt } from '../proofread/plugin';
+import { RULE_GROUPS } from '../proofread/rules';
 import { type Proofreader } from '../proofread/useProofreader';
 
 const KIND_LABEL = { spelling: 'Spelling', grammar: 'Grammar', style: 'Style' } as const;
@@ -23,6 +24,8 @@ export function useSuggestions(issue: FoundIssue | null, proof: Proofreader): st
   }, [issue?.word, issue?.issue.rule, issue?.issue.suggestions.join('\n')]);
   return found;
 }
+
+const ruleLabel = (id: string) => RULE_GROUPS.flatMap((g) => g.rules).find((r) => r.id === id)?.label;
 
 /** How a fix reads on its button, including the ones that only change spaces. */
 export function fixLabel(problem: string, fix: string): string {
@@ -56,9 +59,14 @@ export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor;
             Add to dictionary
           </button>
         )}
-        <button className="pill" onClick={done(() => proof.ignore(issue))}>
+        <button className="pill" title="Only this one, here" onClick={done(() => proof.ignore(issue, 'once'))}>
           Ignore
         </button>
+        {issue.issue.rule !== 'spelling' && (
+          <button className="pill" title="This, everywhere in the book" onClick={done(() => proof.ignore(issue, 'always'))}>
+            Ignore everywhere
+          </button>
+        )}
         {issue.issue.why && (
           <button className="pill" aria-expanded={why} onClick={() => setWhy(!why)}>
             Why?
@@ -66,6 +74,11 @@ export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor;
         )}
       </div>
       {why && <p className="issue-why">{issue.issue.why}</p>}
+      {ruleLabel(issue.group) && (
+        <button className="issue-off" onClick={done(() => proof.setRuleOn(issue.group, false))}>
+          Stop checking {ruleLabel(issue.group)!.toLowerCase()}
+        </button>
+      )}
     </>
   );
 }

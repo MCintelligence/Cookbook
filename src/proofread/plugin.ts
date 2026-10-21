@@ -3,7 +3,8 @@ import { type Node as PMNode } from '@tiptap/pm/model';
 import { type EditorState, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import { type TextMap, textMap } from '../editor/textmap';
-import { type Issue, ignoreKey } from './check';
+import { type Issue } from './check';
+import { type Hiding, type IssueKeys, isHidden, keysOf } from './rules';
 import { isSentenceRule } from './style';
 import { type Checker } from './client';
 
@@ -22,8 +23,8 @@ interface ProofState {
   version: number;
   /** Issues by paragraph text, with offsets into that text. */
   cache: Map<string, Issue[]>;
-  /** What the writer chose to leave alone in this scene (see ignoreKey). */
-  ignored: Set<string>;
+  /** What the writer ignored and the checks they switched off. */
+  hiding: Hiding;
   set: DecorationSet;
   /** The word the writer is typing, whose underline waits until they leave it. */
   fresh: { from: number; to: number } | null;
@@ -33,12 +34,13 @@ interface Meta {
   checker?: Checker | null;
   review?: boolean;
   ignored?: Set<string>;
+  off?: Set<string>;
   results?: { version: number; entries: [string, Issue[]][] };
   /** Drops the underlines on a word at once, such as one just added to the dictionary. */
   forget?: string;
 }
 
-export interface FoundIssue {
+export interface FoundIssue extends IssueKeys {
   from: number;
   to: number;
   word: string;
@@ -58,7 +60,7 @@ function mapOf(node: PMNode): TextMap {
   return map;
 }
 
-function decorate(pos: number, map: TextMap, issue: Issue): Decoration {
+function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Decoration {
   const from = pos + 1 + map.positions[issue.from]!;
   const to = pos + 2 + map.positions[issue.to - 1]!;
   const word = map.text.slice(issue.from, issue.to);
@@ -66,20 +68,23 @@ function decorate(pos: number, map: TextMap, issue: Issue): Decoration {
   const space = word.trim() === '' ? ' cb-issue-space' : '';
   // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
   const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
-  return Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, { issue, word, key: ignoreKey(issue, word) });
+  return Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, { issue, word, ...keys });
 }
 
 /** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */
-function build(doc: PMNode, cache: Map<string, Issue[]>, ignored: Set<string>, old: DecorationSet): DecorationSet {
+function build(doc: PMNode, cache: Map<string, Issue[]>, hiding: Hiding, old: DecorationSet): DecorationSet {
   const decos: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
     const map = mapOf(node);
     const issues = cache.get(map.text);
     if (issues) {
-      for (const issue of issues) if (!ignored.has(ignoreKey(issue, map.text.slice(issue.from, issue.to)))) decos.push(decorate(pos, map, issue));
+      for (const issue of issues) {
+        const keys = keysOf(issue, map.text);
+        if (!isHidden(keys, hiding)) decos.push(decorate(pos, map, issue, keys));
+      }
     } else {
-      decos.push(...old.find(pos, pos + node.nodeSize).filter((d) => !ignored.has((d.spec as { key: string }).key)));
+      decos.push(...old.find(pos, pos + node.nodeSize).filter((d) => !isHidden(d.spec as IssueKeys, hiding)));
     }
     return false;
   });
@@ -172,7 +177,7 @@ export const Proofread = Extension.create({
       new Plugin<ProofState>({
         key: proofreadKey,
         state: {
-          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), ignored: new Set(), set: DecorationSet.empty, fresh: null }),
+          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), hiding: { ignored: new Set(), off: new Set() }, set: DecorationSet.empty, fresh: null }),
           apply(tr, value, _old, state) {
             const meta = tr.getMeta(proofreadKey) as Meta | undefined;
             let next = value;
@@ -188,7 +193,8 @@ export const Proofread = Extension.create({
             if (meta) {
               if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map() };
               if (meta.review !== undefined && meta.review !== next.review) next = { ...next, review: meta.review, version: next.version + 1, cache: new Map() };
-              if (meta.ignored) next = { ...next, ignored: meta.ignored };
+              if (meta.ignored) next = { ...next, hiding: { ...next.hiding, ignored: meta.ignored } };
+              if (meta.off) next = { ...next, hiding: { ...next.hiding, off: meta.off } };
               if (meta.forget) {
                 const word = meta.forget;
                 const spelling = (spec: { word: string; issue: Issue }) => spec.issue.kind === 'spelling' && spec.word === word;
@@ -203,7 +209,7 @@ export const Proofread = Extension.create({
               // Leaving review takes grammar and style away at once; spelling stays until rechecked.
               if (meta.review === false) next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => (spec as { issue: Issue }).issue.kind !== 'spelling')) };
             }
-            if (tr.docChanged || (meta && (meta.ignored || meta.results))) next = { ...next, set: build(state.doc, next.cache, next.ignored, next.set) };
+            if (tr.docChanged || (meta && (meta.ignored || meta.off || meta.results))) next = { ...next, set: build(state.doc, next.cache, next.hiding, next.set) };
             return next;
           },
         },
@@ -238,6 +244,11 @@ export function setReview(editor: Editor, review: boolean): void {
   send(editor, { review });
 }
 
+/** Rule groups (see ruleGroup) the writer has switched off. */
+export function setRulesOff(editor: Editor, off: Iterable<string>): void {
+  send(editor, { off: new Set(off) });
+}
+
 export function setIgnored(editor: Editor, ignored: Iterable<string>): void {
   send(editor, { ignored: new Set(ignored) });
 }
@@ -247,8 +258,8 @@ export function forgetWord(editor: Editor, word: string): void {
 }
 
 function found(d: Decoration): FoundIssue {
-  const spec = d.spec as { issue: Issue; word: string };
-  return { from: d.from, to: d.to, word: spec.word, issue: spec.issue };
+  const spec = d.spec as { issue: Issue; word: string } & IssueKeys;
+  return { from: d.from, to: d.to, word: spec.word, issue: spec.issue, key: spec.key, once: spec.once, group: spec.group };
 }
 
 /** Every issue shown in the scene, in order. */

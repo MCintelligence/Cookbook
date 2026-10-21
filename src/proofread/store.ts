@@ -7,7 +7,8 @@ import { type Dialect } from './check';
  *
  *   dictionary.txt           the writer's own words, one a line, so they
  *                            travel with the book and can be edited by hand
- *   .cookbook/ignored.json   words ignored in each scene, by scene id
+ *   .cookbook/ignored.json   what was ignored in each scene, by scene id,
+ *                            and in the whole book, under "*"
  */
 export const DICTIONARY_FILE = 'dictionary.txt';
 export const IGNORED_FILE = joinPath(HIDDEN_FOLDER, 'ignored.json');
@@ -15,6 +16,9 @@ export const IGNORED_FILE = joinPath(HIDDEN_FOLDER, 'ignored.json');
 const HEADER = '# Words Cookbook’s proofreader should never flag, one a line.';
 
 export type Ignored = Record<string, string[]>;
+
+/** The key in ignored.json for things ignored everywhere in the book. */
+export const BOOK_WIDE = '*';
 
 export function parseDictionary(text: string): string[] {
   const words = text

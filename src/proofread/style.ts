@@ -138,7 +138,7 @@ export function textGrade(paragraphs: string[]): { grade: number; words: number;
       total++;
     }
   }
-  return { grade: Math.round(gradeLevel(letters, count, total)), words: count, sentences: total };
+  return { grade: count > 0 ? Math.max(1, Math.round(gradeLevel(letters, count, total))) : 0, words: count, sentences: total };
 }
 
 const HARD = 10;

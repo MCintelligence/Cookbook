@@ -21,10 +21,11 @@ import {
   readDocument,
   readTree,
   renameFolder,
+  walkFiles,
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, akaOf, statusOf, synopsisOf, withField } from './storage/document';
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
@@ -32,7 +33,9 @@ import { plainText } from './editor/markdown';
 import { exportHistory } from './ui/exportHistory';
 import { TemplateMenu } from './ui/TemplateMenu';
 import { WritingFooter } from './ui/WritingFooter';
-import { type BookIndex, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
+import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
+import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
+import { NamePeek } from './ui/NamePeek';
 import {
   type BookLocation,
   DEFAULT_BOOK,
@@ -545,6 +548,44 @@ export function App() {
       setError(`Couldn’t add that picture: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
+  // Linked names follow the index, but only change when a name does, not on every save.
+  const namedKey = JSON.stringify(
+    [...cards]
+      .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
+      .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind, aka: c.aka }) as NamedCard),
+  );
+  const namedCards = useMemo(() => JSON.parse(namedKey) as NamedCard[], [namedKey]);
+  const matcher = useMemo(() => nameMatcher(namedCards), [namedCards]);
+  useEffect(() => {
+    if (editor) setNameMatcher(editor, matcher);
+  }, [editor, matcher]);
+  const castIds = useEditorState({
+    editor,
+    selector: ({ editor }) => (editor ? castOf(editor.state.doc, nameMatcherOf(editor.state)).map((c) => c.id).join('\n') : ''),
+  });
+  const cast = useMemo(() => {
+    const byId = new Map(namedCards.map((c) => [c.id, c]));
+    return (castIds ?? '').split('\n').flatMap((id) => byId.get(id) ?? []);
+  }, [castIds, namedCards]);
+
+  const [appearsIn, setAppearsIn] = useState<SceneMention[] | null>(null);
+  useEffect(() => {
+    const current = index.current;
+    if (!fs || !current || !doc || (doc.kind !== 'character' && doc.kind !== 'setting')) return setAppearsIn(null);
+    const { id } = doc;
+    const mentions = current.index.scenesNaming([doc.title, ...akaOf(doc.fields)], (text) => countNames(text, matcher).get(id) ?? 0);
+    let live = true;
+    // In the order the scenes come on the Bookshelf.
+    readTree(fs, BOOKSHELF, order.current).then((shelf) => {
+      const at = new Map([...walkFiles(shelf)].map((f, i) => [f.path, i]));
+      if (live) setAppearsIn(mentions.sort((a, b) => (at.get(a.path) ?? Infinity) - (at.get(b.path) ?? Infinity)));
+    }, () => live && setAppearsIn(mentions));
+    return () => {
+      live = false;
+    };
+  }, [fs, doc?.id, doc?.kind, indexVersion, matcher]); // the card's own edits show once saved
+  const loadCard = useCallback((p: string) => (fs ? readDocument(fs, p) : Promise.reject(new Error('No book is open.'))), [fs]);
+
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
@@ -652,6 +693,7 @@ export function App() {
             synopsis={synopsisOf(doc.fields)}
             onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)}
             onSynopsis={(text) => setCardField('synopsis', text)}
+            cast={cast}
           />
         )}
         {doc && path && doc.kind !== 'scene' && (
@@ -659,6 +701,7 @@ export function App() {
             doc={doc}
             choices={cardChoices}
             incoming={incoming}
+            appearsIn={appearsIn}
             loadPicture={loadPicture}
             onChange={(next) => {
               setDoc(next);
@@ -709,6 +752,8 @@ export function App() {
           onClose={() => setSeasoningsOpen(false)}
         />
       )}
+
+      <NamePeek loadCard={loadCard} loadPicture={loadPicture} onOpen={(p) => void select(p)} />
 
       {libraryOpen && (
         <BookLibrary

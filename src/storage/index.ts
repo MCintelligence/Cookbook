@@ -33,6 +33,12 @@ export interface IndexedDocument {
 /** What the Bookshelf shows on each card. */
 export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka'>;
 
+export interface SceneMention {
+  path: string;
+  title: string;
+  count: number;
+}
+
 /** A relationship another card has with this one, such as Ruth's "Mother of" on June's card. */
 export interface IncomingRelationship {
   path: string;
@@ -162,6 +168,26 @@ export class BookIndex {
       this.db.exec({ sql: 'update docs set path = ? || substr(path, ?) where path = ? or substr(path, 1, ?) = ?', bind });
       this.db.exec({ sql: 'update links set from_path = ? || substr(from_path, ?) where from_path = ? or substr(from_path, 1, ?) = ?', bind });
     });
+  }
+
+  /**
+   * Scenes that name a card. Full-text search narrows the scenes down to
+   * those with any of the names in them; `count` then checks each one exactly
+   * (case and whole words), since search ignores case and word endings.
+   */
+  scenesNaming(names: string[], count: (text: string) => number): SceneMention[] {
+    const query = names
+      .map((n) => n.match(/[\p{L}\p{N}]+/gu)?.join(' '))
+      .filter(Boolean)
+      .map((n) => `"${n}"`)
+      .join(' OR ');
+    if (!query) return [];
+    const rows = this.db.selectArrays(
+      `select d.path, d.title, docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid
+        where docs_fts match ? and d.kind = 'scene'`,
+      [`text : (${query})`],
+    ) as [string, string, string][];
+    return rows.map(([path, title, text]) => ({ path, title, count: count(text) })).filter((m) => m.count > 0);
   }
 
   /** The relationships other cards have with the card whose id this is. */

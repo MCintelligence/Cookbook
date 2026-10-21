@@ -1,15 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { STATUSES, type SceneStatus } from '../storage/document';
+import { type NamedCard } from '../editor/names';
 
 interface Props {
   status: SceneStatus;
   synopsis: string;
   onStatus: (status: SceneStatus) => void;
   onSynopsis: (synopsis: string) => void;
+  /** The characters and settings named in the scene, in order of appearance. */
+  cast: NamedCard[];
 }
 
 /** The recipe card for the open scene: where it is up to and what happens in it. Sits above the page, never on it. */
-export function CardDetails({ status, synopsis, onStatus, onSynopsis }: Props) {
+export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Props) {
   const box = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -39,6 +42,15 @@ export function CardDetails({ status, synopsis, onStatus, onSynopsis }: Props) {
         value={synopsis}
         onChange={(e) => onSynopsis(e.target.value)}
       />
+      {cast.length > 0 && (
+        <div className="card-cast" aria-label="In this scene">
+          {cast.map((c) => (
+            <button key={c.id} className={`cast-chip cast-${c.kind}`} data-peek="" data-card={c.path} title={c.kind === 'character' ? 'Character' : 'Setting'}>
+              {c.title}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

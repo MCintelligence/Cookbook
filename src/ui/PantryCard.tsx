@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { type CookbookDocument, type Relationship, akaOf, cardFieldsOf, portraitOf, relationshipsOf } from '../storage/document';
-import { type IncomingRelationship } from '../storage/index';
+import { type IncomingRelationship, type SceneMention } from '../storage/index';
 
 export interface CardChoice {
   id: string;
@@ -14,6 +14,8 @@ interface Props {
   choices: CardChoice[];
   /** Relationships other cards have with this one. */
   incoming: IncomingRelationship[];
+  /** Scenes that name this card, in Bookshelf order; null for cards that can't be named. */
+  appearsIn: SceneMention[] | null;
   loadPicture: (path: string) => Promise<string>;
   onChange: (doc: CookbookDocument) => void;
   onPickPortrait: (file: File) => void;
@@ -27,7 +29,7 @@ const label = (key: string) => key.charAt(0).toUpperCase() + key.slice(1);
  * the writer's own fields and relationships. The free writing is the page
  * below, in the same editor as a scene.
  */
-export function PantryCard({ doc, choices, incoming, loadPicture, onChange, onPickPortrait, onOpen }: Props) {
+export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onChange, onPickPortrait, onOpen }: Props) {
   const fields = cardFieldsOf(doc.fields);
   const relationships = relationshipsOf(doc.fields);
   const portrait = portraitOf(doc.fields);
@@ -168,6 +170,21 @@ export function PantryCard({ doc, choices, incoming, loadPicture, onChange, onPi
             <button className="ghost pc-add" onClick={() => setRelationships([...relationships, { to: '', as: '' }])}>
               + Relationship
             </button>
+          </div>
+        )}
+
+        {appearsIn && (
+          <div className="pc-relations">
+            <span className="pc-heading">Appears in</span>
+            {appearsIn.length === 0 && <span className="pc-quiet">No scene names {doc.title} yet.</span>}
+            {appearsIn.map((m) => (
+              <div className="pc-row pc-incoming" key={m.path}>
+                <button className="pc-link" onClick={() => onOpen(m.path)}>
+                  {m.title}
+                </button>
+                <span>{m.count === 1 ? 'once' : `${m.count} times`}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>

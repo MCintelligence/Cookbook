@@ -13,8 +13,15 @@ export interface Issue {
   /** Which check found it, such as "spelling" or "name"; used to ignore and to switch checks off. */
   rule: string;
   message: string;
-  /** Replacements to offer. Spelling suggestions are worked out only when asked for. */
+  /** Replacements for the whole of from–to; an empty one removes it. Spelling suggestions are worked out only when asked for. */
   suggestions: string[];
+  /** What the rule looks for, for the card's Why? */
+  why?: string;
+}
+
+/** What Ignore remembers: the word for spelling, the rule and its text for anything else. */
+export function ignoreKey(issue: Pick<Issue, 'kind' | 'rule'>, text: string): string {
+  return issue.kind === 'spelling' ? text : `${issue.rule}:${text}`;
 }
 
 export interface Speller {

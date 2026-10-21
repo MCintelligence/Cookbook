@@ -3,7 +3,8 @@ import { type Request, type Response } from './worker';
 
 /** What the editor needs from a proofreader. Tests give it one that runs in place. */
 export interface Checker {
-  check(texts: string[]): Promise<Issue[][]>;
+  /** Spelling; with `review`, grammar and style too. */
+  check(texts: string[], review: boolean): Promise<Issue[][]>;
   suggest(word: string): Promise<string[]>;
 }
 
@@ -39,8 +40,8 @@ export class WorkerChecker implements Checker {
     return this.ask({ type: 'configure', dialect, words, names });
   }
 
-  check(texts: string[]): Promise<Issue[][]> {
-    return this.ask({ type: 'check', texts });
+  check(texts: string[], review: boolean): Promise<Issue[][]> {
+    return this.ask({ type: 'check', texts, review });
   }
 
   suggest(word: string): Promise<string[]> {

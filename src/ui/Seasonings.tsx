@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
+import { type Node as PMNode } from '@tiptap/pm/model';
 import {
   addNoteAnchor,
   deleteFootnote,
@@ -19,6 +20,7 @@ import {
 } from '../editor/seasonings';
 import { DIALECTS } from '../proofread/check';
 import { type FoundIssue, issuesOf, selectIssue } from '../proofread/plugin';
+import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
 import { IssueActions } from './IssueCard';
 
@@ -73,6 +75,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
         dialogue: dialogueStats(doc),
         focus: isDialogueFocus(editor.state),
         issues: issuesOf(editor.state),
+        grade: textGrade(paragraphs(doc)),
       };
     },
   });
@@ -137,9 +140,17 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
                 </button>
               ))}
             </div>
-            <span className="seas-hint">Checked on this device. Story names from the Pantry are always spelt right.</span>
+            {scene.grade.sentences > 0 && (
+              <span className="seas-grade">
+                <span>
+                  Readability: <strong>grade {scene.grade.grade}</strong>
+                </span>
+                <span className="seas-hint">{gradeNote(scene.grade.grade)}</span>
+              </span>
+            )}
+            <span className="seas-hint">Spelling, grammar and style are checked on this device. Story names from the Pantry are always spelt right.</span>
           </div>
-          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix in the spelling here.</div>}
+          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix here. Spelling, grammar and style all look good.</div>}
           {scene.issues.map((i) => {
             const key = issueKey(i);
             return (
@@ -152,7 +163,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
                     selectIssue(editor, i);
                   }}
                 >
-                  <span className="seas-issue-word">{i.word}</span> {i.issue.message}
+                  <span className="seas-issue-word">{shortQuote(i.word)}</span> {i.issue.message}
                 </button>
                 {openIssue === key && <IssueActions editor={editor} issue={i} proof={proof} onDone={() => setOpenIssue(null)} />}
               </div>
@@ -257,6 +268,28 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
     </aside>
   );
 }
+
+/** Every paragraph's text, for the grade level. */
+function paragraphs(doc: PMNode): string[] {
+  const out: string[] = [];
+  doc.descendants((node) => {
+    if (!node.isTextblock) return true;
+    out.push(node.textContent);
+    return false;
+  });
+  return out;
+}
+
+const gradeNote = (grade: number) =>
+  grade <= 6 ? 'Easy to read. Most novels sit between grades 4 and 8.' : grade <= 9 ? 'Comfortable for most readers.' : 'Hard going. Shorter sentences and plainer words will bring it down.';
+
+/** A whole sentence is too long for the list; its first words are enough to find it. */
+const shortQuote = (text: string) => {
+  const t = text.trim();
+  if (!t) return 'Space';
+  const ws = t.split(/\s+/);
+  return ws.length > 6 ? `${ws.slice(0, 6).join(' ')}…` : t;
+};
 
 const issueKey = (i: FoundIssue) => `${i.from}:${i.issue.rule}:${i.word}`;
 

@@ -3,7 +3,8 @@ import { type Node as PMNode } from '@tiptap/pm/model';
 import { type EditorState, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import { type TextMap, textMap } from '../editor/textmap';
-import { type Issue } from './check';
+import { type Issue, ignoreKey } from './check';
+import { isSentenceRule } from './style';
 import { type Checker } from './client';
 
 /**
@@ -15,11 +16,13 @@ import { type Checker } from './client';
 
 interface ProofState {
   checker: Checker | null;
+  /** Reviewing (Seasonings is open): grammar and style are checked too, not just spelling. */
+  review: boolean;
   /** Goes up whenever the checker or its dictionary changes; older answers are dropped. */
   version: number;
   /** Issues by paragraph text, with offsets into that text. */
   cache: Map<string, Issue[]>;
-  /** Words the writer chose to leave alone in this scene. */
+  /** What the writer chose to leave alone in this scene (see ignoreKey). */
   ignored: Set<string>;
   set: DecorationSet;
   /** The word the writer is typing, whose underline waits until they leave it. */
@@ -28,6 +31,7 @@ interface ProofState {
 
 interface Meta {
   checker?: Checker | null;
+  review?: boolean;
   ignored?: Set<string>;
   results?: { version: number; entries: [string, Issue[]][] };
   /** Drops the underlines on a word at once, such as one just added to the dictionary. */
@@ -58,7 +62,11 @@ function decorate(pos: number, map: TextMap, issue: Issue): Decoration {
   const from = pos + 1 + map.positions[issue.from]!;
   const to = pos + 2 + map.positions[issue.to - 1]!;
   const word = map.text.slice(issue.from, issue.to);
-  return Decoration.inline(from, to, { class: `cb-issue cb-issue-${issue.kind}`, 'data-rule': issue.rule }, { issue, word });
+  // Spaces can't show an underline, so they are tinted instead.
+  const space = word.trim() === '' ? ' cb-issue-space' : '';
+  // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
+  const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
+  return Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, { issue, word, key: ignoreKey(issue, word) });
 }
 
 /** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */
@@ -69,9 +77,9 @@ function build(doc: PMNode, cache: Map<string, Issue[]>, ignored: Set<string>, o
     const map = mapOf(node);
     const issues = cache.get(map.text);
     if (issues) {
-      for (const issue of issues) if (!ignored.has(map.text.slice(issue.from, issue.to))) decos.push(decorate(pos, map, issue));
+      for (const issue of issues) if (!ignored.has(ignoreKey(issue, map.text.slice(issue.from, issue.to)))) decos.push(decorate(pos, map, issue));
     } else {
-      decos.push(...old.find(pos, pos + node.nodeSize).filter((d) => !ignored.has((d.spec as { word: string }).word)));
+      decos.push(...old.find(pos, pos + node.nodeSize).filter((d) => !ignored.has((d.spec as { key: string }).key)));
     }
     return false;
   });
@@ -131,7 +139,7 @@ function checkInBackground(view: EditorView) {
     const done = () => {
       if (askingFor === version) for (const t of texts) asking.delete(t);
     };
-    state.checker.check(texts).then(
+    state.checker.check(texts, state.review).then(
       (results) => {
         done();
         if (view.isDestroyed) return;
@@ -164,7 +172,7 @@ export const Proofread = Extension.create({
       new Plugin<ProofState>({
         key: proofreadKey,
         state: {
-          init: () => ({ checker: null, version: 0, cache: new Map(), ignored: new Set(), set: DecorationSet.empty, fresh: null }),
+          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), ignored: new Set(), set: DecorationSet.empty, fresh: null }),
           apply(tr, value, _old, state) {
             const meta = tr.getMeta(proofreadKey) as Meta | undefined;
             let next = value;
@@ -179,10 +187,12 @@ export const Proofread = Extension.create({
             }
             if (meta) {
               if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map() };
+              if (meta.review !== undefined && meta.review !== next.review) next = { ...next, review: meta.review, version: next.version + 1, cache: new Map() };
               if (meta.ignored) next = { ...next, ignored: meta.ignored };
               if (meta.forget) {
                 const word = meta.forget;
-                next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => (spec as { word: string }).word === word)) };
+                const spelling = (spec: { word: string; issue: Issue }) => spec.issue.kind === 'spelling' && spec.word === word;
+                next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => spelling(spec as { word: string; issue: Issue }))) };
               }
               if (meta.results && meta.results.version === next.version) {
                 const cache = new Map(next.cache);
@@ -190,6 +200,8 @@ export const Proofread = Extension.create({
                 next = { ...next, cache: prune(state.doc, cache) };
               }
               if (!next.checker) return { ...next, set: DecorationSet.empty };
+              // Leaving review takes grammar and style away at once; spelling stays until rechecked.
+              if (meta.review === false) next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => (spec as { issue: Issue }).issue.kind !== 'spelling')) };
             }
             if (tr.docChanged || (meta && (meta.ignored || meta.results))) next = { ...next, set: build(state.doc, next.cache, next.ignored, next.set) };
             return next;
@@ -221,6 +233,11 @@ export function setChecker(editor: Editor, checker: Checker | null): void {
   send(editor, { checker });
 }
 
+/** Grammar and style are checked only while the writer is reviewing. */
+export function setReview(editor: Editor, review: boolean): void {
+  send(editor, { review });
+}
+
 export function setIgnored(editor: Editor, ignored: Iterable<string>): void {
   send(editor, { ignored: new Set(ignored) });
 }
@@ -243,7 +260,9 @@ export function issuesOf(state: EditorState): FoundIssue[] {
 /** The issue under a document position, for the card that opens when an underline is clicked. */
 export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const ps = proofreadKey.getState(state);
-  const d = ps?.set.find(pos, pos).find((d) => d.from <= pos && pos < d.to) ?? ps?.set.find(pos, pos)[0];
+  // The narrowest one: a word's issue, not the sentence around it.
+  const here = (ps?.set.find(pos, pos) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
+  const d = here[0];
   return d ? found(d) : null;
 }
 

@@ -14,6 +14,10 @@ export interface StorageAdapter {
   readText(path: string): Promise<string>;
   /** Writes the whole file, replacing it safely so a crash never leaves half a scene. */
   writeText(path: string, text: string): Promise<void>;
+  readBytes(path: string): Promise<Uint8Array>;
+  writeBytes(path: string, data: Uint8Array): Promise<void>;
+  /** Changes whenever the file's contents change, so the hidden index only rereads what is new. */
+  stamp(path: string): Promise<string>;
   exists(path: string): Promise<boolean>;
   list(folder: string): Promise<Entry[]>;
   makeFolder(path: string): Promise<void>;

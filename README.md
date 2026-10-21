@@ -14,13 +14,14 @@ Each book is an ordinary folder you can open in any text editor, back up, or kee
 
 ```
 My Book/
-  book.json        title and format version
+  book.json        title, format version and daily word goal
+  writing-history.csv  words written and deleted each day
   bookshelf/       scenes, in nested folders (parts, chapters)
   pantry/
     characters/
     settings/
     research/
-  .cookbook/       search index and undo history; safe to delete, Cookbook rebuilds it
+  .cookbook/       hidden: search index, undo history and trash (see below)
 ```
 
 Every scene and card is a Markdown file with a small YAML header:
@@ -49,10 +50,14 @@ Dear June, the pie wants more nutmeg than you think.
 
 [She'll never let me read it,]{.thought} she thought.
 
+The [church had burned]{.note #n1} that summer.^[Blessed Assurance.]
+
 - [ ] find Lou's hymn
 ```
 
 Plain paragraphs use the Body style. `::: name` blocks use a named paragraph style, `**strong**`, `*emphasis*` and `[text]{.name}` are character styles, `* * *` is a scene break, and `- [ ]` is a checklist item. The styles themselves live in `styles.json` in the book folder.
+
+`^[text]` is a footnote, written where its number goes. `[text]{.note #n1}` marks the words a note to yourself is about; the note itself sits in the scene's header, under `notes:`, so it never ends up in the manuscript.
 
 ## Typing shortcuts
 
@@ -64,8 +69,28 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `--` | an em dash |
 | `"` and `'` | curly quotes |
 | `* * *` on its own line | a scene break |
+| ⌘⌥M (Ctrl+Alt+M) | a note to yourself on the selected words |
+| ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
 Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
+## Starting points and goals
+
+A new book can start as a novel (chapters of scenes, plus a main character and setting in the Pantry), a short story, or nonfiction (chapters of sections, plus a note for sources). Under the Bookshelf, "New scene from template" offers a blank scene, a chapter opener or a letter. Under the Pantry, the same button makes character, setting and research cards.
+
+The footer shows today's words against your daily goal, your streak, and the open scene's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging scenes move words without counting them as written.
+
+## Undo, splitting and merging
+
+Undo reaches back past closing a scene or the app. Each scene's changes are logged in `.cookbook/undo/`, and opening the scene replays them, so ⌘Z picks up where you left off. If a scene's file was changed in another app, its undo history starts fresh; your text is never touched.
+
+Click a scene break (`* * *`) to split the scene there, so everything after it becomes a new scene right after this one, or to merge the next scene into this one. A merged scene's file goes to `.cookbook/trash/` rather than being deleted. Its notes and footnotes come along.
+
+Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and you only lose undo history and the trash.
+
+## Seasonings
+
+The Seasonings button in the top bar opens everything for reviewing a scene, in this order: the proofreader (coming in Phase 3), your notes and the scene's checklist, footnotes, and dialogue. Dialogue shows how much of the scene is spoken and can fade the narration so only the speech stands out.
 
 ## Running it
 
@@ -79,7 +104,11 @@ npm test             # storage, format and editor tests
 npm run build        # production web build, including the offline service worker
 ```
 
-In the browser, books are kept in the browser's private storage. In the desktop app they live in the app's data folder for now; choosing any folder on disk comes in Phase 1.
+Click the book's title in the top bar to see your books, start a new one or open a book folder. In the desktop app a book can live in any folder. In the browser, books are kept in the browser's private storage, and Chrome and Edge can also open a real folder on your computer.
+
+## Search
+
+The search box in the top bar finds and replaces in the open scene, and lists every other scene and Pantry card that matches. Words match from their start and by stem, so “corn” finds “cornbread” and “run” finds “running”. The index is SQLite with full-text search, kept in `.cookbook/index.sqlite`; opening a book only rereads the files that changed since last time.
 
 ## Project layout
 

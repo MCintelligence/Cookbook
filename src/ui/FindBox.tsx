@@ -1,9 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../editor/findPlugin';
+import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
 
-/** The one search box in the top bar. For now it searches the open scene. */
-export function FindBox({ editor }: { editor: Editor | null }) {
+const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Scene', character: 'Character', setting: 'Setting', research: 'Research' };
+
+interface Props {
+  editor: Editor | null;
+  /** Searches every scene and Pantry card in the book. */
+  search: (query: string) => SearchHit[];
+  currentPath: string | null;
+  onOpenHit: (path: string) => void;
+}
+
+/**
+ * The one search box in the top bar. It finds and replaces in the open scene,
+ * and lists the other scenes and cards that match.
+ */
+export function FindBox({ editor, search, currentPath, onOpenHit }: Props) {
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [wholeWord, setWholeWord] = useState(false);
@@ -20,9 +34,20 @@ export function FindBox({ editor }: { editor: Editor | null }) {
     },
   }) ?? { count: 0, current: -1 };
 
+  const jumpOnOpen = useRef(false);
   useEffect(() => {
-    if (editor) setFindQuery(editor, query, { wholeWord, matchCase });
+    if (!editor) return;
+    setFindQuery(editor, query, { wholeWord, matchCase });
+    // Opening a scene from the results lands on its first match.
+    if (jumpOnOpen.current) {
+      jumpOnOpen.current = false;
+      stepFind(editor, 1);
+    }
   }, [editor, query, wholeWord, matchCase]);
+
+  const deferred = useDeferredValue(query);
+  const hits = useMemo(() => (deferred.trim() ? search(deferred) : []), [deferred, search]);
+  const elsewhere = hits.filter((h) => h.path !== currentPath);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -59,7 +84,7 @@ export function FindBox({ editor }: { editor: Editor | null }) {
         <input
           ref={input}
           value={query}
-          placeholder="Find in this scene"
+          placeholder="Find in this book"
           aria-label="Find"
           onFocus={() => setOpen(true)}
           onChange={(e) => setQuery(e.target.value)}
@@ -97,8 +122,56 @@ export function FindBox({ editor }: { editor: Editor | null }) {
             </button>
             <span className="find-hint">↵ next · ⇧↵ previous · Esc close</span>
           </div>
+          {query.trim() !== '' && (
+            <div className="find-results">
+              <div className="find-results-label">
+                <span>Elsewhere in the book</span>
+                <span>{elsewhere.length === 0 ? 'Nothing else' : elsewhere.length}</span>
+              </div>
+              {elsewhere.length > 0 && (
+                <ul>
+                  {elsewhere.map((h) => (
+                    <li key={h.path}>
+                      <button
+                        className="find-hit"
+                        onClick={() => {
+                          jumpOnOpen.current = true;
+                          onOpenHit(h.path);
+                        }}
+                      >
+                        <span className="find-hit-head">
+                          <span className="find-hit-title">{h.title}</span>
+                          <span className="find-hit-kind">{KIND_LABEL[h.kind]}</span>
+                        </span>
+                        <Snippet text={h.snippet} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       )}
     </div>
+  );
+}
+
+/** Shows a search snippet with the matched words highlighted. */
+function Snippet({ text }: { text: string }) {
+  const parts = text.split(MATCH_START);
+  return (
+    <span className="find-hit-snippet">
+      {parts.map((part, i) => {
+        if (i === 0) return <Fragment key={i}>{part}</Fragment>;
+        const [match, rest] = part.split(MATCH_END);
+        return (
+          <Fragment key={i}>
+            <mark>{match}</mark>
+            {rest}
+          </Fragment>
+        );
+      })}
+    </span>
   );
 }

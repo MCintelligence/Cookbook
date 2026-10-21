@@ -1,4 +1,4 @@
-import { mkdir, readDir, readTextFile, remove, rename, exists, writeTextFile } from '@tauri-apps/plugin-fs';
+import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, stat, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { type Entry, type StorageAdapter, joinPath } from './adapter';
 
 /** A book folder anywhere on the writer's disk, for the desktop and mobile apps. */
@@ -19,6 +19,21 @@ export class TauriAdapter implements StorageAdapter {
     const tmp = this.abs(path) + '.cookbook-tmp';
     await writeTextFile(tmp, text);
     await rename(tmp, this.abs(path));
+  }
+
+  readBytes(path: string): Promise<Uint8Array> {
+    return readFile(this.abs(path));
+  }
+
+  async writeBytes(path: string, data: Uint8Array): Promise<void> {
+    const tmp = this.abs(path) + '.cookbook-tmp';
+    await writeFile(tmp, data);
+    await rename(tmp, this.abs(path));
+  }
+
+  async stamp(path: string): Promise<string> {
+    const info = await stat(this.abs(path));
+    return `${info.mtime?.getTime() ?? 0}:${info.size}`;
   }
 
   exists(path: string): Promise<boolean> {

@@ -8,6 +8,7 @@ import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
 import { BODY_STYLE } from './markdown';
 import { FindExtension } from './findPlugin';
+import { DialogueFocus, Footnote, Note, type SeasoningsRequest } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
@@ -174,13 +175,15 @@ export function toggleCharStyle(editor: Editor, style: string): boolean {
   return true;
 }
 
-export function cookbookExtensions(nextStyle: NextStyle) {
+export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
   return [
     Document,
     Text,
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,
     CharStyle,
+    Note.configure({ onRequest }),
+    Footnote.configure({ onRequest }),
     BulletList.extend({
       addInputRules() {
         return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
@@ -216,5 +219,6 @@ export function cookbookExtensions(nextStyle: NextStyle) {
     Dropcursor,
     Gapcursor,
     FindExtension,
+    DialogueFocus,
   ];
 }

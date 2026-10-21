@@ -4,6 +4,7 @@ import { type EditorState, Plugin, PluginKey, TextSelection } from '@tiptap/pm/s
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 import { type TextMap, textMap } from '../editor/textmap';
 import { type Issue, ignoreKey } from './check';
+import { isSentenceRule } from './style';
 import { type Checker } from './client';
 
 /**
@@ -63,7 +64,9 @@ function decorate(pos: number, map: TextMap, issue: Issue): Decoration {
   const word = map.text.slice(issue.from, issue.to);
   // Spaces can't show an underline, so they are tinted instead.
   const space = word.trim() === '' ? ' cb-issue-space' : '';
-  return Decoration.inline(from, to, { class: `cb-issue cb-issue-${issue.kind}${space}`, 'data-rule': issue.rule }, { issue, word, key: ignoreKey(issue, word) });
+  // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
+  const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
+  return Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, { issue, word, key: ignoreKey(issue, word) });
 }
 
 /** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */
@@ -257,7 +260,9 @@ export function issuesOf(state: EditorState): FoundIssue[] {
 /** The issue under a document position, for the card that opens when an underline is clicked. */
 export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const ps = proofreadKey.getState(state);
-  const d = ps?.set.find(pos, pos).find((d) => d.from <= pos && pos < d.to) ?? ps?.set.find(pos, pos)[0];
+  // The narrowest one: a word's issue, not the sentence around it.
+  const here = (ps?.set.find(pos, pos) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
+  const d = here[0];
   return d ? found(d) : null;
 }
 

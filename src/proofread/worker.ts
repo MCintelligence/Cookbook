@@ -2,10 +2,12 @@
 import nspell from 'nspell';
 import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
+import { isSentenceRule, styleIssues } from './style';
 
 /**
  * The proofreader's background worker: it holds the Hunspell dictionary and,
- * once the writer starts reviewing, Harper's grammar engine, so loading them
+ * once the writer starts reviewing, Harper's grammar engine and the style
+ * checks, so loading them
  * and checking text never stalls typing.
  */
 export type Request =
@@ -82,7 +84,12 @@ async function handle(req: Request): Promise<unknown> {
   const g = await loadGrammar();
   await grammarConfigured;
   const found = await g.grammarIssues(g.linter, req.texts, spelling, g.why);
-  return spelling.map((s, i) => [...s, ...found[i]!].sort((a, b) => a.from - b.from));
+  return spelling.map((s, i) => {
+    const marked = [...s, ...found[i]!];
+    // Our style notes give way to a mistake on the same words; whole sentences can hold both.
+    const style = styleIssues(req.texts[i]!, names).filter((st) => isSentenceRule(st.rule) || !marked.some((m) => st.from < m.to && st.to > m.from));
+    return [...marked, ...style].sort((a, b) => a.from - b.from);
+  });
 }
 
 self.onmessage = (e: MessageEvent<Request>) => {

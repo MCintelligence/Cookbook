@@ -43,7 +43,7 @@ export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor;
     <>
       <div className="issue-fixes">
         {suggestions === null && <span className="issue-quiet">Finding suggestions…</span>}
-        {suggestions?.length === 0 && <span className="issue-quiet">No suggestions.</span>}
+        {suggestions?.length === 0 && issue.issue.kind === 'spelling' && <span className="issue-quiet">No suggestions.</span>}
         {suggestions?.map((s) => (
           <button key={s} className="issue-fix" onClick={done(() => applySuggestion(editor, issue, s))}>
             {fixLabel(issue.word, s)}
@@ -83,7 +83,8 @@ export function IssueCard({ editor, proof }: { editor: Editor | null; proof: Pro
     if (!editor) return;
     const down = (e: MouseEvent) => {
       if (box.current?.contains(e.target as Node)) return;
-      const el = e.target instanceof Element ? e.target.closest('.cb-issue') : null;
+      // Hard and sticky sentences are only tinted; they are listed in Seasonings rather than opened by every click.
+      const el = e.target instanceof Element ? e.target.closest('.cb-issue:not(.cb-issue-sentence)') : null;
       if (!el || e.button !== 0 || !editor.view.dom.contains(el)) return setOpen(null);
       const issue = issueAt(editor.state, editor.view.posAtDOM(el, 0));
       setOpen(issue ? { issue, rect: el.getBoundingClientRect() } : null);

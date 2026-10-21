@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/storage/adapter.ts","./src/storage/book.ts","./src/storage/document.ts","./src/storage/index.ts","./src/storage/memory.ts","./src/storage/opfs.ts","./src/storage/platform.ts","./src/storage/storage.test.ts","./src/storage/tauri.ts","./src/ui/Logo.tsx","./src/ui/Tree.tsx","./vite.config.ts"],"version":"5.9.3"}

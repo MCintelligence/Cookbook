@@ -587,7 +587,7 @@ export function App() {
     },
     [fs, book],
   );
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, editor, docId: doc?.id ?? null, names: storyNames, onError: setError });
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
   const castIds = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? castOf(editor.state.doc, nameMatcherOf(editor.state)).map((c) => c.id).join('\n') : ''),

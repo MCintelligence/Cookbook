@@ -137,9 +137,9 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
                 </button>
               ))}
             </div>
-            <span className="seas-hint">Checked on this device. Story names from the Pantry are always spelt right.</span>
+            <span className="seas-hint">Spelling, grammar and style are checked on this device. Story names from the Pantry are always spelt right.</span>
           </div>
-          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix in the spelling here.</div>}
+          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix here. Spelling, grammar and style all look good.</div>}
           {scene.issues.map((i) => {
             const key = issueKey(i);
             return (
@@ -152,7 +152,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
                     selectIssue(editor, i);
                   }}
                 >
-                  <span className="seas-issue-word">{i.word}</span> {i.issue.message}
+                  <span className="seas-issue-word">{i.word.trim() || 'Space'}</span> {i.issue.message}
                 </button>
                 {openIssue === key && <IssueActions editor={editor} issue={i} proof={proof} onDone={() => setOpenIssue(null)} />}
               </div>

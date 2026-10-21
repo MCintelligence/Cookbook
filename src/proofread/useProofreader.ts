@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
 import { type StorageAdapter } from '../storage/adapter';
-import { type Dialect } from './check';
+import { type Dialect, ignoreKey } from './check';
 import { WorkerChecker } from './client';
-import { forgetWord, setChecker, setIgnored } from './plugin';
+import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview } from './plugin';
 import { type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
 
 export interface Proofreader {
@@ -13,8 +13,8 @@ export interface Proofreader {
   words: string[];
   addWord: (word: string) => void;
   removeWord: (word: string) => void;
-  /** Leaves a word alone in the open scene. */
-  ignore: (word: string) => void;
+  /** Leaves an issue alone in the open scene: that word, or for grammar and style, that rule on that text. */
+  ignore: (issue: FoundIssue) => void;
   suggest: (word: string) => Promise<string[]>;
 }
 
@@ -28,11 +28,13 @@ interface Options {
   docId: string | null;
   /** Every character's and setting's names, never flagged and checked for near misses. */
   names: string[];
+  /** Reviewing (Seasonings is open): grammar and style are checked too. */
+  review: boolean;
   onError: (message: string) => void;
 }
 
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, names, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, names, review, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -89,6 +91,10 @@ export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, 
     if (editor) setChecker(editor, ready > 0 ? checker.current : null);
   }, [editor, ready]);
 
+  useEffect(() => {
+    if (editor) setReview(editor, review);
+  }, [editor, review]);
+
   const sceneIgnored = docId ? ignored[docId] : undefined;
   useEffect(() => {
     if (editor) setIgnored(editor, sceneIgnored ?? []);
@@ -112,9 +118,10 @@ export function useProofreader({ fs, dialect: chosen, onDialect, editor, docId, 
         if (!words.includes(word)) saveWords([...words, word]);
       },
       removeWord: (word) => saveWords(words.filter((w) => w !== word)),
-      ignore: (word) => {
+      ignore: (issue) => {
         if (!docId) return;
-        const next = { ...ignored, [docId]: [...new Set([...(ignored[docId] ?? []), word])] };
+        const key = ignoreKey(issue.issue, issue.word);
+        const next = { ...ignored, [docId]: [...new Set([...(ignored[docId] ?? []), key])] };
         setIgnoredWords(next);
         if (fs) saveIgnored(fs, next).catch(() => {});
       },

@@ -4,7 +4,7 @@ A warm, cozy writing app for novelists. It works fully offline, needs no account
 
 - **Book:** write scenes on a quiet page, organised on the Bookshelf in nested folders.
 - **Pantry:** character, setting and research cards that stay linked to the manuscript.
-- **Seasonings:** an on-device proofreader. Spelling works now, with grammar and style coming next.
+- **Seasonings:** an on-device proofreader for spelling and grammar, with style checks coming next.
 
 Cookbook is free and open source under the [Apache 2.0 licence](LICENSE).
 
@@ -144,6 +144,8 @@ Spelling is checked on the device, in a background worker, with the Hunspell wor
 - Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
 - Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
 - Words ignored in a scene are kept in `.cookbook/ignored.json`.
+
+Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running on the device as WebAssembly. It checks agreement, articles, repeated words, punctuation and word choice, underlined in blue, and its cards have a Why? button that explains the rule. Grammar is only checked while Seasonings is open, so drafting stays quiet. Harper is about 20 MB (8 MB compressed), so it loads the first time you open Seasonings, and the offline web app keeps a copy.
 
 The word lists come from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) (MIT and BSD); their licences are in `public/dictionaries/`.
 

@@ -6,9 +6,9 @@ import { TextSelection } from '@tiptap/pm/state';
 import nspell from 'nspell';
 import { cookbookExtensions } from '../editor/extensions';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from '../editor/markdown';
-import { checkSpelling } from './check';
+import { type Issue, checkSpelling } from './check';
 import { type Checker } from './client';
-import { applySuggestion, drawnSet, forgetWord, issueAt, issuesOf, setChecker, setIgnored } from './plugin';
+import { applySuggestion, drawnSet, forgetWord, issueAt, issuesOf, setChecker, setIgnored, setReview } from './plugin';
 
 const speller = nspell({ aff: readFileSync('public/dictionaries/en-US.aff'), dic: readFileSync('public/dictionaries/en-US.dic') });
 const names = ['Mama Lou'];
@@ -17,9 +17,12 @@ const names = ['Mama Lou'];
 function checker() {
   const asked: string[] = [];
   const c: Checker = {
-    check: async (texts) => {
+    check: async (texts, review) => {
       asked.push(...texts);
-      return texts.map((t) => checkSpelling(t, speller, names));
+      // Stands in for grammar: "a apple".
+      const grammar = (t: string): Issue[] =>
+        [...t.matchAll(/\ba (?=[aeiou])/g)].map((m) => ({ from: m.index, to: m.index + 1, kind: 'grammar', rule: 'AnA', message: 'Use “an”.', suggestions: ['an'] }));
+      return texts.map((t) => [...checkSpelling(t, speller, names), ...(review ? grammar(t) : [])]);
     },
     suggest: async (word) => speller.suggest(word),
   };
@@ -108,6 +111,25 @@ describe('proofreading in the editor', () => {
     expect(serializeMarkdown(editor.getJSON() as NodeJSON)).toBe('She was *received* well.\n');
     await settle();
     expect(shown(editor)).toEqual([]);
+  });
+
+  it('checks grammar only while reviewing, and ignores it by rule and text', async () => {
+    const editor = make('Teh cook ate a apple and a egg.');
+    setChecker(editor, checker().c);
+    await settle();
+    expect(shown(editor)).toEqual(['Teh']);
+    setReview(editor, true);
+    await settle();
+    expect(issuesOf(editor.state).map((i) => [i.word, i.issue.kind])).toEqual([
+      ['Teh', 'spelling'],
+      ['a', 'grammar'],
+      ['a', 'grammar'],
+    ]);
+    setIgnored(editor, ['AnA:a']);
+    expect(shown(editor)).toEqual(['Teh']);
+    setIgnored(editor, []);
+    setReview(editor, false);
+    expect(shown(editor)).toEqual(['Teh']);
   });
 
   it('stops underlining when switched off', async () => {

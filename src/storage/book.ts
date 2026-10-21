@@ -6,8 +6,9 @@ import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder,
  * A book is a plain folder the writer owns:
  *
  *   My Book/
- *     book.json          title, format version and word goal
+ *     book.json          title, format version, word goal and spelling
  *     writing-history.csv words written per day
+ *     dictionary.txt     the writer's own words for the proofreader
  *     bookshelf/         scenes, in nested folders (parts, chapters)
  *     pantry/
  *       characters/
@@ -31,6 +32,8 @@ export interface BookInfo {
   created: string;
   /** Words a day the writer is aiming for. */
   dailyGoal?: number;
+  /** American or British spelling, for the proofreader. */
+  dialect?: 'en-US' | 'en-GB';
 }
 
 export const DEFAULT_DAILY_GOAL = 1000;
@@ -67,6 +70,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     title: info.title ?? 'Untitled book',
     created: info.created ?? '',
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
+    ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
   };
 }
 

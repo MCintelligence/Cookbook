@@ -14,7 +14,7 @@ export default defineConfig({
         registerType: 'prompt',
         includeAssets: ['icon.svg'],
         // Precache the fonts and the search engine too, so everything works with no connection.
-        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm}'] },
+        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,aff,dic}'] },
         manifest: {
           name: 'Cookbook',
           short_name: 'Cookbook',

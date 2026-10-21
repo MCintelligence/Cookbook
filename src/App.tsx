@@ -61,6 +61,8 @@ import { BookLibrary } from './ui/BookLibrary';
 import { SceneBreakActions } from './ui/SceneBreakActions';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes } from './ui/PageFootnotes';
+import { useProofreader } from './proofread/useProofreader';
+import { IssueCard } from './ui/IssueCard';
 import { type Notes, Seasonings, type SeasoningsTab, useSeasoningsCount } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
@@ -575,6 +577,17 @@ export function App() {
   useEffect(() => {
     if (editor) setNameMatcher(editor, matcher);
   }, [editor, matcher]);
+  const storyNames = useMemo(() => namedCards.flatMap((c) => [c.title, ...c.aka]), [namedCards]);
+  const onDialect = useCallback(
+    (dialect: 'en-US' | 'en-GB') => {
+      if (!fs || !book) return;
+      const updated = { ...book, dialect };
+      setBook(updated);
+      saveBookInfo(fs, updated).catch((e: unknown) => setError(String(e)));
+    },
+    [fs, book],
+  );
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, editor, docId: doc?.id ?? null, names: storyNames, onError: setError });
   const castIds = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? castOf(editor.state.doc, nameMatcherOf(editor.state)).map((c) => c.id).join('\n') : ''),
@@ -863,10 +876,13 @@ export function App() {
               request={seasoningsRequest}
               onRequest={showInSeasonings}
               onClose={() => setSeasoningsOpen(false)}
+              proof={proof}
             />
           )}
         </div>
       )}
+
+      <IssueCard editor={editor} proof={proof} />
 
       {shelf && (
         <PantryShelf

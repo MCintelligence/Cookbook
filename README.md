@@ -4,7 +4,7 @@ A warm, cozy writing app for novelists. It works fully offline, needs no account
 
 - **Book:** write scenes on a quiet page, organised on the Bookshelf in nested folders.
 - **Pantry:** character, setting and research cards that stay linked to the manuscript.
-- **Seasonings:** an on-device proofreader for spelling, grammar and style (coming in Phase 3).
+- **Seasonings:** an on-device proofreader. Spelling works now, with grammar and style coming next.
 
 Cookbook is free and open source under the [Apache 2.0 licence](LICENSE).
 
@@ -135,7 +135,17 @@ Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and
 
 ## Seasonings
 
-The Seasonings button in the top bar opens everything for reviewing a scene, in this order: the proofreader (coming in Phase 3), your notes and the scene's checklist, footnotes, and dialogue. Dialogue shows how much of the scene is spoken and can fade the narration so only the speech stands out.
+The Seasonings button in the top bar opens everything for reviewing a scene, in this order: the proofreader, your notes and the scene's checklist, footnotes, and dialogue. Dialogue shows how much of the scene is spoken and can fade the narration so only the speech stands out.
+
+### Proofreader
+
+Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in the Proofread tab; it is saved in `book.json`). A word is only underlined once you have moved past it. Click an underline for suggestions, to add the word to your dictionary, or to ignore it in this scene.
+
+- Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
+- Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
+- Words ignored in a scene are kept in `.cookbook/ignored.json`.
+
+The word lists come from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) (MIT and BSD); their licences are in `public/dictionaries/`.
 
 ## Running it
 
@@ -160,6 +170,8 @@ The search box in the top bar finds and replaces in the open scene, and lists ev
 ```
 src/
   storage/   the book folder format, platform adapters (Tauri, browser, memory) and the hidden index
+  editor/    the Tiptap editor: styles, notes, footnotes, linked names
+  proofread/ the proofreader's checks, its background worker and the editor underlines
   ui/        React components
   App.tsx    the app shell: Book and Pantry tabs, Bookshelf, page
 src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android

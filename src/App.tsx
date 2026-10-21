@@ -36,6 +36,8 @@ import { WritingFooter } from './ui/WritingFooter';
 import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
 import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
+import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
+import { PinnedCards } from './ui/PinnedCards';
 import {
   type BookLocation,
   DEFAULT_BOOK,
@@ -138,6 +140,9 @@ export function App() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [pantryView, setPantryView] = useState<PantryView>('all');
   const [pantryQuery, setPantryQuery] = useState('');
+  /** The Pantry shelf, and where the @ that opened it is. */
+  const [shelf, setShelf] = useState<{ at: number | null } | null>(null);
+  const [pins, setPinsState] = useState<string[]>([]);
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -438,6 +443,7 @@ export function App() {
     indexChanged();
     const moved = (p: string) => p === from || p.startsWith(from + '/');
     if (path && moved(path)) setPath(to + path.slice(from.length));
+    if (pins.some(moved)) setPins(pins.map((p) => (moved(p) ? to + p.slice(from.length) : p)));
   };
 
   const moveInTree = async (from: string, folder: string, at: number) => {
@@ -586,6 +592,80 @@ export function App() {
   }, [fs, doc?.id, doc?.kind, indexVersion, matcher]); // the card's own edits show once saved
   const loadCard = useCallback((p: string) => (fs ? readDocument(fs, p) : Promise.reject(new Error('No book is open.'))), [fs]);
 
+  // Pinned cards are remembered per book on this device.
+  const pinsKey = `cookbook.pins:${JSON.stringify(location)}`;
+  useEffect(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(pinsKey) ?? '[]');
+      setPinsState(Array.isArray(saved) ? saved.filter((p): p is string => typeof p === 'string') : []);
+    } catch {
+      setPinsState([]);
+    }
+  }, [pinsKey]);
+  const setPins = (next: string[]) => {
+    setPinsState(next);
+    try {
+      localStorage.setItem(pinsKey, JSON.stringify(next));
+    } catch {
+      // Pins just won't be there next time.
+    }
+  };
+  const pin = (p: string) => {
+    setShelf(null);
+    if (!pins.includes(p)) setPins([p, ...pins]);
+  };
+
+  const shelfCards = useMemo<ShelfCard[]>(
+    () =>
+      [...cards]
+        .filter(([, c]) => c.kind !== 'scene')
+        .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind as ShelfCard['kind'], aka: c.aka })),
+    [cards],
+  );
+  const searchPantry = useCallback(
+    (query: string): SearchHit[] => index.current?.index.search(query, { kinds: ['character', 'setting', 'research'], limit: 20 }) ?? [],
+    // indexVersion changes whenever the index does, like searchBook below.
+    [indexVersion],
+  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setShelf({ at: null });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => {
+    // Typing @ opens the shelf to pick a name; the @ stays if the writer closes it.
+    if (!editor) return;
+    const dom = editor.view.dom;
+    const onInput = (e: Event) => {
+      if ((e as InputEvent).data !== '@') return;
+      window.setTimeout(() => {
+        const at = editor.state.selection.from - 1;
+        if (at >= 0 && editor.state.doc.textBetween(at, at + 1) === '@') setShelf({ at });
+      }, 0);
+    };
+    dom.addEventListener('input', onInput);
+    return () => dom.removeEventListener('input', onInput);
+  }, [editor]);
+  const insertName = (name: string) => {
+    const at = shelf?.at ?? null;
+    setShelf(null);
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    if (at !== null && editor.state.doc.textBetween(at, at + 1) === '@') chain.insertContentAt({ from: at, to: at + 1 }, { type: 'text', text: name }).run();
+    else chain.insertContent({ type: 'text', text: name }).run();
+  };
+  const closeShelf = () => {
+    const wasTyping = shelf?.at !== null;
+    setShelf(null);
+    if (wasTyping) editor?.commands.focus();
+  };
+  const drawerOpen = (seasoningsOpen && !!doc) || pins.length > 0;
+
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
@@ -598,7 +678,7 @@ export function App() {
   });
 
   return (
-    <div className={`app${seasoningsOpen && doc ? ' with-seasonings' : ''}`}>
+    <div className={`app${drawerOpen ? ' with-seasonings' : ''}${seasoningsOpen && doc ? ' seasonings-open' : ''}`}>
       <style>{css}</style>
       <header className="topbar">
         <div className="brand-wrap">
@@ -740,20 +820,53 @@ export function App() {
         )}
       </main>
 
-      {seasoningsOpen && doc && (
-        <Seasonings
-          editor={editor}
-          notes={notes}
-          onNotesChange={setNotes}
-          tab={seasoningsTab}
-          onTab={setSeasoningsTab}
-          request={seasoningsRequest}
-          onRequest={showInSeasonings}
-          onClose={() => setSeasoningsOpen(false)}
+      {drawerOpen && (
+        <div className="drawer">
+          {pins.length > 0 && (
+            <PinnedCards
+              paths={pins}
+              version={indexVersion}
+              loadCard={loadCard}
+              loadPicture={loadPicture}
+              onUnpin={(p) => setPins(pins.filter((x) => x !== p))}
+              onOpen={(p) => void select(p)}
+            />
+          )}
+          {seasoningsOpen && doc && (
+            <Seasonings
+              editor={editor}
+              notes={notes}
+              onNotesChange={setNotes}
+              tab={seasoningsTab}
+              onTab={setSeasoningsTab}
+              request={seasoningsRequest}
+              onRequest={showInSeasonings}
+              onClose={() => setSeasoningsOpen(false)}
+            />
+          )}
+        </div>
+      )}
+
+      {shelf && (
+        <PantryShelf
+          cards={shelfCards}
+          castIds={cast.map((c) => c.id)}
+          search={searchPantry}
+          inserting={shelf.at !== null}
+          canInsert={!!editor}
+          loadCard={loadCard}
+          loadPicture={loadPicture}
+          onInsert={insertName}
+          onPin={pin}
+          onOpen={(p) => {
+            setShelf(null);
+            void select(p);
+          }}
+          onClose={closeShelf}
         />
       )}
 
-      <NamePeek loadCard={loadCard} loadPicture={loadPicture} onOpen={(p) => void select(p)} />
+      <NamePeek loadCard={loadCard} loadPicture={loadPicture} onOpen={(p) => void select(p)} onPin={pin} />
 
       {libraryOpen && (
         <BookLibrary
@@ -781,6 +894,9 @@ export function App() {
       )}
 
       <footer className="footer">
+        <button className="shelf-button" title="Pantry shelf (⌘J, or type @ while writing)" onClick={() => setShelf({ at: null })}>
+          Pantry shelf <kbd>⌘J</kbd>
+        </button>
         <WritingFooter
           summary={summary}
           dailyGoal={book?.dailyGoal ?? DEFAULT_DAILY_GOAL}

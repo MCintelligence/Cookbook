@@ -9,7 +9,7 @@ redeployed, and shows the same “A new version of Cookbook is ready” prompt.
 
 ## Once: make the signing key
 
-You need Node 22 on your own computer.
+You need Node.js on your own computer: version 22 or newer (any current version is fine).
 
 1. Make a key pair, with a password you will remember:
 

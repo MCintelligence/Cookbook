@@ -155,7 +155,7 @@ The word lists come from [wooorm/dictionaries](https://github.com/wooorm/diction
 
 ## Running it
 
-You need Node 22. For the desktop app you also need Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your system.
+You need Node 22 or newer. For the desktop app you also need Rust and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your system.
 
 ```sh
 npm install

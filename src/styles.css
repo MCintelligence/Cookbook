@@ -1,0 +1,74 @@
+/* Kitchen cream by default, cast iron in dark mode. */
+:root {
+  --bg: #f6eedf;
+  --sidebar: #f3e8d4;
+  --page: #fffbf3;
+  --line: #e8dac3;
+  --text: #3b2a20;
+  --muted: #6b5444;
+  --accent: #a84a28;
+  --on-accent: #fffbf3;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1a17;
+    --sidebar: #262019;
+    --page: #231e1a;
+    --line: #3a322b;
+    --text: #f1e4d2;
+    --muted: #c2ae97;
+    --accent: #e9a84c;
+    --on-accent: #1e1a17;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Nunito', system-ui, sans-serif;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'top top' 'side page' 'foot foot';
+}
+
+.topbar { grid-area: top; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.brand { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 20px; }
+.crumb { color: var(--muted); }
+
+.sidebar { grid-area: side; background: var(--sidebar); border-right: 1px solid var(--line); padding: 12px; overflow: auto; }
+.tabs { display: flex; gap: 4px; background: var(--bg); border-radius: 12px; padding: 4px; }
+.tabs button { flex: 1; min-height: 36px; border: none; border-radius: 9px; background: transparent; font-weight: 700; }
+.tabs button[aria-selected='true'] { background: var(--page); color: var(--accent); }
+.section-label { display: flex; justify-content: space-between; align-items: center; margin: 16px 4px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.ghost { border: none; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
+
+.tree { list-style: none; margin: 0; padding: 0 0 0 12px; }
+.sidebar > .tree { padding-left: 0; }
+.tree button { display: flex; gap: 6px; width: 100%; text-align: left; border: none; background: transparent; padding: 6px 8px; border-radius: 8px; min-height: 32px; }
+.tree-folder { font-weight: 700; }
+.tree li[aria-selected='true'] > .tree-file { background: var(--page); color: var(--accent); font-weight: 700; }
+.chevron { width: 1em; color: var(--muted); }
+
+.page { grid-area: page; overflow: auto; padding: 48px 24px; display: flex; flex-direction: column; align-items: center; }
+.scene-title { width: 100%; max-width: 680px; font-family: 'Fraunces', Georgia, serif; font-weight: 600; margin: 0 0 16px; }
+.editor { width: 100%; max-width: 680px; flex: 1; min-height: 60vh; border: none; outline: none; resize: none; background: transparent; color: inherit; font-family: 'Literata', Georgia, serif; font-size: 19px; line-height: 1.8; }
+.empty, .error { color: var(--muted); }
+.error { color: #c2264b; }
+
+.footer { grid-area: foot; display: flex; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; grid-template-areas: 'top' 'page' 'foot'; }
+  .sidebar { display: none; }
+}

@@ -14,7 +14,8 @@ Each book is an ordinary folder you can open in any text editor, back up, or kee
 
 ```
 My Book/
-  book.json        title and format version
+  book.json        title, format version and daily word goal
+  writing-history.csv  words written and deleted each day
   bookshelf/       scenes, in nested folders (parts, chapters)
   pantry/
     characters/
@@ -72,6 +73,12 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
 Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+
+## Starting points and goals
+
+A new book can start as a novel (chapters of scenes, plus a main character and setting in the Pantry), a short story, or nonfiction (chapters of sections, plus a note for sources). Under the Bookshelf, "New scene from template" offers a blank scene, a chapter opener or a letter. Under the Pantry, the same button makes character, setting and research cards.
+
+The footer shows today's words against your daily goal, your streak, and the open scene's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging scenes move words without counting them as written.
 
 ## Undo, splitting and merging
 

@@ -10,6 +10,7 @@ import {
   recentBooks,
   sameLocation,
 } from '../storage/platform';
+import { BOOK_TEMPLATES, type BookTemplateId } from '../storage/templates';
 
 interface Props {
   current: BookLocation | null;
@@ -19,7 +20,7 @@ interface Props {
   busy: boolean;
   onOpen: (location: BookLocation) => void;
   onOpenFolder: () => void;
-  onCreate: (title: string, inFolder: boolean) => void;
+  onCreate: (title: string, template: BookTemplateId, inFolder: boolean) => void;
   onAdopt: (location: BookLocation) => void;
   onCancelAdopt: () => void;
   onClose: () => void;
@@ -30,6 +31,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
   const [recent, setRecent] = useState<RecentBook[]>(recentBooks);
   const [inBrowser, setInBrowser] = useState<string[]>([]);
   const [title, setTitle] = useState('');
+  const [template, setTemplate] = useState<BookTemplateId>('novel');
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,17 +120,25 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
               className="lib-new"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (canCreate) onCreate(title.trim(), false);
+                if (canCreate) onCreate(title.trim(), template, false);
               }}
             >
               <label htmlFor="lib-new-title">Start a new book</label>
+              <div className="lib-templates" role="radiogroup" aria-label="Kind of book">
+                {BOOK_TEMPLATES.map((t) => (
+                  <button key={t.id} type="button" role="radio" aria-checked={template === t.id} title={t.description} onClick={() => setTemplate(t.id)}>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+              <span className="lib-template-note">{BOOK_TEMPLATES.find((t) => t.id === template)!.description}</span>
               <div className="lib-row">
                 <input id="lib-new-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
                 <button className="pill pill-accent" type="submit" disabled={!canCreate}>
                   Create
                 </button>
                 {canPickFolder() && (
-                  <button className="pill" type="button" disabled={!canCreate} onClick={() => onCreate(title.trim(), true)}>
+                  <button className="pill" type="button" disabled={!canCreate} onClick={() => onCreate(title.trim(), template, true)}>
                     {folderWord}
                   </button>
                 )}

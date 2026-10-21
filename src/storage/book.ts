@@ -5,7 +5,8 @@ import { type CookbookDocument, type DocumentKind, newId, parseDocument, seriali
  * A book is a plain folder the writer owns:
  *
  *   My Book/
- *     book.json          title and format version
+ *     book.json          title, format version and word goal
+ *     writing-history.csv words written per day
  *     bookshelf/         scenes, in nested folders (parts, chapters)
  *     pantry/
  *       characters/
@@ -27,7 +28,11 @@ export interface BookInfo {
   format: number;
   title: string;
   created: string;
+  /** Words a day the writer is aiming for. */
+  dailyGoal?: number;
 }
+
+export const DEFAULT_DAILY_GOAL = 1000;
 
 export interface TreeNode {
   name: string;
@@ -56,7 +61,23 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
   if (typeof info.format !== 'number' || info.format > FORMAT_VERSION) {
     throw new Error('This book was made by a newer version of Cookbook.');
   }
-  return { format: info.format, title: info.title ?? 'Untitled book', created: info.created ?? '' };
+  return {
+    format: info.format,
+    title: info.title ?? 'Untitled book',
+    created: info.created ?? '',
+    ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
+  };
+}
+
+/** Writes book.json, keeping any settings this version of Cookbook does not know about. */
+export async function saveBookInfo(fs: StorageAdapter, info: BookInfo): Promise<void> {
+  let existing: Record<string, unknown> = {};
+  try {
+    existing = JSON.parse(await fs.readText(BOOK_FILE)) as Record<string, unknown>;
+  } catch {
+    // A missing or damaged book.json is simply replaced.
+  }
+  await fs.writeText(BOOK_FILE, JSON.stringify({ ...existing, ...info }, null, 2) + '\n');
 }
 
 const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });

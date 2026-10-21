@@ -7,6 +7,7 @@ import {
   type BookInfo,
   type TreeNode,
   createBook,
+  DEFAULT_DAILY_GOAL,
   createDocument,
   fileAfter,
   fileNameFor,
@@ -14,9 +15,16 @@ import {
   openBook,
   readDocument,
   readTree,
+  saveBookInfo,
   writeDocument,
 } from './storage/book';
 import { type CookbookDocument } from './storage/document';
+import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
+import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
+import { plainText } from './editor/markdown';
+import { exportHistory } from './ui/exportHistory';
+import { TemplateMenu } from './ui/TemplateMenu';
+import { WritingFooter } from './ui/WritingFooter';
 import { type BookIndex, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
 import {
   type BookLocation,
@@ -61,11 +69,20 @@ function readNotes(doc: CookbookDocument | null): Notes {
   return Object.fromEntries(Object.entries(raw).map(([id, text]) => [id, typeof text === 'string' ? text : String(text ?? '')]));
 }
 
-async function startBook(fs: StorageAdapter, title: string): Promise<BookInfo> {
+async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel'): Promise<BookInfo> {
   const info = await createBook(fs, title);
-  await fs.makeFolder(`${BOOKSHELF}/Chapter 1`);
-  await createDocument(fs, `${BOOKSHELF}/Chapter 1`, 'First scene');
+  await applyBookTemplate(fs, template);
   return info;
+}
+
+/** Words in a scene, not counting markup. */
+function sceneWords(doc: CookbookDocument): number {
+  return countWords(plainText(doc.body));
+}
+
+function sceneGoal(doc: CookbookDocument | null): number | null {
+  const goal = doc?.fields.goal;
+  return typeof goal === 'number' && goal > 0 ? goal : null;
 }
 
 function folderName(location: BookLocation): string {
@@ -117,13 +134,13 @@ export function App() {
    * Opens the book at a location. `create` starts a new book there; `adopt`
    * turns a folder that is not a book yet into one.
    */
-  const openAt = async (target: BookLocation, mode: { create?: string; adopt?: boolean } = {}) => {
+  const openAt = async (target: BookLocation, mode: { create?: string; template?: BookTemplateId; adopt?: boolean } = {}) => {
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
-    if (mode.create) info = await startBook(nextFs, mode.create);
+    if (mode.create) info = await startBook(nextFs, mode.create, mode.template);
     else {
       try {
         info = await openBook(nextFs);
@@ -143,6 +160,7 @@ export function App() {
     setTab('book');
     setBook(info);
     setSheet(await loadStyles(nextFs));
+    setHistory(await loadHistory(nextFs));
     setFs(nextFs);
     setWhere(nextWhere);
     setLocation(target);
@@ -195,7 +213,7 @@ export function App() {
     setAdopting(null);
   }, []);
 
-  const createNewBook = (title: string, inFolder: boolean) =>
+  const createNewBook = (title: string, template: BookTemplateId, inFolder: boolean) =>
     fromLibrary(async () => {
       let target: BookLocation;
       if (inFolder) {
@@ -203,7 +221,7 @@ export function App() {
         if (!parent) return 'cancelled';
         target = await childLocation(parent, fileNameFor(title));
       } else target = await newBookLocation(fileNameFor(title));
-      await openAt(target, { create: title });
+      await openAt(target, { create: title, template });
       return 'done';
     });
 
@@ -236,6 +254,16 @@ export function App() {
   }, [refreshTree]);
 
   const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
+  const [history, setHistoryState] = useState<WritingHistory>(() => new Map());
+  const historyRef = useRef<WritingHistory>(history);
+  const setHistory = (h: WritingHistory) => {
+    historyRef.current = h;
+    setHistoryState(h);
+  };
+  /** Words in the open scene when it was last saved, to count what was written since. */
+  const savedWords = useRef<number | null>(null);
+  /** Set while splitting or merging, which moves words without writing any. */
+  const movingWords = useRef(false);
   const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
 
   const onRecorder = useCallback(
@@ -283,6 +311,17 @@ export function App() {
     const current = index.current;
     pendingSave.current = async () => {
       await writeDocument(fs, target, next);
+      // Count words written, unless the change only moved words between scenes.
+      const words = sceneWords(next);
+      if (!movingWords.current && savedWords.current !== null) {
+        const updated = recordWords(historyRef.current, words - savedWords.current);
+        if (updated !== historyRef.current) {
+          historyRef.current = updated;
+          setHistoryState(updated);
+          await saveHistory(fs, updated).catch((e: unknown) => setError(String(e)));
+        }
+      }
+      savedWords.current = words;
       if (current && current === index.current) {
         current.index.upsert(toIndexed(target, next, await fs.stamp(target)));
         indexChanged();
@@ -301,15 +340,22 @@ export function App() {
     else if (p.startsWith(BOOKSHELF + '/')) setTab('book');
     const opened = await readDocument(fs, p);
     docRef.current = opened;
+    savedWords.current = sceneWords(opened);
     setUndoLog(await readUndoLog(fs, opened.id));
     setPath(p);
     setDoc(opened);
   };
 
-  const addScene = async () => {
+  const addScene = (template?: DocTemplate) => {
+    const chosen = template ?? (tab === 'book' ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES[0]!);
+    // New scenes go in the folder of the scene being written, so they land in the same chapter.
+    const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
+    return addFrom(chosen, folder);
+  };
+
+  const addFrom = async (template: DocTemplate, folder: string) => {
     if (!fs) return;
-    const folder = tab === 'book' ? BOOKSHELF : `${PANTRY}/characters`;
-    const p = await createDocument(fs, folder, tab === 'book' ? 'New scene' : 'New character', tab === 'book' ? 'scene' : 'character');
+    const p = await createFromTemplate(fs, folder, template);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
@@ -327,7 +373,8 @@ export function App() {
     if (moved === null) return;
     const { stay, go } = partitionNotes(readNotes(scene), moved);
     setNotes(stay);
-    await flushSave();
+    movingWords.current = true;
+    await flushSave().finally(() => (movingWords.current = false));
     const title = `${scene.title}, part 2`;
     const p = await createDocument(fs, parentOf(path), title, scene.kind);
     const created = await readDocument(fs, p);
@@ -346,7 +393,8 @@ export function App() {
     const merged = mergeNotes(readNotes(scene), scene.body, readNotes(incoming), incoming.body);
     appendScene(editor, merged.text);
     setNotes(merged.notes);
-    await flushSave();
+    movingWords.current = true;
+    await flushSave().finally(() => (movingWords.current = false));
     await moveToTrash(fs, next.path);
     index.current?.index.remove(next.path);
     indexChanged();
@@ -382,6 +430,7 @@ export function App() {
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
+  const summary = useMemo(() => summarize(history), [history]);
   const undoSteps = useEditorState({ editor, selector: ({ editor }) => (editor ? undoDepth(editor.state) : 0) }) ?? 0;
   const words = useEditorState({
     editor,
@@ -437,11 +486,16 @@ export function App() {
         </div>
         <div className="section-label">
           <span>{tab === 'book' ? 'Bookshelf' : 'Pantry'}</span>
-          <button className="ghost" onClick={addScene}>
+          <button className="ghost" onClick={() => void addScene()}>
             {tab === 'book' ? 'New scene' : 'New card'}
           </button>
         </div>
         <Tree nodes={tree} selected={path} onSelect={select} />
+        <TemplateMenu
+          label={tab === 'book' ? 'New scene from template' : 'New card from template'}
+          templates={tab === 'book' ? SCENE_TEMPLATES : CARD_TEMPLATES}
+          onPick={(t) => void addScene(t)}
+        />
       </nav>
 
       <main className="desk">
@@ -505,7 +559,7 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
-          onCreate={(title, inFolder) => void createNewBook(title, inFolder)}
+          onCreate={(title, template, inFolder) => void createNewBook(title, template, inFolder)}
           onAdopt={(target) =>
             void fromLibrary(async () => {
               await openAt(target, { adopt: true });
@@ -518,7 +572,27 @@ export function App() {
       )}
 
       <footer className="footer">
-        <span>{doc ? `${(words ?? 0).toLocaleString('en')} words` : ''}</span>
+        <WritingFooter
+          summary={summary}
+          dailyGoal={book?.dailyGoal ?? DEFAULT_DAILY_GOAL}
+          sceneWords={doc ? (words ?? 0) : null}
+          sceneGoal={sceneGoal(doc)}
+          onDailyGoal={(goal) => {
+            if (!fs || !book) return;
+            const updated = { ...book, dailyGoal: goal };
+            setBook(updated);
+            saveBookInfo(fs, updated).catch((e: unknown) => setError(String(e)));
+          }}
+          onSceneGoal={(goal) => {
+            const base = docRef.current ?? doc;
+            if (!base) return;
+            const { goal: _old, ...fields } = base.fields;
+            const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
+            setDoc(updated);
+            scheduleSave(updated);
+          }}
+          onExport={() => void exportHistory(book?.title ?? 'Book', history).catch((e: unknown) => setError(String(e)))}
+        />
         <span>
           {doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing · ` : ''}
           {doc ? 'US Letter · 100% · ' : ''}

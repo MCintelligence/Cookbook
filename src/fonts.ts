@@ -1,0 +1,22 @@
+// Bundled so the app looks the same offline on every platform. Latin only, since Cookbook is English-only.
+import '@fontsource/literata/latin-400.css';
+import '@fontsource/literata/latin-400-italic.css';
+import '@fontsource/literata/latin-700.css';
+import '@fontsource/literata/latin-700-italic.css';
+import '@fontsource/eb-garamond/latin-400.css';
+import '@fontsource/eb-garamond/latin-400-italic.css';
+import '@fontsource/eb-garamond/latin-700.css';
+import '@fontsource/eb-garamond/latin-700-italic.css';
+import '@fontsource/libre-baskerville/latin-400.css';
+import '@fontsource/libre-baskerville/latin-400-italic.css';
+import '@fontsource/libre-baskerville/latin-700.css';
+import '@fontsource/courier-prime/latin-400.css';
+import '@fontsource/courier-prime/latin-400-italic.css';
+import '@fontsource/courier-prime/latin-700.css';
+import '@fontsource/courier-prime/latin-700-italic.css';
+import '@fontsource/fraunces/latin-400.css';
+import '@fontsource/fraunces/latin-600.css';
+import '@fontsource/fraunces/latin-700.css';
+import '@fontsource/nunito/latin-400.css';
+import '@fontsource/nunito/latin-600.css';
+import '@fontsource/nunito/latin-700.css';

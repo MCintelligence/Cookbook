@@ -195,10 +195,11 @@ export function darkPageColor(color: string): string {
 }
 
 /** CSS for the page, scoped under `scope`. 12 pt text is 16 px at 100% zoom. */
-export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
+/** `dark` adds the dark-page colours; printed and exported books leave them out. */
+export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true): string {
   const rules: string[] = [];
   // Text colours chosen for paper, redone for the dark page.
-  const dark: string[] = [];
+  const darkRules: string[] = [];
   for (const { id } of sheet.paragraph) {
     const s = resolveParagraphStyle(sheet, id);
     const selector = id === BODY ? `${scope} p:not([data-style]), ${scope} p[data-style="${id}"]` : `${scope} p[data-style="${cssValue(id)}"]`;
@@ -217,7 +218,7 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
         ` font-style: ${s.italic ? 'italic' : 'normal'};` +
         ` }`,
     );
-    dark.push(`${selector} { color: ${cssValue(darkPageColor(s.color))}; }`);
+    darkRules.push(`${selector} { color: ${cssValue(darkPageColor(s.color))}; }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];
@@ -225,7 +226,7 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
     if (c.size) props.push(`font-size: ${c.size * PX_PER_PT}px`);
     if (c.color) {
       props.push(`color: ${cssValue(c.color)}`);
-      dark.push(`${scope} span[data-char~="${cssValue(c.id)}"] { color: ${cssValue(darkPageColor(c.color))}; }`);
+      darkRules.push(`${scope} span[data-char~="${cssValue(c.id)}"] { color: ${cssValue(darkPageColor(c.color))}; }`);
     }
     if (c.bold !== undefined) props.push(`font-weight: ${c.bold ? 700 : 400}`);
     if (c.italic !== undefined) props.push(`font-style: ${c.italic ? 'italic' : 'normal'}`);
@@ -233,6 +234,6 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
     if (c.smallCaps) props.push('font-variant-caps: small-caps');
     rules.push(`${scope} span[data-char~="${cssValue(c.id)}"] { ${props.join('; ')} }`);
   }
-  if (dark.length > 0) rules.push(`@media (prefers-color-scheme: dark) {\n${dark.join('\n')}\n}`);
+  if (dark && darkRules.length > 0) rules.push(`@media (prefers-color-scheme: dark) {\n${darkRules.join('\n')}\n}`);
   return rules.join('\n');
 }

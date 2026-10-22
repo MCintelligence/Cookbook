@@ -14,7 +14,7 @@ import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder,
  *       characters/
  *       settings/
  *       research/
- *     .cookbook/         hidden index and undo history; always safe to delete
+ *     .cookbook/         hidden index, undo history and trash; safe to delete once the trash is empty
  *
  * The order of scenes and folders is kept in order.json (see order.ts).
  * Anything it does not list sorts by name in natural order ("2" before "10").
@@ -36,6 +36,8 @@ export interface BookInfo {
   dialect?: 'en-US' | 'en-GB';
   /** Proofreader checks the writer switched off. */
   proofreadOff?: string[];
+  /** Made the first time the book is exported as an e-book, so readers know a new copy is the same book. */
+  id?: string;
 }
 
 export const DEFAULT_DAILY_GOAL = 1000;
@@ -55,7 +57,7 @@ export async function createBook(fs: StorageAdapter, title: string, now = new Da
   await fs.makeFolder(HIDDEN_FOLDER);
   await fs.writeText(
     joinPath(HIDDEN_FOLDER, 'README.txt'),
-    'Cookbook keeps its search index and undo history here.\nIt can be deleted safely; Cookbook rebuilds it from your files.\n',
+    'Cookbook keeps its search index, undo history and trash here.\nIt can be deleted safely, though anything in trash/ goes with it; Cookbook rebuilds the rest from your files.\n',
   );
   await fs.writeText(BOOK_FILE, JSON.stringify(info, null, 2) + '\n');
   return info;
@@ -246,12 +248,4 @@ export function fileAfter(nodes: TreeNode[], path: string): TreeNode | null {
   return folder ? fileAfter(folder.children ?? [], path) : null;
 }
 
-/** Moves a file into the hidden trash rather than deleting it, so nothing is ever lost by a click. */
-export async function moveToTrash(fs: StorageAdapter, path: string, now = new Date()): Promise<string> {
-  const trash = joinPath(HIDDEN_FOLDER, 'trash');
-  await fs.makeFolder(trash);
-  const stamp = now.toISOString().replace(/[:.]/g, '-');
-  const target = joinPath(trash, `${stamp} ${baseName(path)}`);
-  await fs.rename(path, target);
-  return target;
-}
+export { moveToTrash } from './trash';

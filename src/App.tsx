@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type StorageAdapter, joinPath, parentOf } from './storage/adapter';
+import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
   BOOKSHELF,
   PANTRY,
@@ -28,6 +28,18 @@ import {
 } from './storage/book';
 import { type CookbookDocument, type SceneStatus, akaOf, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
+import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
+import { backupZip } from './storage/backup';
+import { IMPORTABLE, canImport, importFile } from './storage/importer';
+import { collect } from './export/manuscript';
+import { bookDocx } from './export/docx';
+import { bookEpub } from './export/epub';
+import { bookHtml } from './export/html';
+import { bookMarkdown } from './export/markdownExport';
+import { printHtml } from './export/print';
+import { KINDS, saveFile } from './ui/saveFile';
+import { Menu, type MenuItem } from './ui/Menu';
+import { TrashDialog } from './ui/TrashDialog';
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
@@ -155,6 +167,18 @@ export function App() {
   const [pins, setPinsState] = useState<string[]>([]);
   /** The Bookshelf being read as one manuscript, or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
+  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  /** The trash dialog's list: undefined while closed, null while it loads. */
+  const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
+  /** A short message at the bottom of the window, sometimes with an Undo. */
+  const [notice, setNotice] = useState<{ text: string; undo?: () => void; at: number } | null>(null);
+  const say = (text: string, undo?: () => void) => setNotice({ text, undo, at: Date.now() });
+  const importInput = useRef<HTMLInputElement>(null);
+  /** The folder the next "Import files…" goes into, or null for the usual place. */
+  const importInto = useRef<string | null>(null);
+  /** The sidebar folder files are being dragged over, for the drop highlight. */
+  const [fileDrop, setFileDrop] = useState<string | null>(null);
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -484,10 +508,215 @@ export function App() {
     setNotes(merged.notes);
     movingWords.current = true;
     await flushSave().finally(() => (movingWords.current = false));
-    await moveToTrash(fs, next.path);
+    order.current = (await moveToTrash(fs, next.path, new Date(), order.current, await namesIn(parentOf(next.path)))).order;
     index.current?.index.remove(next.path);
     indexChanged();
     await refreshTree();
+  };
+
+  /** What a folder shows now, in order, wherever it is in the book. */
+  const namesIn = async (folder: string): Promise<string[]> => {
+    if (!fs) return [];
+    const top = folder.split('/')[0]!;
+    if (!(await fs.exists(folder))) return [];
+    return childrenOf(await readTree(fs, top, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current }), top, folder).map((n) => n.name);
+  };
+
+  /** The index catches up with files that came or went outside the editor. */
+  const reindex = async () => {
+    const current = index.current;
+    if (!fs || !current || current.fs !== fs) return;
+    if ((await refreshIndex(fs, current.index)) > 0) indexChanged();
+  };
+
+  const closeScene = () => {
+    setEditor(null);
+    docRef.current = null;
+    setDoc(null);
+    setPath(null);
+  };
+
+  /** Moves a scene, card or folder to the trash, with an Undo. */
+  const trashPath = async (p: string) => {
+    if (!fs || PANTRY_FOLDERS.has(p)) return;
+    await flushSave();
+    await saveUndoNow();
+    const label = cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '');
+    try {
+      const gone = await moveToTrash(fs, p, new Date(), order.current, await namesIn(parentOf(p)));
+      order.current = gone.order;
+      const under = (q: string) => q === p || q.startsWith(p + '/');
+      if (path && under(path)) closeScene();
+      if (pins.some(under)) setPins(pins.filter((q) => !under(q)));
+      await reindex();
+      await refreshTree();
+      say(`Moved “${label}” to the trash.`, () => void putBack(gone.name));
+    } catch (e) {
+      setError(`Couldn’t move “${label}” to the trash. ${friendlyError(e)}`);
+    }
+  };
+
+  /** Puts something from the trash back where it was. */
+  const putBack = async (name: string): Promise<string | null> => {
+    if (!fs) return null;
+    try {
+      const back = await restoreFromTrash(fs, name, order.current, namesIn);
+      order.current = back.order;
+      await reindex();
+      await refreshTree();
+      setNotice(null);
+      return back.path;
+    } catch (e) {
+      setError(`Couldn’t put that back. ${friendlyError(e)}`);
+      return null;
+    }
+  };
+
+  const openTrash = () => {
+    if (!fs) return;
+    setTrashItems(null);
+    listTrash(fs).then(setTrashItems, (e: unknown) => {
+      setTrashItems(undefined);
+      setError(friendlyError(e));
+    });
+  };
+
+  const inTrash = async (action: () => Promise<unknown>) => {
+    if (!fs) return;
+    setBusy(true);
+    try {
+      await action();
+      setTrashItems(await listTrash(fs));
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** The whole Bookshelf as a Word file, an e-book, Markdown, or printed (where Save as PDF lives). */
+  const exportBook = async (kind: 'docx' | 'epub' | 'md' | 'print') => {
+    if (!fs || !book) return;
+    await flushSave();
+    try {
+      const m = await collect(fs, book.title, await readTree(fs, BOOKSHELF, order.current));
+      if (kind === 'print') return await printHtml(bookHtml(m, sheet));
+      let id = book.id;
+      if (kind === 'epub' && !id) {
+        id = globalThis.crypto.randomUUID();
+        const updated = { ...book, id };
+        setBook(updated);
+        await saveBookInfo(fs, updated);
+      }
+      const data = kind === 'docx' ? bookDocx(m, sheet) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
+      if (await saveFile(fileNameFor(book.title), data, KINDS[kind])) say(`Exported “${book.title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.`);
+    } catch (e) {
+      setError(`Couldn’t export the book. ${friendlyError(e)}`);
+    }
+  };
+
+  /** Every file in the book, zipped, to keep somewhere else. */
+  const backUp = async () => {
+    if (!fs || !book) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      const name = fileNameFor(book.title);
+      const day = new Date().toLocaleDateString('en-CA');
+      if (await saveFile(`${name} backup ${day}`, await backupZip(fs, name), KINDS.zip)) say(`Backed up “${book.title}”.`);
+    } catch (e) {
+      setError(`Couldn’t back up the book. ${friendlyError(e)}`);
+    }
+  };
+
+  /**
+   * Brings Word, Markdown and text files in as new scenes (or Pantry cards),
+   * after the open one or at the end of `into`.
+   */
+  const importFiles = async (files: File[], into: string | null) => {
+    if (!fs || files.length === 0) return;
+    await flushSave();
+    await saveUndoNow();
+    const folder = into ?? (path?.startsWith(viewRoot + '/') ? parentOf(path) : tab === 'pantry' && viewRoot === PANTRY ? joinPath(PANTRY, 'characters') : viewRoot);
+    const top = folder.split('/')[0]!;
+    const section = sectionOf(folder + '/x');
+    const kind = top === PANTRY && section ? SECTION_KIND[section] : 'scene';
+    const problems: string[] = files.filter((f) => !canImport(f.name)).map((f) => `${f.name} isn’t a Word, Markdown or text file`);
+    let after = path && parentOf(path) === folder ? path : null;
+    let first: string | null = null;
+    let count = 0;
+    for (const file of files.filter((f) => canImport(f.name))) {
+      try {
+        const imported = importFile(file.name, new Uint8Array(await file.arrayBuffer()));
+        const p = await createDocument(fs, folder, imported.title, kind);
+        await writeDocument(fs, p, { ...(await readDocument(fs, p)), body: imported.body });
+        const shelf = await readTree(fs, top, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current });
+        order.current = await placeNew(fs, order.current, shelf, top, p, after);
+        after = p;
+        first ??= p;
+        count++;
+      } catch (e) {
+        problems.push(`${file.name}: ${friendlyError(e)}`);
+      }
+    }
+    await reindex();
+    await refreshTree();
+    if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
+    if (first) {
+      await select(first);
+      const where = folder === top ? (top === BOOKSHELF ? 'the Bookshelf' : 'the Pantry') : `“${baseName(folder)}”`;
+      say(`Imported ${count === 1 ? 'one file' : `${count} files`} into ${where}.`);
+    }
+  };
+
+  const chooseImport = (into: string | null) => {
+    importInto.current = into;
+    importInput.current?.click();
+  };
+
+  /** Where files dropped on the sidebar go: the folder under the pointer, or the folder a scene is in. */
+  const dropFolder = (target: EventTarget | null): string => {
+    const row = (target as Element | null)?.closest?.<HTMLElement>('[data-tree-path]');
+    if (!row) return tab === 'pantry' && viewRoot === PANTRY ? joinPath(PANTRY, 'characters') : viewRoot;
+    const p = row.dataset.treePath!;
+    return row.dataset.treeKind === 'folder' && !(p === PANTRY) ? p : parentOf(p) === PANTRY ? joinPath(PANTRY, 'characters') : parentOf(p);
+  };
+
+  const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenu({
+      label: 'Book',
+      x: r.left,
+      y: r.bottom + 4,
+      items: [
+        { label: 'Your books…', onPick: () => setLibraryOpen(true) },
+        { separator: true },
+        { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
+        { label: 'Export as EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
+        { label: 'Export as Markdown…', hint: '.md', onPick: () => void exportBook('md') },
+        { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
+        { separator: true },
+        { label: 'Import files…', hint: '.docx .md .txt', onPick: () => chooseImport(null) },
+        { label: 'Back up as a zip…', onPick: () => void backUp() },
+        { separator: true },
+        { label: 'Trash', onPick: openTrash },
+      ],
+    });
+  };
+
+  const rowMenu = (node: TreeNode, x: number, y: number) => {
+    const fixed = PANTRY_FOLDERS.has(node.path);
+    const inPantry = node.path.startsWith(PANTRY + '/');
+    const items: MenuItem[] =
+      node.kind === 'file'
+        ? [{ label: 'Open', onPick: () => void select(node.path) }]
+        : [
+            ...(fixed ? [] : [{ label: 'Rename', onPick: () => setRenaming(node.path) }]),
+            { label: inPantry ? 'New card here' : 'New scene here', onPick: () => void addFrom(inPantry ? CARD_TEMPLATES.find((t) => t.folder === sectionOf(node.path + '/x'))! : SCENE_TEMPLATES[0]!, node.path) },
+            { label: 'Import files here…', onPick: () => chooseImport(node.path) },
+          ];
+    if (!fixed) items.push({ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(node.path) });
+    setMenu({ label: node.kind === 'file' ? 'Scene' : 'Folder', x, y, items });
   };
 
   /** Keeps the open scene, the index and closed folders pointing at a file or folder that moved. */
@@ -751,6 +980,12 @@ export function App() {
     await saveIndexNow();
   }, [flushSave, saveUndoNow, saveIndexNow]);
 
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), notice.undo ? 10_000 : 5000);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
@@ -770,7 +1005,7 @@ export function App() {
           <Logo />
           <span className="brand">Cookbook</span>
           <span className="crumb">
-            <button className="crumb-book" aria-haspopup="dialog" title="Your books" onClick={() => setLibraryOpen(true)}>
+            <button className="crumb-book" aria-haspopup="menu" aria-expanded={menu?.label === 'Book'} title="Your books, export, import, backup and trash" onClick={bookMenu}>
               {book?.title ?? 'Books'}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" />
@@ -800,7 +1035,24 @@ export function App() {
 
       <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} />
 
-      <nav className="sidebar" aria-label="Book and Pantry">
+      <nav
+        className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
+        aria-label="Book and Pantry"
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          const folder = dropFolder(e.target);
+          if (folder !== fileDrop) setFileDrop(folder);
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
+        onDrop={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          setFileDrop(null);
+          void importFiles(Array.from(e.dataTransfer.files), dropFolder(e.target));
+        }}
+      >
         <div className="tabs" role="tablist">
           <button role="tab" aria-selected={tab === 'book'} onClick={() => setTab('book')}>
             Book
@@ -837,6 +1089,9 @@ export function App() {
           onMove={(from, folder, at) => void moveInTree(from, folder, at)}
           onStartRename={setRenaming}
           onRename={(p, title) => void renameInTree(p, title)}
+          onMenu={rowMenu}
+          onTrash={(p) => void trashPath(p)}
+          dropTarget={fileDrop}
         />
         )}
         {tab === 'book' && (
@@ -992,6 +1247,66 @@ export function App() {
           onClose={closeLibrary}
         />
       )}
+
+      {menu && <Menu {...menu} onClose={closeMenu} />}
+
+      {trashItems !== undefined && (
+        <TrashDialog
+          items={trashItems}
+          busy={busy}
+          onRestore={(name) =>
+            void inTrash(async () => {
+              const p = await putBack(name);
+              if (p) say(`Put “${baseName(p).replace(/\.md$/, '')}” back in ${parentOf(p) === BOOKSHELF ? 'the Bookshelf' : `“${baseName(parentOf(p))}”`}.`);
+            })
+          }
+          onDelete={(name) =>
+            void inTrash(async () => {
+              if (fs) order.current = await deleteFromTrash(fs, name, order.current);
+            })
+          }
+          onEmpty={() =>
+            void inTrash(async () => {
+              if (fs) order.current = await emptyTrash(fs, order.current);
+            })
+          }
+          onClose={() => setTrashItems(undefined)}
+        />
+      )}
+
+      {notice && (
+        <div className="notice" role="status">
+          <span>{notice.text}</span>
+          {notice.undo && (
+            <button
+              className="notice-undo"
+              onClick={() => {
+                const undo = notice.undo!;
+                setNotice(null);
+                undo();
+              }}
+            >
+              Undo
+            </button>
+          )}
+          <button className="notice-close" aria-label="Dismiss" onClick={() => setNotice(null)}>
+            ×
+          </button>
+        </div>
+      )}
+
+      <input
+        ref={importInput}
+        type="file"
+        multiple
+        hidden
+        accept={IMPORTABLE.join(',')}
+        onChange={(e) => {
+          const files = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = '';
+          void importFiles(files, importInto.current);
+        }}
+      />
 
       <footer className="footer">
         <button className="shelf-button" title="Pantry shelf (⌘J, or type @ while writing)" onClick={() => setShelf({ at: null })}>

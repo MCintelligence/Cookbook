@@ -217,7 +217,8 @@ describe('scene order and trash', () => {
     const fs = new MemoryAdapter();
     await createBook(fs, 'Book');
     const p = await createDocument(fs, 'bookshelf', 'Gone');
-    const to = await moveToTrash(fs, p, new Date('2026-10-21T12:00:00Z'));
+    const { name } = await moveToTrash(fs, p, new Date('2026-10-21T12:00:00Z'));
+    const to = `.cookbook/trash/${name}`;
     expect(to).toBe('.cookbook/trash/2026-10-21T12-00-00-000Z Gone.md');
     expect(await fs.exists(p)).toBe(false);
     expect(await fs.exists(to)).toBe(true);

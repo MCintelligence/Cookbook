@@ -23,6 +23,12 @@ interface Props {
   onStartRename: (path: string) => void;
   /** null when the writer cancels. */
   onRename: (path: string, title: string | null) => void;
+  /** A right-click (or the menu key) on a row, with where to show the menu. */
+  onMenu?: (node: TreeNode, x: number, y: number) => void;
+  /** Delete or Backspace on a row. */
+  onTrash?: (path: string) => void;
+  /** The folder files dragged in from outside would land in. */
+  dropTarget?: string | null;
 }
 
 type Where = 'before' | 'after' | 'inside';
@@ -200,13 +206,13 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename } = shared;
+  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget } = shared;
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
   const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : (locked?.get(node.path) ?? node.name);
   const open = node.kind === 'folder' && !collapsed.has(node.path);
   const children = node.children ?? [];
-  const marker = drop?.row === node.path ? ` drop-${drop.where}` : '';
+  const marker = drop?.row === node.path ? ` drop-${drop.where}` : dropTarget === node.path ? ' drop-inside' : '';
   const total = words.get(node.path) ?? 0;
 
   const rowProps = {
@@ -217,8 +223,22 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
     'data-tree-count': children.length,
     'data-tree-open': String(open),
     onPointerDown: (e: ReactPointerEvent) => begin(e, node, label),
-    onContextMenu: (e: React.MouseEvent) => dragging && e.preventDefault(),
+    onContextMenu: (e: React.MouseEvent) => {
+      if (!dragging && !onMenu) return;
+      e.preventDefault();
+      if (!dragging) onMenu?.(node, e.clientX, e.clientY);
+    },
     onKeyDown: (e: ReactKeyboardEvent) => {
+      const plain = !e.altKey && !e.ctrlKey && !e.metaKey;
+      if (plain && (e.key === 'Delete' || e.key === 'Backspace') && !fixed && onTrash) {
+        e.preventDefault();
+        return onTrash(node.path);
+      }
+      if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onMenu) {
+        e.preventDefault();
+        const r = e.currentTarget.getBoundingClientRect();
+        return onMenu(node, r.left + 24, r.bottom - 4);
+      }
       if (!e.altKey || fixed) return;
       if (e.key === 'ArrowUp' && index > 0) onMove(node.path, parent, index - 1);
       else if (e.key === 'ArrowDown' && index < siblings - 1) onMove(node.path, parent, index + 2);

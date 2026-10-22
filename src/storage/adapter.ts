@@ -18,6 +18,8 @@ export interface StorageAdapter {
   writeBytes(path: string, data: Uint8Array): Promise<void>;
   /** Changes whenever the file's contents change, so the hidden index only rereads what is new. */
   stamp(path: string): Promise<string>;
+  /** When the file last changed, in milliseconds since 1970. */
+  modified(path: string): Promise<number>;
   exists(path: string): Promise<boolean>;
   list(folder: string): Promise<Entry[]>;
   makeFolder(path: string): Promise<void>;

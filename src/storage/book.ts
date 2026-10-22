@@ -1,4 +1,5 @@
 import { type StorageAdapter, joinPath, baseName, parentOf } from './adapter';
+import { type PageSettings, pageOf } from './page';
 import { type CookbookDocument, type DocumentKind, newId, parseDocument, serializeDocument } from './document';
 import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder, sortEntries } from './order';
 
@@ -14,7 +15,7 @@ import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder,
  *       characters/
  *       settings/
  *       research/
- *     .cookbook/         hidden index and undo history; always safe to delete
+ *     .cookbook/         hidden index, undo history and trash; safe to delete once the trash is empty
  *
  * The order of scenes and folders is kept in order.json (see order.ts).
  * Anything it does not list sorts by name in natural order ("2" before "10").
@@ -23,6 +24,8 @@ export const BOOK_FILE = 'book.json';
 export const HIDDEN_FOLDER = '.cookbook';
 export const BOOKSHELF = 'bookshelf';
 export const PANTRY = 'pantry';
+/** Writing that isn't part of the book: diaries, morning pages, ideas. */
+export const JOURNAL = 'journal';
 export const PANTRY_SECTIONS = ['characters', 'settings', 'research'] as const;
 export const FORMAT_VERSION = 1;
 
@@ -36,6 +39,17 @@ export interface BookInfo {
   dialect?: 'en-US' | 'en-GB';
   /** Proofreader checks the writer switched off. */
   proofreadOff?: string[];
+  /** Made the first time the book is exported as an e-book, so readers know a new copy is the same book. */
+  id?: string;
+  /** Page size, margins, view and zoom; see page.ts. */
+  page?: Partial<PageSettings>;
+  /** Words the whole book is aiming for, and when by (YYYY-MM-DD). */
+  bookTarget?: number;
+  deadline?: string;
+  /** Pasted words count as written. Off unless the writer says so. */
+  countPasted?: boolean;
+  /** Saturdays and Sundays without writing don't end a streak. */
+  weekendsOff?: boolean;
 }
 
 export const DEFAULT_DAILY_GOAL = 1000;
@@ -52,13 +66,31 @@ export async function createBook(fs: StorageAdapter, title: string, now = new Da
   const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString() };
   await fs.makeFolder(BOOKSHELF);
   for (const section of PANTRY_SECTIONS) await fs.makeFolder(joinPath(PANTRY, section));
+  await fs.makeFolder(JOURNAL);
   await fs.makeFolder(HIDDEN_FOLDER);
   await fs.writeText(
     joinPath(HIDDEN_FOLDER, 'README.txt'),
-    'Cookbook keeps its search index and undo history here.\nIt can be deleted safely; Cookbook rebuilds it from your files.\n',
+    'Cookbook keeps its search index, undo history and trash here.\nIt can be deleted safely, though anything in trash/ goes with it; Cookbook rebuilds the rest from your files.\n',
   );
   await fs.writeText(BOOK_FILE, JSON.stringify(info, null, 2) + '\n');
   return info;
+}
+
+/**
+ * Runs the steps that lay out a new book. If one fails, everything they added
+ * to the folder is taken away again, so a failed start never leaves half a
+ * book behind. Files that were already there are left alone.
+ */
+export async function makeBookOrUndo<T>(fs: StorageAdapter, steps: () => Promise<T>): Promise<T> {
+  const before = new Set((await fs.list('').catch(() => [])).map((e) => e.name));
+  try {
+    return await steps();
+  } catch (e) {
+    for (const entry of await fs.list('').catch(() => [])) {
+      if (!before.has(entry.name)) await fs.remove(entry.name).catch(() => {});
+    }
+    throw e;
+  }
 }
 
 export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
@@ -74,6 +106,12 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
     ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
     ...(Array.isArray(info.proofreadOff) && { proofreadOff: info.proofreadOff.filter((r): r is string => typeof r === 'string') }),
+    ...(typeof info.id === 'string' && { id: info.id }),
+    ...(info.page && typeof info.page === 'object' && { page: pageOf(info.page) }),
+    ...(typeof info.bookTarget === 'number' && info.bookTarget > 0 && { bookTarget: info.bookTarget }),
+    ...(typeof info.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(info.deadline) && { deadline: info.deadline }),
+    ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
+    ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
   };
 }
 
@@ -175,6 +213,43 @@ export async function placeNew(fs: StorageAdapter, order: Order, tree: TreeNode[
   return next;
 }
 
+/**
+ * Copies a scene, card or folder (with everything in it) to just after the
+ * original, named "… copy". Every copied file gets a new id, so links and
+ * notes keep pointing at the original.
+ */
+export async function duplicateItem(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, from: string): Promise<{ path: string; order: Order }> {
+  const folder = parentOf(from);
+  const isFile = (await fs.list(folder)).some((e) => e.name === baseName(from) && e.kind === 'file');
+  const stem = baseName(from).replace(/\.md$/, '');
+  const name = await freeName(fs, folder, isFile ? `${stem} copy.md` : `${stem} copy`);
+  const to = joinPath(folder, name);
+  let next = order;
+  const copy = async (src: string, dst: string, kind: 'file' | 'folder', top: boolean) => {
+    if (kind === 'file') {
+      const doc = await readDocument(fs, src);
+      await writeDocument(fs, dst, { ...doc, id: newId(), title: top ? `${doc.title} copy` : doc.title });
+      return;
+    }
+    await fs.makeFolder(dst);
+    if (order[src]) next = { ...next, [dst]: [...order[src]] };
+    for (const e of await fs.list(src)) if (e.kind === 'folder' || e.name.endsWith('.md')) await copy(joinPath(src, e.name), joinPath(dst, e.name), e.kind, false);
+  };
+  await copy(from, to, isFile ? 'file' : 'folder', true);
+  return { path: to, order: await placeNew(fs, next, tree, root, to, from) };
+}
+
+/** Puts what a folder holds in name order, A to Z or Z to A. */
+export async function sortFolder(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, folder: string, descending = false): Promise<Order> {
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const names = childrenOf(tree, root, folder)
+    .map((n) => n.name)
+    .sort((a, b) => collator.compare(a.replace(/\.md$/, ''), b.replace(/\.md$/, '')) * (descending ? -1 : 1));
+  const next = { ...order, [folder]: names };
+  await saveOrder(fs, next);
+  return next;
+}
+
 /** Makes a new folder, named "New folder" (or "New folder 2"…), and returns its path. */
 export async function createFolder(fs: StorageAdapter, parent: string, title = 'New folder'): Promise<string> {
   const path = joinPath(parent, await freeName(fs, parent, fileNameFor(title)));
@@ -229,12 +304,4 @@ export function fileAfter(nodes: TreeNode[], path: string): TreeNode | null {
   return folder ? fileAfter(folder.children ?? [], path) : null;
 }
 
-/** Moves a file into the hidden trash rather than deleting it, so nothing is ever lost by a click. */
-export async function moveToTrash(fs: StorageAdapter, path: string, now = new Date()): Promise<string> {
-  const trash = joinPath(HIDDEN_FOLDER, 'trash');
-  await fs.makeFolder(trash);
-  const stamp = now.toISOString().replace(/[:.]/g, '-');
-  const target = joinPath(trash, `${stamp} ${baseName(path)}`);
-  await fs.rename(path, target);
-  return target;
-}
+export { moveToTrash } from './trash';

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CookbookDocument } from '../storage/document';
 import { CardPreview } from './CardPreview';
+import { placeAt } from './zoom';
 
 export interface PeekTarget {
   path: string;
@@ -102,7 +103,7 @@ export function NamePeek({ loadCard, loadPicture, onOpen, onPin }: Props) {
     const r = target.rect;
     const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
     const top = r.bottom + 8 + height > window.innerHeight - 12 ? Math.max(12, r.top - 8 - height) : r.bottom + 8;
-    setPos({ left, top });
+    setPos(placeAt(box.current.parentElement, { left, top }));
   }, [target, card]);
 
   if (!target) return null;

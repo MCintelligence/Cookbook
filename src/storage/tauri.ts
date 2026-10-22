@@ -36,6 +36,10 @@ export class TauriAdapter implements StorageAdapter {
     return `${info.mtime?.getTime() ?? 0}:${info.size}`;
   }
 
+  async modified(path: string): Promise<number> {
+    return (await stat(this.abs(path))).mtime?.getTime() ?? 0;
+  }
+
   exists(path: string): Promise<boolean> {
     return exists(this.abs(path));
   }

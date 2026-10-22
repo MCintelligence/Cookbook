@@ -3,6 +3,7 @@ import { type Editor } from '@tiptap/core';
 import { type FoundIssue, applySuggestion, issueAt } from '../proofread/plugin';
 import { RULE_GROUPS } from '../proofread/rules';
 import { type Proofreader } from '../proofread/useProofreader';
+import { placeAt } from './zoom';
 
 const KIND_LABEL = { spelling: 'Spelling', grammar: 'Grammar', style: 'Style' } as const;
 
@@ -126,7 +127,7 @@ export function IssueCard({ editor, proof }: { editor: Editor | null; proof: Pro
     const r = open.rect;
     const left = Math.max(12, Math.min(r.left, window.innerWidth - width - 12));
     const top = r.bottom + 6 + height > window.innerHeight - 12 ? Math.max(12, r.top - 6 - height) : r.bottom + 6;
-    setPos({ left, top });
+    setPos(placeAt(box.current.parentElement, { left, top }));
   }, [open]);
 
   if (!open || !editor) return null;

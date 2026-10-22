@@ -1,5 +1,6 @@
 import { useEditorState, type Editor } from '@tiptap/react';
 import { NodeSelection } from '@tiptap/pm/state';
+import { zoomOf } from './zoom';
 
 interface Props {
   editor: Editor | null;
@@ -19,7 +20,7 @@ export function SceneBreakActions({ editor, nextTitle, onSplit, onMerge }: Props
       const dom = editor.view.nodeDOM(sel.from) as HTMLElement | null;
       const page = dom?.closest('.cb-page');
       if (!dom || !page) return null;
-      return { pos: sel.from, top: dom.getBoundingClientRect().top - page.getBoundingClientRect().top };
+      return { pos: sel.from, top: (dom.getBoundingClientRect().top - page.getBoundingClientRect().top) / zoomOf(page) };
     },
   });
   if (!at) return null;

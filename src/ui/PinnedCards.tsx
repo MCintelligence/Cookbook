@@ -10,20 +10,21 @@ interface Props {
   loadPicture: (path: string) => Promise<string>;
   onUnpin: (path: string) => void;
   onOpen: (path: string) => void;
+  onMenu?: (path: string, x: number, y: number) => void;
 }
 
 /** Cards pinned beside the draft, in the right-hand drawer, to keep a character in view while writing. */
-export function PinnedCards({ paths, version, loadCard, loadPicture, onUnpin, onOpen }: Props) {
+export function PinnedCards({ paths, version, loadCard, loadPicture, onUnpin, onOpen, onMenu }: Props) {
   return (
     <section className="pins" aria-label="Pinned cards">
       {paths.map((p) => (
-        <Pinned key={p} path={p} version={version} loadCard={loadCard} loadPicture={loadPicture} onUnpin={onUnpin} onOpen={onOpen} />
+        <Pinned key={p} path={p} version={version} loadCard={loadCard} loadPicture={loadPicture} onUnpin={onUnpin} onOpen={onOpen} onMenu={onMenu} />
       ))}
     </section>
   );
 }
 
-function Pinned({ path, version, loadCard, loadPicture, onUnpin, onOpen }: Omit<Props, 'paths'> & { path: string }) {
+function Pinned({ path, version, loadCard, loadPicture, onUnpin, onOpen, onMenu }: Omit<Props, 'paths'> & { path: string }) {
   const [card, setCard] = useState<CookbookDocument | null>(null);
   const [gone, setGone] = useState(false);
 
@@ -39,7 +40,14 @@ function Pinned({ path, version, loadCard, loadPicture, onUnpin, onOpen }: Omit<
   }, [path, version, loadCard]);
 
   return (
-    <article className="pin">
+    <article
+      className="pin"
+      onContextMenu={(e) => {
+        if (!onMenu) return;
+        e.preventDefault();
+        onMenu(path, e.clientX, e.clientY);
+      }}
+    >
       <div className="pin-bar">
         <span className="pin-label">Pinned</span>
         {card && (

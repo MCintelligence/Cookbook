@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type CookbookDocument } from '../storage/document';
 import { type SearchHit } from '../storage/index';
 import { CardPreview } from './CardPreview';
+import { keys } from '../shortcuts';
 
 export interface ShelfCard {
   id: string;
@@ -19,13 +20,16 @@ interface Props {
   search: (query: string) => SearchHit[];
   /** Opened by typing @: Enter inserts the name in place of the @. */
   inserting: boolean;
+  /** Letters typed into the page after the @ before the shelf opened; they become the search. */
+  typed?: () => string;
   canInsert: boolean;
   loadCard: (path: string) => Promise<CookbookDocument>;
   loadPicture: (path: string) => Promise<string>;
   onInsert: (name: string) => void;
   onPin: (path: string) => void;
   onOpen: (path: string) => void;
-  onClose: () => void;
+  /** `typed` is what was in the search, which goes back on the page after the @ when the shelf opened from it. */
+  onClose: (typed: string) => void;
 }
 
 interface Row {
@@ -52,14 +56,18 @@ export function bestName(card: ShelfCard, q: string): { name: string; score: num
  * come first. The highlighted card can be inserted by name, pinned beside the
  * draft, or opened.
  */
-export function PantryShelf({ cards, castIds, search, inserting, canInsert, loadCard, loadPicture, onInsert, onPin, onOpen, onClose }: Props) {
+export function PantryShelf({ cards, castIds, search, inserting, typed, canInsert, loadCard, loadPicture, onInsert, onPin, onOpen, onClose }: Props) {
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
   const [preview, setPreview] = useState<CookbookDocument | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
 
-  useEffect(() => input.current?.focus(), []);
+  useEffect(() => {
+    const early = typed?.();
+    if (early) setQuery(early);
+    input.current?.focus();
+  }, []);
 
   const rows = useMemo<Row[]>(() => {
     const q = fold(query.trim());
@@ -100,7 +108,7 @@ export function PantryShelf({ cards, castIds, search, inserting, canInsert, load
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') setAt((i) => Math.min(i + 1, rows.length - 1));
     else if (e.key === 'ArrowUp') setAt((i) => Math.max(i - 1, 0));
-    else if (e.key === 'Escape') onClose();
+    else if (e.key === 'Escape') onClose(query);
     else if (e.key === 'Enter' && current) {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey) onOpen(current.card.path);
       else if (e.metaKey || e.ctrlKey) onPin(current.card.path);
@@ -111,7 +119,7 @@ export function PantryShelf({ cards, castIds, search, inserting, canInsert, load
   };
 
   return (
-    <div className="shelf-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="shelf-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose(query)}>
       <div className="shelf" role="dialog" aria-modal="true" aria-label="Pantry shelf">
         <div className="shelf-search">
           {inserting && <span className="shelf-at">@</span>}
@@ -164,7 +172,7 @@ export function PantryShelf({ cards, castIds, search, inserting, canInsert, load
                   </button>
                 </div>
                 <span className="shelf-keys">
-                  {canInsert ? 'Enter inserts · ' : 'Enter opens · '}⌘Enter pins · ⌘⇧Enter opens
+                  {canInsert ? 'Enter inserts · ' : 'Enter opens · '}{keys('Mod-Enter')} pins · {keys('Mod-Shift-Enter')} opens
                 </span>
               </>
             )}

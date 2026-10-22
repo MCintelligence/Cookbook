@@ -132,10 +132,33 @@ export function nameIssues(text: string, names: string[], speller: Speller): Iss
   return issues;
 }
 
+/** Contractions typed without their apostrophe. */
+const CONTRACTIONS: Record<string, string> = Object.fromEntries(
+  ['don’t', 'doesn’t', 'didn’t', 'can’t', 'won’t', 'isn’t', 'wasn’t', 'aren’t', 'weren’t', 'hasn’t', 'haven’t', 'hadn’t', 'couldn’t', 'wouldn’t', 'shouldn’t', 'mustn’t', 'ain’t', 'I’m', 'I’ve', 'you’re', 'they’re', 'we’ve', 'they’ve', 'you’ve', 'that’s', 'what’s', 'there’s', 'here’s', 'who’s', 'it’ll', 'she’ll', 'he’ll', 'we’ll', 'they’ll', 'you’ll', 'I’ll'].map((c) => [c.replace('’', '').toLowerCase(), c]),
+);
+
+/**
+ * "dont" and its kind: the fix puts the apostrophe back, and after he, she or
+ * it gives "doesn’t" straight away, so "She dont know" is caught in one go.
+ */
+function missingApostrophe(issue: Issue, text: string): Issue {
+  const word = text.slice(issue.from, issue.to);
+  let fixed = CONTRACTIONS[word.toLowerCase()];
+  if (!fixed) return issue;
+  if (/^[A-Z]/.test(word) && !fixed.startsWith('I’')) fixed = fixed[0]!.toUpperCase() + fixed.slice(1);
+  const before = /(\p{L}+)\s+$/u.exec(text.slice(Math.max(0, issue.from - 12), issue.from))?.[1]?.toLowerCase();
+  if (word.toLowerCase() === 'dont' && (before === 'he' || before === 'she' || before === 'it')) {
+    return { ...issue, message: `With “${before}”, it’s “doesn’t”.`, suggestions: [word[0] === 'D' ? 'Doesn’t' : 'doesn’t', fixed] };
+  }
+  return { ...issue, message: `“${word}” needs an apostrophe.`, suggestions: [fixed] };
+}
+
 /** Spelling and names together, with a name's near miss taking the place of a plain misspelling. */
 export function checkSpelling(text: string, speller: Speller, names: string[], ignored: Set<string> = new Set()): Issue[] {
   const near = nameIssues(text, names, speller).filter((i) => !ignored.has(text.slice(i.from, i.to)));
-  const plain = spellingIssues(text, speller, ignored).filter((s) => !near.some((n) => s.from < n.to && s.to > n.from));
+  const plain = spellingIssues(text, speller, ignored)
+    .filter((s) => !near.some((n) => s.from < n.to && s.to > n.from))
+    .map((s) => missingApostrophe(s, text));
   return [...near, ...plain].sort((a, b) => a.from - b.from);
 }
 

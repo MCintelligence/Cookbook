@@ -1,19 +1,48 @@
-import { InputRule, Mark, Node, mergeAttributes, wrappingInputRule, type Editor } from '@tiptap/core';
-import { BulletList, ListItem, TaskItem, TaskList } from '@tiptap/extension-list';
+import { type AnyExtension, Extension, InputRule, Mark, Node, mergeAttributes, wrappingInputRule, type Editor } from '@tiptap/core';
+import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
+import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import { Typography } from '@tiptap/extension-typography';
 import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
-import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
-import { TextSelection } from '@tiptap/pm/state';
-import { BODY_STYLE } from './markdown';
+import { type Mark as PMMark } from '@tiptap/pm/model';
+import { Plugin, Selection, TextSelection } from '@tiptap/pm/state';
+import { commandFor } from '../shortcuts';
+import { type AppSettings, getSettings } from '../settings';
+import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { FindExtension } from './findPlugin';
+import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
 import { Proofread } from '../proofread/plugin';
-import { DialogueFocus, Footnote, Note, type SeasoningsRequest } from './seasonings';
+import { DialogueFocus, Footnote, Note, type SeasoningsRequest, addNoteAnchor, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
+
+/** Headings pasted from other apps come in as Chapter title and the heading styles. */
+const TAG_STYLE: Record<string, string> = { H1: HEADING_STYLES[0], H2: HEADING_STYLES[1], H3: HEADING_STYLES[2], H4: HEADING_STYLES[2], H5: HEADING_STYLES[2], H6: HEADING_STYLES[2] };
+
+type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash' | 'markdown' | 'lineStarters'>;
+
+/** An extension whose typing shortcuts only work while a setting is on; the setting is read on each key. */
+function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting): T {
+  return extension.extend({
+    addInputRules() {
+      return (this.parent?.() ?? []).map(
+        (rule: InputRule) =>
+          new InputRule({
+            find: rule.find,
+            handler: (props) => (getSettings()[setting] ? rule.handler(props) : null),
+            undoable: rule.undoable,
+          }),
+      );
+    },
+  }) as T;
+}
+
+/** A paragraph that is only "* * *" becomes a scene break when Enter is pressed. */
+const BREAK_LINE = /^\s*\*\s*\*\s*\*\s*$/;
 
 const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
   name: 'paragraph',
@@ -28,13 +57,13 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
       style: {
         default: BODY_STYLE,
         keepOnSplit: true,
-        parseHTML: (el) => el.getAttribute('data-style') || BODY_STYLE,
+        parseHTML: (el) => el.getAttribute('data-style') || TAG_STYLE[el.tagName] || (el.closest('blockquote') ? QUOTE_STYLE : BODY_STYLE),
         renderHTML: (attrs) => (attrs.style && attrs.style !== BODY_STYLE ? { 'data-style': attrs.style } : {}),
       },
     };
   },
   parseHTML() {
-    return [{ tag: 'p' }];
+    return [{ tag: 'p' }, ...Object.keys(TAG_STYLE).map((tag) => ({ tag: tag.toLowerCase() }))];
   },
   renderHTML({ HTMLAttributes }) {
     return ['p', mergeAttributes(HTMLAttributes), 0];
@@ -45,6 +74,16 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const { $from, empty } = editor.state.selection;
         // Only top-level paragraphs; lists keep their own Enter behaviour.
         if (!empty || $from.depth !== 1 || $from.parent.type.name !== this.name) return false;
+        if (getSettings().lineStarters && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
+          return editor.commands.command(({ tr, state }) => {
+            const start = $from.before();
+            tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
+            const after = start + 1;
+            if (after >= tr.doc.content.size || tr.doc.nodeAt(after)?.type.name !== 'paragraph') tr.insert(after, state.schema.nodes.paragraph!.create());
+            tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+            return true;
+          });
+        }
         const next = this.options.nextStyle($from.parent.attrs.style as string);
         return editor.chain().splitBlock().updateAttributes(this.name, { style: next }).run();
       },
@@ -62,23 +101,6 @@ const SceneBreak = Node.create({
   },
   renderHTML() {
     return ['hr', { 'data-scene-break': '' }];
-  },
-  addInputRules() {
-    return [
-      new InputRule({
-        find: /^\* \* \*$/,
-        handler: ({ state, range }) => {
-          const $start = state.doc.resolve(range.from);
-          if ($start.depth !== 1) return null;
-          state.tr.replaceRangeWith($start.before(), $start.after(), this.type.create());
-          const after = state.tr.mapping.map($start.after());
-          if (after >= state.tr.doc.content.size) {
-            state.tr.insert(state.tr.doc.content.size, state.schema.nodes.paragraph!.create());
-          }
-          state.tr.setSelection(TextSelection.near(state.tr.doc.resolve(Math.min(after + 1, state.tr.doc.content.size))));
-        },
-      }),
-    ];
   },
 });
 
@@ -101,48 +123,44 @@ export const CharStyle = Mark.create({
   renderHTML({ HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes), 0];
   },
-  addKeyboardShortcuts() {
-    return {
-      'Mod-b': ({ editor }) => toggleCharStyle(editor, 'strong'),
-      'Mod-i': ({ editor }) => toggleCharStyle(editor, 'emphasis'),
-      'Mod-u': ({ editor }) => toggleCharStyle(editor, 'underline'),
-    };
+});
+
+/**
+ * The page's own shortcuts, which the writer can change in Settings: notes,
+ * footnotes and the three basic character styles. They are looked up on each
+ * key press, so a change applies straight away.
+ */
+const PageShortcuts = Extension.create<{ onRequest: (r: SeasoningsRequest) => void }>({
+  name: 'pageShortcuts',
+  priority: 1100,
+  addOptions() {
+    return { onRequest: () => {} };
   },
-  addInputRules() {
+  addProseMirrorPlugins() {
+    const editor = this.editor;
+    const onRequest = (r: SeasoningsRequest) => this.options.onRequest(r);
     return [
-      charStyleRule(/(?:^|[\s([{“‘"'])(\*\*([^*\s](?:[^*]*[^*\s])?)\*\*)$/, 'strong', this.type),
-      charStyleRule(/(?:^|[\s([{“‘"'])(\*([^*\s](?:[^*]*[^*\s])?)\*)$/, 'emphasis', this.type),
-      charStyleRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, 'underline', this.type),
+      new Plugin({
+        props: {
+          handleKeyDown(_view, event) {
+            const id = commandFor(event, ['note', 'footnote', 'strong', 'emphasis', 'underline']);
+            if (!id) return false;
+            event.preventDefault();
+            if (id === 'note') {
+              const note = addNoteAnchor(editor);
+              if (note) onRequest({ tab: 'notes', id: note });
+            } else if (id === 'footnote') onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
+            else toggleFormat(editor, id as BasicStyle);
+            return true;
+          },
+        },
+      }),
     ];
   },
 });
 
 function findStyle(marks: readonly PMMark[], style: string): PMMark | undefined {
   return marks.find((m) => m.type.name === 'charStyle' && m.attrs.style === style);
-}
-
-/**
- * Turns `**word**` into the Strong style (and so on). Unlike Tiptap's own
- * rule, the text keeps any other character styles it already had.
- */
-function charStyleRule(find: RegExp, style: string, type: MarkType): InputRule {
-  return new InputRule({
-    find,
-    handler: ({ state, range, match }) => {
-      // The closing delimiter has not been inserted yet; range.to is just before it.
-      const delimited = match[1]!;
-      const inner = match[2]!;
-      const delimiter = (delimited.length - inner.length) / 2;
-      const delimStart = range.from + match[0].indexOf(delimited);
-      const textStart = delimStart + delimiter;
-      const before = state.doc.resolve(delimStart).marks();
-      const tr = state.tr;
-      tr.delete(textStart + inner.length, range.to);
-      tr.delete(delimStart, textStart);
-      tr.addMark(delimStart, delimStart + inner.length, type.create({ style }));
-      tr.setStoredMarks(before);
-    },
-  });
 }
 
 export function hasCharStyle(editor: Editor, style: string): boolean {
@@ -177,6 +195,44 @@ export function toggleCharStyle(editor: Editor, style: string): boolean {
   return true;
 }
 
+/** The plain mark that looks like each of the three basic character styles. */
+const LOOKALIKE = { strong: 'bold', emphasis: 'italic', underline: 'underline' } as const;
+export type BasicStyle = keyof typeof LOOKALIKE;
+
+/** Bold-looking, whether from the Strong style or plain bold (and so on for italic and underline). */
+export function isFormatted(editor: Editor, style: BasicStyle): boolean {
+  return hasCharStyle(editor, style) || editor.isActive(LOOKALIKE[style]);
+}
+
+/**
+ * ⌘B, ⌘I, ⌘U and the toolbar's B, I and U. They apply the Strong, Emphasis and
+ * Underline styles; on text that is plain bold (say, pasted), they take the bold off instead.
+ */
+export function toggleFormat(editor: Editor, style: BasicStyle): boolean {
+  if (editor.isActive(LOOKALIKE[style])) return editor.chain().unsetMark(LOOKALIKE[style]).run();
+  return toggleCharStyle(editor, style);
+}
+
+/** Only what a novelist expects from Typography; nothing turns (c) into © behind their back. */
+const NO_TYPOGRAPHY = {
+  leftArrow: false,
+  rightArrow: false,
+  copyright: false,
+  trademark: false,
+  servicemark: false,
+  registeredTrademark: false,
+  oneHalf: false,
+  oneQuarter: false,
+  threeQuarters: false,
+  plusMinus: false,
+  notEqual: false,
+  laquo: false,
+  raquo: false,
+  multiplication: false,
+  superscriptTwo: false,
+  superscriptThree: false,
+} as const;
+
 export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
   return [
     Document,
@@ -184,44 +240,100 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,
     CharStyle,
+    PageShortcuts.configure({ onRequest }),
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
-    BulletList.extend({
-      addInputRules() {
-        return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
+    Bold,
+    Italic,
+    Underline,
+    Strike,
+    Code,
+    Link,
+    whenOn(PlainMarkRules, 'markdown'),
+    HardBreak,
+    whenOn(CodeBlock, 'markdown'),
+    Image,
+    whenOn(BlockShortcuts, 'markdown'),
+    PasteCleanup,
+    whenOn(
+      BulletList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
+    // -1 starts a numbered list, as - starts bullets and -TD a checklist; so does 1. on its own.
+    whenOn(
+      OrderedList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*(?:-1|1\.)\s$/, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
+    ListItem.extend({ content: 'paragraph list*' }),
+    whenOn(
+      TaskList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
+    TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
+    Table.extend({
+      addKeyboardShortcuts() {
+        // The browser's own Ctrl+End stops short of a table at the end of the scene.
+        const go = (end: boolean) => ({ editor }: { editor: Editor }) => {
+          const { doc, tr } = editor.state;
+          editor.view.dispatch(tr.setSelection(end ? Selection.atEnd(doc) : Selection.atStart(doc)).scrollIntoView());
+          return true;
+        };
+        return { ...this.parent?.(), 'Mod-End': go(true), 'Mod-Home': go(false) };
       },
-    }),
-    ListItem.extend({ content: 'paragraph' }),
-    TaskList.extend({
-      addInputRules() {
-        return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
+      addCommands() {
+        return {
+          ...this.parent?.(),
+          // A table never ends the scene, so there is always somewhere to type after it.
+          insertTable:
+            (options) =>
+            (props) => {
+              if (!this.parent?.().insertTable!(options)(props)) return false;
+              const { tr, dispatch } = props;
+              if (dispatch && tr.doc.lastChild?.type.name === 'table') tr.insert(tr.doc.content.size, this.editor.schema.nodes.paragraph!.create());
+              return true;
+            },
+        };
       },
-    }),
-    TaskItem.extend({ content: 'paragraph' }).configure({ nested: false }),
-    Typography.configure({
-      // Only what a novelist expects; nothing turns (c) into © behind their back.
-      leftArrow: false,
-      rightArrow: false,
-      copyright: false,
-      trademark: false,
-      servicemark: false,
-      registeredTrademark: false,
-      oneHalf: false,
-      oneQuarter: false,
-      threeQuarters: false,
-      plusMinus: false,
-      notEqual: false,
-      laquo: false,
-      raquo: false,
-      multiplication: false,
-      superscriptTwo: false,
-      superscriptThree: false,
-    }),
+    }).configure({ resizable: false }),
+    TableRow,
+    TableHeader.extend({ content: 'paragraph' }),
+    TableCell.extend({ content: 'paragraph' }),
+    whenOn(
+      Typography.extend({ name: 'curlyQuotes' }).configure({
+        ...NO_TYPOGRAPHY,
+        emDash: false,
+        ellipsis: false,
+      }),
+      'curlyQuotes',
+    ),
+    whenOn(
+      Typography.extend({ name: 'dashes' }).configure({
+        ...NO_TYPOGRAPHY,
+        openDoubleQuote: false,
+        closeDoubleQuote: false,
+        openSingleQuote: false,
+        closeSingleQuote: false,
+      }),
+      'emDash',
+    ),
     UndoRedo,
     Dropcursor,
     Gapcursor,
     FindExtension,
     DialogueFocus,
+    FocusMode,
     LinkedNames,
     Proofread,
   ];

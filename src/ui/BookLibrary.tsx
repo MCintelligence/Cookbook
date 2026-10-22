@@ -11,6 +11,7 @@ import {
   sameLocation,
 } from '../storage/platform';
 import { BOOK_TEMPLATES, type BookTemplateId } from '../storage/templates';
+import { Menu, type MenuItem } from './Menu';
 
 interface Props {
   current: BookLocation | null;
@@ -24,20 +25,24 @@ interface Props {
   onAdopt: (location: BookLocation) => void;
   onCancelAdopt: () => void;
   onClose: () => void;
+  /** Menu items that only work on the open book, such as backing it up. */
+  openBookItems?: MenuItem[];
 }
 
 /** Every book the writer has opened, plus starting a new one or opening a folder. */
-export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFolder, onCreate, onAdopt, onCancelAdopt, onClose }: Props) {
+export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFolder, onCreate, onAdopt, onCancelAdopt, onClose, openBookItems = [] }: Props) {
   const [recent, setRecent] = useState<RecentBook[]>(recentBooks);
   const [inBrowser, setInBrowser] = useState<string[]>([]);
   const [title, setTitle] = useState('');
   const [template, setTemplate] = useState<BookTemplateId>('novel');
   const box = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{ label: string; x: number; y: number; items: MenuItem[] } | null>(null);
 
   useEffect(() => {
     browserBooks().then(setInBrowser, () => setInBrowser([]));
     box.current?.querySelector<HTMLElement>('button, input')?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Escape closes a book's menu first, and the dialog only after.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.lib .menu') && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -66,7 +71,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
           <div className="lib-adopt">
             <p>
               <strong>{describeLocation(adopting)}</strong> isn’t a Cookbook book yet. Make it one? Cookbook adds <code>book.json</code>,{' '}
-              <code>bookshelf/</code>, <code>pantry/</code> and a hidden <code>.cookbook/</code> folder. Nothing already in the folder is changed.
+              <code>bookshelf/</code>, <code>pantry/</code>, <code>journal/</code> and a hidden <code>.cookbook/</code> folder. Nothing already in the folder is changed.
             </p>
             <div className="lib-row">
               <button className="pill" onClick={onCancelAdopt}>
@@ -84,7 +89,26 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                 {recent.map((b) => {
                   const open = current !== null && sameLocation(b.location, current);
                   return (
-                    <li key={JSON.stringify(b.location)}>
+                    <li
+                      key={JSON.stringify(b.location)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        const forget = () => {
+                          forgetBook(b.location);
+                          setRecent(recentBooks());
+                        };
+                        setMenu({
+                          label: b.title,
+                          x: e.clientX,
+                          y: e.clientY,
+                          items: [
+                            { label: open ? 'Back to writing' : 'Open', onPick: () => (open ? onClose() : onOpen(b.location)) },
+                            ...(open && openBookItems.length > 0 ? [{ separator: true } as const, ...openBookItems] : []),
+                            ...(open ? [] : [{ separator: true } as const, { label: 'Remove from this list', hint: 'The book is kept', onPick: forget }]),
+                          ],
+                        });
+                      }}
+                    >
                       <button className="lib-book" aria-current={open} disabled={busy} onClick={() => (open ? onClose() : onOpen(b.location))}>
                         <span className="lib-book-title">{b.title}</span>
                         <span className="lib-book-where">{open ? 'Open now' : describeLocation(b.location)}</span>
@@ -152,6 +176,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
             )}
           </>
         )}
+        {menu && <Menu {...menu} onClose={() => setMenu(null)} />}
       </div>
     </div>
   );

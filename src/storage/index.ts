@@ -1,8 +1,8 @@
 import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
-import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, readDocument, readTree, walkFiles } from './book';
-import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, relationshipsOf, statusOf, synopsisOf } from './document';
+import { BOOKSHELF, HIDDEN_FOLDER, JOURNAL, PANTRY, readDocument, readTree, walkFiles } from './book';
+import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
 
 /**
  * The hidden index: everything that can be worked out again from the files
@@ -12,7 +12,7 @@ import { type CookbookDocument, type DocumentKind, type Relationship, type Scene
  * that changed since last time. Deleting it is always safe.
  */
 export const INDEX_FILE = joinPath(HIDDEN_FOLDER, 'index.sqlite');
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 5;
 
 export interface IndexedDocument {
   path: string;
@@ -24,6 +24,12 @@ export interface IndexedDocument {
   status: SceneStatus;
   /** Other names a Pantry card goes by. */
   aka: string[];
+  /** Where a Pantry card's picture is, or '' when it has none. */
+  portrait: string;
+  /** A colour label (see LABELS), or ''. */
+  label: string;
+  /** Left out when the book is exported. */
+  skipExport: boolean;
   relationships: Relationship[];
   /** The words of the file without markup. */
   text: string;
@@ -31,7 +37,7 @@ export interface IndexedDocument {
 }
 
 /** What the Bookshelf shows on each card. */
-export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka'>;
+export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka' | 'portrait' | 'label' | 'skipExport'>;
 
 export interface SceneMention {
   path: string;
@@ -69,7 +75,7 @@ export function countWords(text: string): number {
 export function toIndexed(path: string, doc: CookbookDocument, stamp: string): IndexedDocument {
   const body = plainText(doc.body);
   // A Pantry card's names and fields are searchable too, so "baker" finds the character whose role it is.
-  const extra = doc.kind === 'scene' ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc.fields).map(([, v]) => v)].filter(Boolean);
+  const extra = !isCard(doc.kind) ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc.fields).map(([, v]) => v)].filter(Boolean);
   const text = extra.length > 0 ? `${body}\n${extra.join('\n')}` : body;
   return {
     path,
@@ -80,6 +86,9 @@ export function toIndexed(path: string, doc: CookbookDocument, stamp: string): I
     synopsis: synopsisOf(doc.fields),
     status: statusOf(doc.fields),
     aka: akaOf(doc.fields),
+    portrait: portraitOf(doc.fields) ?? '',
+    label: labelOf(doc.fields) ?? '',
+    skipExport: !includedInExport(doc.fields),
     relationships: relationshipsOf(doc.fields).filter((r) => r.to),
     text,
     stamp,
@@ -125,7 +134,7 @@ export class BookIndex {
     }
     const db = new sqlite3.oo1.DB(':memory:');
     db.exec(`
-      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, stamp text);
+      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, portrait text, label text, skip_export integer, stamp text);
       create table links (from_path text not null, to_id text not null, label text);
       create index links_to on links (to_id);
       create virtual table docs_fts using fts5(title, text, tokenize = 'porter unicode61 remove_diacritics 2');
@@ -138,8 +147,8 @@ export class BookIndex {
     this.db.transaction(() => {
       this.removeRow(doc.path);
       this.db.exec({
-        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.stamp],
+        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.portrait, doc.label, doc.skipExport ? 1 : 0, doc.stamp],
       });
       const rowid = this.db.selectValue('select last_insert_rowid()') as number;
       this.db.exec({ sql: 'insert into docs_fts (rowid, title, text) values (?, ?, ?)', bind: [rowid, doc.title, doc.text] });
@@ -201,9 +210,24 @@ export class BookIndex {
 
   /** Path to what the Bookshelf shows, for every indexed file. */
   cards(): Map<string, CardSummary> {
-    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka from docs') as [string, string, string, DocumentKind, number, string, SceneStatus, string][];
+    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export from docs') as [
+      string,
+      string,
+      string,
+      DocumentKind,
+      number,
+      string,
+      SceneStatus,
+      string,
+      string,
+      string,
+      number,
+    ][];
     return new Map(
-      rows.map(([path, id, title, kind, words, synopsis, status, aka]) => [path, { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[] }]),
+      rows.map(([path, id, title, kind, words, synopsis, status, aka, portrait, label, skip]) => [
+        path,
+        { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[], portrait: portrait ?? '', label: label ?? '', skipExport: skip === 1 },
+      ]),
     );
   }
 
@@ -258,7 +282,7 @@ export async function refreshIndex(fs: StorageAdapter, index: BookIndex): Promis
   const known = index.stamps();
   const seen = new Set<string>();
   let touched = 0;
-  for (const root of [BOOKSHELF, PANTRY]) {
+  for (const root of [BOOKSHELF, PANTRY, JOURNAL]) {
     if (!(await fs.exists(root))) continue;
     for (const file of walkFiles(await readTree(fs, root))) {
       seen.add(file.path);

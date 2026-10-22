@@ -259,3 +259,22 @@ describe('dialogue focus', () => {
     expect(editor.view.dom.classList.contains('cb-dialogue-focus')).toBe(false);
   });
 });
+
+describe('tables', () => {
+  it('leaves a paragraph after a table inserted at the end, and Ctrl+End reaches the very end', () => {
+    const editor = make('Hello');
+    editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
+    expect(editor.state.doc.lastChild?.type.name).toBe('paragraph');
+    editor.commands.setTextSelection(1);
+    const { view } = editor;
+    view.someProp('handleKeyDown', (f) => f(view, new KeyboardEvent('keydown', { key: 'End', ctrlKey: true })));
+    expect(editor.state.selection.from).toBe(editor.state.doc.content.size - 1);
+  });
+
+  it('does not add a paragraph when the table goes in the middle', () => {
+    const editor = make('One\n\nTwo');
+    editor.commands.setTextSelection(1);
+    editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
+    expect(editor.state.doc.childCount).toBe(3);
+  });
+});

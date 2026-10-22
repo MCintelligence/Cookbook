@@ -6,7 +6,7 @@ import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
 import { type Mark as PMMark } from '@tiptap/pm/model';
-import { TextSelection } from '@tiptap/pm/state';
+import { Selection, TextSelection } from '@tiptap/pm/state';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { FindExtension } from './findPlugin';
@@ -16,6 +16,9 @@ import { DialogueFocus, Footnote, Note, type SeasoningsRequest } from './seasoni
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
+
+/** Headings pasted from other apps come in as Chapter title and the heading styles. */
+const TAG_STYLE: Record<string, string> = { H1: HEADING_STYLES[0], H2: HEADING_STYLES[1], H3: HEADING_STYLES[2], H4: HEADING_STYLES[2], H5: HEADING_STYLES[2], H6: HEADING_STYLES[2] };
 
 const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
   name: 'paragraph',
@@ -30,21 +33,13 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
       style: {
         default: BODY_STYLE,
         keepOnSplit: true,
-        parseHTML: (el) => el.getAttribute('data-style') || BODY_STYLE,
+        parseHTML: (el) => el.getAttribute('data-style') || TAG_STYLE[el.tagName] || (el.closest('blockquote') ? QUOTE_STYLE : BODY_STYLE),
         renderHTML: (attrs) => (attrs.style && attrs.style !== BODY_STYLE ? { 'data-style': attrs.style } : {}),
       },
     };
   },
   parseHTML() {
-    // Headings from other apps come in as Chapter title and the heading styles.
-    const heading = (tag: string, style: string) => ({ tag, attrs: { style } });
-    return [
-      { tag: 'p' },
-      heading('h1', HEADING_STYLES[0]),
-      heading('h2', HEADING_STYLES[1]),
-      ...['h3', 'h4', 'h5', 'h6'].map((h) => heading(h, HEADING_STYLES[2])),
-      { tag: 'blockquote > p', attrs: { style: QUOTE_STYLE } },
-    ];
+    return [{ tag: 'p' }, ...Object.keys(TAG_STYLE).map((tag) => ({ tag: tag.toLowerCase() }))];
   },
   renderHTML({ HTMLAttributes }) {
     return ['p', mergeAttributes(HTMLAttributes), 0];
@@ -113,9 +108,9 @@ export const CharStyle = Mark.create({
   },
   addKeyboardShortcuts() {
     return {
-      'Mod-b': ({ editor }) => toggleCharStyle(editor, 'strong'),
-      'Mod-i': ({ editor }) => toggleCharStyle(editor, 'emphasis'),
-      'Mod-u': ({ editor }) => toggleCharStyle(editor, 'underline'),
+      'Mod-b': ({ editor }) => toggleFormat(editor, 'strong'),
+      'Mod-i': ({ editor }) => toggleFormat(editor, 'emphasis'),
+      'Mod-u': ({ editor }) => toggleFormat(editor, 'underline'),
     };
   },
 });
@@ -154,6 +149,24 @@ export function toggleCharStyle(editor: Editor, style: string): boolean {
   }
   view.dispatch(tr);
   return true;
+}
+
+/** The plain mark that looks like each of the three basic character styles. */
+const LOOKALIKE = { strong: 'bold', emphasis: 'italic', underline: 'underline' } as const;
+export type BasicStyle = keyof typeof LOOKALIKE;
+
+/** Bold-looking, whether from the Strong style or plain bold (and so on for italic and underline). */
+export function isFormatted(editor: Editor, style: BasicStyle): boolean {
+  return hasCharStyle(editor, style) || editor.isActive(LOOKALIKE[style]);
+}
+
+/**
+ * ⌘B, ⌘I, ⌘U and the toolbar's B, I and U. They apply the Strong, Emphasis and
+ * Underline styles; on text that is plain bold (say, pasted), they take the bold off instead.
+ */
+export function toggleFormat(editor: Editor, style: BasicStyle): boolean {
+  if (editor.isActive(LOOKALIKE[style])) return editor.chain().unsetMark(LOOKALIKE[style]).run();
+  return toggleCharStyle(editor, style);
 }
 
 export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
@@ -195,7 +208,31 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
       },
     }),
     TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
-    Table.configure({ resizable: false }),
+    Table.extend({
+      addKeyboardShortcuts() {
+        // The browser's own Ctrl+End stops short of a table at the end of the scene.
+        const go = (end: boolean) => ({ editor }: { editor: Editor }) => {
+          const { doc, tr } = editor.state;
+          editor.view.dispatch(tr.setSelection(end ? Selection.atEnd(doc) : Selection.atStart(doc)).scrollIntoView());
+          return true;
+        };
+        return { ...this.parent?.(), 'Mod-End': go(true), 'Mod-Home': go(false) };
+      },
+      addCommands() {
+        return {
+          ...this.parent?.(),
+          // A table never ends the scene, so there is always somewhere to type after it.
+          insertTable:
+            (options) =>
+            (props) => {
+              if (!this.parent?.().insertTable!(options)(props)) return false;
+              const { tr, dispatch } = props;
+              if (dispatch && tr.doc.lastChild?.type.name === 'table') tr.insert(tr.doc.content.size, this.editor.schema.nodes.paragraph!.create());
+              return true;
+            },
+        };
+      },
+    }).configure({ resizable: false }),
     TableRow,
     TableHeader.extend({ content: 'paragraph' }),
     TableCell.extend({ content: 'paragraph' }),

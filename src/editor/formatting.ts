@@ -275,6 +275,25 @@ export const BlockShortcuts = Extension.create({
 export const PasteCleanup = Extension.create({
   name: 'pasteCleanup',
   addProseMirrorPlugins() {
-    return [new Plugin({ props: { transformPastedHTML: (html) => cleanPastedHtml(html) } })];
+    return [
+      new Plugin({
+        props: {
+          transformPastedHTML: (html) => cleanPastedHtml(html),
+          // Pasted into an empty paragraph, the first pasted paragraph keeps its own style (a title stays a title).
+          handlePaste: (view, _event, slice) => {
+            const { $from, empty } = view.state.selection;
+            const first = slice.content.firstChild;
+            if (!empty || $from.depth !== 1 || $from.parent.type.name !== 'paragraph' || $from.parent.content.size > 0) return false;
+            if (slice.openStart === 0 || first?.type.name !== 'paragraph' || first.attrs.style === $from.parent.attrs.style) return false;
+            const start = $from.before();
+            const tr = view.state.tr.replaceSelection(slice);
+            const target = tr.doc.nodeAt(start);
+            if (target?.type.name === 'paragraph') tr.setNodeMarkup(start, undefined, { ...target.attrs, style: first.attrs.style });
+            view.dispatch(tr.scrollIntoView());
+            return true;
+          },
+        },
+      }),
+    ];
   },
 });

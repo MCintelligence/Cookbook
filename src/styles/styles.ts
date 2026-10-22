@@ -162,6 +162,27 @@ export function resolveParagraphStyle(sheet: StyleSheet, id: string): Required<O
   return merged as Required<Omit<ParagraphStyle, 'basedOn'>>;
 }
 
+/**
+ * Adds a paragraph style that starts out looking like `basedOn` (and follows
+ * it when that changes). Its id comes from the name, kept unique.
+ */
+export function addParagraphStyle(sheet: StyleSheet, name: string, basedOn: string): { sheet: StyleSheet; id: string } {
+  const base = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'style';
+  let id = base;
+  for (let n = 2; sheet.paragraph.some((s) => s.id === id) || sheet.character.some((s) => s.id === id) || id === 'ul' || id === 'note'; n++) id = `${base}-${n}`;
+  const parent = paragraphStyle(sheet, basedOn);
+  const style: ParagraphStyle = { id, name, basedOn: parent.id, next: parent.next === parent.id ? id : parent.next };
+  const at = sheet.paragraph.findIndex((s) => s.id === parent.id);
+  const paragraph = [...sheet.paragraph];
+  paragraph.splice(at + 1, 0, style);
+  return { sheet: { ...sheet, paragraph }, id };
+}
+
+/** Renames a style; its id, and so every paragraph using it, stays the same. */
+export function renameParagraphStyle(sheet: StyleSheet, id: string, name: string): StyleSheet {
+  return { ...sheet, paragraph: sheet.paragraph.map((s) => (s.id === id ? { ...s, name } : s)) };
+}
+
 /** Returns a new sheet with one paragraph style changed. */
 export function updateParagraphStyle(sheet: StyleSheet, id: string, changes: Partial<ParagraphStyle>): StyleSheet {
   return {

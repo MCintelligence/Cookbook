@@ -67,7 +67,19 @@ import {
   rememberBook,
   sameLocation,
 } from './storage/platform';
-import { type ParagraphStyle, type StyleSheet, defaultStyles, loadStyles, paragraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles/styles';
+import {
+  type ParagraphStyle,
+  type StyleSheet,
+  addParagraphStyle,
+  defaultStyles,
+  loadStyles,
+  paragraphStyle,
+  renameParagraphStyle,
+  saveStyles,
+  stylesToCss,
+  updateParagraphStyle,
+} from './styles/styles';
+import { setPictureLoader } from './editor/formatting';
 import { PageEditor } from './editor/PageEditor';
 import { type SeasoningsRequest } from './editor/seasonings';
 import { type UndoLog, type UndoRecorder, readUndoLog, writeUndoLog } from './editor/undoLog';
@@ -712,6 +724,32 @@ export function App() {
     });
   };
 
+  /** Right-click on the page. Inside a table it offers rows and columns; elsewhere the browser's own menu stays. */
+  const pageMenu = (e: React.MouseEvent) => {
+    const ed = editor;
+    if (!ed || !(e.target as Element).closest('.cb-prose td, .cb-prose th')) return;
+    e.preventDefault();
+    // Put the cursor in the cell that was clicked, unless cells are already selected.
+    const at = ed.view.posAtCoords({ left: e.clientX, top: e.clientY });
+    if (at && !('$anchorCell' in ed.state.selection)) ed.commands.setTextSelection(at.pos);
+    const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => void fn(ed.chain().focus()).run();
+    setMenu({
+      label: 'Table',
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: 'Add row above', onPick: run((c) => c.addRowBefore()) },
+        { label: 'Add row below', onPick: run((c) => c.addRowAfter()) },
+        { label: 'Add column left', onPick: run((c) => c.addColumnBefore()) },
+        { label: 'Add column right', onPick: run((c) => c.addColumnAfter()) },
+        { separator: true },
+        { label: 'Delete row', onPick: run((c) => c.deleteRow()) },
+        { label: 'Delete column', onPick: run((c) => c.deleteColumn()) },
+        { label: 'Delete table', danger: true, onPick: run((c) => c.deleteTable()) },
+      ],
+    });
+  };
+
   /** Right-click on the empty part of the Bookshelf or Pantry. */
   const shelfMenu = (x: number, y: number) => {
     const book = tab === 'book';
@@ -822,10 +860,15 @@ export function App() {
     setManuscript(only ? [only] : shelf);
   };
 
-  const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
-    const next = updateParagraphStyle(sheet, id, changes);
+  const changeSheet = (next: StyleSheet) => {
     setSheet(next);
     if (fs) saveStyles(fs, next).catch((e: unknown) => setError(friendlyError(e)));
+  };
+  const editStyle = (id: string, changes: Partial<ParagraphStyle>) => changeSheet(updateParagraphStyle(sheet, id, changes));
+  const addStyle = (name: string, basedOn: string) => {
+    const added = addParagraphStyle(sheet, name, basedOn);
+    changeSheet(added.sheet);
+    return added.id;
   };
 
   const notes = readNotes(doc);
@@ -871,6 +914,10 @@ export function App() {
     },
     [fs],
   );
+  useEffect(() => {
+    // Pictures written into scenes as ![…](path) are read from the book.
+    setPictureLoader(fs ? loadPicture : null);
+  }, [fs, loadPicture]);
   const pickPortrait = async (file: File) => {
     const base = docRef.current ?? doc;
     if (!fs || !base) return;
@@ -1072,7 +1119,9 @@ export function App() {
       </header>
 
       {/* Bookread is for reading, so the formatting toolbar steps aside. */}
-      {!manuscript && <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} />}
+      {!manuscript && (
+        <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} onAddStyle={addStyle} onRenameStyle={(id, name) => changeSheet(renameParagraphStyle(sheet, id, name))} />
+      )}
 
       <nav
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
@@ -1190,7 +1239,7 @@ export function App() {
             />
           )}
           {doc && path ? (
-            <article className="cb-page" key={path}>
+            <article className="cb-page" key={path} onContextMenu={pageMenu}>
               <input
                 className="scene-title"
                 aria-label={doc.kind === 'scene' ? 'Scene title' : 'Card name'}

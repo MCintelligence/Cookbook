@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { type NodeJSON, markKey, parseInline, parseMarkdown, serializeMarkdown } from './markdown';
 
+const PLAIN = ['bold', 'italic', 'ul', 'strike', 'code'];
+// Plain formatting by name; anything else is a character style.
 const t = (text: string, ...styles: string[]): NodeJSON =>
-  styles.length ? { type: 'text', text, marks: styles.map((style) => ({ type: 'charStyle', attrs: { style } })) } : { type: 'text', text };
+  styles.length
+    ? { type: 'text', text, marks: styles.map((style) => (PLAIN.includes(style) ? { type: style === 'ul' ? 'underline' : style } : { type: 'charStyle', attrs: { style } })) as NodeJSON['marks'] }
+    : { type: 'text', text };
 const p = (style: string, ...content: NodeJSON[]): NodeJSON => ({ type: 'paragraph', attrs: { style }, content });
 
 describe('inline markup', () => {
-  it('reads strong, emphasis and named character styles', () => {
+  it('reads plain bold and italic, and named character styles', () => {
     expect(parseInline('a **b** *c* [d]{.thought} [e]{.underline}')).toEqual([
       t('a '),
-      t('b', 'strong'),
+      t('b', 'bold'),
       t(' '),
-      t('c', 'emphasis'),
+      t('c', 'italic'),
       t(' '),
       t('d', 'thought'),
       t(' '),
@@ -21,15 +25,15 @@ describe('inline markup', () => {
 
   it('nests styles', () => {
     expect(parseInline('***both*** and **bold *both* bold**')).toEqual([
-      t('both', 'strong', 'emphasis'),
+      t('both', 'bold', 'italic'),
       t(' and '),
-      t('bold ', 'strong'),
-      t('both', 'strong', 'emphasis'),
-      t(' bold', 'strong'),
+      t('bold ', 'bold'),
+      t('both', 'bold', 'italic'),
+      t(' bold', 'bold'),
     ]);
     expect(parseInline('[she *really* thought]{.thought}')).toEqual([
       t('she ', 'thought'),
-      t('really', 'thought', 'emphasis'),
+      t('really', 'thought', 'italic'),
       t(' thought', 'thought'),
     ]);
   });
@@ -92,7 +96,7 @@ describe('blocks', () => {
 
   it('writes the same file it reads', () => {
     const md = [
-      'The kitchen smelled of **cornbread** and *black pepper*.',
+      'The kitchen smelled of **cornbread** and *black pepper* and [salt]{.strong}.',
       '',
       '::: letter',
       'Dear June,',
@@ -121,10 +125,10 @@ describe('blocks', () => {
   });
 
   it('moves spaces outside styles so the file stays valid', () => {
-    const doc = { type: 'doc', content: [p('body', t('a '), t('bold ', 'strong'), t('end'))] };
+    const doc = { type: 'doc', content: [p('body', t('a '), t('bold ', 'bold'), t('end'))] };
     const md = serializeMarkdown(doc);
     expect(md).toBe('a **bold** end\n');
-    expect(parseMarkdown(md)).toEqual({ type: 'doc', content: [p('body', t('a '), t('bold', 'strong'), t(' end'))] });
+    expect(parseMarkdown(md)).toEqual({ type: 'doc', content: [p('body', t('a '), t('bold', 'bold'), t(' end'))] });
   });
 });
 
@@ -136,19 +140,21 @@ describe('round trips', () => {
       return seed / 0x7fffffff;
     };
   }
-  const words = ['Lou', 'greens', 'pie', '*', '[', ']', '\\', 'a', '“quoted”', 'x_y', '{.z}', 'it’s'];
-  const styles = ['strong', 'emphasis', 'thought', 'underline'];
+  const words = ['Lou', 'greens', 'pie', '*', '[', ']', '\\', 'a', '“quoted”', 'x_y', '{.z}', 'it’s', '_', '~~', '`', '#', '1.', '|', '!', '(x)', 'Wow!'];
+  const styles = ['strong', 'emphasis', 'thought', 'bold', 'italic', 'ul', 'strike', 'code', '@https://example.com/a(b)'];
 
   it('survives 500 random paragraphs', () => {
-    const rand = rng(42);
-    for (let n = 0; n < 500; n++) {
+    const rand = rng(Number(process.env.SEED ?? 42));
+    for (let n = 0; n < Number(process.env.N ?? 500); n++) {
       const count = 1 + Math.floor(rand() * 6);
       const pieces: NodeJSON[] = [];
       for (let i = 0; i < count; i++) {
         const word = words[Math.floor(rand() * words.length)]!;
-        const marks = styles.filter(() => rand() < 0.3);
+        const marks = styles.filter(() => rand() < 0.25);
         if (i > 0) pieces.push(t(' '));
-        pieces.push(t(word, ...marks));
+        const node = t(word, ...marks.filter((m) => !m.startsWith('@')));
+        if (marks.some((m) => m.startsWith('@'))) node.marks = [...(node.marks ?? []), { type: 'link', attrs: { href: 'https://example.com/a(b)' } }];
+        pieces.push(node);
       }
       // Normalise the way the editor would: merge neighbours with identical styles.
       const doc = parseMarkdown(serializeMarkdown({ type: 'doc', content: [p('body', ...pieces)] }));
@@ -176,8 +182,8 @@ describe('notes and footnotes', () => {
   });
 
   it('keeps character styles inside a note', () => {
-    const doc = parseMarkdown('[a **pie**]{.note #n2}');
-    expect(serializeMarkdown(doc)).toBe('[a **pie**]{.note #n2}\n');
+    const doc = parseMarkdown('[a **pie** [too]{.strong}]{.note #n2}');
+    expect(serializeMarkdown(doc)).toBe('[a **pie** [too]{.strong}]{.note #n2}\n');
   });
 
   it('reads an inline footnote', () => {
@@ -200,5 +206,105 @@ describe('notes and footnotes', () => {
 
   it('ignores ids on other classes', () => {
     expect(parseInline('[x]{.thought #n1}')).toEqual([t('[x]{.thought #n1}')]);
+  });
+});
+
+describe('more Markdown', () => {
+  const doc = (...content: NodeJSON[]) => ({ type: 'doc', content });
+  const li = (text: string, ...nested: NodeJSON[]): NodeJSON => ({ type: 'listItem', content: [{ type: 'paragraph', content: [t(text)] }, ...nested] });
+
+  it('reads headings and quotes as their paragraph styles', () => {
+    expect(parseMarkdown('# One\n\n## Two ##\n\n#### Four\n\n> Said\n> she.\n>\n> Again.\n\nAfter')).toEqual(
+      doc(p('chapter-title', t('One')), p('heading-2', t('Two')), p('heading-3', t('Four')), p('quote', t('Said she.')), p('quote', t('Again.')), p('body', t('After'))),
+    );
+    expect(serializeMarkdown(parseMarkdown('# One\n\n> Said\n>\n> Again.\n'))).toBe('# One\n\n> Said\n>\n> Again.\n');
+  });
+
+  it('still reads chapter titles written as fences', () => {
+    expect(parseMarkdown('::: chapter-title\nOne\n:::\n')).toEqual(doc(p('chapter-title', t('One'))));
+  });
+
+  it('reads numbered lists, nested lists and continued lines', () => {
+    const md = '3. three\n4. four\n   - inner\n     still inner\n     1. deeper\n5. five\n';
+    expect(parseMarkdown(md)).toEqual(
+      doc({
+        type: 'orderedList',
+        attrs: { start: 3 },
+        content: [
+          li('three'),
+          li('four', { type: 'bulletList', content: [li('inner still inner', { type: 'orderedList', attrs: { start: 1 }, content: [li('deeper')] })] }),
+          li('five'),
+        ],
+      }),
+    );
+    expect(serializeMarkdown(parseMarkdown(md))).toBe('3. three\n4. four\n   - inner still inner\n     1. deeper\n5. five\n');
+  });
+
+  it('keeps years at the start of a paragraph as text', () => {
+    expect(parseMarkdown('1962. That summer.')).toEqual(doc(p('body', t('1962. That summer.'))));
+    const written = serializeMarkdown(doc(p('body', t('1. not a list'))));
+    expect(written).toBe('1\\. not a list\n');
+    expect(parseMarkdown(written)).toEqual(doc(p('body', t('1. not a list'))));
+  });
+
+  it('reads and writes pipe tables', () => {
+    const md = '| Dish | Who |\n| --- | :-: |\n| Pie | Lou \\| June |\n| Greens |\n';
+    const parsed = parseMarkdown(md);
+    const cell = (type: string, text: string): NodeJSON => ({ type, content: [{ type: 'paragraph', ...(text ? { content: [t(text)] } : {}) }] });
+    expect(parsed).toEqual(
+      doc({
+        type: 'table',
+        content: [
+          { type: 'tableRow', content: [cell('tableHeader', 'Dish'), cell('tableHeader', 'Who')] },
+          { type: 'tableRow', content: [cell('tableCell', 'Pie'), cell('tableCell', 'Lou | June')] },
+          { type: 'tableRow', content: [cell('tableCell', 'Greens'), cell('tableCell', '')] },
+        ],
+      }),
+    );
+    expect(serializeMarkdown(parsed)).toBe('| Dish | Who |\n| --- | --- |\n| Pie | Lou \\| June |\n| Greens |  |\n');
+  });
+
+  it('reads code, strikethrough, underline, links and pictures', () => {
+    expect(parseInline('`a *b*` ~~gone~~ [ul]{.ul} [site](https://x.org/a_(b)) ![Lou](<pantry/pictures/lou 1.jpg>)')).toEqual([
+      t('a *b*', 'code'),
+      t(' '),
+      t('gone', 'strike'),
+      t(' '),
+      t('ul', 'ul'),
+      t(' '),
+      { type: 'text', text: 'site', marks: [{ type: 'link', attrs: { href: 'https://x.org/a_(b)' } }] },
+      t(' '),
+      { type: 'image', attrs: { src: 'pantry/pictures/lou 1.jpg', alt: 'Lou' } },
+    ]);
+    // Backticks inside code get a longer fence, padded when the code starts or ends with one.
+    const md = 'Use `` a`b `` and ` `` ` and ~~x~~ [**bold link**](https://x.org) ![Lou](<pantry/pictures/lou 1.jpg>)\n';
+    const written = serializeMarkdown(parseMarkdown(md));
+    expect(written).toBe('Use ``a`b`` and ``` `` ``` and ~~x~~ [**bold link**](https://x.org) ![Lou](<pantry/pictures/lou 1.jpg>)\n');
+    expect(parseMarkdown(written)).toEqual(parseMarkdown(md));
+  });
+
+  it('reads underscores as italic, but not inside words', () => {
+    expect(parseInline('_soft_ and __loud__ in snake_case_name')).toEqual([t('soft', 'italic'), t(' and '), t('loud', 'bold'), t(' in snake_case_name')]);
+  });
+
+  it('breaks lines with a backslash or two spaces', () => {
+    const parsed = parseMarkdown('Roses are red,\\\nviolets *blue,*  \nsugar.\n');
+    expect(parsed).toEqual(doc(p('body', t('Roses are red,'), { type: 'hardBreak' }, t('violets '), t('blue,', 'italic'), { type: 'hardBreak' }, t('sugar.'))));
+    expect(serializeMarkdown(parsed)).toBe('Roses are red,\\\nviolets *blue,*\\\nsugar.\n');
+    // A line that starts like a list after the break stays text.
+    const tricky = doc(p('body', t('a'), { type: 'hardBreak' }, t('- b')));
+    expect(parseMarkdown(serializeMarkdown(tricky))).toEqual(tricky);
+  });
+
+  it('reads code blocks without looking inside them', () => {
+    const md = '```js\nconst a = *b*;\n\n# not a heading\n```\n';
+    expect(parseMarkdown(md)).toEqual(doc({ type: 'codeBlock', attrs: { language: 'js' }, content: [{ type: 'text', text: 'const a = *b*;\n\n# not a heading' }] }));
+    expect(serializeMarkdown(parseMarkdown(md))).toBe(md);
+  });
+
+  it('escapes text that would start a block', () => {
+    const lines = ['# hash', '> quote', '| pipe', '+ plus', '```', '1) one', '~~~'];
+    const d = doc(...lines.map((l) => p('body', t(l))));
+    expect(parseMarkdown(serializeMarkdown(d))).toEqual(d);
   });
 });

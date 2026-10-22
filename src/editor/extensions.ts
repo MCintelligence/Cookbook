@@ -1,12 +1,14 @@
 import { InputRule, Mark, Node, mergeAttributes, wrappingInputRule, type Editor } from '@tiptap/core';
-import { BulletList, ListItem, TaskItem, TaskList } from '@tiptap/extension-list';
+import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
+import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import { Typography } from '@tiptap/extension-typography';
 import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
-import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
+import { type Mark as PMMark } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
-import { BODY_STYLE } from './markdown';
+import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { FindExtension } from './findPlugin';
 import { LinkedNames } from './names';
 import { Proofread } from '../proofread/plugin';
@@ -34,7 +36,15 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
     };
   },
   parseHTML() {
-    return [{ tag: 'p' }];
+    // Headings from other apps come in as Chapter title and the heading styles.
+    const heading = (tag: string, style: string) => ({ tag, attrs: { style } });
+    return [
+      { tag: 'p' },
+      heading('h1', HEADING_STYLES[0]),
+      heading('h2', HEADING_STYLES[1]),
+      ...['h3', 'h4', 'h5', 'h6'].map((h) => heading(h, HEADING_STYLES[2])),
+      { tag: 'blockquote > p', attrs: { style: QUOTE_STYLE } },
+    ];
   },
   renderHTML({ HTMLAttributes }) {
     return ['p', mergeAttributes(HTMLAttributes), 0];
@@ -108,41 +118,10 @@ export const CharStyle = Mark.create({
       'Mod-u': ({ editor }) => toggleCharStyle(editor, 'underline'),
     };
   },
-  addInputRules() {
-    return [
-      charStyleRule(/(?:^|[\s([{“‘"'])(\*\*([^*\s](?:[^*]*[^*\s])?)\*\*)$/, 'strong', this.type),
-      charStyleRule(/(?:^|[\s([{“‘"'])(\*([^*\s](?:[^*]*[^*\s])?)\*)$/, 'emphasis', this.type),
-      charStyleRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, 'underline', this.type),
-    ];
-  },
 });
 
 function findStyle(marks: readonly PMMark[], style: string): PMMark | undefined {
   return marks.find((m) => m.type.name === 'charStyle' && m.attrs.style === style);
-}
-
-/**
- * Turns `**word**` into the Strong style (and so on). Unlike Tiptap's own
- * rule, the text keeps any other character styles it already had.
- */
-function charStyleRule(find: RegExp, style: string, type: MarkType): InputRule {
-  return new InputRule({
-    find,
-    handler: ({ state, range, match }) => {
-      // The closing delimiter has not been inserted yet; range.to is just before it.
-      const delimited = match[1]!;
-      const inner = match[2]!;
-      const delimiter = (delimited.length - inner.length) / 2;
-      const delimStart = range.from + match[0].indexOf(delimited);
-      const textStart = delimStart + delimiter;
-      const before = state.doc.resolve(delimStart).marks();
-      const tr = state.tr;
-      tr.delete(textStart + inner.length, range.to);
-      tr.delete(delimStart, textStart);
-      tr.addMark(delimStart, delimStart + inner.length, type.create({ style }));
-      tr.setStoredMarks(before);
-    },
-  });
 }
 
 export function hasCharStyle(editor: Editor, style: string): boolean {
@@ -186,18 +165,40 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     CharStyle,
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
+    Bold,
+    Italic,
+    Underline,
+    Strike,
+    Code,
+    Link,
+    PlainMarkRules,
+    HardBreak,
+    CodeBlock,
+    Image,
+    BlockShortcuts,
+    PasteCleanup,
     BulletList.extend({
       addInputRules() {
         return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
       },
     }),
-    ListItem.extend({ content: 'paragraph' }),
+    // -1 starts a numbered list, as - starts bullets and -TD a checklist; so does 1. on its own.
+    OrderedList.extend({
+      addInputRules() {
+        return [wrappingInputRule({ find: /^\s*(?:-1|1\.)\s$/, type: this.type })];
+      },
+    }),
+    ListItem.extend({ content: 'paragraph list*' }),
     TaskList.extend({
       addInputRules() {
         return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
       },
     }),
-    TaskItem.extend({ content: 'paragraph' }).configure({ nested: false }),
+    TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader.extend({ content: 'paragraph' }),
+    TableCell.extend({ content: 'paragraph' }),
     Typography.configure({
       // Only what a novelist expects; nothing turns (c) into © behind their back.
       leftArrow: false,

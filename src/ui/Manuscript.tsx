@@ -23,8 +23,13 @@ type Item =
 /** Words a minute for a reader of fiction. */
 const READING_SPEED = 250;
 
+/** Folders and scenes in reading order. Folders with no scenes anywhere inside are left out. */
 function flatten(nodes: TreeNode[], depth = 0): ({ folder: TreeNode; depth: number } | { file: TreeNode })[] {
-  return nodes.flatMap((n) => (n.kind === 'folder' ? [{ folder: n, depth }, ...flatten(n.children ?? [], depth + 1)] : [{ file: n }]));
+  return nodes.flatMap((n) => {
+    if (n.kind !== 'folder') return [{ file: n }];
+    const inside = flatten(n.children ?? [], depth + 1);
+    return inside.some((i) => 'file' in i) ? [{ folder: n, depth }, ...inside] : [];
+  });
 }
 
 function footnotesOf(node: NodeJSON): string[] {
@@ -41,8 +46,8 @@ export function readingTime(words: number): string {
 }
 
 /**
- * The whole manuscript as one document to read: every scene in Bookshelf
- * order, under its chapter headings. Click a scene's title to write in it.
+ * Bookread: the whole manuscript as one document to read, every scene in
+ * Bookshelf order under its chapter headings. Click a scene's title to write in it.
  */
 export function Manuscript({ fs, tree, onOpen, onClose }: Props) {
   const [items, setItems] = useState<Item[] | null>(null);
@@ -77,14 +82,14 @@ export function Manuscript({ fs, tree, onOpen, onClose }: Props) {
     <>
       <div className="ms-bar">
         <span>
-          <strong>The whole manuscript</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'scene' : 'scenes'} · {words.toLocaleString('en')} words · about{' '}
+          <strong>Bookread</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'scene' : 'scenes'} · {words.toLocaleString('en')} words · about{' '}
           {readingTime(words)} to read
         </span>
         <button className="pill" onClick={onClose}>
           Back to writing
         </button>
       </div>
-      <article className="cb-page manuscript" aria-label="Manuscript">
+      <article className="cb-page manuscript" aria-label="Bookread">
         {scenes.length === 0 && <p className="empty">The Bookshelf has no scenes yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (

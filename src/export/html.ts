@@ -40,16 +40,41 @@ export class HtmlWriter {
       case 'sceneBreak':
         return '<p class="scene-break">* * *</p>';
       case 'bulletList':
-        return `<ul>${(n.content ?? []).map((i) => `<li>${this.itemText(i)}</li>`).join('')}</ul>`;
+      case 'orderedList':
       case 'taskList':
-        return `<ul class="tasks">${(n.content ?? []).map((i) => `<li>${i.attrs?.checked ? '☑' : '☐'} ${this.itemText(i)}</li>`).join('')}</ul>`;
+        return this.list(n);
+      case 'codeBlock':
+        return `<pre><code>${escapeHtml((n.content ?? []).map((t) => t.text ?? '').join(''))}</code></pre>`;
+      case 'table':
+        return `<table>${(n.content ?? [])
+          .map(
+            (row) =>
+              `<tr>${(row.content ?? [])
+                .map((cell) => {
+                  const tag = cell.type === 'tableHeader' ? 'th' : 'td';
+                  return `<${tag}>${(cell.content ?? []).map((p) => this.inline(p.content ?? [])).join(' ')}</${tag}>`;
+                })
+                .join('')}</tr>`,
+          )
+          .join('')}</table>`;
       default:
         return '';
     }
   }
 
-  private itemText(item: NodeJSON): string {
-    return (item.content ?? []).map((p) => this.inline(p.content ?? [])).join(' ');
+  private list(n: NodeJSON): string {
+    const items = (n.content ?? [])
+      .map((item) => {
+        const [first, ...rest] = item.content ?? [];
+        const box = item.type === 'taskItem' ? `${item.attrs?.checked ? '☑' : '☐'} ` : '';
+        return `<li>${box}${this.inline(first?.content ?? [])}${rest.map((l) => this.list(l)).join('')}</li>`;
+      })
+      .join('');
+    if (n.type === 'orderedList') {
+      const start = Number(n.attrs?.start ?? 1);
+      return `<ol${start !== 1 ? ` start="${start}"` : ''}>${items}</ol>`;
+    }
+    return `<ul${n.type === 'taskList' ? ' class="tasks"' : ''}>${items}</ul>`;
   }
 
   private inline(nodes: NodeJSON[]): string {
@@ -60,14 +85,24 @@ export class HtmlWriter {
           this.notes.push(String(n.attrs?.text ?? ''));
           return `<sup class="fn"><a id="fr${this.count}" href="#fn${this.count}">${this.count}</a></sup>`;
         }
+        if (n.type === 'hardBreak') return this.xhtml ? '<br />' : '<br>';
+        // Pictures aren't carried into exports yet; their description stands in.
+        if (n.type === 'image') return n.attrs?.alt ? `<em class="picture">[${escapeHtml(String(n.attrs.alt))}]</em>` : '';
         if (n.type !== 'text') return '';
-        const text = escapeHtml(n.text ?? '');
+        let html = escapeHtml(n.text ?? '');
         const styles = charStyles(n);
-        return styles.length > 0 ? `<span data-char="${escapeHtml(styles.join(' '))}">${text}</span>` : text;
+        // Innermost first, the same nesting the editor uses.
+        for (const m of [...(n.marks ?? [])].reverse()) {
+          if (m.type === 'link') html = `<a href="${escapeHtml(m.attrs.href)}">${html}</a>`;
+          else if (m.type in PLAIN_TAGS) html = `<${PLAIN_TAGS[m.type]}>${html}</${PLAIN_TAGS[m.type]}>`;
+        }
+        return styles.length > 0 ? `<span data-char="${escapeHtml(styles.join(' '))}">${html}</span>` : html;
       })
       .join('');
   }
 }
+
+const PLAIN_TAGS: Record<string, string> = { bold: 'strong', italic: 'em', underline: 'u', strike: 's', code: 'code' };
 
 /** Page-independent CSS for exported and printed books, on top of the book's styles. */
 export function bookCss(sheet: StyleSheet, scope: string): string {
@@ -79,6 +114,11 @@ ${scope} .scene-break { text-align: center; text-indent: 0; margin: 1em 0; }
 ${scope} .footnotes { font-size: 0.85em; margin-top: 2em; }
 ${scope} .footnotes hr { width: 30%; margin-left: 0; }
 ${scope} ul.tasks { list-style: none; padding-left: 1em; }
+${scope} table { border-collapse: collapse; margin: 1em auto; }
+${scope} th, ${scope} td { border: 1px solid #999; padding: 0.25em 0.6em; text-indent: 0; text-align: left; }
+${scope} pre { font-family: 'Courier Prime', monospace; font-size: 0.85em; white-space: pre-wrap; margin: 1em 0; }
+${scope} code { font-family: 'Courier Prime', monospace; font-size: 0.92em; }
+${scope} a { color: inherit; }
 ${scope} sup.fn a { text-decoration: none; color: inherit; }`;
 }
 

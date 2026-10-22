@@ -73,10 +73,60 @@ describe('typing shortcuts', () => {
     expect(editor.getText()).toBe('-TD ');
   });
 
-  it('applies Strong, Emphasis and Underline from Markdown', () => {
+  it('applies plain bold, italic, underline, strikethrough and code from Markdown', () => {
     const editor = make();
-    type(editor, 'a **bold** and *soft* and _under_ end');
-    expect(md(editor)).toBe('a **bold** and *soft* and [under]{.underline} end\n');
+    type(editor, 'a **bold** and *soft* and _under_ and ~~gone~~ and `x` end');
+    expect(md(editor)).toBe('a **bold** and *soft* and [under]{.ul} and ~~gone~~ and `x` end\n');
+    expect(editor.getJSON().content?.[0]?.content?.[1]?.marks).toEqual([{ type: 'bold' }]);
+  });
+
+  it('starts numbered lists with -1 or 1., and headings and quotes with # and >', () => {
+    const editor = make();
+    type(editor, '-1 one');
+    press(editor, 'Enter');
+    type(editor, 'two');
+    expect(md(editor)).toBe('1. one\n2. two\n');
+    const other = make();
+    type(other, '## Part one');
+    press(other, 'Enter');
+    type(other, '> Said she');
+    expect(md(other)).toBe('## Part one\n\n> Said she\n');
+    const year = make();
+    type(year, '1962. That summer');
+    expect(md(year)).toBe('1962. That summer\n');
+  });
+
+  it('breaks a line with Shift+Enter', () => {
+    const editor = make('Roses');
+    editor.commands.focus('end');
+    press(editor, 'Shift-Enter');
+    type(editor, 'violets');
+    expect(md(editor)).toBe('Roses\\\nviolets\n');
+  });
+
+  it('opens every new kind of block from its Markdown and writes it back unchanged', () => {
+    const body = [
+      '# Title',
+      '',
+      '1. one',
+      '   - nested',
+      '2. two',
+      '',
+      '| a | b |',
+      '| --- | --- |',
+      '| c | d |',
+      '',
+      '```',
+      'code *here*',
+      '```',
+      '',
+      '> quote',
+      '',
+      'Pie ~~cake~~ [site](https://x.org) `x` [u]{.ul} ![Lou](pantry/lou.jpg)\\',
+      'next',
+      '',
+    ].join('\n');
+    expect(md(make(body))).toBe(body);
   });
 
   it('keeps an outer character style when Markdown adds another', () => {
@@ -107,9 +157,10 @@ describe('typing shortcuts', () => {
     editor.commands.setTextSelection({ from: 1, to: 6 });
     toggleCharStyle(editor, 'emphasis');
     toggleCharStyle(editor, 'strong');
-    expect(md(editor)).toBe('***plain*** words\n');
+    // Character styles are written by name, so restyling Strong restyles every use.
+    expect(md(editor)).toBe('[[plain]{.strong}]{.emphasis} words\n');
     toggleCharStyle(editor, 'emphasis');
-    expect(md(editor)).toBe('**plain** words\n');
+    expect(md(editor)).toBe('[plain]{.strong} words\n');
   });
 });
 
@@ -121,7 +172,7 @@ describe('paragraph styles', () => {
     type(editor, 'The kitchen.');
     press(editor, 'Enter');
     type(editor, 'Her greens.');
-    expect(md(editor)).toBe('::: chapter-title\nSunday Dinner\n:::\n\n::: body-first\nThe kitchen.\n:::\n\nHer greens.\n');
+    expect(md(editor)).toBe('# Sunday Dinner\n\n::: body-first\nThe kitchen.\n:::\n\nHer greens.\n');
   });
 });
 

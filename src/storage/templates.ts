@@ -34,7 +34,7 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
     name: 'Chapter opener',
     kind: 'scene',
     title: 'Chapter opener',
-    body: '::: chapter-title\nChapter title\n:::\n\n::: body-first\nThe first line of the chapter.\n:::\n',
+    body: '# Chapter title\n\n::: body-first\nThe first line of the chapter.\n:::\n',
   },
   {
     id: 'letter',

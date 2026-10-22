@@ -127,6 +127,14 @@ function sceneGoal(doc: CookbookDocument | null): number | null {
   return typeof goal === 'number' && goal > 0 ? goal : null;
 }
 
+function* walkFolders(nodes: TreeNode[]): Generator<TreeNode> {
+  for (const n of nodes) {
+    if (n.kind !== 'folder') continue;
+    yield n;
+    yield* walkFolders(n.children ?? []);
+  }
+}
+
 function folderName(location: BookLocation): string {
   if (location.kind === 'folder') return location.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || DEFAULT_BOOK;
   return location.name;
@@ -704,6 +712,22 @@ export function App() {
     });
   };
 
+  /** Right-click on the empty part of the Bookshelf or Pantry. */
+  const shelfMenu = (x: number, y: number) => {
+    const book = tab === 'book';
+    setMenu({
+      label: book ? 'Bookshelf' : 'Pantry',
+      x,
+      y,
+      items: [
+        { label: book ? 'New scene' : 'New card', onPick: () => void addScene() },
+        { label: 'New folder', onPick: () => void addFolder() },
+        { label: 'Import files…', onPick: () => chooseImport(null) },
+        ...(book ? [{ separator: true } as const, { label: 'Bookread', onPick: () => void readManuscript() }] : []),
+      ],
+    });
+  };
+
   const rowMenu = (node: TreeNode, x: number, y: number) => {
     const fixed = PANTRY_FOLDERS.has(node.path);
     const inPantry = node.path.startsWith(PANTRY + '/');
@@ -713,7 +737,9 @@ export function App() {
         : [
             ...(fixed ? [] : [{ label: 'Rename', onPick: () => setRenaming(node.path) }]),
             { label: inPantry ? 'New card here' : 'New scene here', onPick: () => void addFrom(inPantry ? CARD_TEMPLATES.find((t) => t.folder === sectionOf(node.path + '/x'))! : SCENE_TEMPLATES[0]!, node.path) },
+            { label: 'New folder inside', onPick: () => void addFolderIn(node.path) },
             { label: 'Import files here…', onPick: () => chooseImport(node.path) },
+            ...(inPantry ? [] : [{ label: 'Bookread this folder', onPick: () => void readManuscript(node.path) }]),
           ];
     if (!fixed) items.push({ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(node.path) });
     setMenu({ label: node.kind === 'file' ? 'Scene' : 'Folder', x, y, items });
@@ -755,6 +781,15 @@ export function App() {
     setRenaming(created);
   };
 
+  /** A new folder inside `parent`, at its end, with its name ready to type. */
+  const addFolderIn = async (parent: string) => {
+    if (!fs) return;
+    const created = await createFolder(fs, parent);
+    order.current = await placeNew(fs, order.current, tree, root, created, null);
+    await refreshTree();
+    setRenaming(created);
+  };
+
   const renameInTree = async (from: string, title: string | null) => {
     setRenaming(null);
     if (!fs || title === null) return;
@@ -778,10 +813,13 @@ export function App() {
     scheduleSave(updated);
   };
 
-  const readManuscript = async () => {
+  /** Bookread for the whole Bookshelf, or for one folder of it. */
+  const readManuscript = async (folder?: string) => {
     if (!fs) return;
     await flushSave();
-    setManuscript(await readTree(fs, BOOKSHELF, order.current));
+    const shelf = await readTree(fs, BOOKSHELF, order.current);
+    const only = folder ? [...walkFolders(shelf)].find((n) => n.path === folder) : undefined;
+    setManuscript(only ? [only] : shelf);
   };
 
   const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
@@ -1033,7 +1071,8 @@ export function App() {
         </div>
       </header>
 
-      <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} />
+      {/* Bookread is for reading, so the formatting toolbar steps aside. */}
+      {!manuscript && <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} />}
 
       <nav
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
@@ -1046,6 +1085,12 @@ export function App() {
           if (folder !== fileDrop) setFileDrop(folder);
         }}
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
+        onContextMenu={(e) => {
+          // Rows have their own menu; this one is for the space around them.
+          if ((e.target as Element).closest('[data-tree-path], input, .menu')) return;
+          e.preventDefault();
+          shelfMenu(e.clientX, e.clientY);
+        }}
         onDrop={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
@@ -1063,14 +1108,17 @@ export function App() {
         </div>
         <div className="section-label">
           <span>{tab === 'book' ? 'Bookshelf' : pantryView === 'all' ? 'Pantry' : SECTION_LABEL[pantryView]}</span>
-          <span className="section-actions">
-            <button className="ghost" onClick={() => void addFolder()}>
-              New folder
-            </button>
-            <button className="ghost" onClick={() => void addScene()}>
-              {tab === 'book' ? 'New scene' : 'New card'}
-            </button>
-          </span>
+          {/* On the Bookshelf, new scenes and folders come from the right-click menu and the template button. */}
+          {tab === 'pantry' && (
+            <span className="section-actions">
+              <button className="ghost" onClick={() => void addFolder()}>
+                New folder
+              </button>
+              <button className="ghost" onClick={() => void addScene()}>
+                New card
+              </button>
+            </span>
+          )}
         </div>
         {tab === 'pantry' && <PantryBar view={pantryView} onView={setPantryView} query={pantryQuery} onQuery={setPantryQuery} />}
         {pantryHits ? (
@@ -1096,7 +1144,7 @@ export function App() {
         )}
         {tab === 'book' && (
           <button className="ms-open" aria-pressed={manuscript !== null} onClick={() => (manuscript ? setManuscript(null) : void readManuscript())}>
-            {manuscript ? 'Back to writing' : 'Read the whole manuscript'}
+            Bookread
           </button>
         )}
         <TemplateMenu

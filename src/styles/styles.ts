@@ -58,6 +58,8 @@ export interface StyleSheet {
 }
 
 export const STYLES_FILE = 'styles.json';
+/** Paragraph styles every book has, because Markdown has its own syntax for them. */
+const BUILT_IN = ['chapter-title', 'heading-2', 'heading-3', 'quote'];
 export const BODY = 'body';
 
 export const FONTS = ['Literata', 'EB Garamond', 'Libre Baskerville', 'Courier Prime', 'Fraunces', 'Nunito'] as const;
@@ -97,6 +99,9 @@ export function defaultStyles(): StyleSheet {
         spaceAfter: 18,
         bold: true,
       },
+      { id: 'heading-2', name: 'Heading 2', basedOn: 'chapter-title', next: 'body-first', size: 15, spaceBefore: 12, spaceAfter: 12 },
+      { id: 'heading-3', name: 'Heading 3', basedOn: 'chapter-title', next: 'body-first', size: 13, align: 'left', spaceBefore: 12, spaceAfter: 6 },
+      { id: 'quote', name: 'Quote', basedOn: BODY, next: BODY, italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 6, spaceAfter: 6 },
       { id: 'letter', name: 'Letter', basedOn: BODY, next: 'letter', italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 9, spaceAfter: 9 },
       { id: 'epigraph', name: 'Epigraph', basedOn: BODY, next: 'body-first', size: 11, italic: true, align: 'right', firstLineIndent: 0, spaceAfter: 18 },
     ],
@@ -118,6 +123,14 @@ export async function loadStyles(fs: StorageAdapter): Promise<StyleSheet> {
   const character = Array.isArray(sheet.character) ? sheet.character : [];
   // Body must always exist, because every other style falls back to it.
   if (!paragraph.some((s) => s.id === BODY)) paragraph.unshift(defaults.paragraph[0]!);
+  // Styles Markdown has syntax for (# headings, > quotes) are added to books made before they existed.
+  for (const id of BUILT_IN) {
+    if (paragraph.some((s) => s.id === id)) continue;
+    const style = defaults.paragraph.find((s) => s.id === id)!;
+    const before = defaults.paragraph.findIndex((s) => s.id === id) - 1;
+    const after = paragraph.findIndex((s) => s.id === defaults.paragraph[before]?.id);
+    paragraph.splice(after === -1 ? paragraph.length : after + 1, 0, style);
+  }
   return { format: 1, paragraph, character };
 }
 

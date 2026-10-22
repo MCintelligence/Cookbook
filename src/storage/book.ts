@@ -61,6 +61,23 @@ export async function createBook(fs: StorageAdapter, title: string, now = new Da
   return info;
 }
 
+/**
+ * Runs the steps that lay out a new book. If one fails, everything they added
+ * to the folder is taken away again, so a failed start never leaves half a
+ * book behind. Files that were already there are left alone.
+ */
+export async function makeBookOrUndo<T>(fs: StorageAdapter, steps: () => Promise<T>): Promise<T> {
+  const before = new Set((await fs.list('').catch(() => [])).map((e) => e.name));
+  try {
+    return await steps();
+  } catch (e) {
+    for (const entry of await fs.list('').catch(() => [])) {
+      if (!before.has(entry.name)) await fs.remove(entry.name).catch(() => {});
+    }
+    throw e;
+  }
+}
+
 export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
   if (!(await fs.exists(BOOK_FILE))) throw new Error('This folder is not a Cookbook book.');
   const info = JSON.parse(await fs.readText(BOOK_FILE)) as Partial<BookInfo>;

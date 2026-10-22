@@ -110,9 +110,24 @@ export async function openLocation(location: BookLocation): Promise<OpenedStorag
   }
   if (hasBrowserStorage()) {
     const { OpfsAdapter } = await import('./opfs');
-    return { fs: await OpfsAdapter.open(location.name), where: 'Saved in this browser' };
+    const kept = await keepBrowserStorage();
+    return { fs: await OpfsAdapter.open(location.name), where: kept ? 'Saved in this browser' : 'Saved in this browser, which may clear it when space runs low' };
   }
   return { fs: new MemoryAdapter(), where: 'Not saved (this browser has no private storage)' };
+}
+
+/**
+ * Asks the browser not to clear Cookbook's storage when the disk fills up or
+ * the site goes unused. Browsers that grant it quietly return true; some only
+ * grant it to sites that are installed or bookmarked.
+ */
+export async function keepBrowserStorage(): Promise<boolean> {
+  try {
+    if (await navigator.storage.persisted?.()) return true;
+    return (await navigator.storage.persist?.()) ?? false;
+  } catch {
+    return false;
+  }
 }
 
 /** Book folders kept in the browser's private storage. */

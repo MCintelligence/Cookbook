@@ -9,6 +9,7 @@ import {
   type BookInfo,
   type TreeNode,
   createBook,
+  makeBookOrUndo,
   DEFAULT_DAILY_GOAL,
   createDocument,
   createFolder,
@@ -25,12 +26,14 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, akaOf, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, akaOf, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { plainText } from './editor/markdown';
 import { exportHistory } from './ui/exportHistory';
+import { friendlyError } from './storage/errors';
 import { TemplateMenu } from './ui/TemplateMenu';
 import { WritingFooter } from './ui/WritingFooter';
 import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
@@ -44,6 +47,7 @@ import {
   DEFAULT_BOOK,
   childLocation,
   defaultLocation,
+  isTauri,
   newBookLocation,
   openLocation,
   pickFolder,
@@ -94,9 +98,11 @@ function readNotes(doc: CookbookDocument | null): Notes {
 }
 
 async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel'): Promise<BookInfo> {
-  const info = await createBook(fs, title);
-  await applyBookTemplate(fs, template);
-  return info;
+  return makeBookOrUndo(fs, async () => {
+    const info = await createBook(fs, title);
+    await applyBookTemplate(fs, template);
+    return info;
+  });
 }
 
 /** Words in a scene, not counting markup. */
@@ -179,11 +185,14 @@ export function App() {
         info = await openBook(nextFs);
       } catch (e) {
         if (!(e instanceof Error && e.message === NOT_A_BOOK)) throw e;
-        if (mode.adopt) info = await createBook(nextFs, folderName(target));
+        if (mode.adopt) info = await makeBookOrUndo(nextFs, () => createBook(nextFs, folderName(target)));
         else if (sameLocation(target, await defaultLocation())) info = await startBook(nextFs, DEFAULT_BOOK);
         else throw e;
       }
     }
+    // Words a closing browser tab didn't finish saving go back into their scene.
+    const rescue = takeRescue(window.localStorage, target);
+    if (rescue) await applyRescue(nextFs, rescue).catch(() => {});
     index.current?.index.close();
     index.current = null;
     setEditor(null);
@@ -208,7 +217,7 @@ export function App() {
       .then((touched) => {
         if (touched > 0 && index.current === opened) indexChanged();
       })
-      .catch((e: unknown) => setError(`Search may miss some files: ${String(e)}`));
+      .catch((e: unknown) => setError(`Search may miss some files. ${friendlyError(e)}`));
   };
 
   /** Runs a library action. The dialog closes when it succeeds and stays open, with the reason, when it fails. */
@@ -221,7 +230,7 @@ export function App() {
         setAdopting(null);
       }
     } catch (e) {
-      setLibraryError(e instanceof Error ? e.message : String(e));
+      setLibraryError(friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -271,12 +280,12 @@ export function App() {
           return;
         } catch (e) {
           // A folder that moved, or one the browser needs a click to reopen: show the books instead.
-          setLibraryError(e instanceof Error ? e.message : String(e));
+          setLibraryError(friendlyError(e));
           setLibraryOpen(true);
         }
       }
       await openAt(await defaultLocation());
-    })().catch((e: unknown) => setError(String(e)));
+    })().catch((e: unknown) => setError(friendlyError(e)));
   }, []);
 
   const root = tab === 'book' ? BOOKSHELF : PANTRY;
@@ -302,6 +311,11 @@ export function App() {
   const savedWords = useRef<number | null>(null);
   /** Set while splitting or merging, which moves words without writing any. */
   const movingWords = useRef(false);
+  /** The open scene's file text as last read or written, and the newest text still waiting to be saved. */
+  const savedText = useRef<string | null>(null);
+  const unsaved = useRef<{ path: string; text: string; base: string } | null>(null);
+  const locationRef = useRef<BookLocation | null>(null);
+  locationRef.current = location;
   const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
 
   const onRecorder = useCallback(
@@ -325,12 +339,21 @@ export function App() {
     window.clearTimeout(saveTimer.current);
     const save = pendingSave.current;
     pendingSave.current = null;
-    if (save) await save().catch((e: unknown) => setError(String(e)));
+    if (!save) return;
+    try {
+      await save();
+      unsaved.current = null;
+      dropRescue(window.localStorage);
+    } catch (e) {
+      setError(friendlyError(e));
+    }
   }, []);
 
   useEffect(() => {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
     const onHide = () => {
+      const pending = unsaved.current;
+      if (pending && locationRef.current) keepRescue(window.localStorage, { location: locationRef.current, ...pending });
       void flushSave().then(saveUndoNow);
       void saveIndexNow();
     };
@@ -342,13 +365,36 @@ export function App() {
     };
   }, [flushSave, saveIndexNow, saveUndoNow]);
 
+  useEffect(() => {
+    // The desktop app waits for the last save before the window closes.
+    if (!isTauri()) return;
+    let stop: (() => void) | undefined;
+    let gone = false;
+    void import('@tauri-apps/api/window').then(({ getCurrentWindow }) =>
+      getCurrentWindow()
+        .onCloseRequested(async () => {
+          await flushSave();
+          await saveUndoNow();
+          await saveIndexNow();
+        })
+        .then((unlisten) => (gone ? unlisten() : (stop = unlisten))),
+    );
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  }, [flushSave, saveIndexNow, saveUndoNow]);
+
   const scheduleSave = (next: CookbookDocument) => {
     if (!fs || !path) return;
     const target = path;
     docRef.current = next;
     const current = index.current;
+    const text = serializeDocument(next);
+    unsaved.current = { path: target, text, base: savedText.current ?? text };
     pendingSave.current = async () => {
       await writeDocument(fs, target, next);
+      savedText.current = text;
       // Count words written, unless the change only moved words between scenes.
       const words = sceneWords(next);
       if (!movingWords.current && savedWords.current !== null) {
@@ -356,7 +402,7 @@ export function App() {
         if (updated !== historyRef.current) {
           historyRef.current = updated;
           setHistoryState(updated);
-          await saveHistory(fs, updated).catch((e: unknown) => setError(String(e)));
+          await saveHistory(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
         }
       }
       savedWords.current = words;
@@ -379,6 +425,7 @@ export function App() {
     const opened = await readDocument(fs, p);
     setManuscript(null);
     docRef.current = opened;
+    savedText.current = serializeDocument(opened);
     savedWords.current = sceneWords(opened);
     setUndoLog(await readUndoLog(fs, opened.id));
     setPath(p);
@@ -462,7 +509,7 @@ export function App() {
       order.current = moved.order;
       followMove(from, moved.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     }
     await refreshTree();
   };
@@ -489,7 +536,7 @@ export function App() {
       order.current = renamed.order;
       followMove(from, renamed.path);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(friendlyError(e));
     }
     await refreshTree();
   };
@@ -511,7 +558,7 @@ export function App() {
   const editStyle = (id: string, changes: Partial<ParagraphStyle>) => {
     const next = updateParagraphStyle(sheet, id, changes);
     setSheet(next);
-    if (fs) saveStyles(fs, next).catch((e: unknown) => setError(String(e)));
+    if (fs) saveStyles(fs, next).catch((e: unknown) => setError(friendlyError(e)));
   };
 
   const notes = readNotes(doc);
@@ -564,7 +611,7 @@ export function App() {
       const { data, type } = await shrinkPicture(file);
       setCardField('portrait', await savePicture(fs, base.title, data, type));
     } catch (e) {
-      setError(`Couldn’t add that picture: ${e instanceof Error ? e.message : String(e)}`);
+      setError(`Couldn’t add that picture: ${friendlyError(e)}`);
     }
   };
   // Linked names follow the index, but only change when a name does, not on every save.
@@ -584,7 +631,7 @@ export function App() {
       if (!fs || !book) return;
       const updated = { ...book, dialect };
       setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(String(e)));
+      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
     },
     [fs, book],
   );
@@ -593,7 +640,7 @@ export function App() {
       if (!fs || !book) return;
       const updated = { ...book, proofreadOff };
       setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(String(e)));
+      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
     },
     [fs, book],
   );
@@ -959,7 +1006,7 @@ export function App() {
             if (!fs || !book) return;
             const updated = { ...book, dailyGoal: goal };
             setBook(updated);
-            saveBookInfo(fs, updated).catch((e: unknown) => setError(String(e)));
+            saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
           }}
           onSceneGoal={(goal) => {
             const base = docRef.current ?? doc;
@@ -969,7 +1016,7 @@ export function App() {
             setDoc(updated);
             scheduleSave(updated);
           }}
-          onExport={() => void exportHistory(book?.title ?? 'Book', history).catch((e: unknown) => setError(String(e)))}
+          onExport={() => void exportHistory(book?.title ?? 'Book', history).catch((e: unknown) => setError(friendlyError(e)))}
         />
         <span>
           {doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing · ` : ''}

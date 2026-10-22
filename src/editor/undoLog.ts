@@ -120,7 +120,10 @@ export class UndoRecorder {
    * that text, when the log does not lead to it.
    */
   restore(log: UndoLog, expected: string): boolean {
-    const target = serializeMarkdown(parseMarkdown(expected));
+    // Both sides go through the same parse, so whitespace the file format
+    // trims (such as trailing spaces) can't make a good log look wrong.
+    const normal = (text: string) => serializeMarkdown(parseMarkdown(text));
+    const target = normal(expected);
     this.replaying = true;
     try {
       const schema = this.editor.schema;
@@ -147,7 +150,7 @@ export class UndoRecorder {
           view.dispatch(tr);
         }
       });
-      if (serializeMarkdown(this.editor.getJSON() as NodeJSON) !== target) throw new Error('The log does not match the file.');
+      if (normal(serializeMarkdown(this.editor.getJSON() as NodeJSON)) !== target) throw new Error('The log does not match the file.');
       this.base = base;
       this.entries = log.entries.slice(keepFrom);
       // The cursor is left where the last change was made.

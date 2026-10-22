@@ -59,6 +59,25 @@ describe('undo that survives closing', () => {
     expect(md(again.editor)).toBe('The kitchen. It smelled of cornbread.\n');
   });
 
+  it('keeps the history when the scene ends with a space', () => {
+    const { editor, recorder } = make('The kitchen.');
+    type(editor, ' It smelled of cornbread. ');
+    const text = md(editor);
+    const again = reopen(text, JSON.stringify(recorder.toJSON()));
+    expect(again.restored).toBe(true);
+    again.editor.commands.undo();
+    expect(md(again.editor)).toBe('The kitchen.\n');
+  });
+
+  it('keeps the history when a line in the middle ends with spaces', () => {
+    const { editor, recorder } = make('First line.');
+    type(editor, '  ');
+    editor.commands.enter();
+    type(editor, 'Second line.');
+    const again = reopen(md(editor), JSON.stringify(recorder.toJSON()));
+    expect(again.restored).toBe(true);
+  });
+
   it('keeps undos and redos made before closing', () => {
     const { editor, recorder } = make('Pie.');
     type(editor, ' Peach.');

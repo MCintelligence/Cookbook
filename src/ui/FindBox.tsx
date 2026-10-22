@@ -3,7 +3,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../editor/findPlugin';
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
 
-const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Scene', character: 'Character', setting: 'Setting', research: 'Research' };
+const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Scene', character: 'Character', setting: 'Setting', research: 'Research', journal: 'Journal' };
 
 interface Props {
   editor: Editor | null;
@@ -11,13 +11,15 @@ interface Props {
   search: (query: string) => SearchHit[];
   currentPath: string | null;
   onOpenHit: (path: string) => void;
+  /** Opens the box with these words, as "Find everywhere" on a right-click does. */
+  request?: { query: string; at: number } | null;
 }
 
 /**
  * The one search box in the top bar. It finds and replaces in the open scene,
  * and lists the other scenes and cards that match.
  */
-export function FindBox({ editor, search, currentPath, onOpenHit }: Props) {
+export function FindBox({ editor, search, currentPath, onOpenHit, request }: Props) {
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [wholeWord, setWholeWord] = useState(false);
@@ -67,6 +69,13 @@ export function FindBox({ editor, search, currentPath, onOpenHit }: Props) {
       window.removeEventListener('mousedown', onClick);
     };
   }, []);
+
+  useEffect(() => {
+    if (!request) return;
+    setQuery(request.query);
+    setOpen(true);
+    input.current?.focus();
+  }, [request?.at]);
 
   const close = () => {
     setOpen(false);

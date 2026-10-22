@@ -46,6 +46,10 @@ export class OpfsAdapter implements StorageAdapter {
     return `${file.lastModified}:${file.size}`;
   }
 
+  async modified(path: string): Promise<number> {
+    return (await this.file(path)).lastModified;
+  }
+
   private async file(path: string): Promise<File> {
     const dir = await this.folder(parentOf(path));
     return (await dir.getFileHandle(baseName(path))).getFile();

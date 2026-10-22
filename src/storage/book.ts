@@ -23,6 +23,8 @@ export const BOOK_FILE = 'book.json';
 export const HIDDEN_FOLDER = '.cookbook';
 export const BOOKSHELF = 'bookshelf';
 export const PANTRY = 'pantry';
+/** Writing that isn't part of the book: diaries, morning pages, ideas. */
+export const JOURNAL = 'journal';
 export const PANTRY_SECTIONS = ['characters', 'settings', 'research'] as const;
 export const FORMAT_VERSION = 1;
 
@@ -54,6 +56,7 @@ export async function createBook(fs: StorageAdapter, title: string, now = new Da
   const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString() };
   await fs.makeFolder(BOOKSHELF);
   for (const section of PANTRY_SECTIONS) await fs.makeFolder(joinPath(PANTRY, section));
+  await fs.makeFolder(JOURNAL);
   await fs.makeFolder(HIDDEN_FOLDER);
   await fs.writeText(
     joinPath(HIDDEN_FOLDER, 'README.txt'),
@@ -190,6 +193,43 @@ export async function placeNew(fs: StorageAdapter, order: Order, tree: TreeNode[
   const current = childrenOf(tree, root, folder).map((n) => n.name).filter((n) => n !== baseName(path));
   const at = after && parentOf(after) === folder ? current.indexOf(baseName(after)) + 1 : current.length;
   const next = placeItem(order, folder, current, baseName(path), at > 0 ? at : current.length);
+  await saveOrder(fs, next);
+  return next;
+}
+
+/**
+ * Copies a scene, card or folder (with everything in it) to just after the
+ * original, named "… copy". Every copied file gets a new id, so links and
+ * notes keep pointing at the original.
+ */
+export async function duplicateItem(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, from: string): Promise<{ path: string; order: Order }> {
+  const folder = parentOf(from);
+  const isFile = (await fs.list(folder)).some((e) => e.name === baseName(from) && e.kind === 'file');
+  const stem = baseName(from).replace(/\.md$/, '');
+  const name = await freeName(fs, folder, isFile ? `${stem} copy.md` : `${stem} copy`);
+  const to = joinPath(folder, name);
+  let next = order;
+  const copy = async (src: string, dst: string, kind: 'file' | 'folder', top: boolean) => {
+    if (kind === 'file') {
+      const doc = await readDocument(fs, src);
+      await writeDocument(fs, dst, { ...doc, id: newId(), title: top ? `${doc.title} copy` : doc.title });
+      return;
+    }
+    await fs.makeFolder(dst);
+    if (order[src]) next = { ...next, [dst]: [...order[src]] };
+    for (const e of await fs.list(src)) if (e.kind === 'folder' || e.name.endsWith('.md')) await copy(joinPath(src, e.name), joinPath(dst, e.name), e.kind, false);
+  };
+  await copy(from, to, isFile ? 'file' : 'folder', true);
+  return { path: to, order: await placeNew(fs, next, tree, root, to, from) };
+}
+
+/** Puts what a folder holds in name order, A to Z or Z to A. */
+export async function sortFolder(fs: StorageAdapter, order: Order, tree: TreeNode[], root: string, folder: string, descending = false): Promise<Order> {
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  const names = childrenOf(tree, root, folder)
+    .map((n) => n.name)
+    .sort((a, b) => collator.compare(a.replace(/\.md$/, ''), b.replace(/\.md$/, '')) * (descending ? -1 : 1));
+  const next = { ...order, [folder]: names };
   await saveOrder(fs, next);
   return next;
 }

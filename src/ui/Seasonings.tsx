@@ -49,6 +49,8 @@ interface Props {
   onRequest: (r: SeasoningsRequest) => void;
   onClose: () => void;
   proof: Proofreader;
+  /** A right-click on an issue's card. */
+  onIssueMenu?: (issue: FoundIssue, x: number, y: number) => void;
 }
 
 /** How many things Seasonings has for the writer, for the badge on its button. */
@@ -61,7 +63,7 @@ export function useSeasoningsCount(editor: Editor | null, notes: Notes): number 
   return new Set([...Object.keys(notes), ...anchored.ids]).size + anchored.footnotes;
 }
 
-export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose, proof }: Props) {
+export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose, proof, onIssueMenu }: Props) {
   const panel = useRef<HTMLDivElement>(null);
   const [openIssue, setOpenIssue] = useState<string | null>(null);
   const [kindFilter, setKindFilter] = useState<IssueKind | null>(null);
@@ -174,7 +176,15 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
           {scene.issues.filter((i) => !kindFilter || i.issue.kind === kindFilter).map((i) => {
             const key = issueKey(i);
             return (
-              <div className={`seas-card seas-issue issue-${i.issue.kind}`} key={key}>
+              <div
+                className={`seas-card seas-issue issue-${i.issue.kind}`}
+                key={key}
+                onContextMenu={(e) => {
+                  if (!onIssueMenu) return;
+                  e.preventDefault();
+                  onIssueMenu(i, e.clientX, e.clientY);
+                }}
+              >
                 <button
                   className="seas-quote"
                   aria-expanded={openIssue === key}

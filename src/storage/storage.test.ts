@@ -12,7 +12,10 @@ import {
   writeDocument,
   fileAfter,
   moveToTrash,
+  duplicateItem,
+  sortFolder,
 } from './book';
+import { type Order } from './order';
 import { BookIndex, INDEX_FILE, MATCH_END, MATCH_START, countWords, loadIndex, refreshIndex, saveIndex, toFtsQuery } from './index';
 
 describe('document format', () => {
@@ -222,5 +225,42 @@ describe('scene order and trash', () => {
     expect(to).toBe('.cookbook/trash/2026-10-21T12-00-00-000Z Gone.md');
     expect(await fs.exists(p)).toBe(false);
     expect(await fs.exists(to)).toBe(true);
+  });
+});
+
+describe('duplicating and sorting', () => {
+  it('copies a folder with everything in it, with new ids, right after the original', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    await fs.makeFolder('bookshelf/Chapter 1/Inner');
+    const a = await createDocument(fs, 'bookshelf/Chapter 1', 'Supper');
+    await createDocument(fs, 'bookshelf/Chapter 1/Inner', 'Pie');
+    await fs.makeFolder('bookshelf/Chapter 2');
+    let order: Order = { bookshelf: ['Chapter 1', 'Chapter 2'], 'bookshelf/Chapter 1': ['Inner', 'Supper.md'] };
+    const tree = await readTree(fs, 'bookshelf', order);
+    const copied = await duplicateItem(fs, order, tree, 'bookshelf', 'bookshelf/Chapter 1');
+    expect(copied.path).toBe('bookshelf/Chapter 1 copy');
+    order = copied.order;
+    expect(order.bookshelf).toEqual(['Chapter 1', 'Chapter 1 copy', 'Chapter 2']);
+    expect(order['bookshelf/Chapter 1 copy']).toEqual(['Inner', 'Supper.md']);
+    const original = await readDocument(fs, a);
+    const copy = await readDocument(fs, 'bookshelf/Chapter 1 copy/Supper.md');
+    expect(copy.title).toBe('Supper');
+    expect(copy.id).not.toBe(original.id);
+    expect(await fs.exists('bookshelf/Chapter 1 copy/Inner/Pie.md')).toBe(true);
+
+    const scene = await duplicateItem(fs, order, await readTree(fs, 'bookshelf', order), 'bookshelf', a);
+    expect(scene.path).toBe('bookshelf/Chapter 1/Supper copy.md');
+    expect((await readDocument(fs, scene.path)).title).toBe('Supper copy');
+    expect(scene.order['bookshelf/Chapter 1']).toEqual(['Inner', 'Supper.md', 'Supper copy.md']);
+  });
+
+  it('sorts a folder A to Z and Z to A, numbers in number order', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    for (const t of ['Scene 10', 'Scene 2', 'apple']) await createDocument(fs, 'bookshelf', t);
+    const tree = await readTree(fs, 'bookshelf');
+    expect((await sortFolder(fs, {}, tree, 'bookshelf', 'bookshelf')).bookshelf).toEqual(['apple.md', 'Scene 2.md', 'Scene 10.md']);
+    expect((await sortFolder(fs, {}, tree, 'bookshelf', 'bookshelf', true)).bookshelf).toEqual(['Scene 10.md', 'Scene 2.md', 'apple.md']);
   });
 });

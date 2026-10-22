@@ -45,6 +45,12 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
   },
 ];
 
+export const JOURNAL_TEMPLATES: DocTemplate[] = [
+  { id: 'entry', name: 'Blank entry', kind: 'journal', title: 'New entry', body: '' },
+  { id: 'morning-pages', name: 'Morning pages', kind: 'journal', title: 'Morning pages', body: 'Three pages, by hand if you can, about whatever comes.\n' },
+  { id: 'idea', name: 'Idea', kind: 'journal', title: 'An idea', body: '' },
+];
+
 export const CARD_TEMPLATES: DocTemplate[] = [
   {
     id: 'character',

@@ -5,7 +5,10 @@ export class MemoryAdapter implements StorageAdapter {
   private files = new Map<string, Uint8Array>();
   private folders = new Set<string>(['']);
   private stamps = new Map<string, number>();
+  private times = new Map<string, number>();
   private writes = 0;
+  /** What "now" is when a file is written; tests set it to get known dates. */
+  clock = () => Date.now();
 
   async readText(path: string): Promise<string> {
     return new TextDecoder().decode(await this.readBytes(path));
@@ -26,12 +29,19 @@ export class MemoryAdapter implements StorageAdapter {
     if (!this.folders.has(parentOf(p))) throw new Error(`No such folder: ${parentOf(p)}`);
     this.files.set(p, data.slice());
     this.stamps.set(p, ++this.writes);
+    this.times.set(p, this.clock());
   }
 
   async stamp(path: string): Promise<string> {
     const p = joinPath(path);
     if (!this.files.has(p)) throw new Error(`No such file: ${path}`);
     return String(this.stamps.get(p));
+  }
+
+  async modified(path: string): Promise<number> {
+    const p = joinPath(path);
+    if (!this.files.has(p)) throw new Error(`No such file: ${path}`);
+    return this.times.get(p)!;
   }
 
   async exists(path: string): Promise<boolean> {
@@ -70,6 +80,7 @@ export class MemoryAdapter implements StorageAdapter {
     if (this.files.has(a)) {
       this.files.set(b, this.files.get(a)!);
       this.stamps.set(b, this.stamps.get(a)!);
+      this.times.set(b, this.times.get(a)!);
       this.files.delete(a);
       return;
     }
@@ -83,6 +94,7 @@ export class MemoryAdapter implements StorageAdapter {
       this.files.delete(k);
       this.files.set(move(k), v);
       this.stamps.set(move(k), this.stamps.get(k)!);
+      this.times.set(move(k), this.times.get(k)!);
     }
   }
 }

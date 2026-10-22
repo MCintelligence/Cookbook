@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { type TreeNode } from '../storage/book';
-import { STATUSES } from '../storage/document';
+import { STATUSES, isCard } from '../storage/document';
+import { type FolderDate, showDay } from '../storage/journal';
 import { type CardSummary } from '../storage/index';
 
 interface Props {
@@ -29,6 +30,16 @@ interface Props {
   onTrash?: (path: string) => void;
   /** The folder files dragged in from outside would land in. */
   dropTarget?: string | null;
+  /** Where folder names sit, to line up with the section's place in the switch above. */
+  align?: 'left' | 'center' | 'right';
+  /** Journal folders show a date in place of a word count. */
+  folderDates?: Map<string, FolderDate>;
+  /** Shows a Pantry card's portrait beside its name. */
+  loadPicture?: (path: string) => Promise<string>;
+  /** Opens or closes every folder, or every one inside `under`. A new `at` asks again. */
+  folding?: { open: boolean; under?: string; at: number } | null;
+  /** F2 on a scene or card. */
+  onRenameFile?: (path: string) => void;
 }
 
 type Where = 'before' | 'after' | 'inside';
@@ -67,9 +78,7 @@ export function Tree(props: Props) {
 
   useEffect(() => setCollapsed(readCollapsed(collapseKey)), [collapseKey]);
 
-  const toggle = (path: string) => {
-    const next = new Set(collapsed);
-    if (!next.delete(path)) next.add(path);
+  const remember = (next: Set<string>) => {
     setCollapsed(next);
     try {
       localStorage.setItem(collapseKey, JSON.stringify([...next]));
@@ -77,13 +86,38 @@ export function Tree(props: Props) {
       // Folders simply open again next time.
     }
   };
+  const toggle = (path: string) => {
+    const next = new Set(collapsed);
+    if (!next.delete(path)) next.add(path);
+    remember(next);
+  };
+
+  useEffect(() => {
+    const f = props.folding;
+    if (!f) return;
+    const folders: string[] = [];
+    const walk = (list: TreeNode[]) =>
+      list.forEach((n) => {
+        if (n.kind !== 'folder') return;
+        if (!f.under || n.path === f.under || n.path.startsWith(f.under + '/')) folders.push(n.path);
+        walk(n.children ?? []);
+      });
+    walk(nodes);
+    const next = new Set(collapsed);
+    for (const p of folders) {
+      if (f.open) next.delete(p);
+      // Collapsing "inside" a folder leaves that folder itself open.
+      else if (p !== f.under) next.add(p);
+    }
+    remember(next);
+  }, [props.folding?.at]);
 
   // Words per scene and folder, with the open scene counted as it is now. Pantry cards aren't counted.
   const words = useMemo(() => {
     const totals = new Map<string, number>();
     const count = (n: TreeNode): number => {
       const w =
-        n.kind === 'file' ? (cards.get(n.path)?.kind !== 'scene' ? 0 : live?.path === n.path ? live.words : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
+        n.kind === 'file' ? (isCard(cards.get(n.path)?.kind) ? 0 : live?.path === n.path ? live.words : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
       totals.set(n.path, w);
       return w;
     };
@@ -125,6 +159,8 @@ export function Tree(props: Props) {
     const x0 = e.clientX;
     const y0 = e.clientY;
     let active = false;
+    // On a touch screen, a long press that ends without moving opens the row's menu instead of dragging.
+    let moved = false;
     const scroller = list.current?.closest<HTMLElement>('.sidebar');
 
     const start = (x: number, y: number) => {
@@ -141,6 +177,7 @@ export function Tree(props: Props) {
         if (touch) return finish();
         start(ev.clientX, ev.clientY);
       }
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) >= 8) moved = true;
       setDrag((d) => d && { ...d, x: ev.clientX, y: ev.clientY });
       setDrop(target(ev.clientX, ev.clientY, node.path));
       if (scroller) {
@@ -150,6 +187,10 @@ export function Tree(props: Props) {
       }
     };
     const up = (ev: PointerEvent) => {
+      if (active && touch && !moved && props.onMenu) {
+        finish();
+        return props.onMenu(node, ev.clientX, ev.clientY);
+      }
       const landed = active ? target(ev.clientX, ev.clientY, node.path) : null;
       finish();
       if (landed) onMove(node.path, landed.folder, landed.index);
@@ -183,7 +224,7 @@ export function Tree(props: Props) {
     <>
       <ul className={`tree${drop?.row === null ? ' drop-end' : ''}`} role="tree" ref={list}>
         {nodes.map((n, i) => (
-          <TreeItem key={n.path} node={n} parent={root} index={i} siblings={nodes.length} {...shared} />
+          <TreeItem key={n.path} node={n} parent={root} index={i} siblings={nodes.length} depth={0} {...shared} />
         ))}
       </ul>
       {drag && (
@@ -205,8 +246,8 @@ interface Shared extends Props {
   justDragged: { current: boolean };
 }
 
-function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget } = shared;
+function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number; depth: number }) {
+  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, align = 'left', folderDates, loadPicture } = shared;
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
   const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : (locked?.get(node.path) ?? node.name);
@@ -214,6 +255,7 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
   const children = node.children ?? [];
   const marker = drop?.row === node.path ? ` drop-${drop.where}` : dropTarget === node.path ? ' drop-inside' : '';
   const total = words.get(node.path) ?? 0;
+  const date = folderDates?.get(node.path);
 
   const rowProps = {
     'data-tree-path': node.path,
@@ -234,6 +276,10 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
         e.preventDefault();
         return onTrash(node.path);
       }
+      if (plain && !e.shiftKey && e.key === 'F2' && !fixed) {
+        e.preventDefault();
+        return node.kind === 'folder' ? onStartRename(node.path) : shared.onRenameFile?.(node.path);
+      }
       if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onMenu) {
         e.preventDefault();
         const r = e.currentTarget.getBoundingClientRect();
@@ -250,12 +296,13 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
   if (node.kind === 'file') {
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
     // Scenes show their synopsis; Pantry cards show the other names they go by.
-    const subtitle = card?.kind === 'scene' ? card.synopsis : card && card.aka.length > 0 ? `Also ${card.aka.join(', ')}` : '';
+    const subtitle = card?.kind === 'scene' ? card.synopsis : card && isCard(card.kind) && card.aka.length > 0 ? `Also ${card.aka.join(', ')}` : '';
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         <button {...rowProps} className={`tree-card${marker}`} onClick={() => !justDragged.current && onSelect(node.path)}>
           <span className="tree-card-top">
             {status && <span className={`status-dot status-${status.id}`} title={status.label} aria-label={status.label} role="img" />}
+            {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
             {total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>
@@ -272,22 +319,34 @@ function TreeItem({ node, parent, index, siblings, ...shared }: Shared & { node:
       ) : (
         <button
           {...rowProps}
-          className={`tree-folder${marker}`}
+          className={`tree-folder align-${align}${marker}`}
+          // Centred and right-aligned folders line up with the switch, however deep they are.
+          style={align === 'left' ? undefined : { marginLeft: -12 * depth, width: `calc(100% + ${12 * depth}px)` }}
           title={fixed ? undefined : 'Double-click to rename'}
           onClick={() => !justDragged.current && toggle(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
-          <span aria-hidden="true" className="chevron">
-            {open ? '▾' : '▸'}
+          <span className="tree-folder-name">
+            <span aria-hidden="true" className="chevron">
+              {open ? '▾' : '▸'}
+            </span>
+            <span className="tree-card-title">{label}</span>
           </span>
-          <span className="tree-card-title">{label}</span>
-          {total > 0 && <span className="tree-words">{fmt(total)}</span>}
+          {folderDates ? (
+            date && (
+              <span className="tree-date" title={date.pinned ? 'Date set by hand' : 'When anything in this folder last changed'}>
+                {showDay(date.date)}
+              </span>
+            )
+          ) : (
+            total > 0 && <span className="tree-words">{fmt(total)}</span>
+          )}
         </button>
       )}
       {open && children.length > 0 && (
         <ul className="tree" role="group">
           {children.map((c, i) => (
-            <TreeItem key={c.path} node={c} parent={node.path} index={i} siblings={children.length} {...shared} />
+            <TreeItem key={c.path} node={c} parent={node.path} index={i} siblings={children.length} depth={depth + 1} {...shared} />
           ))}
         </ul>
       )}
@@ -317,5 +376,33 @@ function FolderName({ name, onDone }: { name: string; onDone: (title: string | n
         else if (e.key === 'Escape') finish(null);
       }}
     />
+  );
+}
+
+/** A Pantry card's portrait, or its initial on a colour picked from its name: round for characters, square for the rest. */
+function CardIcon({ name, kind, portrait, loadPicture }: { name: string; kind: string; portrait: string; loadPicture?: (path: string) => Promise<string> }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    setUrl(null);
+    if (!portrait || !loadPicture) return;
+    let live = true;
+    loadPicture(portrait).then(
+      (u) => live && setUrl(u),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [portrait, loadPicture]);
+  const hue = [...name].reduce((h, c) => (h * 31 + c.codePointAt(0)!) % 360, 7);
+  const initial = (name.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase();
+  return (
+    <span
+      className={`card-icon${kind === 'character' ? '' : ' square'}`}
+      style={url ? { backgroundImage: `url("${url}")` } : { background: `hsl(${hue} 38% 38%)` }}
+      aria-hidden="true"
+    >
+      {url ? '' : initial}
+    </span>
   );
 }

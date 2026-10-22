@@ -14,7 +14,11 @@ import { parse, stringify } from 'yaml';
  * (`::: letter` blocks, `[text]{.thought}` spans) so the file still reads
  * well in any text editor.
  */
-export type DocumentKind = 'scene' | 'character' | 'setting' | 'research';
+export type DocumentKind = 'scene' | 'character' | 'setting' | 'research' | 'journal';
+
+/** The kinds that live in the Pantry. */
+export const CARD_KINDS: readonly DocumentKind[] = ['character', 'setting', 'research'];
+export const isCard = (kind: DocumentKind | undefined): boolean => !!kind && CARD_KINDS.includes(kind);
 
 export interface CookbookDocument {
   id: string;
@@ -26,7 +30,7 @@ export interface CookbookDocument {
 }
 
 const FENCE = '---';
-const KINDS: readonly DocumentKind[] = ['scene', 'character', 'setting', 'research'];
+const KINDS: readonly DocumentKind[] = ['scene', 'character', 'setting', 'research', 'journal'];
 
 export function parseDocument(text: string, fallbackTitle = 'Untitled'): CookbookDocument {
   const normalized = text.replace(/\r\n/g, '\n');

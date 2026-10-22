@@ -13,6 +13,8 @@ interface Props {
   tree: TreeNode[];
   /** Opens a scene for writing. */
   onOpen: (path: string) => void;
+  /** A right-click on a scene. */
+  onMenu?: (path: string, x: number, y: number) => void;
   onClose: () => void;
 }
 
@@ -49,7 +51,7 @@ export function readingTime(words: number): string {
  * Bookread: the whole manuscript as one document to read, every scene in
  * Bookshelf order under its chapter headings. Click a scene's title to write in it.
  */
-export function Manuscript({ fs, tree, onOpen, onClose }: Props) {
+export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
   const [items, setItems] = useState<Item[] | null>(null);
   const schema = useMemo(() => getSchema(cookbookExtensions((s) => s)), []);
 
@@ -97,7 +99,15 @@ export function Manuscript({ fs, tree, onOpen, onClose }: Props) {
               {item.name}
             </h2>
           ) : (
-            <section key={item.path} className="ms-scene">
+            <section
+              key={item.path}
+              className="ms-scene"
+              onContextMenu={(e) => {
+                if (!onMenu) return;
+                e.preventDefault();
+                onMenu(item.path, e.clientX, e.clientY);
+              }}
+            >
               <button className="scene-title ms-scene-title" title="Write in this scene" onClick={() => onOpen(item.path)}>
                 {item.title}
               </button>

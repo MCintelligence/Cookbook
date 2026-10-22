@@ -170,11 +170,28 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .section-label { display: flex; justify-content: space-between; align-items: center; margin: 16px 4px 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ghost { border: none; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 .section-actions { display: flex; gap: 10px; white-space: nowrap; }
+/* The section label is also the Bookshelf / Pantry / Journal switch. Only the text colour changes. */
+.section-switch { display: flex; justify-content: space-between; align-items: center; margin: 16px 4px 6px; min-height: 28px; }
+.section-switch button { border: none; background: transparent; padding: 0; min-height: 28px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; margin-right: -0.08em; text-transform: uppercase; color: var(--muted); }
+.section-switch button:hover, .section-switch button[aria-pressed='true'], .section-switch button:focus-visible { color: var(--accent); outline: none; }
+.section-switch .sw-ghost { visibility: hidden; }
 .tree { list-style: none; margin: 0; padding: 0 0 0 12px; }
 .sidebar > .tree { padding-left: 0; padding-bottom: 24px; }
 .tree button { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 6px 8px; border-radius: 8px; min-height: 32px; position: relative; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 .tree-folder { flex-direction: row !important; align-items: center; gap: 6px !important; font-weight: 700; }
 .chevron { width: 1em; color: var(--muted); flex: none; }
+.tree-folder-name { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+/* In the Pantry, folder names are centred under "Pantry"; in the Journal they sit on the right with their date. */
+.tree .tree-folder:is(.align-center, .align-right) { padding-left: 4px; padding-right: 4px; }
+.tree .tree-folder.align-center { justify-content: center; padding-left: calc(4px + max(0px, 2 * var(--switch-centre, 0px))); padding-right: calc(4px + max(0px, -2 * var(--switch-centre, 0px))); }
+.tree-folder.align-center > .tree-folder-name { flex: 0 1 auto; position: relative; max-width: 100%; }
+.tree-folder.align-center .chevron { position: absolute; right: 100%; text-align: right; padding-right: 0.3em; }
+.tree-folder:is(.align-center, .align-right) .tree-card-title { flex: 0 1 auto; }
+.tree .tree-folder.align-right { justify-content: flex-end; gap: 14px !important; }
+.tree-folder.align-right > .tree-folder-name { flex: 0 1 auto; }
+.tree-date { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.card-icon { flex: none; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; background-size: cover; background-position: center; }
+.card-icon.square { border-radius: 6px; }
 
 /* Scenes are small recipe cards. */
 .tree-card { margin: 3px 0; }
@@ -501,6 +518,9 @@ button.seas-quote:hover { color: var(--accent); }
 .menu .menu-danger { color: var(--danger-text); }
 .menu-hint { font-size: 12px; color: var(--muted); }
 .menu-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+.menu-check { display: inline-block; width: 1.2em; }
+.menu button.menu-open { background: var(--sidebar); }
+.menu-sub { list-style: none; }
 .menu-heading { padding: 6px 10px 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .sidebar.file-drop { box-shadow: inset 0 0 0 2px var(--accent); }
 .trash-list li { gap: 6px; }
@@ -539,3 +559,15 @@ button.seas-quote:hover { color: var(--accent); }
   .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: 16px 16px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
   .issue-fix, .issue-actions .pill { min-height: 44px; }
 }
+
+/* Changing a Journal folder's date */
+.date-pop { position: fixed; z-index: 31; width: 252px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); box-shadow: 0 12px 32px rgba(var(--shadow), 0.2); }
+.date-pop form { display: flex; flex-direction: column; gap: 10px; }
+.date-pop label { display: flex; flex-direction: column; gap: 4px; }
+.date-pop-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-pop input { height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--bg); }
+.date-pop-note { margin: 0; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.date-pop-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.date-pop-actions button { min-height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line-strong); background: transparent; font-size: 13px; font-weight: 700; }
+.date-pop-actions .primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.notice span.notice-long { white-space: normal; line-height: 1.4; padding: 4px 0; }

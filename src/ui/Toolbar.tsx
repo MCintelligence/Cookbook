@@ -1,5 +1,6 @@
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
+import { type CSSProperties } from 'react';
+import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 
 interface Props {
@@ -97,7 +98,7 @@ export function Toolbar({ editor, sheet, onEditStyle }: Props) {
         </select>
       </label>
       <label className="tb-select" title={edits}>
-        <span className="swatch" style={{ background: style.color }} aria-hidden="true" />
+        <span className="swatch" style={{ '--ink': style.color, '--ink-dark': darkPageColor(style.color) } as CSSProperties} aria-hidden="true" />
         <select value={style.color} disabled={disabled} onChange={(e) => edit({ color: e.target.value })} aria-label="Text colour">
           {COLOURS.some((c) => c.value === style.color) ? null : <option value={style.color}>Custom</option>}
           {COLOURS.map((c) => (

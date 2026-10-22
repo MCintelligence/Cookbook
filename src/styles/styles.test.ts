@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryAdapter } from '../storage/memory';
-import { defaultStyles, loadStyles, resolveParagraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
+import { darkPageColor, defaultStyles, loadStyles, resolveParagraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
 
 describe('styles', () => {
   it('fills unset properties from the based-on chain', () => {
@@ -41,5 +41,19 @@ describe('styles', () => {
     const changed = updateParagraphStyle(defaultStyles(), 'body', { lineSpacing: 2 });
     await saveStyles(fs, changed);
     expect(resolveParagraphStyle(await loadStyles(fs), 'body').lineSpacing).toBe(2);
+  });
+});
+
+describe('darkPageColor', () => {
+  it('turns dark ink light and keeps its hue', () => {
+    expect(darkPageColor('#3B2A20')).toBe('#dfcec4');
+    expect(darkPageColor('#111111')).toBe('#e6e6e6');
+  });
+  it('keeps light colours and anything that is not a hex colour', () => {
+    expect(darkPageColor('#f2c46b')).toBe('#f2c46b');
+    expect(darkPageColor('rebeccapurple')).toBe('rebeccapurple');
+  });
+  it('is added for the dark page by stylesToCss', () => {
+    expect(stylesToCss(defaultStyles())).toContain('@media (prefers-color-scheme: dark)');
   });
 });

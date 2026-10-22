@@ -169,9 +169,36 @@ function cssValue(v: string): string {
   return v.replace(/[;{}<>]/g, '');
 }
 
+/**
+ * The same colour for text on the dark page: hue and saturation kept, lightness
+ * mirrored so dark ink reads as light ink. Colours that aren't #rgb or #rrggbb are kept.
+ */
+export function darkPageColor(color: string): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return color;
+  const hex = m[1]!.length === 3 ? [...m[1]!].map((c) => c + c).join('') : m[1]!;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (l >= 0.6) return color;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  const h = d === 0 ? 0 : max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  // Dark ink becomes light; colours already light enough to read stay as they are.
+  const light = Math.max(Math.min(0.9, 1 - l), 0.7);
+  const c = (1 - Math.abs(2 * light - 1)) * s;
+  const x = c * (1 - Math.abs((h % 2) - 1));
+  const [r1, g1, b1] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+  const to = (v: number) => Math.round((v + light - c / 2) * 255).toString(16).padStart(2, '0');
+  return `#${to(r1)}${to(g1)}${to(b1)}`;
+}
+
 /** CSS for the page, scoped under `scope`. 12 pt text is 16 px at 100% zoom. */
 export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
   const rules: string[] = [];
+  // Text colours chosen for paper, redone for the dark page.
+  const dark: string[] = [];
   for (const { id } of sheet.paragraph) {
     const s = resolveParagraphStyle(sheet, id);
     const selector = id === BODY ? `${scope} p:not([data-style]), ${scope} p[data-style="${id}"]` : `${scope} p[data-style="${cssValue(id)}"]`;
@@ -190,17 +217,22 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
         ` font-style: ${s.italic ? 'italic' : 'normal'};` +
         ` }`,
     );
+    dark.push(`${selector} { color: ${cssValue(darkPageColor(s.color))}; }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];
     if (c.font) props.push(`font-family: ${fontStack(c.font)}`);
     if (c.size) props.push(`font-size: ${c.size * PX_PER_PT}px`);
-    if (c.color) props.push(`color: ${cssValue(c.color)}`);
+    if (c.color) {
+      props.push(`color: ${cssValue(c.color)}`);
+      dark.push(`${scope} span[data-char~="${cssValue(c.id)}"] { color: ${cssValue(darkPageColor(c.color))}; }`);
+    }
     if (c.bold !== undefined) props.push(`font-weight: ${c.bold ? 700 : 400}`);
     if (c.italic !== undefined) props.push(`font-style: ${c.italic ? 'italic' : 'normal'}`);
     if (c.underline) props.push('text-decoration: underline');
     if (c.smallCaps) props.push('font-variant-caps: small-caps');
     rules.push(`${scope} span[data-char~="${cssValue(c.id)}"] { ${props.join('; ')} }`);
   }
+  if (dark.length > 0) rules.push(`@media (prefers-color-scheme: dark) {\n${dark.join('\n')}\n}`);
   return rules.join('\n');
 }

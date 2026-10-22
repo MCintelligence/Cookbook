@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { strFromU8, unzipSync, zipSync, strToU8 } from 'fflate';
 import { MemoryAdapter } from '../storage/memory';
 import { createBook, createDocument, readDocument, readTree, writeDocument } from '../storage/book';
+import { withField } from '../storage/document';
 import { backupZip } from '../storage/backup';
 import { importDocx, importFile, importMarkdown, importText } from '../storage/importer';
 import { defaultStyles } from '../styles/styles';
@@ -36,6 +37,22 @@ describe('the manuscript', () => {
   it('lays folders out as headings with breaks between scenes', async () => {
     const { m } = await sampleBook();
     expect(m.parts.map((p) => p.kind)).toEqual(['heading', 'scene', 'break', 'scene', 'heading', 'scene']);
+  });
+
+  it('leaves out scenes marked so, and a chapter left empty by them', async () => {
+    const { fs } = await sampleBook();
+    for (const p of ['bookshelf/Chapter 1/Noon.md', 'bookshelf/Chapter 2/Night.md']) await writeDocument(fs, p, withField(await readDocument(fs, p), 'export', false));
+    const m = await collect(fs, 'The Summer Kitchen', await readTree(fs, 'bookshelf'));
+    expect(m.parts.map((p) => (p.kind === 'heading' ? p.text : p.kind))).toEqual(['Chapter 1', 'scene']);
+  });
+
+  it('prints and writes Word files on the book’s page size', async () => {
+    const { m } = await sampleBook();
+    const page = { size: 'a5', margins: 'narrow', view: 'page', zoom: 100, showTitle: true } as const;
+    expect(bookHtml(m, defaultStyles(), page)).toContain('@page { size: 5.83in 8.27in; margin: 0.6in; }');
+    const xml = strFromU8(unzipSync(bookDocx(m, defaultStyles(), page))['word/document.xml']!);
+    expect(xml).toContain('<w:pgSz w:w="8395" w:h="11909"/>');
+    expect(xml).toContain('w:left="864"');
   });
 
   it('never lets notes to self leave the app', async () => {

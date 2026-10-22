@@ -2,6 +2,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { type BasicStyle, isFormatted, toggleFormat } from '../editor/extensions';
 import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
+import { keysFor } from '../shortcuts';
 import { BODY_STYLE } from '../editor/markdown';
 
 interface Props {
@@ -16,10 +17,10 @@ interface Props {
 const INDENTS = [0, 0.25, 0.5, 0.75, 1];
 const SIDE_INDENTS = [0, 0.25, 0.5, 0.75, 1, 1.5];
 const SPACES = [0, 3, 6, 9, 12, 18, 24];
-const FORMATS: { style: BasicStyle; label: string; key: string; glyph: CSSProperties; letter: string }[] = [
-  { style: 'strong', label: 'Bold (Strong style)', key: '⌘B', glyph: { fontWeight: 800 }, letter: 'B' },
-  { style: 'emphasis', label: 'Italic (Emphasis style)', key: '⌘I', glyph: { fontStyle: 'italic', fontFamily: 'Literata, Georgia, serif' }, letter: 'I' },
-  { style: 'underline', label: 'Underline (Underline style)', key: '⌘U', glyph: { textDecoration: 'underline' }, letter: 'U' },
+const FORMATS: { style: BasicStyle; label: string; glyph: CSSProperties; letter: string }[] = [
+  { style: 'strong', label: 'Bold (Strong style)', glyph: { fontWeight: 800 }, letter: 'B' },
+  { style: 'emphasis', label: 'Italic (Emphasis style)', glyph: { fontStyle: 'italic', fontFamily: 'Literata, Georgia, serif' }, letter: 'I' },
+  { style: 'underline', label: 'Underline (Underline style)', glyph: { textDecoration: 'underline' }, letter: 'U' },
 ];
 
 const SIZES = [9, 10, 10.5, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
@@ -164,7 +165,7 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
             key={f.style}
             aria-pressed={!!active?.[f.style]}
             aria-label={f.label}
-            title={`${f.label}  ${f.key}`}
+            title={`${f.label}  ${keysFor(f.style)}`}
             disabled={noText}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor && toggleFormat(editor, f.style)}

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { placeAt } from './zoom';
 
 export type MenuItem =
   | { label: string; onPick: () => void; disabled?: boolean; danger?: boolean; hint?: string; checked?: boolean }
@@ -38,7 +39,7 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
     let left = x;
     // A submenu that doesn't fit on the right opens on the left of its menu instead.
     if (nested && left + r.width > window.innerWidth - 8) left = nested.from.getBoundingClientRect().left - r.width + 4;
-    setAt({ left: Math.max(8, Math.min(left, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
+    setAt(placeAt(el.parentElement, { left: Math.max(8, Math.min(left, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) }));
     el.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
   }, [x, y]);
 

@@ -121,7 +121,7 @@ describe('undo that survives closing', () => {
     };
     typeShortcut('Supper.');
     editor.commands.enter();
-    typeShortcut('* * *After.');
+    typeShortcut('After **dinner** came pie.');
     const depth = recorder.depth();
     expect(depth).toBeGreaterThan(1);
     const again = reopen(md(editor), JSON.stringify(recorder.toJSON()));

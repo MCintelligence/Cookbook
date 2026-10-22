@@ -1,4 +1,4 @@
-import { InputRule, Mark, Node, mergeAttributes, wrappingInputRule, type Editor } from '@tiptap/core';
+import { type AnyExtension, Extension, InputRule, Mark, Node, mergeAttributes, wrappingInputRule, type Editor } from '@tiptap/core';
 import { BulletList, ListItem, OrderedList, TaskItem, TaskList } from '@tiptap/extension-list';
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table';
 import { Typography } from '@tiptap/extension-typography';
@@ -6,19 +6,43 @@ import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
 import { type Mark as PMMark } from '@tiptap/pm/model';
-import { Selection, TextSelection } from '@tiptap/pm/state';
+import { Plugin, Selection, TextSelection } from '@tiptap/pm/state';
+import { commandFor } from '../shortcuts';
+import { type AppSettings, getSettings } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { FindExtension } from './findPlugin';
+import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
 import { Proofread } from '../proofread/plugin';
-import { DialogueFocus, Footnote, Note, type SeasoningsRequest } from './seasonings';
+import { DialogueFocus, Footnote, Note, type SeasoningsRequest, addNoteAnchor, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
 
 /** Headings pasted from other apps come in as Chapter title and the heading styles. */
 const TAG_STYLE: Record<string, string> = { H1: HEADING_STYLES[0], H2: HEADING_STYLES[1], H3: HEADING_STYLES[2], H4: HEADING_STYLES[2], H5: HEADING_STYLES[2], H6: HEADING_STYLES[2] };
+
+type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash' | 'markdown' | 'lineStarters'>;
+
+/** An extension whose typing shortcuts only work while a setting is on; the setting is read on each key. */
+function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting): T {
+  return extension.extend({
+    addInputRules() {
+      return (this.parent?.() ?? []).map(
+        (rule: InputRule) =>
+          new InputRule({
+            find: rule.find,
+            handler: (props) => (getSettings()[setting] ? rule.handler(props) : null),
+            undoable: rule.undoable,
+          }),
+      );
+    },
+  }) as T;
+}
+
+/** A paragraph that is only "* * *" becomes a scene break when Enter is pressed. */
+const BREAK_LINE = /^\s*\*\s*\*\s*\*\s*$/;
 
 const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
   name: 'paragraph',
@@ -50,6 +74,16 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const { $from, empty } = editor.state.selection;
         // Only top-level paragraphs; lists keep their own Enter behaviour.
         if (!empty || $from.depth !== 1 || $from.parent.type.name !== this.name) return false;
+        if (getSettings().lineStarters && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
+          return editor.commands.command(({ tr, state }) => {
+            const start = $from.before();
+            tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
+            const after = start + 1;
+            if (after >= tr.doc.content.size || tr.doc.nodeAt(after)?.type.name !== 'paragraph') tr.insert(after, state.schema.nodes.paragraph!.create());
+            tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+            return true;
+          });
+        }
         const next = this.options.nextStyle($from.parent.attrs.style as string);
         return editor.chain().splitBlock().updateAttributes(this.name, { style: next }).run();
       },
@@ -67,23 +101,6 @@ const SceneBreak = Node.create({
   },
   renderHTML() {
     return ['hr', { 'data-scene-break': '' }];
-  },
-  addInputRules() {
-    return [
-      new InputRule({
-        find: /^\* \* \*$/,
-        handler: ({ state, range }) => {
-          const $start = state.doc.resolve(range.from);
-          if ($start.depth !== 1) return null;
-          state.tr.replaceRangeWith($start.before(), $start.after(), this.type.create());
-          const after = state.tr.mapping.map($start.after());
-          if (after >= state.tr.doc.content.size) {
-            state.tr.insert(state.tr.doc.content.size, state.schema.nodes.paragraph!.create());
-          }
-          state.tr.setSelection(TextSelection.near(state.tr.doc.resolve(Math.min(after + 1, state.tr.doc.content.size))));
-        },
-      }),
-    ];
   },
 });
 
@@ -106,12 +123,39 @@ export const CharStyle = Mark.create({
   renderHTML({ HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes), 0];
   },
-  addKeyboardShortcuts() {
-    return {
-      'Mod-b': ({ editor }) => toggleFormat(editor, 'strong'),
-      'Mod-i': ({ editor }) => toggleFormat(editor, 'emphasis'),
-      'Mod-u': ({ editor }) => toggleFormat(editor, 'underline'),
-    };
+});
+
+/**
+ * The page's own shortcuts, which the writer can change in Settings: notes,
+ * footnotes and the three basic character styles. They are looked up on each
+ * key press, so a change applies straight away.
+ */
+const PageShortcuts = Extension.create<{ onRequest: (r: SeasoningsRequest) => void }>({
+  name: 'pageShortcuts',
+  priority: 1100,
+  addOptions() {
+    return { onRequest: () => {} };
+  },
+  addProseMirrorPlugins() {
+    const editor = this.editor;
+    const onRequest = (r: SeasoningsRequest) => this.options.onRequest(r);
+    return [
+      new Plugin({
+        props: {
+          handleKeyDown(_view, event) {
+            const id = commandFor(event, ['note', 'footnote', 'strong', 'emphasis', 'underline']);
+            if (!id) return false;
+            event.preventDefault();
+            if (id === 'note') {
+              const note = addNoteAnchor(editor);
+              if (note) onRequest({ tab: 'notes', id: note });
+            } else if (id === 'footnote') onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
+            else toggleFormat(editor, id as BasicStyle);
+            return true;
+          },
+        },
+      }),
+    ];
   },
 });
 
@@ -169,6 +213,26 @@ export function toggleFormat(editor: Editor, style: BasicStyle): boolean {
   return toggleCharStyle(editor, style);
 }
 
+/** Only what a novelist expects from Typography; nothing turns (c) into © behind their back. */
+const NO_TYPOGRAPHY = {
+  leftArrow: false,
+  rightArrow: false,
+  copyright: false,
+  trademark: false,
+  servicemark: false,
+  registeredTrademark: false,
+  oneHalf: false,
+  oneQuarter: false,
+  threeQuarters: false,
+  plusMinus: false,
+  notEqual: false,
+  laquo: false,
+  raquo: false,
+  multiplication: false,
+  superscriptTwo: false,
+  superscriptThree: false,
+} as const;
+
 export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
   return [
     Document,
@@ -176,6 +240,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,
     CharStyle,
+    PageShortcuts.configure({ onRequest }),
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
     Bold,
@@ -184,29 +249,38 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Strike,
     Code,
     Link,
-    PlainMarkRules,
+    whenOn(PlainMarkRules, 'markdown'),
     HardBreak,
-    CodeBlock,
+    whenOn(CodeBlock, 'markdown'),
     Image,
-    BlockShortcuts,
+    whenOn(BlockShortcuts, 'markdown'),
     PasteCleanup,
-    BulletList.extend({
-      addInputRules() {
-        return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
-      },
-    }),
+    whenOn(
+      BulletList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
     // -1 starts a numbered list, as - starts bullets and -TD a checklist; so does 1. on its own.
-    OrderedList.extend({
-      addInputRules() {
-        return [wrappingInputRule({ find: /^\s*(?:-1|1\.)\s$/, type: this.type })];
-      },
-    }),
+    whenOn(
+      OrderedList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*(?:-1|1\.)\s$/, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
     ListItem.extend({ content: 'paragraph list*' }),
-    TaskList.extend({
-      addInputRules() {
-        return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
-      },
-    }),
+    whenOn(
+      TaskList.extend({
+        addInputRules() {
+          return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
+        },
+      }),
+      'lineStarters',
+    ),
     TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
     Table.extend({
       addKeyboardShortcuts() {
@@ -236,30 +310,30 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     TableRow,
     TableHeader.extend({ content: 'paragraph' }),
     TableCell.extend({ content: 'paragraph' }),
-    Typography.configure({
-      // Only what a novelist expects; nothing turns (c) into © behind their back.
-      leftArrow: false,
-      rightArrow: false,
-      copyright: false,
-      trademark: false,
-      servicemark: false,
-      registeredTrademark: false,
-      oneHalf: false,
-      oneQuarter: false,
-      threeQuarters: false,
-      plusMinus: false,
-      notEqual: false,
-      laquo: false,
-      raquo: false,
-      multiplication: false,
-      superscriptTwo: false,
-      superscriptThree: false,
-    }),
+    whenOn(
+      Typography.extend({ name: 'curlyQuotes' }).configure({
+        ...NO_TYPOGRAPHY,
+        emDash: false,
+        ellipsis: false,
+      }),
+      'curlyQuotes',
+    ),
+    whenOn(
+      Typography.extend({ name: 'dashes' }).configure({
+        ...NO_TYPOGRAPHY,
+        openDoubleQuote: false,
+        closeDoubleQuote: false,
+        openSingleQuote: false,
+        closeSingleQuote: false,
+      }),
+      'emDash',
+    ),
     UndoRedo,
     Dropcursor,
     Gapcursor,
     FindExtension,
     DialogueFocus,
+    FocusMode,
     LinkedNames,
     Proofread,
   ];

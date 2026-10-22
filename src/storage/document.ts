@@ -97,7 +97,7 @@ export interface Relationship {
 }
 
 /** Front matter keys Cookbook uses itself; everything else on a card is one of the writer's fields. */
-const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships']);
+const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export']);
 
 /** The writer's own fields on a card, like role, age and wants, in order. */
 export function cardFieldsOf(fields: Record<string, unknown>): [string, string][] {
@@ -130,4 +130,23 @@ export function relationshipsOf(fields: Record<string, unknown>): Relationship[]
 /** Where the card's picture is, relative to the book folder. */
 export function portraitOf(fields: Record<string, unknown>): string | null {
   return typeof fields.portrait === 'string' && fields.portrait ? fields.portrait : null;
+}
+
+/** Colour labels, as in Scrivener: a dot beside a scene, card or entry in the sidebar. */
+export const LABELS = [
+  { id: 'red', name: 'Red', color: '#c8452f' },
+  { id: 'orange', name: 'Orange', color: '#d9822b' },
+  { id: 'yellow', name: 'Yellow', color: '#d4b02a' },
+  { id: 'green', name: 'Green', color: '#5f9a4a' },
+  { id: 'blue', name: 'Blue', color: '#3f7cc0' },
+  { id: 'purple', name: 'Purple', color: '#8a5bb8' },
+] as const;
+
+export function labelOf(fields: Record<string, unknown>): string | null {
+  return LABELS.some((l) => l.id === fields.label) ? (fields.label as string) : null;
+}
+
+/** Whether a scene goes into the exported book. It does unless the writer leaves it out (export: false). */
+export function includedInExport(fields: Record<string, unknown>): boolean {
+  return fields.export !== false;
 }

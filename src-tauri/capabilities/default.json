@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Lets the app read and write books in its own data folder and in folders the writer picks, and install signed updates.",
+  "description": "Lets the app read and write books and their automatic backups in its own data folder and in folders the writer picks, and install signed updates.",
   "windows": [
     "main"
   ],
@@ -31,6 +31,12 @@
         },
         {
           "path": "$APPDATA/books/**"
+        },
+        {
+          "path": "$APPDATA/backups"
+        },
+        {
+          "path": "$APPDATA/backups/**"
         }
       ]
     }

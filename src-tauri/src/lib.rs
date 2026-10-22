@@ -1,3 +1,80 @@
+#[cfg(desktop)]
+mod menu {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+    use tauri::{App, Emitter};
+
+    /// The app menu: Cookbook › Settings… on a Mac, Edit › Settings… elsewhere.
+    /// Picking it tells the page to open Settings, as ⌘, or Ctrl+, does.
+    pub fn install(app: &mut App) -> tauri::Result<()> {
+        let handle = app.handle();
+        let settings = MenuItem::with_id(handle, "settings", "Settings…", true, if cfg!(target_os = "macos") { Some("CmdOrCtrl+,") } else { None })?;
+
+        #[cfg(target_os = "macos")]
+        let menu = {
+            let cookbook = Submenu::with_items(
+                handle,
+                "Cookbook",
+                true,
+                &[
+                    &PredefinedMenuItem::about(handle, None, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &settings,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::services(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::hide(handle, None)?,
+                    &PredefinedMenuItem::hide_others(handle, None)?,
+                    &PredefinedMenuItem::show_all(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::quit(handle, None)?,
+                ],
+            )?;
+            // Copy and paste in the page need the Edit menu on a Mac.
+            let edit = Submenu::with_items(
+                handle,
+                "Edit",
+                true,
+                &[
+                    &PredefinedMenuItem::undo(handle, None)?,
+                    &PredefinedMenuItem::redo(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::cut(handle, None)?,
+                    &PredefinedMenuItem::copy(handle, None)?,
+                    &PredefinedMenuItem::paste(handle, None)?,
+                    &PredefinedMenuItem::select_all(handle, None)?,
+                ],
+            )?;
+            let window = Submenu::with_items(
+                handle,
+                "Window",
+                true,
+                &[
+                    &PredefinedMenuItem::minimize(handle, None)?,
+                    &PredefinedMenuItem::fullscreen(handle, None)?,
+                    &PredefinedMenuItem::separator(handle)?,
+                    &PredefinedMenuItem::close_window(handle, None)?,
+                ],
+            )?;
+            Menu::with_items(handle, &[&cookbook, &edit, &window])?
+        };
+
+        #[cfg(not(target_os = "macos"))]
+        let menu = {
+            let file = Submenu::with_items(handle, "File", true, &[&PredefinedMenuItem::quit(handle, Some("Quit"))?])?;
+            let edit = Submenu::with_items(handle, "Edit", true, &[&settings])?;
+            Menu::with_items(handle, &[&file, &edit])?
+        };
+
+        app.set_menu(menu)?;
+        app.on_menu_event(|app, event| {
+            if event.id() == "settings" {
+                let _ = app.emit("open-settings", ());
+            }
+        });
+        Ok(())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -6,6 +83,8 @@ pub fn run() {
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
         .setup(|app| {
+            #[cfg(desktop)]
+            menu::install(app)?;
             // Signed updates from the project's GitHub releases, on the desktop only;
             // the phone apps update through their stores.
             #[cfg(desktop)]

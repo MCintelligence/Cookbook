@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { placeAt } from './zoom';
 
 interface Props {
   name: string;
@@ -20,7 +21,7 @@ export function DatePopover({ name, date, pinned, x, y, onDone, onClose }: Props
 
   useLayoutEffect(() => {
     const r = box.current!.getBoundingClientRect();
-    setAt({ left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
+    setAt(placeAt(box.current!.parentElement, { left: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) }));
     box.current!.querySelector('input')?.focus();
   }, [x, y]);
 

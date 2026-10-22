@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate';
 import { type NodeJSON, BODY_STYLE, HEADING_STYLES } from '../editor/markdown';
 import { type StyleSheet, resolveParagraphStyle } from '../styles/styles';
+import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
 
 /**
@@ -59,7 +60,11 @@ class DocxBody {
   readonly links: string[] = [];
   /** One Word numbering instance per numbered list, so each starts where it should. */
   readonly numbered: number[] = [];
-  constructor(private readonly sheet: StyleSheet) {}
+  constructor(
+    private readonly sheet: StyleSheet,
+    /** The width between the margins, in twentieths of a point. */
+    private readonly textWidth = 9360,
+  ) {}
 
   paragraph(style: string, inner: string, extra = ''): string {
     return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${extra}</w:pPr>${inner}</w:p>`;
@@ -122,7 +127,7 @@ class DocxBody {
     const rows = n.content ?? [];
     const width = Math.max(1, ...rows.map((r) => r.content?.length ?? 0));
     const border = (side: string) => `<w:${side} w:val="single" w:sz="4" w:space="0" w:color="999999"/>`;
-    const grid = Array.from({ length: width }, () => `<w:gridCol w:w="${Math.floor(9360 / width)}"/>`).join('');
+    const grid = Array.from({ length: width }, () => `<w:gridCol w:w="${Math.floor(this.textWidth / width)}"/>`).join('');
     const body = rows
       .map((row) => {
         const cells = Array.from({ length: width }, (_, i) => row.content?.[i]);
@@ -130,7 +135,7 @@ class DocxBody {
         return `<w:tr>${header ? '<w:trPr><w:tblHeader/></w:trPr>' : ''}${cells
           .map((cell) => {
             const text = (cell?.content ?? []).map((p) => this.inline(p.content ?? [])).join('');
-            return `<w:tc><w:tcPr><w:tcW w:w="${Math.floor(9360 / width)}" w:type="dxa"/></w:tcPr>${this.paragraph(header ? 'cbTableHeader' : 'cbTableText', text)}</w:tc>`;
+            return `<w:tc><w:tcPr><w:tcW w:w="${Math.floor(this.textWidth / width)}" w:type="dxa"/></w:tcPr>${this.paragraph(header ? 'cbTableHeader' : 'cbTableText', text)}</w:tc>`;
           })
           .join('')}</w:tr>`;
       })
@@ -214,8 +219,11 @@ function stylesXml(sheet: StyleSheet): string {
 
 const W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-export function bookDocx(m: Manuscript, sheet: StyleSheet): Uint8Array {
-  const w = new DocxBody(sheet);
+export function bookDocx(m: Manuscript, sheet: StyleSheet, page: PageSettings = DEFAULT_PAGE): Uint8Array {
+  const twips = (inches: number) => Math.round(inches * 1440);
+  const size = PAGE_SIZES[page.size];
+  const margin = twips(MARGINS[page.margins].inches);
+  const w = new DocxBody(sheet, twips(size.width) - 2 * margin);
   const body: string[] = [w.paragraph('Title', textRun(m.title))];
   for (const part of m.parts) {
     if (part.kind === 'heading') body.push(w.paragraph(`Heading${Math.min(3, part.depth)}`, textRun(part.text)));
@@ -223,7 +231,7 @@ export function bookDocx(m: Manuscript, sheet: StyleSheet): Uint8Array {
     else body.push(...(part.body.content ?? []).map((n) => w.block(n)));
   }
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document ${W_NS}><w:body>${body.join('')}<w:sectPr><w:footnotePr><w:numFmt w:val="decimal"/></w:footnotePr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+<w:document ${W_NS}><w:body>${body.join('')}<w:sectPr><w:footnotePr><w:numFmt w:val="decimal"/></w:footnotePr><w:pgSz w:w="${twips(size.width)}" w:h="${twips(size.height)}"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const footnotes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:footnotes ${W_NS}><w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>${w.notes
     .map(

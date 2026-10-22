@@ -54,6 +54,7 @@ describe('darkPageColor', () => {
     expect(darkPageColor('rebeccapurple')).toBe('rebeccapurple');
   });
   it('is added for the dark page by stylesToCss', () => {
-    expect(stylesToCss(defaultStyles())).toContain('@media (prefers-color-scheme: dark)');
+    expect(stylesToCss(defaultStyles())).toContain(':root[data-page="dark"] .cb-page p:not([data-style])');
+    expect(stylesToCss(defaultStyles(), '.x', false)).not.toContain('data-page');
   });
 });

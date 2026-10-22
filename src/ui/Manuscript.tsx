@@ -128,7 +128,7 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
 }
 
 /** A scene's text drawn with the same schema and styles as the editor, but not editable. */
-function SceneText({ schema, body }: { schema: ReturnType<typeof getSchema>; body: NodeJSON }) {
+export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchema>; body: NodeJSON }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current;

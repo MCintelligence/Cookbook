@@ -38,6 +38,15 @@ describe('spelling', () => {
     expect(checkSpelling('The colour of the realised plan.', gb, [])).toEqual([]);
   });
 
+  it('puts back a missing apostrophe, and catches “she dont” in one go', () => {
+    const fixes = (text: string) => checkSpelling(text, us, []).map((i) => [text.slice(i.from, i.to), i.suggestions]);
+    expect(fixes('She dont know. They wasnt. Dont go.')).toEqual([
+      ['dont', ['doesn’t', 'don’t']],
+      ['wasnt', ['wasn’t']],
+      ['Dont', ['Don’t']],
+    ]);
+  });
+
   it('leaves words the writer ignored', () => {
     expect(checkSpelling('Teh end.', us, [], new Set(['Teh']))).toEqual([]);
   });

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
+import { DEFAULT_SETTINGS, setSettings } from '../settings';
 import { Editor } from '@tiptap/core';
 import { cookbookExtensions, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
@@ -142,8 +143,25 @@ describe('typing shortcuts', () => {
     editor.commands.focus('end');
     press(editor, 'Enter');
     type(editor, '* * *');
+    press(editor, 'Enter');
     type(editor, 'After.');
+    // Enter makes the break and goes on below it, with no empty line in between.
     expect(md(editor)).toBe('Before.\n\n* * *\n\nAfter.\n');
+    expect(editor.state.doc.childCount).toBe(3);
+  });
+
+  it('leaves typing shortcuts alone when they are switched off', () => {
+    setSettings({ curlyQuotes: false, emDash: false, markdown: false, lineStarters: false });
+    try {
+      const editor = make();
+      type(editor, '"Well--" **so**');
+      press(editor, 'Enter');
+      type(editor, '- * * *');
+      press(editor, 'Enter');
+      expect(md(editor)).toBe('"Well--" \\*\\*so\\*\\*\n\n\\- \\* \\* \\*\n');
+    } finally {
+      setSettings(DEFAULT_SETTINGS);
+    }
   });
 
   it('makes em dashes and curly quotes', () => {

@@ -39,15 +39,6 @@ export const Note = Mark.create<{ onRequest: (r: SeasoningsRequest) => void }>({
   renderHTML({ HTMLAttributes }) {
     return ['span', mergeAttributes(HTMLAttributes, { class: 'cb-note' }), 0];
   },
-  addKeyboardShortcuts() {
-    return {
-      'Mod-Alt-m': ({ editor }) => {
-        const id = addNoteAnchor(editor);
-        if (id) this.options.onRequest({ tab: 'notes', id });
-        return true;
-      },
-    };
-  },
 });
 
 export const Footnote = Node.create<{ onRequest: (r: SeasoningsRequest) => void }>({
@@ -74,14 +65,6 @@ export const Footnote = Node.create<{ onRequest: (r: SeasoningsRequest) => void 
   renderHTML({ HTMLAttributes }) {
     // The number comes from a CSS counter, so it is always in reading order.
     return ['sup', mergeAttributes(HTMLAttributes, { class: 'cb-footnote', title: HTMLAttributes['data-footnote'] })];
-  },
-  addKeyboardShortcuts() {
-    return {
-      'Mod-Alt-f': ({ editor }) => {
-        this.options.onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
-        return true;
-      },
-    };
   },
   addProseMirrorPlugins() {
     const onRequest = (index: number) => this.options.onRequest({ tab: 'footnotes', index });

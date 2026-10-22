@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
@@ -29,7 +29,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, STATUSES, akaOf, isCard, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
 import { type FolderDate, type PinnedDates, folderDates as readFolderDates, loadPinned, movePinned, savePinned, withPinned } from './storage/journal';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
@@ -43,21 +43,23 @@ import { bookMarkdown } from './export/markdownExport';
 import { printHtml } from './export/print';
 import { KINDS, saveFile } from './ui/saveFile';
 import { Menu, type MenuItem } from './ui/Menu';
-import { TrashDialog } from './ui/TrashDialog';
+const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
-import { type WritingHistory, loadHistory, recordWords, saveHistory, summarize } from './storage/history';
+import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, JOURNAL_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
-import { plainText } from './editor/markdown';
-import { exportHistory } from './ui/exportHistory';
+import { parseMarkdown, plainText } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { TemplateMenu } from './ui/TemplateMenu';
-import { WritingFooter } from './ui/WritingFooter';
+import { GoalsPopup, type Goals } from './ui/GoalsPopup';
+import { Palette, type PaletteItem } from './ui/Palette';
+import { InsertMenu } from './ui/InsertMenu';
+import { TextSelection } from '@tiptap/pm/state';
 import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
 import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
-import { Manuscript } from './ui/Manuscript';
+const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: m.Manuscript })));
 import {
   type BookLocation,
   DEFAULT_BOOK,
@@ -65,7 +67,9 @@ import {
   defaultLocation,
   isTauri,
   newBookLocation,
+  openBackups,
   openLocation,
+  canPickFolder,
   pickFolder,
   recentBooks,
   rememberBook,
@@ -89,7 +93,7 @@ import { type SeasoningsRequest } from './editor/seasonings';
 import { type UndoLog, type UndoRecorder, readUndoLog, writeUndoLog } from './editor/undoLog';
 import { undoDepth } from '@tiptap/pm/history';
 import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/scenes';
-import { BookLibrary } from './ui/BookLibrary';
+const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes } from './ui/PageFootnotes';
@@ -98,7 +102,17 @@ import { IssueCard, fixLabel } from './ui/IssueCard';
 import { type FoundIssue, applySuggestion, issueAt } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
-import { keys } from './ui/keys';
+import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
+import { getSettings, setSettings, useSettings } from './settings';
+import { type BackupInfo, type SettingsSection } from './ui/Settings';
+import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel } from './storage/page';
+import { type Backup, listBackups, makeBackup, restoreBackup } from './storage/autoBackup';
+import { historyCsv } from './storage/goals';
+import { focusKey } from './editor/focusMode';
+import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
+import { SnapshotsDialog } from './ui/SnapshotsDialog';
+const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
+import { checkForUpdates } from './ui/UpdateBanner';
 import { addNoteAnchor, deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
 import { isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { DatePopover } from './ui/DatePopover';
@@ -116,6 +130,11 @@ import { SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from
 
 type Tab = Section;
 
+// Settings opens rarely, so it loads when first needed and keeps the first load light.
+const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
+/** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
+const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+
 const TEMPLATES: Record<Tab, DocTemplate[]> = { book: SCENE_TEMPLATES, pantry: CARD_TEMPLATES, journal: JOURNAL_TEMPLATES };
 const NOUN: Record<Tab, string> = { book: 'scene', pantry: 'card', journal: 'entry' };
 const SECTION_NAME: Record<Tab, string> = { book: 'Bookshelf', pantry: 'Pantry', journal: 'Journal' };
@@ -128,7 +147,6 @@ const ALIGN = { book: 'left', pantry: 'center', journal: 'right' } as const;
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
 
-const SAVE_DELAY_MS = 600;
 /** The search index is cheap to rebuild, so it is written back less often than scenes. */
 const INDEX_SAVE_DELAY_MS = 5000;
 const NOT_A_BOOK = 'This folder is not a Cookbook book.';
@@ -209,6 +227,8 @@ export function App() {
   const [pantryQuery, setPantryQuery] = useState('');
   /** The Pantry shelf, and where the @ that opened it is. */
   const [shelf, setShelf] = useState<{ at: number | null } | null>(null);
+  /** Where the / is that opened the insert menu. */
+  const [slash, setSlash] = useState<number | null>(null);
   const [pins, setPinsState] = useState<string[]>([]);
   /** Journal folder dates pinned by hand, and the date every Journal folder shows. */
   const [pinned, setPinnedState] = useState<PinnedDates>({});
@@ -237,6 +257,64 @@ export function App() {
   const importInto = useRef<string | null>(null);
   /** The sidebar folder files are being dragged over, for the drop highlight. */
   const [fileDrop, setFileDrop] = useState<string | null>(null);
+  const settings = useSettings();
+  /** On a phone, the sidebar slides out over the page. */
+  const [sideOpen, setSideOpen] = useState(false);
+  /** The Settings screen's section while it is open, or null while writing. */
+  const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
+  const lastSection = useRef<SettingsSection>('general');
+  const openSettings = (section: SettingsSection = lastSection.current) => setSettingsAt(section);
+  const [goalsRequest, setGoalsRequest] = useState<{ tab: 'targets' | 'history'; at: number } | null>(null);
+  const [backups, setBackups] = useState<BackupInfo>({ folder: '', canChoose: canPickFolder(), last: null, count: 0 });
+  // Read by handlers that outlive a render: closing the window, keys, backups.
+  const fsRef = useRef(fs);
+  fsRef.current = fs;
+  const bookRef = useRef(book);
+  bookRef.current = book;
+  /** Words pasted since the last save, which don't count towards the goal unless the book says so. */
+  const pastedWords = useRef(0);
+  /** Something was saved since the last automatic backup. */
+  const changedSinceBackup = useRef(false);
+  const lastBackupAt = useRef(0);
+
+  /** Changes the open book's settings in book.json. */
+  const updateBook = (changes: Partial<BookInfo>) => {
+    const current = bookRef.current;
+    if (!fs || !current) return;
+    const updated = { ...current, ...changes };
+    bookRef.current = updated;
+    setBook(updated);
+    saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
+  };
+
+  const backupStore = useRef<{ key: string; fs: StorageAdapter; where: string } | null>(null);
+  const openBackupStore = async () => {
+    const chosen = getSettings().backupFolder;
+    const key = JSON.stringify(chosen);
+    if (backupStore.current?.key !== key) backupStore.current = { key, ...(await openBackups(chosen)) };
+    return backupStore.current;
+  };
+  const refreshBackups = async () => {
+    const title = bookRef.current?.title;
+    if (!title) return;
+    try {
+      const store = await openBackupStore();
+      const list = await listBackups(store.fs, title);
+      setBackups({ folder: store.where, canChoose: canPickFolder(), last: list[0]?.date ?? null, count: list.length });
+    } catch (e) {
+      setBackups((b) => ({ ...b, folder: `Can’t reach the backup folder. ${friendlyError(e)}` }));
+    }
+  };
+  /** Zips the open book into the backups folder; automatic ones only when something changed. */
+  const autoBackup = async (always = false) => {
+    const bookFs = fsRef.current;
+    const info = bookRef.current;
+    if (!bookFs || !info || (!always && !changedSinceBackup.current)) return;
+    changedSinceBackup.current = false;
+    lastBackupAt.current = Date.now();
+    const store = await openBackupStore();
+    await makeBackup(bookFs, store.fs, info.title, getSettings().keepBackups);
+  };
 
   const saveIndexNow = useCallback(async () => {
     window.clearTimeout(indexTimer.current);
@@ -259,6 +337,7 @@ export function App() {
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
+    if (getSettings().backupOnClose) await autoBackup().catch(() => {});
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
     if (mode.create) info = await startBook(nextFs, mode.create, mode.template);
@@ -291,6 +370,9 @@ export function App() {
     setWhere(nextWhere);
     setLocation(target);
     rememberBook({ location: target, title: info.title });
+    bookRef.current = info;
+    fsRef.current = nextFs;
+    void refreshBackups();
 
     // The index catches up in the background; search works on whatever it has so far.
     const opened = { fs: nextFs, index: await loadIndex(nextFs) };
@@ -346,7 +428,7 @@ export function App() {
         const parent = await pickFolder(`Choose where to keep “${title}”`);
         if (!parent) return 'cancelled';
         target = await childLocation(parent, fileNameFor(title));
-      } else target = await newBookLocation(fileNameFor(title));
+      } else target = await newBookLocation(fileNameFor(title), getSettings().newBooksFolder);
       await openAt(target, { create: title, template });
       return 'done';
     });
@@ -460,6 +542,8 @@ export function App() {
       if (pending && locationRef.current) keepRescue(window.localStorage, { location: locationRef.current, ...pending });
       void flushSave().then(saveUndoNow);
       void saveIndexNow();
+      // The browser can't wait for a zip as a tab closes, so the book is backed up whenever it's put away.
+      if (!isTauri() && document.visibilityState === 'hidden' && getSettings().backupOnClose && Date.now() - lastBackupAt.current > 10 * 60_000) void autoBackup().catch(() => {});
     };
     window.addEventListener('pagehide', onHide);
     document.addEventListener('visibilitychange', onHide);
@@ -480,6 +564,7 @@ export function App() {
           await flushSave();
           await saveUndoNow();
           await saveIndexNow();
+          if (getSettings().backupOnClose) await autoBackup().catch(() => {});
         })
         .then((unlisten) => (gone ? unlisten() : (stop = unlisten))),
     );
@@ -488,6 +573,20 @@ export function App() {
       stop?.();
     };
   }, [flushSave, saveIndexNow, saveUndoNow]);
+
+  useEffect(() => {
+    // The app menu's Settings… (Cookbook › Settings… on a Mac, Edit › Settings… elsewhere).
+    if (!isTauri()) return;
+    let stop: (() => void) | undefined;
+    let gone = false;
+    void import('@tauri-apps/api/event').then(({ listen }) =>
+      listen('open-settings', () => setSettingsAt((at) => at ?? lastSection.current)).then((unlisten) => (gone ? unlisten() : (stop = unlisten))),
+    );
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  }, []);
 
   const scheduleSave = (next: CookbookDocument) => {
     if (!fs || !path) return;
@@ -500,9 +599,15 @@ export function App() {
       await writeDocument(fs, target, next);
       savedText.current = text;
       // Count words written, unless the change only moved words between scenes.
+      changedSinceBackup.current = true;
       const words = sceneWords(next);
+      const pasted = pastedWords.current;
+      pastedWords.current = 0;
       if (!movingWords.current && savedWords.current !== null) {
-        const updated = recordWords(historyRef.current, words - savedWords.current);
+        let delta = words - savedWords.current;
+        // Pasting a chapter in isn't writing it, unless the book counts pasted words.
+        if (delta > 0 && !bookRef.current?.countPasted) delta -= Math.min(delta, pasted);
+        const updated = recordWords(historyRef.current, delta);
         if (updated !== historyRef.current) {
           historyRef.current = updated;
           setHistoryState(updated);
@@ -517,7 +622,7 @@ export function App() {
       if (recorder.current && Date.now() - recorder.current.at > UNDO_SAVE_INTERVAL_MS) await saveUndoNow();
     };
     window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => void flushSave(), SAVE_DELAY_MS);
+    saveTimer.current = window.setTimeout(() => void flushSave(), getSettings().saveDelay);
   };
 
   const select = async (p: string) => {
@@ -529,6 +634,7 @@ export function App() {
     else if (p.startsWith(JOURNAL + '/')) setTab('journal');
     const opened = await readDocument(fs, p);
     setManuscript(null);
+    setSideOpen(false);
     docRef.current = opened;
     savedText.current = serializeDocument(opened);
     savedWords.current = sceneWords(opened);
@@ -592,10 +698,54 @@ export function App() {
 
   const next = path ? fileAfter(tree, path) : null;
 
+  /** The open scene's snapshots dialog, with its list once read. */
+  const [snapshots, setSnapshots] = useState<{ path: string; title: string; list: Snapshot[] | null } | null>(null);
+  /** A copy of the open scene's text as it is now, to go back to. */
+  const takeSnapshot = async (reason: string) => {
+    const scene = docRef.current;
+    if (!fs || !scene) return;
+    await flushSave();
+    try {
+      await storeSnapshot(fs, scene, reason);
+      if (snapshots?.path === path) setSnapshots({ ...snapshots, list: await listSnapshots(fs, scene.id) });
+      else if (reason === 'By hand') say(`Took a snapshot of “${scene.title}”.`);
+    } catch (e) {
+      setError(`Couldn’t take a snapshot. ${friendlyError(e)}`);
+    }
+  };
+  /** Snapshots are taken before splits, merges and Replace all, unless Settings says not to. */
+  const autoSnapshot = (reason: string) => (getSettings().autoSnapshot ? takeSnapshot(reason) : Promise.resolve());
+  const showSnapshots = async (p: string) => {
+    if (!fs) return;
+    if (p !== path) await select(p);
+    const scene = docRef.current;
+    if (!scene) return;
+    setSnapshots({ path: p, title: scene.title, list: null });
+    setSnapshots({ path: p, title: scene.title, list: await listSnapshots(fs, scene.id) });
+  };
+  /** Puts a snapshot's text back, after keeping the text it replaces as a snapshot too. Undo still works. */
+  const rollBack = async (snapshot: Snapshot) => {
+    const scene = docRef.current;
+    if (!fs || !scene || !editor) return;
+    await storeSnapshot(fs, scene, 'Before rolling back');
+    editor.chain().focus().setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
+    setSnapshots(null);
+    say(`Rolled “${scene.title}” back to ${snapshot.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. Undo puts it back.`);
+  };
+
+  /** The scene shown beside the one being written, if any. */
+  const [beside, setBeside] = useState<string | null>(null);
+  const swapBeside = async (p: string) => {
+    const writing = path;
+    await select(p);
+    setBeside(writing && writing !== p ? writing : null);
+  };
+
   /** Turns everything after a scene break into a new scene that comes right after this one. */
   const splitScene = async (pos: number) => {
     const scene = docRef.current;
     if (!fs || !path || !editor || !scene) return;
+    await autoSnapshot('Before splitting');
     const moved = splitAtBreak(editor, pos);
     if (moved === null) return;
     const { stay, go } = partitionNotes(readNotes(scene), moved);
@@ -616,7 +766,7 @@ export function App() {
   const mergeNext = async () => {
     const scene = docRef.current;
     if (!fs || !path || !editor || !scene || !next) return;
-    await flushSave();
+    await autoSnapshot('Before merging');
     const incoming = await readDocument(fs, next.path);
     const merged = mergeNotes(readNotes(scene), scene.body, readNotes(incoming), incoming.body);
     appendScene(editor, merged.text);
@@ -715,7 +865,7 @@ export function App() {
     await flushSave();
     try {
       const m = await collect(fs, part?.title ?? book.title, part?.nodes ?? (await readTree(fs, BOOKSHELF, order.current)));
-      if (kind === 'print') return await printHtml(bookHtml(m, sheet));
+      if (kind === 'print') return await printHtml(bookHtml(m, sheet, pageOf(book.page)));
       let id = book.id;
       if (kind === 'epub' && !id) {
         id = globalThis.crypto.randomUUID();
@@ -723,7 +873,7 @@ export function App() {
         setBook(updated);
         await saveBookInfo(fs, updated);
       }
-      const data = kind === 'docx' ? bookDocx(m, sheet) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
+      const data = kind === 'docx' ? bookDocx(m, sheet, pageOf(book.page)) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
       const title = part?.title ?? book.title;
       if (await saveFile(fileNameFor(title), data, KINDS[kind])) say(`Exported “${title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.`);
     } catch (e) {
@@ -798,6 +948,65 @@ export function App() {
     return row.dataset.treeKind === 'folder' && !(p === PANTRY) ? p : parentOf(p) === PANTRY ? joinPath(PANTRY, 'characters') : parentOf(p);
   };
 
+  const backUpNow = async () => {
+    try {
+      await flushSave();
+      await saveUndoNow();
+      await autoBackup(true);
+      await refreshBackups();
+      say(`Backed up “${bookRef.current?.title ?? 'the book'}”.`);
+    } catch (e) {
+      setError(`Couldn’t back up the book. ${friendlyError(e)}`);
+    }
+  };
+  /** Shows the book's backups; picking one opens a copy of the book as it was, beside this one. */
+  const chooseRestore = async (x: number, y: number) => {
+    const current = bookRef.current;
+    if (!current) return;
+    const store = await openBackupStore();
+    const list = await listBackups(store.fs, current.title);
+    const when = (d: Date) => d.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' });
+    showMenu('Restore', x, y, [
+      { heading: 'Open a copy of the book as it was' },
+      ...list.slice(0, 25).map((b) => ({ label: when(b.date), onPick: () => void restoreCopy(b) })),
+      ...(list.length === 0 ? [{ label: 'No backups yet', disabled: true, onPick: () => {} }] : []),
+    ]);
+  };
+  const restoreCopy = async (b: Backup) => {
+    const current = bookRef.current;
+    if (!current) return;
+    try {
+      const store = await openBackupStore();
+      const stamp = b.date.toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(/[,:]/g, (c) => (c === ':' ? '.' : ''));
+      const title = `${current.title} (backup ${stamp})`;
+      const target = await newBookLocation(fileNameFor(title), getSettings().newBooksFolder);
+      const { fs: into } = await openLocation(target);
+      if (!(await into.exists('book.json'))) {
+        await restoreBackup(store.fs, b, into);
+        await saveBookInfo(into, { ...(await openBook(into)), title });
+      }
+      setSettingsAt(null);
+      await openAt(target);
+      say(`Opened a copy of “${current.title}” from ${b.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. The book itself is unchanged.`);
+    } catch (e) {
+      setError(`Couldn’t restore that backup. ${friendlyError(e)}`);
+    }
+  };
+  const chooseBackupFolder = async () => {
+    try {
+      const picked = await pickFolder('Choose a folder for backups');
+      if (!picked) return;
+      setSettings({ backupFolder: picked });
+      await refreshBackups();
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+  };
+  const chooseNewBooksFolder = async () => {
+    const picked = await pickFolder('Choose where new books go').catch(() => null);
+    if (picked?.kind === 'folder') setSettings({ newBooksFolder: picked.path });
+  };
+
   const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     setMenu({
@@ -806,6 +1015,8 @@ export function App() {
       y: r.bottom + 4,
       items: [
         { label: 'Your books…', onPick: () => setLibraryOpen(true) },
+        { label: 'Configure this book…', onPick: () => openSettings('page') },
+        { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
         { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
         { label: 'Export as EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
@@ -1051,6 +1262,13 @@ export function App() {
     const card = cards.get(p);
     const trash: MenuItem[] = fixed ? [] : [{ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(p) }];
     const common = {
+      label: {
+        label: 'Label',
+        items: [
+          { label: 'None', checked: !card?.label, onPick: () => void setFieldOf(p, 'label', undefined) },
+          ...LABELS.map((l) => ({ label: l.name, checked: card?.label === l.id, onPick: () => void setFieldOf(p, 'label', l.id) })),
+        ],
+      },
       duplicate: { label: 'Duplicate', onPick: () => void duplicate(p) },
       move: { label: 'Move to', items: moveTargets(p) },
     };
@@ -1090,6 +1308,7 @@ export function App() {
         { label: 'Pin beside the draft', disabled: pins.includes(p), onPick: () => pin(p) },
         { label: 'Insert name in the scene', disabled: !editor || doc?.kind === undefined || isCard(doc.kind), onPick: () => editor?.chain().focus().insertContent(card!.title).run() },
         { label: 'Set portrait…', disabled: card?.kind === 'research', onPick: () => choosePortrait(p) },
+        common.label,
         { separator: true },
         common.duplicate,
         common.move,
@@ -1100,8 +1319,20 @@ export function App() {
     const status = card?.status ?? 'not-started';
     showMenu(tab === 'journal' ? 'Entry' : 'Scene', x, y, [
       { label: 'Open', onPick: () => void select(p) },
+      ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
       { label: 'Rename', hint: 'F2', onPick: () => void renameFile(p) },
       common.duplicate,
+      common.label,
+      ...(tab === 'book'
+        ? [{ label: 'Include in export', checked: !card?.skipExport, onPick: () => void setFieldOf(p, 'export', card?.skipExport ? undefined : false) }]
+        : []),
+      {
+        label: 'Snapshots',
+        items: [
+          { label: 'Take a snapshot', onPick: () => void (p === path ? takeSnapshot('By hand') : select(p).then(() => takeSnapshot('By hand'))) },
+          { label: 'Compare and roll back…', onPick: () => void showSnapshots(p) },
+        ],
+      },
       ...(tab === 'book'
         ? [
             {
@@ -1474,30 +1705,146 @@ export function App() {
     // indexVersion changes whenever the index does, like searchBook below.
     [indexVersion],
   );
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+  /** The app's own shortcuts (Settings › Keyboard shortcuts); the page's are in the editor. */
+  const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
+  onAppKey.current = (e: KeyboardEvent) => {
+    if (e.defaultPrevented) return;
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings']);
+    if (settingsAt) {
+      // Only the Settings shortcut itself works over Settings: it closes it again.
+      if (id === 'settings') {
         e.preventDefault();
-        setShelf({ at: null });
+        setSettingsAt(null);
       }
-    };
+      return;
+    }
+    if (!id) {
+      // ⌘= and ⌘− zoom the page; ⌘0 goes back to 100%.
+      if (!(IS_MAC ? e.metaKey : e.ctrlKey) || e.altKey || !book || manuscript) return;
+      const steps = ZOOMS.filter((z) => z > 0);
+      const now = pageOf(book.page).zoom || 100;
+      const zoom = e.key === '=' || e.key === '+' ? steps.find((z) => z > now) : e.key === '-' ? [...steps].reverse().find((z) => z < now) : e.key === '0' ? 100 : null;
+      if (zoom === null) return;
+      e.preventDefault();
+      if (zoom !== undefined) updateBook({ page: { ...pageOf(book.page), zoom } });
+      return;
+    }
+    e.preventDefault();
+    if (id === 'palette') setPalette({ scenesOnly: false, at: Date.now() });
+    else if (id === 'switcher') setPalette({ scenesOnly: true, at: Date.now() });
+    else if (id === 'shelf') setShelf({ at: null });
+    else if (id === 'seasonings') doc && setSeasoningsOpen((o) => !o);
+    else if (id === 'focus') toggleFocus();
+    else if (id === 'newScene') void addScene();
+    else if (id === 'bookread') manuscript ? setManuscript(null) : void readManuscript();
+    else if (id === 'settings') openSettings();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  const toggleFocus = () => {
+    const focus = !getSettings().focus;
+    setSettings({ focus });
+    say(focus ? `Focus mode. ${keysFor('focus')} or Escape brings everything back.` : 'Focus mode off.');
+  };
   useEffect(() => {
-    // Typing @ opens the shelf to pick a name; the @ stays if the writer closes it.
+    // Escape leaves focus mode, unless something else (a menu, the find box) wanted it first.
+    if (!settings.focus) return;
+    const onKey = (e: KeyboardEvent) => {
+      // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
+      const handled = e.defaultPrevented && !(e.target instanceof Element && e.target.closest('.ProseMirror'));
+      if (e.key !== 'Escape' || handled || document.querySelector('.menu, .shelf, .settings, .palette, .goals-pop, .issue-card')) return;
+      setSettings({ focus: false });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [settings.focus]);
+  useEffect(() => {
+    // The page redraws its fading when focus mode or what it keeps bright changes.
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(focusKey, true));
+  }, [editor, settings.focus, settings.fade]);
+  useEffect(() => {
+    // Typewriter scrolling keeps the line being typed in the middle of the window.
+    if (!editor || !settings.typewriter) return;
+    const center = () => {
+      const desk = document.querySelector<HTMLElement>('.desk');
+      if (!desk || !editor.isFocused) return;
+      const caret = editor.view.coordsAtPos(editor.state.selection.head);
+      const box = desk.getBoundingClientRect();
+      desk.scrollBy({ top: (caret.top + caret.bottom) / 2 - (box.top + box.height / 2) });
+    };
+    editor.on('selectionUpdate', center);
+    editor.on('focus', center);
+    return () => {
+      editor.off('selectionUpdate', center);
+      editor.off('focus', center);
+    };
+  }, [editor, settings.typewriter]);
+  useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom;
+    let escapedAt = 0;
+    const onEscape = (e: KeyboardEvent) => e.key === 'Escape' && (escapedAt += 1);
+    // Typing @ opens the shelf to pick a name; the @ stays if the writer closes it.
     const onInput = (e: Event) => {
-      if ((e as InputEvent).data !== '@') return;
+      if ((e as InputEvent).data === '/' && getSettings().slashMenu) {
+        const typedAt = escapedAt;
+        window.setTimeout(() => {
+          const { $head, empty } = editor.state.selection;
+          // Escape pressed straight after the / means no menu.
+          if (!empty || escapedAt !== typedAt) return;
+          const line = $head.parent.textBetween(0, $head.parentOffset, undefined, '\ufffc');
+          // At the start of a line or after a space, so dates and and/or are left alone.
+          const found = /(^|\s)\/[\p{L}\p{N} ]{0,30}$/u.exec(line);
+          if (found) setSlash($head.start() + found.index + found[1]!.length);
+        }, 0);
+        return;
+      }
+      if ((e as InputEvent).data !== '@' || !getSettings().atShelf) return;
       window.setTimeout(() => {
-        const at = editor.state.selection.from - 1;
-        if (at >= 0 && editor.state.doc.textBetween(at, at + 1) === '@') setShelf({ at });
+        // Letters typed quickly may already follow the @, so look back for it.
+        const { $head } = editor.state.selection;
+        const line = $head.parent.textBetween(0, $head.parentOffset, undefined, '\ufffc');
+        const found = /(^|[^\p{L}\p{N}._%+-])@[\p{L}\p{N}'’-]{0,40}$/u.exec(line);
+        // After a letter or number it's an email address, not a name.
+        if (!found) return;
+        setShelf({ at: $head.start() + found.index + found[1]!.length });
       }, 0);
     };
+    // Pasted words are counted apart from typed ones; and Settings can make every paste plain text.
+    const onPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      pastedWords.current += countWords(text);
+      if (getSettings().pastePlain && text && e.clipboardData?.types.includes('text/html') && !editor.isActive('codeBlock')) {
+        e.preventDefault();
+        e.stopPropagation();
+        editor.view.pasteText(text);
+      }
+    };
+    const host = dom.parentElement ?? dom;
     dom.addEventListener('input', onInput);
-    return () => dom.removeEventListener('input', onInput);
+    dom.addEventListener('keydown', onEscape, true);
+    host.addEventListener('paste', onPaste, true);
+    return () => {
+      dom.removeEventListener('input', onInput);
+      dom.removeEventListener('keydown', onEscape, true);
+      host.removeEventListener('paste', onPaste, true);
+    };
   }, [editor]);
+  /** Letters typed after @ before the shelf opened: they leave the page and become its search. */
+  const takeTyped = () => {
+    const at = shelf?.at;
+    if (at === null || at === undefined || !editor) return '';
+    const { state } = editor;
+    const head = state.selection.head;
+    if (head <= at + 1 || state.doc.textBetween(at, at + 1) !== '@') return '';
+    const typed = state.doc.textBetween(at + 1, head, '');
+    if (typed.length > 40 || /\n/.test(typed)) return '';
+    editor.view.dispatch(state.tr.delete(at + 1, head));
+    return typed;
+  };
   const insertName = (name: string) => {
     const at = shelf?.at ?? null;
     setShelf(null);
@@ -1506,11 +1853,42 @@ export function App() {
     if (at !== null && editor.state.doc.textBetween(at, at + 1) === '@') chain.insertContentAt({ from: at, to: at + 1 }, { type: 'text', text: name }).run();
     else chain.insertContent({ type: 'text', text: name }).run();
   };
-  const closeShelf = () => {
-    const wasTyping = shelf?.at !== null;
+  const closeShelf = (typed = '') => {
+    const at = shelf?.at ?? null;
     setShelf(null);
-    if (wasTyping) editor?.commands.focus();
+    if (at === null || !editor) return;
+    // Closing without a pick leaves what was typed after the @ on the page.
+    const { state } = editor;
+    if (typed && /^[^\n]{1,40}$/.test(typed) && state.doc.textBetween(at, at + 1) === '@') editor.chain().focus().insertContentAt(at + 1, typed).run();
+    else editor.commands.focus();
   };
+  const insertItems = useMemo<PaletteItem[]>(() => {
+    if (!editor) return [];
+    const item = (id: string, label: string, group: string, words: string, run: () => void, hint?: string): PaletteItem => ({ id, label, group, words, run, hint });
+    const breakHere = () =>
+      editor.commands.command(({ tr, state }) => {
+        const { $from } = state.selection;
+        if ($from.depth !== 1) return false;
+        const empty = $from.parent.content.size === 0;
+        const start = empty ? $from.before() : $from.after();
+        if (empty) tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
+        else tr.insert(start, state.schema.nodes.sceneBreak!.create());
+        const after = start + 1;
+        if (after >= tr.doc.content.size || tr.doc.nodeAt(after)?.type.name !== 'paragraph') tr.insert(after, state.schema.nodes.paragraph!.create());
+        tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+        return true;
+      });
+    return [
+      item('break', 'Scene break', 'Insert', 'scene break * * * divider hr', breakHere),
+      item('bullets', 'Bulleted list', 'Insert', 'list bullets ul', () => void editor.chain().focus().toggleBulletList().run()),
+      item('numbers', 'Numbered list', 'Insert', 'list numbers ol ordered', () => void editor.chain().focus().toggleOrderedList().run()),
+      item('checklist', 'Checklist', 'Insert', 'list todo tasks checkbox', () => void editor.chain().focus().toggleTaskList().run()),
+      item('table', 'Table', 'Insert', 'table grid', () => void editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()),
+      item('footnote', 'Footnote', 'Insert', 'footnote note', () => showInSeasonings({ tab: 'footnotes', index: insertFootnote(editor) }), keysFor('footnote')),
+      item('name', 'Name from the Pantry', 'Insert', 'pantry character place @ name', () => setShelf({ at: null }), keysFor('shelf')),
+      ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
+    ];
+  }, [editor, sheet, settings.shortcuts, settings.shortcutStyle]);
   const drawerOpen = (seasoningsOpen && !!doc) || pins.length > 0;
   const saveEverything = useCallback(async () => {
     await flushSave();
@@ -1524,26 +1902,136 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [notice]);
 
+  /** The command palette (⌘K) or, with scenesOnly, the quick switcher (⌘O). */
+  const [palette, setPalette] = useState<{ scenesOnly: boolean; at: number } | null>(null);
+  const paletteItems = (scenesOnly: boolean): PaletteItem[] => {
+    const places: PaletteItem[] = [...cards]
+      .map(([p, c]) => {
+        const top = p.split('/')[0];
+        const folder = parentOf(p) === top ? '' : ` · ${baseName(parentOf(p))}`;
+        const group = top === PANTRY ? 'Pantry' : top === JOURNAL ? 'Journal' : 'Bookshelf';
+        return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
+      })
+      .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
+    if (scenesOnly) return places;
+    const cmd = (id: string, label: string, run: () => void, group = 'Actions', hint?: string, words?: string): PaletteItem => ({ id, label, run, group, hint, words });
+    const sections: [SettingsSection, string, string][] = [
+      ['general', 'General', 'reopen startup shortcuts mac ctrl'],
+      ['appearance', 'Appearance', 'theme dark light sepia size motion page colour'],
+      ['writing', 'Writing', 'quotes dash markdown typewriter focus paste @'],
+      ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
+      ['shortcuts', 'Keyboard shortcuts', 'keys'],
+      ['updates', 'Updates and privacy', 'version'],
+      ['page', 'Page and view', 'size margins zoom draft letter a4'],
+      ['styles', 'Styles', 'paragraph character font'],
+      ['proofreader', 'Proofreader', 'spelling grammar dictionary british american'],
+      ['goals', 'Goals', 'target deadline words a day pasted'],
+    ];
+    const page = pageOf(book?.page);
+    return [
+      cmd('new', `New ${NOUN[tab]}`, () => void addScene(), 'Actions', keysFor('newScene')),
+      cmd('folder', 'New folder', () => void addFolder()),
+      cmd('bookread', manuscript ? 'Back to writing' : 'Bookread', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
+      cmd('find', 'Find in book', () => document.querySelector<HTMLInputElement>('.find-field input')?.focus(), 'Actions', keysFor('find'), 'search replace'),
+      cmd('shelf', 'Pantry shelf', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters'),
+      ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => setSeasoningsOpen((o) => !o), 'Actions', keysFor('seasonings'), 'notes footnotes proofreader')] : []),
+      ...(doc ? [cmd('snapshot', 'Take a snapshot of this scene', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this scene…', () => path && void showSnapshots(path))] : []),
+      cmd('focus', settings.focus ? 'Focus mode off' : 'Focus mode on', toggleFocus, 'View', keysFor('focus')),
+      cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
+      cmd('draft', page.view === 'page' ? 'Show scenes as Draft' : 'Show scenes as Page', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
+      ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
+      ...(['system', 'light', 'dark', 'sepia'] as const).map((t) => cmd(`theme-${t}`, `Theme: ${t[0]!.toUpperCase()}${t.slice(1)}`, () => setSettings({ theme: t }), 'View', settings.theme === t ? '✓' : undefined)),
+      cmd('show-book', 'Show the Bookshelf', () => setTab('book'), 'View'),
+      cmd('show-pantry', 'Show the Pantry', () => setTab('pantry'), 'View'),
+      cmd('show-journal', 'Show the Journal', () => setTab('journal'), 'View'),
+      cmd('goals', 'Goals', () => setGoalsRequest({ tab: 'targets', at: Date.now() }), 'Book', undefined, 'target daily words streak'),
+      cmd('history', 'Writing history', () => setGoalsRequest({ tab: 'history', at: Date.now() }), 'Book', undefined, 'words written days'),
+      cmd('docx', 'Export as Word…', () => void exportBook('docx'), 'Book', '.docx'),
+      cmd('epub', 'Export as EPUB…', () => void exportBook('epub'), 'Book', '.epub'),
+      cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Book', '.md'),
+      cmd('print', 'Print or save as PDF…', () => void exportBook('print'), 'Book'),
+      cmd('import', 'Import files…', () => chooseImport(null), 'Book', '.docx .md .txt'),
+      cmd('zip', 'Back up as a zip…', () => void backUp(), 'Book'),
+      cmd('backup', 'Back up now', () => void backUpNow(), 'Book', undefined, 'automatic backup'),
+      cmd('books', 'Your books…', () => setLibraryOpen(true), 'Book', undefined, 'open library switch'),
+      cmd('trash', 'Trash', openTrash, 'Book', undefined, 'deleted restore'),
+      cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
+      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
+      ...places,
+    ];
+  };
+
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
-  const summary = useMemo(() => summarize(history), [history]);
   const undoSteps = useEditorState({ editor, selector: ({ editor }) => (editor ? undoDepth(editor.state) : 0) }) ?? 0;
   const words = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? countWords(editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ')) : 0),
   });
 
+  const page = pageOf(book?.page);
+  const goals: Goals = { dailyGoal: book?.dailyGoal ?? DEFAULT_DAILY_GOAL, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };
+  const bookWords = useMemo(() => {
+    let total = 0;
+    for (const [p, c] of cards) if (p.startsWith(BOOKSHELF + '/') && c.kind === 'scene') total += p === path ? (words ?? c.words) : c.words;
+    return total;
+  }, [cards, path, words]);
+  const exportHistoryCsv = () =>
+    void saveFile(`${book?.title ?? 'Book'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
+  // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
+  const desk = useRef<HTMLElement>(null);
+  const [deskWidth, setDeskWidth] = useState(0);
+  useEffect(() => {
+    const el = desk.current;
+    if (!el) return;
+    const watch = new ResizeObserver(() => setDeskWidth(el.clientWidth));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  const pageSize = PAGE_SIZES[page.size];
+  // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft.
+  const asDraft = page.view === 'draft' || (deskWidth > 0 && deskWidth < 640);
+  const pageZoom = asDraft && (page.zoom === 0 || deskWidth < 640) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
+  const pageStyle =
+    asDraft
+      ? { zoom: pageZoom }
+      : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
+
   return (
-    <div className={`app${drawerOpen ? ' with-seasonings' : ''}${seasoningsOpen && doc ? ' seasonings-open' : ''}`}>
+    <div
+      className={`app${drawerOpen ? ' with-seasonings' : ''}${seasoningsOpen && doc ? ' seasonings-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+    >
       <style>{css}</style>
       <header className="topbar">
         <div className="brand-wrap">
+          <button className="side-toggle" aria-label="Bookshelf, Pantry and Journal" aria-expanded={sideOpen} onClick={() => setSideOpen(!sideOpen)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
           <Logo />
           <span className="brand">Cookbook</span>
           <span className="crumb">
-            <button className="crumb-book" aria-haspopup="menu" aria-expanded={menu?.label === 'Book'} title="Your books, export, import, backup and trash" onClick={bookMenu}>
+            <button
+              className="crumb-book"
+              aria-haspopup="menu"
+              aria-expanded={menu?.label === 'Book'}
+              title="Your books, export, import, backup and trash. Right-click to configure the book."
+              onClick={bookMenu}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                showMenu('Book', e.clientX, e.clientY, [
+                  { label: 'Configure…', onPick: () => openSettings('page') },
+                  { label: 'Goals…', onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
+                  { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
+                  { separator: true },
+                  { label: 'Back up now', onPick: () => void backUpNow() },
+                  { label: 'Your books…', onPick: () => setLibraryOpen(true) },
+                ]);
+              }}
+            >
               {book?.title ?? 'Books'}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" />
@@ -1567,7 +2055,7 @@ export function App() {
             Seasonings
             {seasoningsCount > 0 && <span className="badge">{seasoningsCount}</span>}
           </button>
-          <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} />
+          <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
         </div>
       </header>
 
@@ -1648,8 +2136,9 @@ export function App() {
           onPick={(t) => void addScene(t)}
         />
       </nav>
+      {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
 
-      <main className="desk">
+      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <p role="alert" className="error">
@@ -1657,7 +2146,7 @@ export function App() {
           </p>
         )}
         {manuscript && fs ? (
-          <Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} />
+          <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
         ) : (
           <>
           {doc && path && doc.kind === 'scene' && (
@@ -1684,10 +2173,11 @@ export function App() {
               onOpen={(p) => void select(p)}
             />
           )}
+          <div className="page-row">
           {doc && path ? (
-            <article className="cb-page" key={path} onContextMenu={pageMenu}>
+            <article className={`cb-page${asDraft ? ' draft' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
               <input
-                className="scene-title"
+                className={`scene-title${page.showTitle ? '' : ' is-hidden'}`}
                 aria-label={doc.kind === 'scene' ? 'Scene title' : doc.kind === 'journal' ? 'Entry title' : 'Card name'}
                 value={doc.title}
                 onChange={(e) => {
@@ -1708,9 +2198,12 @@ export function App() {
               <PageFootnotes editor={editor} />
               <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
             </article>
-          ) : (
-            <p className="empty">Pick a scene from the Bookshelf to start writing.</p>
-          )}
+          ) : null}
+          {doc && path && beside && beside !== path ? (
+            <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onClose={() => setBeside(null)} /></Suspense>
+          ) : null}
+          </div>
+          {doc && path ? null : <p className="empty">Pick a scene from the Bookshelf to start writing.</p>}
           </>
         )}
       </main>
@@ -1746,6 +2239,7 @@ export function App() {
       )}
 
       <IssueCard editor={editor} proof={proof} />
+      {slash !== null && editor && <InsertMenu editor={editor} at={slash} items={insertItems} onClose={() => setSlash(null)} />}
 
       {shelf && (
         <PantryShelf
@@ -1753,6 +2247,7 @@ export function App() {
           castIds={cast.map((c) => c.id)}
           search={searchPantry}
           inserting={shelf.at !== null}
+          typed={takeTyped}
           canInsert={!!editor}
           loadCard={loadCard}
           loadPicture={loadPicture}
@@ -1769,7 +2264,7 @@ export function App() {
       <NamePeek loadCard={loadCard} loadPicture={loadPicture} onOpen={(p) => void select(p)} onPin={pin} />
 
       {libraryOpen && (
-        <BookLibrary
+        <Suspense fallback={null}><BookLibrary
           current={location}
           adopting={adopting}
           error={libraryError}
@@ -1803,7 +2298,7 @@ export function App() {
             },
             { label: 'Trash', onPick: openTrash },
           ]}
-        />
+        /></Suspense>
       )}
 
       {menu && <Menu {...menu} onClose={closeMenu} />}
@@ -1824,7 +2319,7 @@ export function App() {
       )}
 
       {trashItems !== undefined && (
-        <TrashDialog
+        <Suspense fallback={null}><TrashDialog
           items={trashItems}
           busy={busy}
           onRestore={(name) =>
@@ -1844,7 +2339,7 @@ export function App() {
             })
           }
           onClose={() => setTrashItems(undefined)}
-        />
+        /></Suspense>
       )}
 
       {notice && (
@@ -1896,20 +2391,11 @@ export function App() {
       />
 
       <footer className="footer">
-        <button className="shelf-button" title="Pantry shelf (⌘J, or type @ while writing)" onClick={() => setShelf({ at: null })}>
-          Pantry shelf <kbd>⌘J</kbd>
-        </button>
-        <WritingFooter
-          summary={summary}
-          dailyGoal={book?.dailyGoal ?? DEFAULT_DAILY_GOAL}
-          sceneWords={doc ? (words ?? 0) : null}
-          sceneGoal={sceneGoal(doc)}
-          onDailyGoal={(goal) => {
-            if (!fs || !book) return;
-            const updated = { ...book, dailyGoal: goal };
-            setBook(updated);
-            saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
-          }}
+        <GoalsPopup
+          history={history}
+          goals={goals}
+          onGoals={(changes) => updateBook(changes)}
+          scene={doc && doc.kind === 'scene' ? { title: doc.title, words: words ?? 0, goal: sceneGoal(doc) } : null}
           onSceneGoal={(goal) => {
             const base = docRef.current ?? doc;
             if (!base) return;
@@ -1918,14 +2404,81 @@ export function App() {
             setDoc(updated);
             scheduleSave(updated);
           }}
-          onExport={() => void exportHistory(book?.title ?? 'Book', history).catch((e: unknown) => setError(friendlyError(e)))}
+          bookWords={bookWords}
+          onExport={exportHistoryCsv}
+          request={goalsRequest}
         />
-        <span>
-          {doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing · ` : ''}
-          {doc ? 'US Letter · 100% · ' : ''}
-          {where}
+        <button className="shelf-button" title={`Pantry shelf (${keysFor('shelf')}, or type @ while writing)`} onClick={() => setShelf({ at: null })}>
+          Pantry shelf <kbd>{keysFor('shelf')}</kbd>
+        </button>
+        <span className="footer-end">
+          {doc && undoSteps > 0 && <span className="footer-undo">Undo remembers {undoSteps.toLocaleString('en')} {undoSteps === 1 ? 'step' : 'steps'}, even after closing</span>}
+          {doc && (
+            <button className="footer-link" title="Page and view settings" onClick={() => openSettings('page')}>
+              {page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label} · {zoomLabel(page.zoom)}
+            </button>
+          )}
+          <span className="footer-where">{where}</span>
+          <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+            </svg>
+          </button>
         </span>
       </footer>
+
+      {settingsAt && (
+        <Suspense fallback={<div className="settings" aria-busy="true" />}>
+          <Settings
+            section={settingsAt}
+            onSection={(section) => {
+              lastSection.current = section;
+              setSettingsAt(section);
+            }}
+            onClose={() => setSettingsAt(null)}
+            book={book}
+            onBook={updateBook}
+            sheet={sheet}
+            onEditStyle={editStyle}
+            onAddStyle={addStyle}
+            onRenameStyle={(id, name) => changeSheet(renameParagraphStyle(sheet, id, name))}
+            proof={proof}
+            onExportHistory={exportHistoryCsv}
+            backups={backups}
+            onBackUpNow={backUpNow}
+            onRestore={() => {
+              const r = document.activeElement?.getBoundingClientRect();
+              void chooseRestore(r?.left ?? 200, (r?.bottom ?? 200) + 4);
+            }}
+            onChooseBackupFolder={() => void chooseBackupFolder()}
+            newBooksFolder={isTauri() ? settings.newBooksFolder || 'Cookbook’s own folder, with its app data' : null}
+            onChooseNewBooksFolder={() => void chooseNewBooksFolder()}
+            version={__APP_VERSION__}
+            onCheckUpdates={checkForUpdates}
+          />
+        </Suspense>
+      )}
+
+      {palette && <Palette key={palette.at} items={paletteItems(palette.scenesOnly)} placeholder={palette.scenesOnly ? 'Go to a scene, card or entry' : 'Type a command, setting or scene'} onClose={() => setPalette(null)} />}
+
+      {snapshots && (
+        <SnapshotsDialog
+          title={snapshots.title}
+          current={docRef.current?.body ?? ''}
+          snapshots={snapshots.list}
+          onTake={() => void takeSnapshot('By hand')}
+          onRollBack={(snap) => void rollBack(snap)}
+          onDelete={(snap) =>
+            void (async () => {
+              if (!fs || !docRef.current) return;
+              await deleteSnapshot(fs, snap);
+              setSnapshots({ ...snapshots, list: await listSnapshots(fs, docRef.current.id) });
+            })()
+          }
+          onClose={() => setSnapshots(null)}
+        />
+      )}
     </div>
   );
 }

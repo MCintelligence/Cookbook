@@ -23,6 +23,7 @@ import { RULE_GROUPS } from '../proofread/rules';
 import { type FoundIssue, issuesOf, selectIssue } from '../proofread/plugin';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
+import { keysFor } from '../shortcuts';
 import { IssueActions } from './IssueCard';
 
 export type SeasoningsTab = 'all' | 'proofread' | 'notes' | 'footnotes' | 'dialogue';
@@ -74,6 +75,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
       const { doc } = editor.state;
       return {
         anchors: noteAnchors(doc).map(({ id, quote, from, to }) => ({ id, quote, from, to })),
+        nothingSelected: editor.state.selection.empty,
         footnotes: footnotes(doc),
         todos: todos(doc),
         dialogue: dialogueStats(doc),
@@ -107,6 +109,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
 
   const addNote = () => {
     const id = addNoteAnchor(editor, Object.keys(notes));
+    if (!id) return;
     onNotesChange({ ...notes, [id]: '' });
     onRequest({ tab: 'notes', id });
   };
@@ -144,7 +147,10 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
                 </button>
               ))}
             </div>
-            {scene.grade.sentences > 0 && (
+            {scene.grade.sentences > 0 && scene.grade.words < MIN_GRADE_WORDS && (
+              <span className="seas-hint">Readability shows once the scene has {MIN_GRADE_WORDS} words.</span>
+            )}
+            {scene.grade.words >= MIN_GRADE_WORDS && (
               <span className="seas-grade">
                 <span>
                   Readability: <strong>grade {scene.grade.grade}</strong>
@@ -248,8 +254,12 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
       )}
 
       {show('notes') && (
-        <Section title="Notes" count={noteCount} action={<button className="ghost" onClick={addNote}>+ Add note</button>}>
-          {noteCount === 0 && <div className="seas-card seas-quiet">Select some words and press ⌘⌥M to leave yourself a note.</div>}
+        <Section title="Notes" count={noteCount} action={
+            <button className="ghost" disabled={scene.nothingSelected} title={scene.nothingSelected ? 'Select some words in the scene first' : `Add a note on the selected words (${keysFor('note')})`} onClick={addNote}>
+              + Add note
+            </button>
+          }>
+          {noteCount === 0 && <div className="seas-card seas-quiet">Select some words and press {keysFor('note')} to leave yourself a note.</div>}
           {scene.anchors.map((a) => (
             <div className="seas-card" key={a.id} data-key={`note-${a.id}`}>
               <button className="seas-quote" onClick={() => selectRange(editor, a.from, a.to)}>
@@ -291,7 +301,7 @@ export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, 
           count={scene.footnotes.length}
           action={<button className="ghost" onClick={addFootnote}>+ Add at cursor</button>}
         >
-          {scene.footnotes.length === 0 && <div className="seas-card seas-quiet">Press ⌘⌥F to add a footnote where the cursor is.</div>}
+          {scene.footnotes.length === 0 && <div className="seas-card seas-quiet">Press {keysFor('footnote')} to add a footnote where the cursor is.</div>}
           {scene.footnotes.map((f, i) => (
             <div className="seas-card" key={f.pos} data-key={`footnote-${i}`}>
               <button className="seas-quote" onClick={() => selectFootnote(editor, i)}>
@@ -336,6 +346,8 @@ function paragraphs(doc: PMNode): string[] {
   return out;
 }
 
+/** A grade level from a few words means nothing, so it waits for a paragraph or two. */
+const MIN_GRADE_WORDS = 50;
 const gradeNote = (grade: number) =>
   grade <= 6 ? 'Easy to read. Most novels sit between grades 4 and 8.' : grade <= 9 ? 'Comfortable for most readers.' : 'Hard going. Shorter sentences and plainer words will bring it down.';
 

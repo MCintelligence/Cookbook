@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { type TreeNode } from '../storage/book';
-import { STATUSES, isCard } from '../storage/document';
+import { LABELS, STATUSES, isCard } from '../storage/document';
 import { type FolderDate, showDay } from '../storage/journal';
 import { type CardSummary } from '../storage/index';
+import { placeAt } from './zoom';
 
 interface Props {
   nodes: TreeNode[];
@@ -228,7 +229,7 @@ export function Tree(props: Props) {
         ))}
       </ul>
       {drag && (
-        <div className="tree-ghost" style={{ left: drag.x + 14, top: drag.y + 10 }} aria-hidden="true">
+        <div className="tree-ghost" style={placeAt(list.current, { left: drag.x + 14, top: drag.y + 10 })} aria-hidden="true">
           {drag.label}
         </div>
       )}
@@ -297,13 +298,16 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
     // Scenes show their synopsis; Pantry cards show the other names they go by.
     const subtitle = card?.kind === 'scene' ? card.synopsis : card && isCard(card.kind) && card.aka.length > 0 ? `Also ${card.aka.join(', ')}` : '';
+    const colour = LABELS.find((l) => l.id === card?.label);
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
-        <button {...rowProps} className={`tree-card${marker}`} onClick={() => !justDragged.current && onSelect(node.path)}>
+        <button {...rowProps} className={`tree-card${marker}${card?.skipExport ? ' no-export' : ''}`} onClick={() => !justDragged.current && onSelect(node.path)}>
           <span className="tree-card-top">
             {status && <span className={`status-dot status-${status.id}`} title={status.label} aria-label={status.label} role="img" />}
             {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
+            {card?.skipExport && <span className="tree-flag">Not exported</span>}
+            {colour && <span className="label-dot" style={{ background: colour.color }} title={`${colour.name} label`} aria-label={`${colour.name} label`} role="img" />}
             {total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>
           {subtitle && <span className="tree-card-synopsis">{subtitle}</span>}

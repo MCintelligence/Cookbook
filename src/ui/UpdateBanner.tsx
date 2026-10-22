@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isTauri } from '../storage/platform';
+import { getSettings } from '../settings';
 
 /**
  * Tells the writer a new version of Cookbook is ready and installs it only
@@ -40,6 +41,23 @@ async function checkDesktop(): Promise<Ready | null> {
   };
 }
 
+/** The banner on screen, told when "Check now" in Settings finds an update. */
+let announce: ((ready: Ready) => void) | null = null;
+
+/** Looks for a new version now, from Settings, and says what it found. */
+export async function checkForUpdates(): Promise<string> {
+  if (isTauri()) {
+    const ready = await checkDesktop();
+    if (!ready) return 'You have the latest version.';
+    announce?.(ready);
+    return `Cookbook ${ready.version} is ready. Choose “Update and restart” at the top of the page.`;
+  }
+  const registration = await navigator.serviceWorker?.getRegistration();
+  if (!registration) return 'This copy of Cookbook updates when the page reloads.';
+  await registration.update();
+  return registration.waiting || registration.installing ? 'A new version is ready. Choose “Update and restart” at the top of the page.' : 'You have the latest version.';
+}
+
 interface Props {
   /** Saves everything still in memory: the scene, undo history and index. */
   beforeRestart: () => Promise<void>;
@@ -55,9 +73,21 @@ export function UpdateBanner({ beforeRestart }: Props) {
   saveRef.current = beforeRestart;
 
   useEffect(() => {
+    announce = (r) => {
+      setReady(r);
+      setLater(false);
+    };
+    return () => {
+      announce = null;
+    };
+  }, []);
+
+  useEffect(() => {
     if (isTauri()) {
       let live = true;
+      // Settings can turn automatic checks off; "Check now" there still works.
       const run = () =>
+        getSettings().checkUpdates &&
         checkDesktop().then(
           (r) => live && r && setReady(r),
           () => {}, // Offline, or no releases yet: try again later.
@@ -82,7 +112,7 @@ export function UpdateBanner({ beforeRestart }: Props) {
             install: () => reload(true),
           }),
         onRegisteredSW: (_url, registration) => {
-          if (registration) window.setInterval(() => void registration.update().catch(() => {}), CHECK_EVERY_MS);
+          if (registration) window.setInterval(() => getSettings().checkUpdates && void registration.update().catch(() => {}), CHECK_EVERY_MS);
         },
       });
     }, () => {});

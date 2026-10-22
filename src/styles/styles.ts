@@ -228,6 +228,13 @@ export function darkPageColor(color: string): string {
   return `#${to(r1)}${to(g1)}${to(b1)}`;
 }
 
+/** A selector list that only applies while the page is drawn dark (see settings.ts). */
+const onDarkPage = (selector: string) =>
+  selector
+    .split(',')
+    .map((part) => `:root[data-page="dark"] ${part.trim()}`)
+    .join(', ');
+
 /** CSS for the page, scoped under `scope`. 12 pt text is 16 px at 100% zoom. */
 /** `dark` adds the dark-page colours; printed and exported books leave them out. */
 export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true): string {
@@ -252,7 +259,7 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true):
         ` font-style: ${s.italic ? 'italic' : 'normal'};` +
         ` }`,
     );
-    darkRules.push(`${selector} { color: ${cssValue(darkPageColor(s.color))}; }`);
+    darkRules.push(`${onDarkPage(selector)} { color: ${cssValue(darkPageColor(s.color))}; }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];
@@ -260,7 +267,7 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true):
     if (c.size) props.push(`font-size: ${c.size * PX_PER_PT}px`);
     if (c.color) {
       props.push(`color: ${cssValue(c.color)}`);
-      darkRules.push(`${scope} span[data-char~="${cssValue(c.id)}"] { color: ${cssValue(darkPageColor(c.color))}; }`);
+      darkRules.push(`${onDarkPage(`${scope} span[data-char~="${cssValue(c.id)}"]`)} { color: ${cssValue(darkPageColor(c.color))}; }`);
     }
     if (c.bold !== undefined) props.push(`font-weight: ${c.bold ? 700 : 400}`);
     if (c.italic !== undefined) props.push(`font-style: ${c.italic ? 'italic' : 'normal'}`);
@@ -268,6 +275,6 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true):
     if (c.smallCaps) props.push('font-variant-caps: small-caps');
     rules.push(`${scope} span[data-char~="${cssValue(c.id)}"] { ${props.join('; ')} }`);
   }
-  if (dark && darkRules.length > 0) rules.push(`@media (prefers-color-scheme: dark) {\n${darkRules.join('\n')}\n}`);
+  if (dark) rules.push(...darkRules);
   return rules.join('\n');
 }

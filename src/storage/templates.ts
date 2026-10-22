@@ -41,7 +41,7 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
     name: 'Letter',
     kind: 'scene',
     title: 'A letter',
-    body: '::: letter\nDear ,\n\nYours,\n:::\n',
+    body: '::: letter\nDear friend,\n\nYours,\n:::\n',
   },
 ];
 

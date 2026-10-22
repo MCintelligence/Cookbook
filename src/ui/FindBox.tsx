@@ -2,6 +2,7 @@ import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from
 import { useEditorState, type Editor } from '@tiptap/react';
 import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../editor/findPlugin';
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
+import { keysFor, pressed } from '../shortcuts';
 
 const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Scene', character: 'Character', setting: 'Setting', research: 'Research', journal: 'Journal' };
 
@@ -13,13 +14,15 @@ interface Props {
   onOpenHit: (path: string) => void;
   /** Opens the box with these words, as "Find everywhere" on a right-click does. */
   request?: { query: string; at: number } | null;
+  /** Runs before Replace all, which takes a snapshot of the scene. */
+  beforeReplaceAll?: () => Promise<void>;
 }
 
 /**
  * The one search box in the top bar. It finds and replaces in the open scene,
  * and lists the other scenes and cards that match.
  */
-export function FindBox({ editor, search, currentPath, onOpenHit, request }: Props) {
+export function FindBox({ editor, search, currentPath, onOpenHit, request, beforeReplaceAll }: Props) {
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [wholeWord, setWholeWord] = useState(false);
@@ -53,7 +56,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request }: Pro
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'k')) {
+      if (!e.defaultPrevented && pressed(e, 'find')) {
         e.preventDefault();
         setOpen(true);
         input.current?.select();
@@ -105,7 +108,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request }: Pro
         {query ? (
           <span className="find-count">{find.count === 0 ? 'No matches' : `${find.current + 1} of ${find.count}`}</span>
         ) : (
-          <kbd>⌘F</kbd>
+          <kbd>{keysFor('find')}</kbd>
         )}
       </label>
       {open && (
@@ -118,7 +121,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request }: Pro
             <button className="pill" disabled={!editor || find.count === 0} onClick={() => editor && replaceCurrent(editor, replacement)}>
               Replace
             </button>
-            <button className="pill pill-accent" disabled={!editor || find.count === 0} onClick={() => editor && replaceAll(editor, replacement)}>
+            <button className="pill pill-accent" disabled={!editor || find.count === 0} onClick={() => editor && void (beforeReplaceAll?.() ?? Promise.resolve()).then(() => replaceAll(editor, replacement))}>
               All {find.count || ''}
             </button>
           </div>

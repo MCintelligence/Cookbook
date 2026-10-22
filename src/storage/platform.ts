@@ -76,11 +76,11 @@ export function defaultLocation(): Promise<BookLocation> {
   return newBookLocation(DEFAULT_BOOK);
 }
 
-/** Where a new book goes when the writer does not choose a folder. */
-export async function newBookLocation(name: string): Promise<BookLocation> {
+/** Where a new book goes when the writer does not choose a folder: the one set in Settings, or Cookbook's own. */
+export async function newBookLocation(name: string, folder = ''): Promise<BookLocation> {
   if (isTauri()) {
     const { appDataDir, join } = await import('@tauri-apps/api/path');
-    return { kind: 'folder', path: await join(await appDataDir(), 'books', name) };
+    return { kind: 'folder', path: folder ? await join(folder, name) : await join(await appDataDir(), 'books', name) };
   }
   return { kind: 'browser', name };
 }
@@ -143,6 +143,31 @@ export async function browserBooks(): Promise<string[]> {
   const names: string[] = [];
   for await (const [name, handle] of books.entries()) if (handle.kind === 'directory') names.push(name);
   return names.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+}
+
+/**
+ * Where automatic backups go: a folder the writer chose, or else Cookbook's
+ * own (beside its books in the desktop app, the browser's storage on the web).
+ */
+export async function openBackups(chosen: BookLocation | null): Promise<{ fs: StorageAdapter; where: string }> {
+  if (chosen && chosen.kind !== 'browser') {
+    const { fs } = await openLocation(chosen);
+    return { fs, where: chosen.kind === 'folder' ? chosen.path : chosen.name };
+  }
+  if (isTauri()) {
+    const { appDataDir, join } = await import('@tauri-apps/api/path');
+    const path = await join(await appDataDir(), 'backups');
+    const { TauriAdapter } = await import('./tauri');
+    const fs = new TauriAdapter(path);
+    await fs.makeFolder('');
+    return { fs, where: path };
+  }
+  if (hasBrowserStorage()) {
+    const root = await navigator.storage.getDirectory();
+    const { OpfsAdapter } = await import('./opfs');
+    return { fs: new OpfsAdapter(await root.getDirectoryHandle('backups', { create: true })), where: 'In this browser’s storage. Choose a folder to keep a copy outside the browser.' };
+  }
+  return { fs: new MemoryAdapter(), where: 'Nowhere: this browser has no storage for backups.' };
 }
 
 // ---------- choosing a folder ----------

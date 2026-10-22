@@ -1,5 +1,6 @@
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode, readDocument } from '../storage/book';
+import { includedInExport } from '../storage/document';
 import { type NodeJSON, parseMarkdown } from '../editor/markdown';
 
 /**
@@ -23,11 +24,15 @@ export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode
     let lastWasScene = false;
     for (const node of list) {
       if (node.kind === 'folder') {
+        const at = parts.length;
         parts.push({ kind: 'heading', text: node.name, depth });
         await walk(node.children ?? [], depth + 1);
+        // A folder whose scenes are all left out of the export doesn't leave an empty heading behind.
+        if (parts.length === at + 1 && (node.children ?? []).length > 0) parts.pop();
         lastWasScene = false;
       } else if (node.path.endsWith('.md')) {
         const doc = await readDocument(fs, node.path);
+        if (!includedInExport(doc.fields)) continue;
         if (lastWasScene) parts.push({ kind: 'break' });
         parts.push({ kind: 'scene', title: doc.title, body: withoutNotes(parseMarkdown(doc.body)) });
         lastWasScene = true;

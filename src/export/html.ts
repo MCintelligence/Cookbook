@@ -1,5 +1,6 @@
 import { type NodeJSON, BODY_STYLE } from '../editor/markdown';
 import { type StyleSheet, stylesToCss } from '../styles/styles';
+import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
 
 export function escapeHtml(text: string): string {
@@ -123,7 +124,8 @@ ${scope} sup.fn a { text-decoration: none; color: inherit; }`;
 }
 
 /** The whole book as one HTML page, used for printing and Save as PDF. */
-export function bookHtml(m: Manuscript, sheet: StyleSheet, page: { width: string; height: string } = { width: '8.5in', height: '11in' }): string {
+export function bookHtml(m: Manuscript, sheet: StyleSheet, page: PageSettings = DEFAULT_PAGE): string {
+  const size = PAGE_SIZES[page.size];
   const w = new HtmlWriter();
   const out: string[] = [`<h1 class="book-title">${escapeHtml(m.title)}</h1>`];
   let started = false;
@@ -140,7 +142,7 @@ export function bookHtml(m: Manuscript, sheet: StyleSheet, page: { width: string
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title>
 <style>
-@page { size: ${page.width} ${page.height}; margin: 1in; }
+@page { size: ${size.width}in ${size.height}in; margin: ${MARGINS[page.margins].inches}in; }
 html, body { margin: 0; background: #fff; }
 .book .new-page { break-before: page; }
 .book p { orphans: 2; widows: 2; }

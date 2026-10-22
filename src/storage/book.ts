@@ -1,4 +1,5 @@
 import { type StorageAdapter, joinPath, baseName, parentOf } from './adapter';
+import { type PageSettings, pageOf } from './page';
 import { type CookbookDocument, type DocumentKind, newId, parseDocument, serializeDocument } from './document';
 import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder, sortEntries } from './order';
 
@@ -40,6 +41,15 @@ export interface BookInfo {
   proofreadOff?: string[];
   /** Made the first time the book is exported as an e-book, so readers know a new copy is the same book. */
   id?: string;
+  /** Page size, margins, view and zoom; see page.ts. */
+  page?: Partial<PageSettings>;
+  /** Words the whole book is aiming for, and when by (YYYY-MM-DD). */
+  bookTarget?: number;
+  deadline?: string;
+  /** Pasted words count as written. Off unless the writer says so. */
+  countPasted?: boolean;
+  /** Saturdays and Sundays without writing don't end a streak. */
+  weekendsOff?: boolean;
 }
 
 export const DEFAULT_DAILY_GOAL = 1000;
@@ -96,6 +106,12 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
     ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
     ...(Array.isArray(info.proofreadOff) && { proofreadOff: info.proofreadOff.filter((r): r is string => typeof r === 'string') }),
+    ...(typeof info.id === 'string' && { id: info.id }),
+    ...(info.page && typeof info.page === 'object' && { page: pageOf(info.page) }),
+    ...(typeof info.bookTarget === 'number' && info.bookTarget > 0 && { bookTarget: info.bookTarget }),
+    ...(typeof info.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(info.deadline) && { deadline: info.deadline }),
+    ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
+    ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
   };
 }
 

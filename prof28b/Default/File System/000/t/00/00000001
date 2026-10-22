@@ -1,2 +1,0 @@
-Cookbook keeps its search index, undo history and trash here.
-It can be deleted safely, though anything in trash/ goes with it; Cookbook rebuilds the rest from your files.

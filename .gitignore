@@ -6,3 +6,6 @@ dev-dist
 src-tauri/target
 src-tauri/gen/schemas
 *.tsbuildinfo
+
+# Browser profiles left by local e2e runs
+prof*/

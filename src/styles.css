@@ -121,9 +121,14 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .app {
   height: 100%;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr);
   grid-template-rows: 52px auto minmax(0, 1fr) 36px;
   grid-template-areas: 'top top' 'tools tools' 'side desk' 'foot foot';
+}
+/* A side panel takes a column of its own, so the page centres in the space that is left. */
+.app.drawer-open {
+  grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr) 320px;
+  grid-template-areas: 'top top top' 'tools tools tools' 'side desk drawer' 'foot foot foot';
 }
 
 /* Top bar */
@@ -204,6 +209,11 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 
 /* Sidebar */
 .sidebar { grid-area: side; background: var(--sidebar); border-right: 1px solid var(--line); padding: 16px 14px; overflow: auto; }
+/* The Shelf's right edge: drag to resize it. It sits over the border, inside the Shelf's grid cell. */
+.shelf-resize { grid-area: side; justify-self: end; z-index: 2; width: 9px; margin-right: -5px; cursor: col-resize; touch-action: none; outline: none; position: relative; }
+.shelf-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 3px; border-radius: 2px; background: transparent; transition: background 0.15s; }
+.shelf-resize:hover::after, .shelf-resize.dragging::after, .shelf-resize:focus-visible::after { background: var(--accent); }
+.app:has(.shelf-resize.dragging) { cursor: col-resize; user-select: none; }
 .ghost { border: none; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 /* The section label is also the Bookshelf / Pantry / Journal switch. Only the text colour changes. */
 .tree { list-style: none; margin: 0; padding: 0 0 0 12px; }
@@ -347,7 +357,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .manuscript .cb-note { background: transparent; border-bottom: none; }
 
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
-.desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: center; }
+.desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: var(--page-text); border: 1px solid var(--page-line); border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 var(--line), 0 12px 28px rgba(var(--shadow), 0.08); }
 .cb-page { position: relative; }
 .break-actions { position: absolute; right: 84px; display: flex; gap: 4px; font-family: 'Nunito', sans-serif; z-index: 1; }
@@ -463,8 +473,8 @@ button.seas-quote:hover { color: var(--accent); }
 .lib-template-note { font-size: 12px; color: var(--muted); }
 
 @media (max-width: 900px) {
-  .app { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'tools' 'desk' 'foot'; }
-  .sidebar { display: none; }
+  .app, .app.drawer-open { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'tools' 'desk' 'foot'; }
+  .sidebar, .shelf-resize { display: none; }
   .card-details { flex-direction: column; gap: 6px; }
   .shelf-body { flex-direction: column; }
   .shelf-list { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); }
@@ -666,7 +676,7 @@ button.seas-quote:hover { color: var(--accent); }
 .tree-card.no-export .tree-card-title { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
 
 /* The page: size, margins and zoom come from the book (see App) */
-.page-row { display: flex; align-items: flex-start; justify-content: center; gap: 24px; width: 100%; }
+.page-row { display: flex; align-items: flex-start; justify-content: safe center; gap: 24px; width: 100%; }
 .page-row > .cb-page { flex: none; }
 .desk.split .page-row { justify-content: flex-start; }
 .desk.split .page-row > .cb-page { flex: 1 1 auto; min-width: 0; }
@@ -678,7 +688,7 @@ button.seas-quote:hover { color: var(--accent); }
 .beside-page { width: auto !important; min-height: 0 !important; padding: 24px 28px !important; border: none !important; box-shadow: none !important; overflow-y: auto; zoom: 0.85; }
 
 /* Focus mode: the panels step aside and the page fades around where you are */
-.app.focus .sidebar, .app.focus .toolbar, .app.focus .drawer, .app.focus .card-details, .app.focus .pantry-card { display: none; }
+.app.focus .sidebar, .app.focus .shelf-resize, .app.focus .toolbar, .app.focus .drawer, .app.focus .card-details, .app.focus .pantry-card { display: none; }
 .app.focus { grid-template-columns: 0 1fr !important; }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
 .app.focus .topbar:hover, .app.focus .footer:hover, .app.focus .topbar:focus-within, .app.focus .footer:focus-within { opacity: 1; }
@@ -731,8 +741,8 @@ button.seas-quote:hover { color: var(--accent); }
 .icon-btn.icon-text { color: var(--text); }
 .icon-btn.icon-text:hover { color: var(--accent); }
 
-/* The right panel sits over the desk's edge; the page moves over only as far as it must (see App). */
-.drawer { grid-area: desk; justify-self: end; align-self: stretch; width: 320px; max-width: 100%; z-index: 2; display: flex; flex-direction: column; min-height: 0; overflow: auto; background: var(--bar); border-left: 1px solid var(--line); }
+/* The right panel has its own column (see .app.drawer-open); on a phone it slides over the page. */
+.drawer { grid-area: drawer; align-self: stretch; width: 100%; z-index: 2; display: flex; flex-direction: column; min-height: 0; overflow: auto; background: var(--bar); border-left: 1px solid var(--line); }
 .panel { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .panel-list { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .panel-quiet { margin: 4px 2px; font-size: 13px; color: var(--muted); }

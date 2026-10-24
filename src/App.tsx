@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
@@ -121,6 +121,7 @@ import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { type Recipe, Tree } from './ui/Tree';
+import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
@@ -134,6 +135,8 @@ type Panel = 'pantry' | 'seasonings';
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
+/** The right-hand panel's column; matches .app.drawer-open in styles.css. */
+const DRAWER_WIDTH = 320;
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
@@ -253,6 +256,8 @@ export function App() {
   const settings = useSettings();
   /** On a phone, the sidebar slides out over the page. */
   const [sideOpen, setSideOpen] = useState(false);
+  const [shelfWidth, setShelfWidth] = useShelfWidth();
+  const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   const lastSection = useRef<SettingsSection>('general');
@@ -2047,12 +2052,12 @@ export function App() {
     return () => watch.disconnect();
   }, []);
   const pageSize = PAGE_SIZES[page.size];
-  // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft.
-  const asDraft = page.view === 'draft' || (deskWidth > 0 && deskWidth < 640);
-  const pageZoom = asDraft && (page.zoom === 0 || deskWidth < 640) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
-  // The right panel lies over the desk's edge; the page moves left only as far as it must to stay clear of it.
-  const pageWidth = asDraft ? Math.min(deskWidth - 48, 760 * pageZoom) : pageSize.width * 96 * pageZoom;
-  const clearOfPanel = drawerOpen && deskWidth > 0 && window.innerWidth > 900 ? Math.max(0, Math.min(2 * (336 - (deskWidth - pageWidth) / 2), deskWidth - 48 - pageWidth)) : 0;
+  // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft. A side panel takes
+  // its own column beside the desk, but opening one shouldn't switch the page between views.
+  const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? DRAWER_WIDTH : 0;
+  const small = deskWidth > 0 && deskWidth + panelColumn < 640;
+  const asDraft = page.view === 'draft' || small;
+  const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
   const pageStyle =
     asDraft
       ? { zoom: pageZoom }
@@ -2060,7 +2065,8 @@ export function App() {
 
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
@@ -2122,6 +2128,7 @@ export function App() {
       )}
 
       <nav
+        ref={shelfRef}
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
         aria-label="Shelf"
         onDragOver={(e) => {
@@ -2165,9 +2172,10 @@ export function App() {
           recipes={recipes}
         />
       </nav>
+      <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
       {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
 
-      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk} style={clearOfPanel > 0 ? { paddingRight: 24 + clearOfPanel } : undefined}>
+      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <p role="alert" className="error">

@@ -428,8 +428,10 @@ button.seas-quote:hover { color: var(--accent); }
 .update { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 auto 14px; max-width: 760px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card); box-shadow: 0 4px 14px rgba(var(--shadow), 0.12); font-size: 14px; }
 .update-text { flex: 1 1 260px; }
 .update-notes { flex-basis: 100%; margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; color: var(--muted); }
-.empty, .error { color: var(--muted); }
-.error { color: var(--spelling); }
+.empty { color: var(--muted); }
+.error { position: sticky; top: 0; z-index: 6; flex-shrink: 0; display: flex; align-items: flex-start; gap: 10px; margin: 0 auto 14px; max-width: 760px; padding: 10px 10px 10px 14px; border-radius: 12px; border: 1px solid var(--spelling); background: var(--card); color: var(--text); font-size: 14px; box-shadow: 0 4px 14px rgba(var(--shadow), 0.12); }
+.error > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.error > span::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--spelling); vertical-align: 1px; }
 
 .footer { grid-area: foot; display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: center; justify-content: space-between; padding: 8px 24px; border-top: 1px solid var(--line); background: var(--bar); color: var(--muted); font-size: 13px; }
 
@@ -833,6 +835,8 @@ button.seas-quote:hover { color: var(--accent); }
 .saved { display: inline-flex; align-items: center; gap: 6px; min-width: 66px; cursor: default; outline: none; }
 .saved-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .saved.is-dirty .saved-dot { background: var(--amber); }
+.saved.is-failed { color: var(--spelling); }
+.saved.is-failed .saved-dot { background: var(--spelling); }
 .gear { width: 28px; height: 28px; margin: 0 -6px 0 0; border-radius: 6px; }
 @media (max-width: 900px) {
   .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(340px, 100vw); z-index: 6; box-shadow: -12px 0 32px rgba(var(--shadow), 0.2); }

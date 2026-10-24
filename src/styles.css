@@ -540,6 +540,7 @@ button.seas-quote:hover { color: var(--accent); }
 .goals-hr.today .hl { color: var(--accent); font-weight: 800; }
 
 /* Settings */
+.settings:focus { outline: none; }
 .settings { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--bg); color: var(--text); overflow: auto; font-size: 14px; line-height: 1.45; }
 .set-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; padding: 12px 24px; background: var(--bar); border-bottom: 1px solid var(--line); }
 .set-brand { display: flex; align-items: center; gap: 10px; }

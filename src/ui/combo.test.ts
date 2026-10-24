@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchStyles, parseSize, stepSize } from './combo';
+import { matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
 const styles = [{ name: 'Body' }, { name: 'Chapter title' }, { name: 'Heading 2' }, { name: 'Heading 3' }, { name: 'Quote' }, { name: 'Letter' }];
 const names = (text: string) => matchStyles(styles, text).map((s) => s.name);
@@ -40,5 +40,22 @@ describe('Size box', () => {
     expect(stepSize(10.5, false)).toBe(10);
     expect(stepSize(1, false)).toBe(1);
     expect(stepSize(400, true)).toBe(400);
+  });
+});
+
+describe('Line spacing box', () => {
+  it('takes spacings from 0.5 to 5, to two places', () => {
+    expect(parseSpacing('1.15')).toBe(1.15);
+    expect(parseSpacing('2x')).toBe(2);
+    expect(parseSpacing('1,5')).toBe(1.5);
+    for (const bad of ['', 'double', '0.4', '6', '-1']) expect(parseSpacing(bad)).toBeNull();
+  });
+
+  it('steps a tenth at a time, onto tenths, within the limits', () => {
+    expect(stepSpacing(1.5, true)).toBe(1.6);
+    expect(stepSpacing(1.15, true)).toBe(1.2);
+    expect(stepSpacing(1.15, false)).toBe(1.1);
+    expect(stepSpacing(0.5, false)).toBe(0.5);
+    expect(stepSpacing(5, true)).toBe(5);
   });
 });

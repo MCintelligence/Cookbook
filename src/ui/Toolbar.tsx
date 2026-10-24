@@ -3,7 +3,7 @@ import { type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, 
 import { type Alignment, BODY, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, defaultStyles, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 import { ColourWheel } from './ColourWheel';
-import { MAX_SIZE, MIN_SIZE, matchStyles, parseSize, stepSize } from './combo';
+import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
 interface Props {
   editor: Editor | null;
@@ -84,28 +84,52 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
       {naming ? (
         <StyleName initial={naming === 'rename' ? named : `${named} 2`} label={naming === 'rename' ? `Rename ${named}` : `New style based on ${named}`} onDone={finishNaming} />
       ) : (
-        <StyleBox
-          styles={sheet.paragraph}
-          current={named}
+        <NameBox
+          tag="Style"
+          label="Paragraph style"
+          listLabel="Styles"
+          className="tb-style"
+          items={sheet.paragraph}
+          current={styleId}
           disabled={disabled}
-          onApply={applyStyle}
-          onNew={() => setNaming('new')}
-          onRename={() => setNaming('rename')}
+          actions={[
+            { id: 'new', label: 'New style from this paragraph…' },
+            { id: 'rename', label: `Rename “${named}”…` },
+          ]}
+          missing={(typed) => `No style is called “${typed}”.`}
+          onPick={(id) => applyStyle(id)}
+          onAction={(id) => setNaming(id === 'new' ? 'new' : 'rename')}
           onCreate={(name) => applyStyle(onAddStyle(name, styleId))}
           onCancel={() => editor?.commands.focus()}
         />
       )}
       <span className="tb-sep" />
-      <label className="tb-select tb-font" title={edits}>
-        <select value={style.font} disabled={disabled} onChange={(e) => edit({ font: e.target.value })} aria-label="Font">
-          {FONTS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
-      </label>
-      <SizeBox size={style.size} disabled={disabled} title={edits} onSize={(size, keepFocus) => edit({ size }, keepFocus)} onCancel={() => editor?.commands.focus()} />
+      <NameBox
+        label="Font"
+        listLabel="Fonts"
+        className="tb-font"
+        title={edits}
+        items={FONTS.map((f) => ({ id: f, name: f }))}
+        current={style.font}
+        disabled={disabled}
+        missing={(typed) => `Cookbook has no font called “${typed}”.`}
+        onPick={(font, keepFocus) => edit({ font }, keepFocus)}
+        onCancel={() => editor?.commands.focus()}
+      />
+      <NumberBox
+        label="Size in points"
+        listLabel="Sizes"
+        className="tb-size"
+        title={edits}
+        value={style.size}
+        presets={SIZES}
+        disabled={disabled}
+        parse={parseSize}
+        step={stepSize}
+        invalid={`Type a size from ${MIN_SIZE} to ${MAX_SIZE} points.`}
+        onValue={(size, keepFocus) => edit({ size }, keepFocus)}
+        onCancel={() => editor?.commands.focus()}
+      />
       <span className="tb-sep" />
       <Pop
         open={open === 'colour'}
@@ -160,19 +184,25 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
           ))}
         </div>
       </Pop>
-      <label className="tb-select" title={edits}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />
-        </svg>
-        <select value={style.lineSpacing} disabled={disabled} onChange={(e) => edit({ lineSpacing: Number(e.target.value) })} aria-label="Line spacing">
-          {SPACINGS.includes(style.lineSpacing) ? null : <option value={style.lineSpacing}>{style.lineSpacing}</option>}
-          {SPACINGS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </label>
+      <NumberBox
+        label="Line spacing"
+        listLabel="Line spacings"
+        className="tb-spacing"
+        title={edits}
+        icon={
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />
+          </svg>
+        }
+        value={style.lineSpacing}
+        presets={SPACINGS}
+        disabled={disabled}
+        parse={parseSpacing}
+        step={stepSpacing}
+        invalid={`Type a spacing from ${MIN_SPACING} to ${MAX_SPACING}.`}
+        onValue={(lineSpacing, keepFocus) => edit({ lineSpacing }, keepFocus)}
+        onCancel={() => editor?.commands.focus()}
+      />
     </div>
   );
 }
@@ -241,34 +271,102 @@ function ListPopup({ id, label, className = '', children }: { id: string; label:
   );
 }
 
-type StyleChoice = { kind: 'style'; id: string; name: string } | { kind: 'create'; name: string } | { kind: 'new' } | { kind: 'rename' };
+/**
+ * Rolling the mouse wheel over a box steps it up or down, as in Adobe's apps.
+ * React's wheel events can't stop the toolbar or page scrolling, so this is a plain listener.
+ */
+function useWheelSteps(onStep: (up: boolean) => void) {
+  const box = useRef<HTMLDivElement>(null);
+  const latest = useRef(onStep);
+  latest.current = onStep;
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    let travel = 0;
+    const wheel = (e: WheelEvent) => {
+      if (e.deltaY === 0 || el.querySelector('input:disabled')) return;
+      e.preventDefault();
+      // A mouse wheel moves a notch at a time; a trackpad sends many small moves, so those add up first.
+      travel += e.deltaMode === 0 ? e.deltaY : e.deltaY * 40;
+      if (Math.abs(travel) < 40 && Math.abs(e.deltaY) < 40) return;
+      const up = travel < 0;
+      travel = 0;
+      latest.current(up);
+    };
+    el.addEventListener('wheel', wheel, { passive: false });
+    return () => el.removeEventListener('wheel', wheel);
+  }, []);
+  return box;
+}
+
+/** The chevron that opens a typeable box's list. It never takes focus, so typing carries on. */
+function OpenList({ label, open, disabled, input, onToggle }: { label: string; open: boolean; disabled: boolean; input: React.RefObject<HTMLInputElement | null>; onToggle: (open: boolean) => void }) {
+  return (
+    <button
+      className="tb-combo-open"
+      tabIndex={-1}
+      aria-label={label}
+      disabled={disabled}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        if (!open) input.current?.focus();
+        onToggle(!open);
+      }}
+    >
+      <Chevron />
+    </button>
+  );
+}
+
+interface Named {
+  id: string;
+  name: string;
+}
+
+type Choice = { kind: 'item'; id: string; name: string } | { kind: 'create'; name: string } | { kind: 'action'; id: string; label: string };
 
 /**
- * The Style box, like Word's: pick from the list, or type a name. Typing
- * fills in the first style that starts with what was typed; Enter applies it.
- * A name no style has is never applied by accident: the list says so and
- * offers to make it a new style.
+ * A box of names, like Word's Style and Font boxes: pick from the list, or
+ * type. Typing fills in the first name that starts with what was typed;
+ * Enter applies it. A name that isn't there is never applied by accident:
+ * the list says so (and, if `onCreate` is given, offers to make it). The
+ * mouse wheel over the box moves to the name above or below.
  */
-function StyleBox({
-  styles,
+function NameBox({
+  tag,
+  label,
+  listLabel,
+  className,
+  title,
+  items,
   current,
   disabled,
-  onApply,
-  onNew,
-  onRename,
+  actions = [],
+  missing,
+  onPick,
+  onAction,
   onCreate,
   onCancel,
 }: {
-  styles: ParagraphStyle[];
+  tag?: string;
+  label: string;
+  listLabel: string;
+  className: string;
+  title?: string;
+  items: readonly Named[];
   current: string;
   disabled: boolean;
-  onApply: (id: string) => void;
-  onNew: () => void;
-  onRename: () => void;
-  onCreate: (name: string) => void;
+  /** Shown under the names while nothing has been typed. */
+  actions?: { id: string; label: string }[];
+  /** What the list says when nothing matches the typing. */
+  missing: (typed: string) => string;
+  onPick: (id: string, keepFocus: boolean) => void;
+  onAction?: (id: string) => void;
+  onCreate?: (name: string) => void;
   onCancel: () => void;
 }) {
-  const [text, setText] = useState(current);
+  const currentName = items.find((s) => s.id === current)?.name ?? current;
+  const [text, setText] = useState(currentName);
   // What the person has typed, before the box filled in the rest; null when they haven't typed.
   const [typed, setTyped] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -277,8 +375,8 @@ function StyleBox({
   const listId = useId();
 
   useEffect(() => {
-    if (typed === null) setText(current);
-  }, [current, typed]);
+    if (typed === null) setText(currentName);
+  }, [currentName, typed]);
 
   // Keeps the filled-in part of the name selected, so typing on replaces it.
   useLayoutEffect(() => {
@@ -287,32 +385,38 @@ function StyleBox({
     el.setSelectionRange(text.toLowerCase().startsWith(typed.toLowerCase()) ? typed.length : 0, text.length);
   }, [typed, text]);
 
-  const matches = typed === null ? styles : matchStyles(styles, typed);
-  const choices: StyleChoice[] = matches.map((s) => ({ kind: 'style', id: s.id, name: s.name }));
-  if (typed !== null && typed.trim() && !matches.length) choices.push({ kind: 'create', name: typed.trim() });
-  if (typed === null) choices.push({ kind: 'new' }, { kind: 'rename' });
+  const box = useWheelSteps((up) => {
+    const at = items.findIndex((s) => s.id === current);
+    const next = items[Math.min(items.length - 1, Math.max(0, at + (up ? -1 : 1)))];
+    reset();
+    if (next && next.id !== current) onPick(next.id, true);
+  });
+
+  const matches = typed === null ? items : matchStyles(items, typed);
+  const choices: Choice[] = matches.map((s) => ({ kind: 'item', id: s.id, name: s.name }));
+  if (onCreate && typed !== null && typed.trim() && !matches.length) choices.push({ kind: 'create', name: typed.trim() });
+  if (typed === null) choices.push(...actions.map((a) => ({ kind: 'action' as const, ...a })));
 
   const reset = () => {
     setTyped(null);
-    setText(current);
+    setText(currentName);
     setOpen(false);
     setActive(-1);
   };
-  const choose = (choice: StyleChoice) => {
+  const choose = (choice: Choice) => {
     reset();
-    if (choice.kind === 'style') onApply(choice.id);
-    else if (choice.kind === 'create') onCreate(choice.name);
-    else if (choice.kind === 'new') onNew();
-    else onRename();
+    if (choice.kind === 'item') onPick(choice.id, false);
+    else if (choice.kind === 'create') onCreate?.(choice.name);
+    else onAction?.(choice.id);
   };
   const type = (value: string, deleting: boolean) => {
-    const found = deleting || !value ? [] : matchStyles(styles, value);
+    const found = deleting || !value ? [] : matchStyles(items, value);
     // Only a name that starts with what was typed can be filled in.
     const fill = found[0] && found[0].name.toLowerCase().startsWith(value.toLowerCase()) ? found[0] : undefined;
     setTyped(value);
     setText(fill ? fill.name : value);
     setOpen(true);
-    setActive(value && matchStyles(styles, value).length ? 0 : -1);
+    setActive(value && matchStyles(items, value).length ? 0 : -1);
   };
   const enter = () => {
     const choice = choices[active];
@@ -321,18 +425,18 @@ function StyleBox({
       reset();
       return onCancel();
     }
-    // A name no style has: leave it for the person to fix or make into a style.
+    // A name that isn't there: leave it for the person to fix (or make into a style).
     setOpen(true);
   };
 
   return (
     <div className="tb-pop">
-      <div className={`tb-select tb-style tb-combo${open && typed !== null && !matches.length ? ' tb-invalid' : ''}`}>
-        <span className="tb-tag">Style</span>
+      <div ref={box} className={`tb-select ${className} tb-combo${open && typed !== null && !matches.length ? ' tb-invalid' : ''}`} title={title}>
+        {tag && <span className="tb-tag">{tag}</span>}
         <input
           ref={input}
           role="combobox"
-          aria-label="Paragraph style"
+          aria-label={label}
           aria-autocomplete="both"
           aria-expanded={open}
           aria-controls={listId}
@@ -359,43 +463,30 @@ function StyleBox({
               const next = (active + step + choices.length) % choices.length;
               setActive(next);
               const choice = choices[next];
-              if (choice?.kind === 'style') setText(choice.name);
-            } else if (e.key === 'Tab' && open && choices[active]?.kind === 'style') {
+              if (choice?.kind === 'item') setText(choice.name);
+            } else if (e.key === 'Tab' && open && choices[active]?.kind === 'item') {
               // Tab accepts the filled-in name, as in Word.
               choose(choices[active]!);
             }
           }}
         />
-        <button
-          className="tb-combo-open"
-          tabIndex={-1}
-          aria-label="Show styles"
-          disabled={disabled}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            if (open) return reset();
-            input.current?.focus();
-            setOpen(true);
-          }}
-        >
-          <Chevron />
-        </button>
+        <OpenList label={`Show ${listLabel.toLowerCase()}`} open={open} disabled={disabled} input={input} onToggle={(show) => (show ? setOpen(true) : reset())} />
       </div>
       {open && (
-        <ListPopup id={listId} label="Paragraph styles">
-          {typed !== null && !matches.length && <div className="tb-list-note">No style is called “{typed.trim()}”.</div>}
+        <ListPopup id={listId} label={listLabel}>
+          {typed !== null && !matches.length && <div className="tb-list-note">{missing(typed.trim())}</div>}
           {choices.map((c, i) => (
             <button
-              key={c.kind === 'style' ? c.id : c.kind}
+              key={c.kind === 'create' ? '\u0000create' : c.id}
               id={`${listId}-${i}`}
               role="option"
               tabIndex={-1}
               aria-selected={i === active}
-              className={[c.kind === 'style' ? '' : 'tb-list-action', c.kind === 'new' ? 'tb-list-first-action' : '', c.kind === 'style' && c.name === current ? 'tb-list-current' : ''].join(' ').trim() || undefined}
+              className={[c.kind === 'item' ? '' : 'tb-list-action', c.kind === 'action' && i === matches.length ? 'tb-list-first-action' : '', c.kind === 'item' && c.id === current ? 'tb-list-current' : ''].join(' ').trim() || undefined}
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(c)}
             >
-              {c.kind === 'style' ? c.name : c.kind === 'create' ? `New style called “${c.name}”` : c.kind === 'new' ? 'New style from this paragraph…' : `Rename “${current}”…`}
+              {c.kind === 'item' ? c.name : c.kind === 'create' ? `New style called “${c.name}”` : c.label}
             </button>
           ))}
         </ListPopup>
@@ -405,63 +496,62 @@ function StyleBox({
 }
 
 /**
- * The Size box: pick a size, type any size from 1 to 400 points, or roll the
- * mouse wheel over it to go up and down a point at a time. Anything that isn't
- * a size is turned away and the box goes back to the size the style has.
+ * A number box, like the Size box: pick from the list, type a number, roll
+ * the mouse wheel over it or press the arrow keys to step it. Anything that
+ * isn't a number it can take is turned away and the box goes back.
  */
-function SizeBox({
-  size,
-  disabled,
+function NumberBox({
+  label,
+  listLabel,
+  className,
   title,
-  onSize,
+  icon,
+  value,
+  presets,
+  disabled,
+  parse,
+  step,
+  invalid,
+  onValue,
   onCancel,
 }: {
-  size: number;
-  disabled: boolean;
+  label: string;
+  listLabel: string;
+  className: string;
   title: string;
-  onSize: (size: number, keepFocus: boolean) => void;
+  icon?: ReactNode;
+  value: number;
+  presets: readonly number[];
+  disabled: boolean;
+  parse: (text: string) => number | null;
+  step: (value: number, up: boolean) => number;
+  /** What the list says when the typing isn't a number the box takes. */
+  invalid: string;
+  onValue: (value: number, keepFocus: boolean) => void;
   onCancel: () => void;
 }) {
   const [text, setText] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [bad, setBad] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const listId = useId();
-  const sizes = SIZES.includes(size) ? SIZES : [...SIZES, size].sort((a, b) => a - b);
-  // The wheel handler is added once, so it reads these through refs.
-  const latest = useRef({ size, disabled, onSize });
-  latest.current = { size, disabled, onSize };
+  const values = presets.includes(value) ? presets : [...presets, value].sort((a, b) => a - b);
 
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    let travel = 0;
-    const wheel = (e: WheelEvent) => {
-      const { size, disabled, onSize } = latest.current;
-      if (disabled || e.deltaY === 0) return;
-      // React's wheel events can't stop the toolbar or page scrolling, so this is a plain listener.
-      e.preventDefault();
-      // A mouse wheel moves a notch at a time; a trackpad sends many small moves, so those add up first.
-      travel += e.deltaMode === 0 ? e.deltaY : e.deltaY * 40;
-      if (Math.abs(travel) < 40 && Math.abs(e.deltaY) < 40) return;
-      const next = stepSize(size, travel < 0);
-      travel = 0;
-      setText(null);
-      setBad(false);
-      if (next !== size) onSize(next, true);
-    };
-    el.addEventListener('wheel', wheel, { passive: false });
-    return () => el.removeEventListener('wheel', wheel);
-  }, []);
+  const stepBy = (up: boolean) => {
+    const next = step(parse(text ?? '') ?? value, up);
+    setText(null);
+    setBad(false);
+    if (next !== value) onValue(next, true);
+  };
+  const box = useWheelSteps(stepBy);
 
   const reset = () => {
     setText(null);
     setOpen(false);
     setBad(false);
   };
-  const commit = (value: string) => {
-    const next = parseSize(value);
+  const commit = (typed: string) => {
+    const next = parse(typed);
     if (next === null) {
       setBad(true);
       setOpen(true);
@@ -469,27 +559,22 @@ function SizeBox({
       return;
     }
     reset();
-    onSize(next, false);
-  };
-  const step = (up: boolean) => {
-    const next = stepSize(parseSize(text ?? '') ?? size, up);
-    setText(null);
-    setBad(false);
-    onSize(next, true);
+    onValue(next, false);
   };
 
   return (
     <div className="tb-pop">
-      <div ref={box} className={`tb-select tb-size tb-combo${bad ? ' tb-invalid' : ''}`} title={`${title}. Roll the mouse wheel here to change the size.`}>
+      <div ref={box} className={`tb-select ${className} tb-combo${bad ? ' tb-invalid' : ''}`} title={title}>
+        {icon}
         <input
           ref={input}
           role="combobox"
-          aria-label="Size in points"
+          aria-label={label}
           aria-expanded={open}
           aria-controls={listId}
           aria-invalid={bad || undefined}
           inputMode="decimal"
-          value={text ?? String(size)}
+          value={text ?? String(value)}
           disabled={disabled}
           spellCheck={false}
           autoComplete="off"
@@ -502,7 +587,7 @@ function SizeBox({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
-              commit(text ?? String(size));
+              commit(text ?? String(value));
             } else if (e.key === 'Escape') {
               e.preventDefault();
               reset();
@@ -512,34 +597,28 @@ function SizeBox({
               setOpen(!open);
             } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
               e.preventDefault();
-              step(e.key === 'ArrowUp');
+              stepBy(e.key === 'ArrowUp');
             }
           }}
         />
-        <button
-          className="tb-combo-open"
-          tabIndex={-1}
-          aria-label="Show sizes"
-          disabled={disabled}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            if (open) return reset();
-            input.current?.focus();
-            setOpen(true);
-          }}
-        >
-          <Chevron />
-        </button>
+        <OpenList label={`Show ${listLabel.toLowerCase()}`} open={open} disabled={disabled} input={input} onToggle={(show) => (show ? setOpen(true) : reset())} />
       </div>
       {open && (
-        <ListPopup id={listId} label="Sizes" className="tb-size-list">
-          {bad && <div className="tb-list-note">Type a size from {MIN_SIZE} to {MAX_SIZE} points.</div>}
-          {sizes.map((s) => (
-            <button key={s} role="option" tabIndex={-1} aria-selected={s === size} className={s === size ? 'tb-list-current' : undefined} onClick={() => {
-              reset();
-              onSize(s, false);
-            }}>
-              {s}
+        <ListPopup id={listId} label={listLabel} className="tb-number-list">
+          {bad && <div className="tb-list-note">{invalid}</div>}
+          {values.map((v) => (
+            <button
+              key={v}
+              role="option"
+              tabIndex={-1}
+              aria-selected={v === value}
+              className={v === value ? 'tb-list-current' : undefined}
+              onClick={() => {
+                reset();
+                onValue(v, false);
+              }}
+            >
+              {v}
             </button>
           ))}
         </ListPopup>

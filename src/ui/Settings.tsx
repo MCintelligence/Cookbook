@@ -155,8 +155,7 @@ const CHECK_HELP: Record<string, string> = {
   name: 'Salty Sam: “Mamma Lou” when the Pantry has Mama Lou.',
   grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
-  'hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
-  'very-hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
+  'stray-capitals': 'Peppery Pete: “MOnster” or “mONSTER”, while Seasonings is open.',
 };
 
 /**
@@ -803,7 +802,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
       </Group>
       <Group title="Checks">
         {RULE_GROUPS.flatMap((g) => g.rules).map((r) => (
-          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Peppery Pete: a blue highlight, while Seasonings is open.'}>
+          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Spicy Sally: a blue highlight, while Seasonings is open.'}>
             <Switch label={r.label} on={!proof.off.includes(r.id)} onChange={(on) => proof.setRuleOn(r.id, on)} />
           </Row>
         ))}

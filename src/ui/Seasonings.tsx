@@ -3,7 +3,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
 import { type FoundIssue, applySuggestion, issuesOf, selectIssue } from '../proofread/plugin';
-import { SEASONINGS, type SeasoningId, fixText, gradeRemark, ownerOf, remark, talkRemark } from '../proofread/remarks';
+import { SEASONINGS, SPICE, type SeasoningId, fixText, gradeRemark, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
@@ -160,6 +160,7 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
                   </>
                 )}
 
+                {id === 'sally' && page.grade.words >= MIN_GRADE_WORDS && <SpiceMeter grade={page.grade.grade} />}
                 {id === 'sally' && graded && (
                   <div className="say">
                     <Bubble id="sally" text={gradeRemark(page.grade.grade)} onRemove={() => onGone(gradeKey)} />
@@ -184,6 +185,28 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
         </div>
       )}
     </aside>
+  );
+}
+
+/** How hot the page reads, from Mild to Inferno. */
+function SpiceMeter({ grade }: { grade: number }) {
+  const at = spiceOf(grade);
+  return (
+    <div className="spice" role="meter" aria-label="Spice" aria-valuemin={0} aria-valuemax={SPICE.length - 1} aria-valuenow={at} aria-valuetext={`${SPICE[at]!.level}, grade ${grade}`}>
+      <div className="spice-row">
+        <span className="spice-level">{SPICE[at]!.level}</span>
+        <span className="spice-grade">Grade {grade}</span>
+      </div>
+      <div className="spice-bar" aria-hidden="true">
+        {SPICE.map((s, i) => (
+          <span key={s.level} className={`spice-step spice-${i}${i <= at ? ' is-on' : ''}`} />
+        ))}
+      </div>
+      <div className="spice-ends" aria-hidden="true">
+        <span>Mild</span>
+        <span>Inferno</span>
+      </div>
+    </div>
   );
 }
 

@@ -197,6 +197,7 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   for (const m of text.matchAll(CLICHE_RE)) out.push(issue(m.index, m.index + m[0].length, 'cliche', `“${m[0]}” is a cliché.`));
   const open = unclosedQuote(text);
   if (open) out.push(open);
+  out.push(...strayCapitals(text, names));
 
   // Echoes: the same telling word again within a few words. Names, glue and
   // short words don't count, and nor does a word that starts a sentence in capitals.
@@ -235,6 +236,27 @@ export function unclosedQuote(text: string): Issue | null {
   if (!word || end <= last + 1) return null;
   const from = last + word.index;
   return { from, to: end, kind: 'grammar', rule: 'unclosed-quote', message: 'This quote is never closed.', suggestions: [`${text.slice(from, end)}”`] };
+}
+
+/**
+ * Capitals in the wrong place, as when Shift is held a moment too long
+ * (“MOnster”, “THe”) or Caps Lock is on (“mONSTER”). Acronyms with a plural
+ * (“DVDs”), degrees (“MSc”), short ones like “iOS” and the story's names are left alone.
+ */
+export function strayCapitals(text: string, names: string[] = []): Issue[] {
+  const known = new Set(names.flatMap((n) => n.split(/\s+/)));
+  const out: Issue[] = [];
+  for (const w of words(text)) {
+    if (known.has(w.word) || w.word.includes('-')) continue;
+    // One trailing small letter is usually a plural or a degree (“DVDs”, “MSc”); a vowel there is a word (“THe”).
+    const held = /^\p{Lu}{2,}(?:\p{Ll}{2,}|[aeiouy])$/u.test(w.word);
+    const locked = /^\p{Ll}\p{Lu}{3,}$/u.test(w.word);
+    if (!held && !locked) continue;
+    // Held Shift meant one capital; Caps Lock turned every letter over.
+    const fix = held ? w.word[0]! + w.word.slice(1).toLowerCase() : [...w.word].map((c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase())).join('');
+    out.push({ from: w.from, to: w.to, kind: 'grammar', rule: 'stray-capitals', message: `“${w.word}” has capitals in the wrong place.`, suggestions: [fix] });
+  }
+  return out;
 }
 
 export const isSentenceRule = (rule: string) => rule === 'hard-sentence' || rule === 'very-hard-sentence' || rule === 'sticky-sentence';

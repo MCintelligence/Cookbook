@@ -30,6 +30,15 @@ describe('spelling', () => {
     ]);
   });
 
+  it('accepts real words with a common prefix or suffix, and hyphenated words, but not typos', () => {
+    expect(said('The untextured, textureless, texture-less bread was unbuttered and overbaked.')).toEqual([]);
+    expect(said('The untexturred bread was unbutterred and reless.')).toEqual([
+      ['untexturred', 'spelling'],
+      ['unbutterred', 'spelling'],
+      ['reless', 'spelling'],
+    ]);
+  });
+
   it('follows the dialect', () => {
     expect(said('The colour of the realised plan.', checkSpelling('The colour of the realised plan.', us, []))).toEqual([
       ['colour', 'spelling'],

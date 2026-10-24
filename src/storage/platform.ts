@@ -180,7 +180,8 @@ export function canPickFolder(): boolean {
 export async function pickFolder(title: string): Promise<BookLocation | null> {
   if (isTauri()) {
     const { open } = await import('@tauri-apps/plugin-dialog');
-    const path = await open({ directory: true, title });
+    // Recursive, so Cookbook may also write the book's own folders inside the one picked.
+    const path = await open({ directory: true, recursive: true, title });
     return typeof path === 'string' ? { kind: 'folder', path } : null;
   }
   try {

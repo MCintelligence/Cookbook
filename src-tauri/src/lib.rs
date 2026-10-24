@@ -1,13 +1,17 @@
 #[cfg(desktop)]
 mod menu {
-    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-    use tauri::{App, Emitter};
+    #[cfg(target_os = "macos")]
+    use tauri::menu::PredefinedMenuItem;
+    use tauri::menu::{Menu, MenuItem, Submenu};
+    use tauri::{App, Emitter, Manager};
 
     /// The app menu: Cookbook › Settings… on a Mac, Edit › Settings… elsewhere.
     /// Picking it tells the page to open Settings, as ⌘, or Ctrl+, does.
     pub fn install(app: &mut App) -> tauri::Result<()> {
         let handle = app.handle();
         let settings = MenuItem::with_id(handle, "settings", "Settings…", true, if cfg!(target_os = "macos") { Some("CmdOrCtrl+,") } else { None })?;
+        // Quitting closes the window first, so the page saves the last words typed before the app ends.
+        let quit = MenuItem::with_id(handle, "quit", if cfg!(target_os = "macos") { "Quit Cookbook" } else { "Quit" }, true, Some("CmdOrCtrl+Q"))?;
 
         #[cfg(target_os = "macos")]
         let menu = {
@@ -26,7 +30,7 @@ mod menu {
                     &PredefinedMenuItem::hide_others(handle, None)?,
                     &PredefinedMenuItem::show_all(handle, None)?,
                     &PredefinedMenuItem::separator(handle)?,
-                    &PredefinedMenuItem::quit(handle, None)?,
+                    &quit,
                 ],
             )?;
             // Copy and paste in the page need the Edit menu on a Mac.
@@ -60,7 +64,7 @@ mod menu {
 
         #[cfg(not(target_os = "macos"))]
         let menu = {
-            let file = Submenu::with_items(handle, "File", true, &[&PredefinedMenuItem::quit(handle, Some("Quit"))?])?;
+            let file = Submenu::with_items(handle, "File", true, &[&quit])?;
             let edit = Submenu::with_items(handle, "Edit", true, &[&settings])?;
             Menu::with_items(handle, &[&file, &edit])?
         };
@@ -69,6 +73,10 @@ mod menu {
         app.on_menu_event(|app, event| {
             if event.id() == "settings" {
                 let _ = app.emit("open-settings", ());
+            } else if event.id() == "quit" {
+                for window in app.webview_windows().values() {
+                    let _ = window.close();
+                }
             }
         });
         Ok(())

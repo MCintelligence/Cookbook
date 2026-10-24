@@ -24,6 +24,9 @@ export function ZoomControl({ zoom, fitted, label, onZoom }: { zoom: number; /**
     <div className="zoom" ref={box}>
       <button className="footer-link" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
         {label} · {zoomLabel(zoom)}
+        <svg className="zoom-chev" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="m6 15 6-6 6 6" />
+        </svg>
       </button>
       {open && (
         <div className="zoom-pop" role="dialog" aria-label="Zoom">

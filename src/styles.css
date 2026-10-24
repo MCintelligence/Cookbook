@@ -843,6 +843,8 @@ button.seas-quote:hover { color: var(--accent); }
   .issue-card .btn { height: 40px; }
 }
 .zoom { position: relative; }
+.zoom .footer-link { display: inline-flex; align-items: center; gap: 4px; }
+.zoom-chev { opacity: 0.7; }
 .zoom-pop { position: absolute; right: 0; bottom: 34px; z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); box-shadow: 0 12px 32px rgba(var(--shadow), 0.18); white-space: nowrap; }
 .zoom-pop input[type='range'] { width: 160px; accent-color: var(--accent); }
 .zoom-pop .icon-btn { font-size: 16px; color: var(--text); }

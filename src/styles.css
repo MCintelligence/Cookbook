@@ -830,7 +830,7 @@ button.seas-quote:hover { color: var(--accent); }
 .footer { min-height: 36px; padding: 0 16px; gap: 16px; font-size: 12px; }
 .footer-end { gap: 16px; }
 .footer-link { font-size: 12px; padding: 2px 6px; }
-.saved { display: inline-flex; align-items: center; gap: 6px; cursor: default; outline: none; }
+.saved { display: inline-flex; align-items: center; gap: 6px; min-width: 66px; cursor: default; outline: none; }
 .saved-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .saved.is-dirty .saved-dot { background: var(--amber); }
 .gear { width: 28px; height: 28px; margin: 0 -6px 0 0; border-radius: 6px; }

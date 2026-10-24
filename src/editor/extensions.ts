@@ -16,7 +16,7 @@ import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
 import { Proofread } from '../proofread/plugin';
-import { DialogueFocus, Footnote, Note, type SeasoningsRequest, addNoteAnchor, insertFootnote } from './seasonings';
+import { DialogueFocus, Footnote, Note, type SeasoningsRequest, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
@@ -144,13 +144,10 @@ const PageShortcuts = Extension.create<{ onRequest: (r: SeasoningsRequest) => vo
       new Plugin({
         props: {
           handleKeyDown(_view, event) {
-            const id = commandFor(event, ['note', 'footnote', 'strong', 'emphasis', 'underline']);
+            const id = commandFor(event, ['footnote', 'strong', 'emphasis', 'underline']);
             if (!id) return false;
             event.preventDefault();
-            if (id === 'note') {
-              const note = addNoteAnchor(editor);
-              if (note) onRequest({ tab: 'notes', id: note });
-            } else if (id === 'footnote') onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
+            if (id === 'footnote') onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
             else toggleFormat(editor, id as BasicStyle);
             return true;
           },

@@ -11,7 +11,7 @@ import { type DocumentKind } from './document';
 export type BookTemplateId = 'novel' | 'short-story' | 'nonfiction';
 
 export const BOOK_TEMPLATES: { id: BookTemplateId; name: string; description: string }[] = [
-  { id: 'novel', name: 'Novel', description: 'Chapters of pages, with a main character and a setting in the Pantry.' },
+  { id: 'novel', name: 'Novel', description: 'Chapters of pages, with a main character and a place in the Pantry.' },
   { id: 'short-story', name: 'Short story', description: 'A single page and a main character.' },
   { id: 'nonfiction', name: 'Nonfiction', description: 'Chapters of sections, with a note for your sources.' },
 ];
@@ -28,7 +28,7 @@ export interface DocTemplate {
 }
 
 export const SCENE_TEMPLATES: DocTemplate[] = [
-  { id: 'scene', name: 'Blank scene', kind: 'scene', title: 'New scene', body: '' },
+  { id: 'scene', name: 'Blank page', kind: 'scene', title: 'New page', body: '' },
   {
     id: 'chapter-opener',
     name: 'Chapter opener',
@@ -45,12 +45,6 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
   },
 ];
 
-export const JOURNAL_TEMPLATES: DocTemplate[] = [
-  { id: 'entry', name: 'Blank entry', kind: 'journal', title: 'New entry', body: '' },
-  { id: 'morning-pages', name: 'Morning pages', kind: 'journal', title: 'Morning pages', body: 'Three pages, by hand if you can, about whatever comes.\n' },
-  { id: 'idea', name: 'Idea', kind: 'journal', title: 'An idea', body: '' },
-];
-
 export const CARD_TEMPLATES: DocTemplate[] = [
   {
     id: 'character',
@@ -63,10 +57,10 @@ export const CARD_TEMPLATES: DocTemplate[] = [
   },
   {
     id: 'setting',
-    name: 'Setting',
+    name: 'Place',
     kind: 'setting',
     folder: 'settings',
-    title: 'New setting',
+    title: 'New place',
     fields: { when: '' },
     body: 'What it smells like, what it sounds like, and who belongs here.\n',
   },

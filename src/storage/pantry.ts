@@ -10,7 +10,7 @@ export type PantrySection = (typeof PANTRY_SECTIONS)[number];
 
 export const SECTION_KIND: Record<PantrySection, DocumentKind> = { characters: 'character', settings: 'setting', research: 'research' };
 
-export const SECTION_LABEL: Record<PantrySection, string> = { characters: 'Characters', settings: 'Settings', research: 'Research' };
+export const SECTION_LABEL: Record<PantrySection, string> = { characters: 'Characters', settings: 'Places', research: 'Research' };
 
 /** The Pantry section a path is in, if any. */
 export function sectionOf(path: string): PantrySection | null {

@@ -1,7 +1,7 @@
 import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
-import { BOOKSHELF, HIDDEN_FOLDER, JOURNAL, PANTRY, readDocument, readTree, walkFiles } from './book';
+import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
 import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
 
 /**
@@ -282,7 +282,7 @@ export async function refreshIndex(fs: StorageAdapter, index: BookIndex): Promis
   const known = index.stamps();
   const seen = new Set<string>();
   let touched = 0;
-  for (const root of [BOOKSHELF, PANTRY, JOURNAL]) {
+  for (const root of [BOOKSHELF, PANTRY, RECIPES]) {
     if (!(await fs.exists(root))) continue;
     for (const file of walkFiles(await readTree(fs, root))) {
       seen.add(file.path);

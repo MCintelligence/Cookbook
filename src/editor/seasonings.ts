@@ -13,8 +13,8 @@ import { textMap, toRange } from './textmap';
  * its own text.
  */
 
-/** Where the writer asked to go next: the Notes or Footnotes tab, with a note or footnote picked. */
-export type SeasoningsRequest = { tab: 'notes'; id: string } | { tab: 'footnotes'; index: number };
+/** A footnote the writer asked to edit, by its place among the page's footnotes. */
+export type SeasoningsRequest = { tab: 'footnotes'; index: number };
 
 export const Note = Mark.create<{ onRequest: (r: SeasoningsRequest) => void }>({
   name: 'note',
@@ -84,56 +84,6 @@ export const Footnote = Node.create<{ onRequest: (r: SeasoningsRequest) => void 
 
 // ---------- notes ----------
 
-export interface NoteAnchor {
-  id: string;
-  /** The words the note is attached to. */
-  quote: string;
-  from: number;
-  to: number;
-}
-
-/** Every anchored note in reading order, one entry per note id. */
-export function noteAnchors(doc: PMNode): NoteAnchor[] {
-  const byId = new Map<string, NoteAnchor>();
-  doc.descendants((node, pos) => {
-    if (!node.isText) return true;
-    for (const mark of node.marks) {
-      if (mark.type.name !== 'note') continue;
-      const id = mark.attrs.id as string;
-      const end = pos + node.nodeSize;
-      const seen = byId.get(id);
-      if (seen) {
-        seen.quote += (seen.to < pos ? ' … ' : '') + node.text!;
-        seen.to = end;
-      } else byId.set(id, { id, quote: node.text!, from: pos, to: end });
-    }
-    return false;
-  });
-  return [...byId.values()];
-}
-
-export function nextNoteId(doc: PMNode, existing: Iterable<string>): string {
-  let max = 0;
-  const ids = [...existing, ...noteAnchors(doc).map((a) => a.id)];
-  for (const id of ids) {
-    const n = /^n(\d+)$/.exec(id);
-    if (n) max = Math.max(max, Number(n[1]));
-  }
-  return `n${max + 1}`;
-}
-
-/**
- * Anchors a new note to the selected words and returns its id. With nothing
- * selected it returns an id for a note on the whole scene.
- */
-export function addNoteAnchor(editor: Editor, existing: Iterable<string> = []): string {
-  const { state } = editor;
-  const id = nextNoteId(state.doc, existing);
-  const { from, to, empty } = state.selection;
-  if (!empty) editor.view.dispatch(state.tr.addMark(from, to, state.schema.marks.note!.create({ id })));
-  return id;
-}
-
 export function removeNoteAnchor(editor: Editor, id: string): void {
   const { state } = editor;
   const tr = state.tr;
@@ -144,11 +94,6 @@ export function removeNoteAnchor(editor: Editor, id: string): void {
     return false;
   });
   if (tr.docChanged) editor.view.dispatch(tr);
-}
-
-export function selectRange(editor: Editor, from: number, to: number): void {
-  editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, from, to)).scrollIntoView());
-  editor.view.focus();
 }
 
 // ---------- footnotes ----------
@@ -193,27 +138,6 @@ export function selectFootnote(editor: Editor, index: number): void {
   if (!entry) return;
   editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, entry.pos)).scrollIntoView());
   editor.view.focus();
-}
-
-// ---------- the scene's checklist ----------
-
-export interface TodoEntry {
-  pos: number;
-  text: string;
-  checked: boolean;
-}
-
-export function todos(doc: PMNode): TodoEntry[] {
-  const out: TodoEntry[] = [];
-  doc.descendants((node, pos) => {
-    if (node.type.name === 'taskItem') out.push({ pos, text: node.textContent, checked: !!node.attrs.checked });
-    return node.type.name !== 'taskItem';
-  });
-  return out;
-}
-
-export function setTodoChecked(editor: Editor, pos: number, checked: boolean): void {
-  editor.view.dispatch(editor.state.tr.setNodeAttribute(pos, 'checked', checked));
 }
 
 // ---------- dialogue focus ----------

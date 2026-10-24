@@ -161,19 +161,16 @@ export function PantryShelf({ cards, castIds, search, inserting, typed, canInser
               <>
                 <CardPreview card={preview} loadPicture={loadPicture} />
                 <div className="peek-actions">
-                  <button className="pill pill-accent" disabled={!canInsert} onClick={() => onInsert(current.name)}>
-                    Insert “{current.name}”
+                  <button className="btn btn-primary" disabled={!canInsert} title={`Insert “${current.name}” (Enter)`} onClick={() => onInsert(current.name)}>
+                    Insert
                   </button>
-                  <button className="pill" onClick={() => onPin(current.card.path)}>
-                    Pin beside draft
+                  <button className="btn" title={keys('Mod-Enter')} onClick={() => onPin(current.card.path)}>
+                    Pin beside page
                   </button>
-                  <button className="pill" onClick={() => onOpen(current.card.path)}>
-                    Open in Pantry
+                  <button className="btn" title={keys('Mod-Shift-Enter')} onClick={() => onOpen(current.card.path)}>
+                    Open
                   </button>
                 </div>
-                <span className="shelf-keys">
-                  {canInsert ? 'Enter inserts · ' : 'Enter opens · '}{keys('Mod-Enter')} pins · {keys('Mod-Shift-Enter')} opens
-                </span>
               </>
             )}
           </div>

@@ -6,18 +6,14 @@ import { cookbookExtensions, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
 import {
-  addNoteAnchor,
   deleteFootnote,
   dialogueSpans,
   dialogueStats,
   footnotes,
   insertFootnote,
-  noteAnchors,
   removeNoteAnchor,
   setDialogueFocus,
   setFootnoteText,
-  setTodoChecked,
-  todos,
 } from './seasonings';
 
 const editors: Editor[] = [];
@@ -241,14 +237,6 @@ describe('find and replace', () => {
 });
 
 describe('notes', () => {
-  it('anchors a note to the selected words', () => {
-    const editor = make('The church had burned that summer.');
-    editor.commands.setTextSelection({ from: 5, to: 22 });
-    expect(addNoteAnchor(editor, ['n1'])).toBe('n2');
-    expect(md(editor)).toBe('The [church had burned]{.note #n2} that summer.\n');
-    expect(noteAnchors(editor.state.doc)).toMatchObject([{ id: 'n2', quote: 'church had burned' }]);
-  });
-
   it('does not stretch a note when typing after it', () => {
     const editor = make('[pie]{.note #n1}');
     editor.commands.focus('end');
@@ -276,16 +264,6 @@ describe('footnotes', () => {
     expect(footnotes(editor.state.doc).map((f) => f.text)).toEqual(['First line.', 'Second [one].']);
     deleteFootnote(editor, 0);
     expect(md(editor)).toBe('One. Two.^[Second \\[one\\].]\n');
-  });
-});
-
-describe('scene checklist', () => {
-  it('lists and ticks checklist items', () => {
-    const editor = make('- [ ] find the hymn\n- [x] done');
-    const list = todos(editor.state.doc);
-    expect(list.map((t) => [t.text, t.checked])).toEqual([['find the hymn', false], ['done', true]]);
-    setTodoChecked(editor, list[0]!.pos, true);
-    expect(md(editor)).toBe('- [x] find the hymn\n- [x] done\n');
   });
 });
 

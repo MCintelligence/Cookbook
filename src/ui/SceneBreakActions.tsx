@@ -27,7 +27,7 @@ export function SceneBreakActions({ editor, nextTitle, onSplit, onMerge }: Props
   return (
     <div className="break-actions" style={{ top: at.top - 14 }}>
       <button onMouseDown={(e) => e.preventDefault()} onClick={() => onSplit(at.pos)}>
-        Split into new scene
+        Split into new page
       </button>
       <button
         onMouseDown={(e) => e.preventDefault()}

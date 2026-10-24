@@ -45,7 +45,7 @@ export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Pr
       {cast.length > 0 && (
         <div className="card-cast" aria-label="On this page">
           {cast.map((c) => (
-            <button key={c.id} className={`cast-chip cast-${c.kind}`} data-peek="" data-card={c.path} title={c.kind === 'character' ? 'Character' : 'Setting'}>
+            <button key={c.id} className={`cast-chip cast-${c.kind}`} data-peek="" data-card={c.path} title={c.kind === 'character' ? 'Character' : 'Place'}>
               {c.title}
             </button>
           ))}

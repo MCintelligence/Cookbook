@@ -55,7 +55,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
     <div className="lib-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="lib" role="dialog" aria-modal="true" aria-labelledby="lib-title" ref={box}>
         <div className="lib-head">
-          <h2 id="lib-title">Your books</h2>
+          <h2 id="lib-title">Your works</h2>
           <button className="lib-close" aria-label="Close" onClick={onClose}>
             ×
           </button>
@@ -70,22 +70,22 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
         {adopting ? (
           <div className="lib-adopt">
             <p>
-              <strong>{describeLocation(adopting)}</strong> isn’t a Cookbook book yet. Make it one? Cookbook adds <code>book.json</code>,{' '}
-              <code>bookshelf/</code>, <code>pantry/</code>, <code>journal/</code> and a hidden <code>.cookbook/</code> folder. Nothing already in the folder is changed.
+              <strong>{describeLocation(adopting)}</strong> isn’t a Cookbook work yet. Make it one? Cookbook adds <code>book.json</code>,{' '}
+              <code>bookshelf/</code>, <code>pantry/</code> and a hidden <code>.cookbook/</code> folder. Nothing already in the folder is changed.
             </p>
             <div className="lib-row">
-              <button className="pill" onClick={onCancelAdopt}>
+              <button className="btn" onClick={onCancelAdopt}>
                 Cancel
               </button>
-              <button className="pill pill-accent" disabled={busy} onClick={() => onAdopt(adopting)}>
-                Make it a book
+              <button className="btn btn-primary" disabled={busy} onClick={() => onAdopt(adopting)}>
+                Make it a work
               </button>
             </div>
           </div>
         ) : (
           <>
             {(recent.length > 0 || others.length > 0) && (
-              <ul className="lib-list" aria-label="Recent books">
+              <ul className="lib-list" aria-label="Recent works">
                 {recent.map((b) => {
                   const open = current !== null && sameLocation(b.location, current);
                   return (
@@ -147,7 +147,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                 if (canCreate) onCreate(title.trim(), template, false);
               }}
             >
-              <label htmlFor="lib-new-title">Start a new book</label>
+              <label htmlFor="lib-new-title">Start a new work</label>
               <div className="lib-templates" role="radiogroup" aria-label="Kind of book">
                 {BOOK_TEMPLATES.map((t) => (
                   <button key={t.id} type="button" role="radio" aria-checked={template === t.id} title={t.description} onClick={() => setTemplate(t.id)}>
@@ -158,11 +158,11 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
               <span className="lib-template-note">{BOOK_TEMPLATES.find((t) => t.id === template)!.description}</span>
               <div className="lib-row">
                 <input id="lib-new-title" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-                <button className="pill pill-accent" type="submit" disabled={!canCreate}>
+                <button className="btn btn-primary" type="submit" disabled={!canCreate}>
                   Create
                 </button>
                 {canPickFolder() && (
-                  <button className="pill" type="button" disabled={!canCreate} onClick={() => onCreate(title.trim(), template, true)}>
+                  <button className="btn" type="button" disabled={!canCreate} onClick={() => onCreate(title.trim(), template, true)}>
                     {folderWord}
                   </button>
                 )}
@@ -171,7 +171,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
 
             {canPickFolder() && (
               <button className="lib-open-folder" disabled={busy} onClick={onOpenFolder}>
-                Open a book folder…
+                Open a work’s folder…
               </button>
             )}
           </>

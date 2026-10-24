@@ -23,6 +23,5 @@ describe('automatic backups', () => {
     await restoreBackup(backups, kept[0]!, copy);
     expect((await openBook(copy)).title).toBe('Supper');
     expect(await copy.readText('bookshelf/One.md')).toContain('Pie.');
-    expect(await copy.exists('journal')).toBe(true);
   });
 });

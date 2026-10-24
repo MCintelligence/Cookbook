@@ -48,7 +48,7 @@ export function readingTime(words: number): string {
 }
 
 /**
- * Bookread: the whole manuscript as one document to read, every scene in
+ * Read book: the whole manuscript as one document to read, every scene in
  * Bookshelf order under its chapter headings. Click a scene's title to write in it.
  */
 export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
@@ -84,14 +84,14 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
     <>
       <div className="ms-bar">
         <span>
-          <strong>Bookread</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'scene' : 'scenes'} · {words.toLocaleString('en')} words · about{' '}
+          <strong>Read book</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'page' : 'pages'} · {words.toLocaleString('en')} words · about{' '}
           {readingTime(words)} to read
         </span>
         <button className="pill" onClick={onClose}>
           Back to writing
         </button>
       </div>
-      <article className="cb-page manuscript" aria-label="Bookread">
+      <article className="cb-page manuscript" aria-label="Read book">
         {scenes.length === 0 && <p className="empty">The Shelf has no pages yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
@@ -102,15 +102,14 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
             <section
               key={item.path}
               className="ms-scene"
+              aria-label={item.title}
+              onDoubleClick={() => onOpen(item.path)}
               onContextMenu={(e) => {
                 if (!onMenu) return;
                 e.preventDefault();
                 onMenu(item.path, e.clientX, e.clientY);
               }}
             >
-              <button className="scene-title ms-scene-title" title="Write on this page" onClick={() => onOpen(item.path)}>
-                {item.title}
-              </button>
               <SceneText schema={schema} body={item.body} />
               {item.footnotes.length > 0 && (
                 <ol className="cb-page-notes">

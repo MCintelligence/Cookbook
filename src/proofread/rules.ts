@@ -18,6 +18,7 @@ export const RULE_GROUPS: { title: string; rules: { id: string; label: string }[
     title: 'Grammar',
     rules: [
       { id: 'grammar', label: 'Grammar and punctuation' },
+      { id: 'unclosed-quote', label: 'Unclosed quotes' },
       { id: 'harper-style', label: 'Word choice and wordiness' },
     ],
   },

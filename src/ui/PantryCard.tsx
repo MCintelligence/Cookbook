@@ -100,6 +100,7 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
         </div>
       )}
       <div className="pc-main">
+        <input className="pc-name" aria-label="Card name" value={doc.title} onChange={(e) => onChange({ ...doc, title: e.target.value })} />
         {!isResearch && (
           <label className="pc-row">
             <span className="pc-key">Also known as</span>

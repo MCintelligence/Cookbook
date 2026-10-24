@@ -62,6 +62,17 @@ export const STYLES_FILE = 'styles.json';
 const BUILT_IN = ['chapter-title', 'heading-2', 'heading-3', 'quote'];
 export const BODY = 'body';
 
+/**
+ * "Body, first after break" was Body with no first-line indent, for the
+ * paragraph after a heading. Body has no indent either, so it looked the same
+ * and only confused the Style menu; headings now go straight back to Body.
+ * Books that still have it untouched lose it, and its paragraphs read as Body.
+ */
+const RETIRED_BODY_FIRST: ParagraphStyle = { id: 'body-first', name: 'Body, first after break', basedOn: BODY, next: BODY, firstLineIndent: 0 };
+const RETIRED = [RETIRED_BODY_FIRST.id];
+
+const sameStyle = (a: ParagraphStyle, b: ParagraphStyle) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+
 export const FONTS = ['Literata', 'EB Garamond', 'Libre Baskerville', 'Courier Prime', 'Fraunces', 'Nunito'] as const;
 
 export function defaultStyles(): StyleSheet {
@@ -86,12 +97,11 @@ export function defaultStyles(): StyleSheet {
         bold: false,
         italic: false,
       },
-      { id: 'body-first', name: 'Body, first after break', basedOn: BODY, next: BODY, firstLineIndent: 0 },
       {
         id: 'chapter-title',
         name: 'Chapter title',
         basedOn: BODY,
-        next: 'body-first',
+        next: BODY,
         font: 'Fraunces',
         size: 18,
         align: 'center',
@@ -99,11 +109,11 @@ export function defaultStyles(): StyleSheet {
         spaceAfter: 18,
         bold: true,
       },
-      { id: 'heading-2', name: 'Heading 2', basedOn: 'chapter-title', next: 'body-first', size: 15, spaceBefore: 12, spaceAfter: 12 },
-      { id: 'heading-3', name: 'Heading 3', basedOn: 'chapter-title', next: 'body-first', size: 13, align: 'left', spaceBefore: 12, spaceAfter: 6 },
+      { id: 'heading-2', name: 'Heading 2', basedOn: 'chapter-title', next: BODY, size: 15, spaceBefore: 12, spaceAfter: 12 },
+      { id: 'heading-3', name: 'Heading 3', basedOn: 'chapter-title', next: BODY, size: 13, align: 'left', spaceBefore: 12, spaceAfter: 6 },
       { id: 'quote', name: 'Quote', basedOn: BODY, next: BODY, italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 6, spaceAfter: 6 },
       { id: 'letter', name: 'Letter', basedOn: BODY, next: 'letter', italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 9, spaceAfter: 9 },
-      { id: 'epigraph', name: 'Epigraph', basedOn: BODY, next: 'body-first', size: 11, italic: true, align: 'right', firstLineIndent: 0, spaceAfter: 18 },
+      { id: 'epigraph', name: 'Epigraph', basedOn: BODY, next: BODY, size: 11, italic: true, align: 'right', firstLineIndent: 0, spaceAfter: 18 },
     ],
     character: [
       { id: 'strong', name: 'Strong', bold: true },
@@ -119,7 +129,11 @@ export async function loadStyles(fs: StorageAdapter): Promise<StyleSheet> {
   if (!(await fs.exists(STYLES_FILE))) return defaultStyles();
   const sheet = JSON.parse(await fs.readText(STYLES_FILE)) as Partial<StyleSheet>;
   const defaults = defaultStyles();
-  const paragraph = Array.isArray(sheet.paragraph) ? sheet.paragraph : [];
+  let paragraph = Array.isArray(sheet.paragraph) ? sheet.paragraph : [];
+  const retired = paragraph.find((s) => s.id === RETIRED_BODY_FIRST.id);
+  if (retired && sameStyle(retired, RETIRED_BODY_FIRST)) {
+    paragraph = paragraph.filter((s) => s !== retired).map((s) => (s.next === retired.id ? { ...s, next: BODY } : s));
+  }
   const character = Array.isArray(sheet.character) ? sheet.character : [];
   // Body must always exist, because every other style falls back to it.
   if (!paragraph.some((s) => s.id === BODY)) paragraph.unshift(defaults.paragraph[0]!);
@@ -243,7 +257,9 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true):
   const darkRules: string[] = [];
   for (const { id } of sheet.paragraph) {
     const s = resolveParagraphStyle(sheet, id);
-    const selector = id === BODY ? `${scope} p:not([data-style]), ${scope} p[data-style="${id}"]` : `${scope} p[data-style="${cssValue(id)}"]`;
+    // Paragraphs still marked with a retired style look like Body.
+    const aliases = id === BODY ? RETIRED.filter((r) => !sheet.paragraph.some((s) => s.id === r)).map((r) => `, ${scope} p[data-style="${r}"]`).join('') : '';
+    const selector = id === BODY ? `${scope} p:not([data-style]), ${scope} p[data-style="${id}"]${aliases}` : `${scope} p[data-style="${cssValue(id)}"]`;
     rules.push(
       `${selector} {` +
         ` font-family: ${fontStack(s.font)};` +

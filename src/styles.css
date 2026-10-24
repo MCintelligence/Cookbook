@@ -171,7 +171,7 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .toolbar { grid-area: tools; display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bar); white-space: nowrap; overflow-x: auto; overflow-y: visible; }
 .tb-select { flex: none; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); font-family: 'Literata', Georgia, serif; font-size: 13px; }
 .tb-select select { height: 26px; border: none; background: transparent; outline: none; font-family: inherit; font-size: 13px; padding-right: 2px; }
-.tb-style select { width: 150px; font-weight: 600; }
+.tb-style select { width: 196px; font-weight: 600; }
 .tb-font select { width: 104px; }
 .tb-size select { width: 44px; }
 .tb-button { padding: 0 8px; gap: 6px; }
@@ -846,10 +846,11 @@ button.seas-quote:hover { color: var(--accent); }
 .zoom .footer-link { display: inline-flex; align-items: center; gap: 4px; }
 .zoom-chev { opacity: 0.7; }
 .zoom-pop { position: absolute; right: 0; bottom: 34px; z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); box-shadow: 0 12px 32px rgba(var(--shadow), 0.18); white-space: nowrap; }
-.zoom-pop input[type='range'] { width: 160px; accent-color: var(--accent); }
-.zoom-pop .icon-btn { font-size: 16px; color: var(--text); }
+.zoom-slider { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.zoom-slider input[type='range'] { width: 160px; accent-color: var(--accent); }
+.zoom-slider .icon-btn { font-size: 16px; color: var(--text); }
 .zoom-value { width: 40px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--muted); }
-.zoom-pop .btn[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+.zoom-slider .btn[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
 
 /* Menus: the book menu and every right-click, compact like the Shelf */
 .menu { min-width: 200px; padding: 4px; border-radius: 8px; box-shadow: 0 10px 28px rgba(var(--shadow), 0.16); }

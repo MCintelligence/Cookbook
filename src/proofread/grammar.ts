@@ -6,7 +6,8 @@ import { type Dialect, type Issue, type IssueKind } from './check';
  * left to Hunspell (see check.ts), so Harper's own spelling rules are off.
  */
 // Unclosed quotes are Pete's own check (style.ts), which can offer the closing quote.
-export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes'];
+// OrthographicConsistency turns names such as Sam into acronyms (SAM).
+export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes', 'OrthographicConsistency'];
 
 /** Harper's kinds of lint that read as style advice rather than mistakes. */
 const STYLE_KINDS = new Set<LintKind>(['Style', 'Readability', 'Enhancement', 'Redundancy']);

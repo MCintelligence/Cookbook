@@ -224,7 +224,13 @@ function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIss
       }}
     >
       <Bubble id={ownerOf(issue.issue)} text={remark(issue.issue, issue.word)} onRemove={() => proof.ignore(issue, 'once')} />
-      {!sentence && <Context editor={editor} issue={issue} />}
+      {sentence ? (
+        <div className="ctx">
+          <span className={`mark-${issue.issue.kind}`}>{issue.word.length > LONG ? `${issue.word.slice(0, LONG).replace(/\s\S*$/, '')}…` : issue.word}</span>
+        </div>
+      ) : (
+        <Context editor={editor} issue={issue} />
+      )}
       <div className="fix">
         <span className="sug">{fix !== undefined && <>→ <strong>{fixText(issue.word, fix)}</strong></>}</span>
         <button className="btn btn-primary" disabled={fix === undefined} onClick={() => fix !== undefined && applySuggestion(editor, issue, fix)}>
@@ -239,6 +245,8 @@ function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIss
 }
 
 const AROUND = 32;
+/** How much of a long sentence its remark quotes. */
+const LONG = 90;
 
 /** A few words either side of the issue, from its own paragraph. */
 function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {

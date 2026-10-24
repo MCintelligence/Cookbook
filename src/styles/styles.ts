@@ -77,7 +77,7 @@ export function defaultStyles(): StyleSheet {
         color: '#3B2A20',
         align: 'justify',
         lineSpacing: 1.5,
-        firstLineIndent: 0.5,
+        firstLineIndent: 0,
         sideIndent: 0,
         spaceBefore: 0,
         spaceAfter: 0,

@@ -23,7 +23,10 @@ describe('styles', () => {
   it('draws 12 pt as 16 px and inches at 96 px', () => {
     const css = stylesToCss(defaultStyles());
     expect(css).toContain("font-family: 'Literata', serif; font-size: 16px");
-    expect(css).toContain('text-indent: 48px');
+    // Quotes and letters are indented half an inch on both sides.
+    expect(css).toContain('margin: 8px 48px 8px');
+    // New books start every paragraph at the margin.
+    expect(css).toContain('text-indent: 0px');
     expect(css).toContain('line-height: 1.5');
   });
 

@@ -16,7 +16,7 @@ export const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test
 
 export const SHORTCUTS: Shortcut[] = [
   { id: 'palette', label: 'Command palette', key: 'Mod-K' },
-  { id: 'switcher', label: 'Go to a scene or card', key: 'Mod-O' },
+  { id: 'switcher', label: 'Go to a page or card', key: 'Mod-O' },
   { id: 'find', label: 'Find', key: 'Mod-F' },
   { id: 'shelf', label: 'Pantry shelf', key: 'Mod-J' },
   { id: 'seasonings', label: 'Seasonings', key: 'Mod-Shift-S' },
@@ -27,7 +27,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'emphasis', label: 'Emphasis', key: 'Mod-I' },
   { id: 'underline', label: 'Underline', key: 'Mod-U' },
   // The browser keeps Ctrl+N for a new window, so the web version adds Alt.
-  { id: 'newScene', label: 'New scene', key: isTauri() ? 'Mod-N' : 'Mod-Alt-N' },
+  { id: 'newScene', label: 'New page', key: isTauri() ? 'Mod-N' : 'Mod-Alt-N' },
   { id: 'bookread', label: 'Bookread', key: 'Mod-Shift-R' },
   { id: 'settings', label: 'Settings', key: 'Mod-,' },
 ];

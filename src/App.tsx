@@ -136,9 +136,9 @@ const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Se
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 
 const TEMPLATES: Record<Tab, DocTemplate[]> = { book: SCENE_TEMPLATES, pantry: CARD_TEMPLATES, journal: JOURNAL_TEMPLATES };
-const NOUN: Record<Tab, string> = { book: 'scene', pantry: 'card', journal: 'entry' };
+const NOUN: Record<Tab, string> = { book: 'page', pantry: 'card', journal: 'entry' };
 const SECTION_NAME: Record<Tab, string> = { book: 'Bookshelf', pantry: 'Pantry', journal: 'Journal' };
-const TEMPLATE_LABEL: Record<Tab, string> = { book: 'New scene from template', pantry: 'New card from template', journal: 'New entry from template' };
+const TEMPLATE_LABEL: Record<Tab, string> = { book: 'New page from template', pantry: 'New card from template', journal: 'New entry from template' };
 
 const ROOTS: Record<Tab, string> = { book: BOOKSHELF, pantry: PANTRY, journal: JOURNAL };
 /** Folder names line up with the section's place in the switch above them. */
@@ -241,8 +241,6 @@ export function App() {
   const [folding, setFolding] = useState<{ open: boolean; under?: string; at: number } | null>(null);
   /** The Journal folder whose date is being changed. */
   const [dating, setDating] = useState<{ path: string; x: number; y: number; date: string | null; pinned: boolean } | null>(null);
-  /** Set by Rename on a scene or card: its title gets the cursor once it opens. */
-  const focusTitle = useRef(false);
   const portraitInput = useRef<HTMLInputElement>(null);
   const portraitFor = useRef<string | null>(null);
   const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
@@ -666,14 +664,10 @@ export function App() {
     }
   }, [fs, location]);
 
-  // A scene opens at its top, with its status and synopsis card in view; Rename puts the cursor in the title.
+  // A page opens at its top, with its status and synopsis card in view.
   useLayoutEffect(() => {
     if (!path) return;
     document.querySelector('.desk')?.scrollTo({ top: 0 });
-    if (focusTitle.current) {
-      focusTitle.current = false;
-      document.querySelector<HTMLInputElement>('.scene-title')?.select();
-    }
   }, [path]);
 
   const addScene = (template?: DocTemplate) => {
@@ -1097,9 +1091,9 @@ export function App() {
     const breakEl = target.closest('hr[data-scene-break]');
     if (breakEl) {
       const pos = ed.view.posAtDOM(breakEl, 0);
-      return showMenu('Scene break', x, y, [
-        { label: 'Split into a new scene here', onPick: () => void splitScene(pos), disabled: doc?.kind !== 'scene' },
-        { label: 'Merge with the next scene', onPick: () => void mergeNext(), disabled: !next },
+      return showMenu('Section break', x, y, [
+        { label: 'Split into a new page here', onPick: () => void splitScene(pos), disabled: doc?.kind !== 'scene' },
+        { label: 'Merge with the next page', onPick: () => void mergeNext(), disabled: !next },
         { separator: true },
         { label: 'Remove the break', danger: true, onPick: () => ed.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run() },
       ]);
@@ -1180,7 +1174,7 @@ export function App() {
           { label: 'Numbered list', onPick: run((c) => c.toggleOrderedList()) },
           { label: 'Bulleted list', onPick: run((c) => c.toggleBulletList()) },
           { label: 'Checklist', onPick: run((c) => c.toggleTaskList()) },
-          { label: 'Scene break', onPick: run((c) => c.insertContent({ type: 'sceneBreak' })), disabled: ed.state.selection.$from.depth !== 1 },
+          { label: 'Section break', onPick: run((c) => c.insertContent({ type: 'sceneBreak' })), disabled: ed.state.selection.$from.depth !== 1 },
         ],
       },
       { separator: true },
@@ -1277,7 +1271,7 @@ export function App() {
       const date = dates.get(p);
       showMenu('Folder', x, y, [
         {
-          label: tab === 'pantry' ? 'New card here' : tab === 'journal' ? 'New entry here' : 'New scene here',
+          label: tab === 'pantry' ? 'New card here' : tab === 'journal' ? 'New entry here' : 'New page here',
           onPick: () => void addFrom(tab === 'pantry' ? CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))! : TEMPLATES[tab][0]!, p),
         },
         { label: 'New folder inside', onPick: () => void addFolderIn(p) },
@@ -1304,9 +1298,9 @@ export function App() {
     if (isCard(card?.kind)) {
       showMenu('Card', x, y, [
         { label: 'Open', onPick: () => void select(p) },
-        { label: 'Rename', hint: 'F2', onPick: () => void renameFile(p) },
+        { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
         { label: 'Pin beside the draft', disabled: pins.includes(p), onPick: () => pin(p) },
-        { label: 'Insert name in the scene', disabled: !editor || doc?.kind === undefined || isCard(doc.kind), onPick: () => editor?.chain().focus().insertContent(card!.title).run() },
+        { label: 'Insert name on the page', disabled: !editor || doc?.kind === undefined || isCard(doc.kind), onPick: () => editor?.chain().focus().insertContent(card!.title).run() },
         { label: 'Set portrait…', disabled: card?.kind === 'research', onPick: () => choosePortrait(p) },
         common.label,
         { separator: true },
@@ -1317,10 +1311,10 @@ export function App() {
       return;
     }
     const status = card?.status ?? 'not-started';
-    showMenu(tab === 'journal' ? 'Entry' : 'Scene', x, y, [
+    showMenu(tab === 'journal' ? 'Entry' : 'Page', x, y, [
       { label: 'Open', onPick: () => void select(p) },
       ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
-      { label: 'Rename', hint: 'F2', onPick: () => void renameFile(p) },
+      { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
       common.duplicate,
       common.label,
       ...(tab === 'book'
@@ -1347,7 +1341,7 @@ export function App() {
       ...(tab === 'book' && p === path ? [{ label: 'Merge with next', disabled: !next, onPick: () => void mergeNext() }] : []),
       { separator: true },
       { label: 'Copy as Markdown', onPick: () => void copyMarkdown(p) },
-      ...(tab === 'book' ? [{ label: 'Export scene', items: exportItems(p) }] : []),
+      ...(tab === 'book' ? [{ label: 'Export page', items: exportItems(p) }] : []),
       ...trash,
     ]);
   };
@@ -1401,11 +1395,23 @@ export function App() {
     }
   };
 
-  /** A scene's or card's name is its title: open it and put the cursor there. */
-  const renameFile = async (p: string) => {
-    focusTitle.current = true;
-    if (p === path) document.querySelector<HTMLInputElement>('.scene-title')?.select();
-    else await select(p);
+  /** Gives a page or card a new title, open or not. */
+  const retitle = async (p: string, title: string) => {
+    if (p === path) {
+      const base = docRef.current ?? doc;
+      if (!base || base.title === title) return;
+      const next = { ...base, title };
+      setDoc(next);
+      scheduleSave(next);
+      return;
+    }
+    if (!fs) return;
+    const found = await readDocument(fs, p);
+    if (found.title === title) return;
+    const updated = { ...found, title };
+    await writeDocument(fs, p, updated);
+    index.current?.index.upsert(toIndexed(p, updated, await fs.stamp(p)));
+    indexChanged();
   };
 
   const copyMarkdown = async (p: string) => {
@@ -1436,7 +1442,7 @@ export function App() {
 
   /** A scene in Bookread. */
   const readerMenu = (p: string, x: number, y: number) =>
-    showMenu('Scene', x, y, [
+    showMenu('Page', x, y, [
       { label: 'Open to write', onPick: () => void select(p) },
       { label: 'Copy text', onPick: () => void copyText(p) },
       { label: 'Export', items: exportItems(p) },
@@ -1515,6 +1521,7 @@ export function App() {
   const renameInTree = async (from: string, title: string | null) => {
     setRenaming(null);
     if (!fs || title === null) return;
+    if (from.endsWith('.md')) return void retitle(from, title).catch((e: unknown) => setError(friendlyError(e)));
     await flushSave();
     await saveUndoNow();
     try {
@@ -1879,7 +1886,7 @@ export function App() {
         return true;
       });
     return [
-      item('break', 'Scene break', 'Insert', 'scene break * * * divider hr', breakHere),
+      item('break', 'Section break', 'Insert', 'section scene break * * * divider hr', breakHere),
       item('bullets', 'Bulleted list', 'Insert', 'list bullets ul', () => void editor.chain().focus().toggleBulletList().run()),
       item('numbers', 'Numbered list', 'Insert', 'list numbers ol ordered', () => void editor.chain().focus().toggleOrderedList().run()),
       item('checklist', 'Checklist', 'Insert', 'list todo tasks checkbox', () => void editor.chain().focus().toggleTaskList().run()),
@@ -1935,10 +1942,10 @@ export function App() {
       cmd('find', 'Find in book', () => document.querySelector<HTMLInputElement>('.find-field input')?.focus(), 'Actions', keysFor('find'), 'search replace'),
       cmd('shelf', 'Pantry shelf', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters'),
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => setSeasoningsOpen((o) => !o), 'Actions', keysFor('seasonings'), 'notes footnotes proofreader')] : []),
-      ...(doc ? [cmd('snapshot', 'Take a snapshot of this scene', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this scene…', () => path && void showSnapshots(path))] : []),
+      ...(doc ? [cmd('snapshot', 'Take a snapshot of this page', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this page…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Focus mode off' : 'Focus mode on', toggleFocus, 'View', keysFor('focus')),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
-      cmd('draft', page.view === 'page' ? 'Show scenes as Draft' : 'Show scenes as Page', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
+      cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
       ...(['system', 'light', 'dark', 'sepia'] as const).map((t) => cmd(`theme-${t}`, `Theme: ${t[0]!.toUpperCase()}${t.slice(1)}`, () => setSettings({ theme: t }), 'View', settings.theme === t ? '✓' : undefined)),
       cmd('show-book', 'Show the Bookshelf', () => setTab('book'), 'View'),
@@ -2120,7 +2127,6 @@ export function App() {
           dropTarget={fileDrop}
           align={ALIGN[tab]}
           folding={folding}
-          onRenameFile={(p) => void renameFile(p)}
           folderDates={tab === 'journal' ? dates : undefined}
           loadPicture={tab === 'pantry' ? loadPicture : undefined}
         />
@@ -2176,9 +2182,10 @@ export function App() {
           <div className="page-row">
           {doc && path ? (
             <article className={`cb-page${asDraft ? ' draft' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
+              {isCard(doc.kind) && (
               <input
-                className={`scene-title${page.showTitle ? '' : ' is-hidden'}`}
-                aria-label={doc.kind === 'scene' ? 'Scene title' : doc.kind === 'journal' ? 'Entry title' : 'Card name'}
+                className="scene-title"
+                aria-label="Card name"
                 value={doc.title}
                 onChange={(e) => {
                   const next = { ...(docRef.current ?? doc), title: e.target.value };
@@ -2186,6 +2193,7 @@ export function App() {
                   scheduleSave(next);
                 }}
               />
+              )}
               <PageEditor
                 initialBody={doc.body}
                 undoLog={undoLog}
@@ -2203,7 +2211,7 @@ export function App() {
             <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onClose={() => setBeside(null)} /></Suspense>
           ) : null}
           </div>
-          {doc && path ? null : <p className="empty">Pick a scene from the Bookshelf to start writing.</p>}
+          {doc && path ? null : <p className="empty">Pick a page from the Shelf to start writing.</p>}
           </>
         )}
       </main>
@@ -2460,7 +2468,7 @@ export function App() {
         </Suspense>
       )}
 
-      {palette && <Palette key={palette.at} items={paletteItems(palette.scenesOnly)} placeholder={palette.scenesOnly ? 'Go to a scene, card or entry' : 'Type a command, setting or scene'} onClose={() => setPalette(null)} />}
+      {palette && <Palette key={palette.at} items={paletteItems(palette.scenesOnly)} placeholder={palette.scenesOnly ? 'Go to a page or card' : 'Type a command, setting or page'} onClose={() => setPalette(null)} />}
 
       {snapshots && (
         <SnapshotsDialog

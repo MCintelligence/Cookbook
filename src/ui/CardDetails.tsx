@@ -24,7 +24,7 @@ export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Pr
   }, [synopsis]);
 
   return (
-    <section className="card-details" aria-label="Scene card">
+    <section className="card-details" aria-label="Page card">
       <div className="card-status" role="radiogroup" aria-label="Status">
         {STATUSES.map((s) => (
           <button key={s.id} role="radio" aria-checked={status === s.id} onClick={() => onStatus(s.id)}>
@@ -38,12 +38,12 @@ export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Pr
         className="card-synopsis"
         aria-label="Synopsis"
         rows={1}
-        placeholder="Synopsis: what happens in this scene, in a line or two"
+        placeholder="Synopsis: what happens on this page, in a line or two"
         value={synopsis}
         onChange={(e) => onSynopsis(e.target.value)}
       />
       {cast.length > 0 && (
-        <div className="card-cast" aria-label="In this scene">
+        <div className="card-cast" aria-label="On this page">
           {cast.map((c) => (
             <button key={c.id} className={`cast-chip cast-${c.kind}`} data-peek="" data-card={c.path} title={c.kind === 'character' ? 'Character' : 'Setting'}>
               {c.title}

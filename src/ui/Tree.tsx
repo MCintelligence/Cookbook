@@ -39,8 +39,6 @@ interface Props {
   loadPicture?: (path: string) => Promise<string>;
   /** Opens or closes every folder, or every one inside `under`. A new `at` asks again. */
   folding?: { open: boolean; under?: string; at: number } | null;
-  /** F2 on a scene or card. */
-  onRenameFile?: (path: string) => void;
 }
 
 type Where = 'before' | 'after' | 'inside';
@@ -279,7 +277,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       }
       if (plain && !e.shiftKey && e.key === 'F2' && !fixed) {
         e.preventDefault();
-        return node.kind === 'folder' ? onStartRename(node.path) : shared.onRenameFile?.(node.path);
+        return onStartRename(node.path);
       }
       if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onMenu) {
         e.preventDefault();
@@ -301,7 +299,15 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
     const colour = LABELS.find((l) => l.id === card?.label);
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
-        <button {...rowProps} className={`tree-card${marker}${card?.skipExport ? ' no-export' : ''}`} onClick={() => !justDragged.current && onSelect(node.path)}>
+        {renaming === node.path ? (
+          <FolderName name={label} onDone={(title) => onRename(node.path, title)} />
+        ) : (
+        <button
+          {...rowProps}
+          className={`tree-card${marker}${card?.skipExport ? ' no-export' : ''}`}
+          onClick={() => !justDragged.current && onSelect(node.path)}
+          onDoubleClick={() => !fixed && onStartRename(node.path)}
+        >
           <span className="tree-card-top">
             {status && <span className={`status-dot status-${status.id}`} title={status.label} aria-label={status.label} role="img" />}
             {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
@@ -312,6 +318,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
           </span>
           {subtitle && <span className="tree-card-synopsis">{subtitle}</span>}
         </button>
+        )}
       </li>
     );
   }
@@ -369,7 +376,7 @@ function FolderName({ name, onDone }: { name: string; onDone: (title: string | n
   return (
     <input
       className="tree-rename"
-      aria-label="Folder name"
+      aria-label="Name"
       autoFocus
       value={text}
       onFocus={(e) => e.currentTarget.select()}

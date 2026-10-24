@@ -32,7 +32,7 @@ export function SceneBreakActions({ editor, nextTitle, onSplit, onMerge }: Props
       <button
         onMouseDown={(e) => e.preventDefault()}
         disabled={!nextTitle}
-        title={nextTitle ? `Add “${nextTitle}” to the end of this scene` : 'This is the last scene in its folder'}
+        title={nextTitle ? `Add “${nextTitle}” to the end of this page` : 'This is the last page in its book'}
         onClick={onMerge}
       >
         Merge with next

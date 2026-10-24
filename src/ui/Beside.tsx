@@ -38,11 +38,11 @@ export function Beside({ path, load, version, onWrite, onClose }: Props) {
   return (
     <aside className="beside" aria-label={`Beside: ${doc?.title ?? 'scene'}`}>
       <div className="beside-bar">
-        <span className="beside-title">{doc?.title || (missing ? 'Scene not found' : '…')}</span>
-        <button className="pill" disabled={missing} onClick={() => onWrite(path)} title="Write in this scene, and put the other one here">
+        <span className="beside-title">{doc?.title || (missing ? 'Page not found' : '…')}</span>
+        <button className="pill" disabled={missing} onClick={() => onWrite(path)} title="Write on this page, and put the other one here">
           Swap
         </button>
-        <button className="notice-close beside-close" aria-label="Close the scene beside" onClick={onClose}>
+        <button className="notice-close beside-close" aria-label="Close the page beside" onClick={onClose}>
           ×
         </button>
       </div>

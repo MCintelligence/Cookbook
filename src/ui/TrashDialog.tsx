@@ -51,10 +51,10 @@ export function TrashDialog({ items, busy, onRestore, onDelete, onEmpty, onClose
         {items === null ? (
           <p className="trash-empty">Looking…</p>
         ) : items.length === 0 ? (
-          <p className="trash-empty">Nothing in the trash. Scenes and folders you delete wait here until you put them back or empty it.</p>
+          <p className="trash-empty">Nothing in the trash. Pages and books you delete wait here until you put them back or empty it.</p>
         ) : (
           <>
-            <ul className="lib-list trash-list" aria-label="Deleted scenes and folders">
+            <ul className="lib-list trash-list" aria-label="Deleted pages and books">
               {items.map((item) => (
                 <li key={item.name}>
                   <div className="trash-item">

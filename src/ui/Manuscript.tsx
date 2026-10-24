@@ -76,7 +76,7 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  if (!items) return <p className="empty">Gathering every scene…</p>;
+  if (!items) return <p className="empty">Gathering every page…</p>;
   const scenes = items.filter((i) => i.type === 'scene');
   const words = scenes.reduce((sum, s) => sum + s.words, 0);
 
@@ -92,7 +92,7 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
         </button>
       </div>
       <article className="cb-page manuscript" aria-label="Bookread">
-        {scenes.length === 0 && <p className="empty">The Bookshelf has no scenes yet.</p>}
+        {scenes.length === 0 && <p className="empty">The Shelf has no pages yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
             <h2 key={item.path} className={`ms-folder ms-depth-${Math.min(item.depth, 2)}`}>
@@ -108,7 +108,7 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
                 onMenu(item.path, e.clientX, e.clientY);
               }}
             >
-              <button className="scene-title ms-scene-title" title="Write in this scene" onClick={() => onOpen(item.path)}>
+              <button className="scene-title ms-scene-title" title="Write on this page" onClick={() => onOpen(item.path)}>
                 {item.title}
               </button>
               <SceneText schema={schema} body={item.body} />
@@ -137,7 +137,7 @@ export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchem
       const doc = PMNode.fromJSON(schema, body);
       el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
     } catch {
-      el.textContent = 'This scene could not be shown.';
+      el.textContent = 'This page could not be shown.';
     }
   }, [schema, body]);
   return <div className="cb-prose ms-text" ref={box} />;

@@ -5,8 +5,9 @@ import { Typography } from '@tiptap/extension-typography';
 import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
-import { type Mark as PMMark } from '@tiptap/pm/model';
-import { Plugin, Selection, TextSelection } from '@tiptap/pm/state';
+import { type Mark as PMMark, type NodeType } from '@tiptap/pm/model';
+import { liftListItem } from '@tiptap/pm/schema-list';
+import { Plugin, Selection, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
 import { type AppSettings, getSettings } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
@@ -213,6 +214,72 @@ export function toggleFormat(editor: Editor, style: BasicStyle): boolean {
   return toggleCharStyle(editor, style);
 }
 
+const ITEMS = new Set(['listItem', 'taskItem']);
+
+/** The list item the cursor's paragraph opens, when the cursor is in an item's first paragraph. */
+function itemAtCursor(editor: Editor): NodeType | null {
+  const { $from } = editor.state.selection;
+  if ($from.depth < 2 || $from.parent.type.name !== 'paragraph' || $from.index($from.depth - 1) !== 0) return null;
+  const item = $from.node($from.depth - 1);
+  return ITEMS.has(item.type.name) ? item.type : null;
+}
+
+/**
+ * Takes the cursor's list item out of every list it sits in, in one undo step,
+ * so it becomes a plain paragraph at the left margin.
+ */
+export function leaveLists(editor: Editor): boolean {
+  let state = editor.state;
+  const tr = state.tr;
+  for (;;) {
+    const { $from } = state.selection;
+    let item: NodeType | null = null;
+    for (let d = $from.depth; d > 0 && !item; d--) if (ITEMS.has($from.node(d).type.name)) item = $from.node(d).type;
+    let lifted: Transaction | null = null;
+    if (!item || !liftListItem(item)(state, (t) => (lifted = t)) || !lifted) break;
+    const step: Transaction = lifted;
+    step.steps.forEach((s) => tr.step(s));
+    state = state.apply(step);
+  }
+  if (!tr.docChanged) return false;
+  editor.view.dispatch(tr.setSelection(TextSelection.create(tr.doc, state.selection.from)).scrollIntoView());
+  return true;
+}
+
+/**
+ * Lists stay simple. Enter or Backspace on an empty item leaves the list
+ * completely, even from a sub-list; Backspace at the start of an item makes it
+ * a paragraph rather than joining it to the item above. Tab outside a list
+ * indents the line with a tab and never starts a list.
+ */
+const ListKeys = Extension.create({
+  name: 'listKeys',
+  priority: 1050,
+  addKeyboardShortcuts() {
+    const atItemStart = (editor: Editor) => {
+      const { empty, $from } = editor.state.selection;
+      return empty && $from.parentOffset === 0 && itemAtCursor(editor) !== null;
+    };
+    return {
+      Enter: ({ editor }) => atItemStart(editor) && editor.state.selection.$from.parent.content.size === 0 && leaveLists(editor),
+      // Backspace straight after - or -TD gives the typed text back first.
+      Backspace: ({ editor }) => editor.commands.undoInputRule() || (atItemStart(editor) && leaveLists(editor)),
+      Tab: ({ editor }) => {
+        const { $from } = editor.state.selection;
+        if ($from.parent.type.name !== 'paragraph' || $from.depth !== 1) return false;
+        return editor.commands.insertContent('\t');
+      },
+      'Shift-Tab': ({ editor }) => {
+        const { $from, empty } = editor.state.selection;
+        if ($from.parent.type.name !== 'paragraph' || $from.depth !== 1) return false;
+        // Takes back a tab just before the cursor, and otherwise keeps the cursor on the page.
+        if (empty && $from.parentOffset > 0 && $from.parent.textBetween($from.parentOffset - 1, $from.parentOffset) === '\t') editor.commands.deleteRange({ from: $from.pos - 1, to: $from.pos });
+        return true;
+      },
+    };
+  },
+});
+
 /** Only what a novelist expects from Typography; nothing turns (c) into © behind their back. */
 const NO_TYPOGRAPHY = {
   leftArrow: false,
@@ -241,6 +308,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     SceneBreak,
     CharStyle,
     PageShortcuts.configure({ onRequest }),
+    ListKeys,
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
     Bold,

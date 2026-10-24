@@ -293,12 +293,16 @@ function paragraphNode(lines: string[], style: string, withStyle = true): NodeJS
     } else if (!last && / {2,}$/.test(raw)) hard = true;
     source += line + (last ? '' : hard ? '\n' : ' ');
   });
-  const inline = parseInline(source);
+  const inline = parseInline(source).map(untab);
   const node: NodeJSON = { type: 'paragraph' };
   if (withStyle) node.attrs = { style };
   if (inline.length > 0) node.content = inline;
   return node;
 }
+
+/** Tabs are written as &#9;, which other Markdown apps read as a tab too, so indents survive the trip. */
+const TAB = '&#9;';
+const untab = (node: NodeJSON): NodeJSON => (node.text?.includes(TAB) ? { ...node, text: node.text.replaceAll(TAB, '\t') } : node);
 
 // ---------- parsing inline ----------
 
@@ -622,7 +626,7 @@ function serializeTable(table: NodeJSON): string {
 
 function escapeText(text: string): string {
   // A ! right before a bracket would make a picture.
-  return text.replace(/[\\*_~`[\]]/g, (c) => '\\' + c).replace(/!$/, '\\!');
+  return text.replace(/[\\*_~`[\]]/g, (c) => '\\' + c).replace(/!$/, '\\!').replaceAll('\t', TAB);
 }
 
 function escapeLineStart(line: string): string {

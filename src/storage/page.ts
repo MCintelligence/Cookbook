@@ -13,8 +13,6 @@ export interface PageSettings {
   view: 'page' | 'draft';
   /** Percent; 0 fits the page to the window's width. */
   zoom: number;
-  /** The scene's title above its text. */
-  showTitle: boolean;
 }
 
 export const PAGE_SIZES: Record<PageSize, { label: string; width: number; height: number }> = {
@@ -33,7 +31,7 @@ export const MARGINS: Record<Margins, { label: string; inches: number }> = {
 
 export const ZOOMS = [75, 100, 125, 150, 0] as const;
 
-export const DEFAULT_PAGE: PageSettings = { size: 'letter', margins: 'normal', view: 'page', zoom: 100, showTitle: true };
+export const DEFAULT_PAGE: PageSettings = { size: 'letter', margins: 'normal', view: 'page', zoom: 100 };
 
 /** A book's page settings, with anything missing or not understood set to the default. */
 export function pageOf(saved: unknown): PageSettings {
@@ -43,7 +41,6 @@ export function pageOf(saved: unknown): PageSettings {
     margins: typeof p.margins === 'string' && p.margins in MARGINS ? (p.margins as Margins) : DEFAULT_PAGE.margins,
     view: p.view === 'draft' ? 'draft' : 'page',
     zoom: typeof p.zoom === 'number' && (ZOOMS as readonly number[]).includes(p.zoom) ? p.zoom : DEFAULT_PAGE.zoom,
-    showTitle: typeof p.showTitle === 'boolean' ? p.showTitle : DEFAULT_PAGE.showTitle,
   };
 }
 

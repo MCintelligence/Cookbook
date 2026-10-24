@@ -113,7 +113,7 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
             {fmt(today)} / {fmt(goals.dailyGoal)}
           </strong>{' '}
           words today{streakText}
-          {scene && (scene.goal ? ` · Scene ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
+          {scene && (scene.goal ? ` · Page ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
         </span>
       </button>
       {open && (
@@ -185,10 +185,10 @@ function Targets({
       </div>
       <div className="goals-row">
         <span className="goals-t">
-          <b>This scene</b>
-          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open a scene to give it a goal'}</span>
+          <b>This page</b>
+          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open a page to give it a goal'}</span>
         </span>
-        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Scene goal in words" disabled={!scene} onCommit={onSceneGoal} />
+        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Page goal in words" disabled={!scene} onCommit={onSceneGoal} />
       </div>
       <div className="goals-row goals-book">
         <div className="goals-line">

@@ -5,7 +5,7 @@ import { type BookInfo, DEFAULT_DAILY_GOAL } from '../storage/book';
 import { MARGINS, PAGE_SIZES, type PageSettings, ZOOMS, pageOf, zoomLabel } from '../storage/page';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
-import { FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
+import { BODY, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 
 export type SettingsSection = 'general' | 'appearance' | 'writing' | 'saving' | 'shortcuts' | 'updates' | 'page' | 'styles' | 'proofreader' | 'goals';
 
@@ -18,7 +18,7 @@ const APP_SECTIONS: [SettingsSection, string][] = [
   ['updates', 'Updates and privacy'],
 ];
 const BOOK_SECTIONS: [SettingsSection, string][] = [
-  ['page', 'Page and view'],
+  ['page', 'Layout'],
   ['styles', 'Styles'],
   ['proofreader', 'Proofreader'],
   ['goals', 'Goals'],
@@ -253,7 +253,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
       return (
         <>
           <Group title="Starting up">
-            <Row title="Reopen where I left off" help="Open the last book at the scene you were writing when Cookbook starts.">
+            <Row title="Reopen where I left off" help="Open the last book at the page you were writing when Cookbook starts.">
               <Switch label="Reopen where I left off" on={s.reopenLast} onChange={(reopenLast) => set({ reopenLast })} />
             </Row>
             <Row title="Where new books go" help={props.newBooksFolder ?? 'In this browser’s own storage. Use “Open a folder” in Your books to keep a book somewhere else.'}>
@@ -348,13 +348,13 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             >
               <Switch label="Markdown formatting" on={s.markdown} onChange={(markdown) => set({ markdown })} />
             </Row>
-            <Row title="Line starters" help={'At the start of a line: "- " bullets, "-1 " a numbered list, "-TD " a checklist, and "* * *" then Enter a scene break.'}>
+            <Row title="Line starters" help={'At the start of a line: "- " bullets, "-1 " a numbered list, "-TD " a checklist, and "* * *" then Enter a section break.'}>
               <Switch label="Line starters" on={s.lineStarters} onChange={(lineStarters) => set({ lineStarters })} />
             </Row>
             <Row title="Typing @ opens the Pantry shelf" help="Not after a letter or number, so email addresses are left alone.">
               <Switch label="Typing @ opens the Pantry shelf" on={s.atShelf} onChange={(atShelf) => set({ atShelf })} />
             </Row>
-            <Row title="Typing / opens the insert menu" help="At the start of a line or after a space: styles, lists, a table, a scene break or a footnote.">
+            <Row title="Typing / opens the insert menu" help="At the start of a line or after a space: styles, lists, a table, a section break or a footnote.">
               <Switch label="Typing / opens the insert menu" on={s.slashMenu} onChange={(slashMenu) => set({ slashMenu })} />
             </Row>
           </Group>
@@ -362,7 +362,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Focus mode" help={`Hides the panels and fades everything but where you are. ${keys(binding('focus'))} turns it on and off.`}>
               <Switch label="Focus mode" on={s.focus} onChange={(focus) => set({ focus })} />
             </Row>
-            <Row title="Focus mode keeps bright" help="The rest of the scene fades.">
+            <Row title="Focus mode keeps bright" help="The rest of the page fades.">
               <Select
                 label="Focus mode keeps bright"
                 value={s.fade}
@@ -397,7 +397,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
     case 'updates':
       return <Updates version={props.version} onCheck={props.onCheckUpdates} />;
     case 'page':
-      return <PageView book={props.book} onBook={props.onBook} />;
+      return <PageView book={props.book} onBook={props.onBook} sheet={props.sheet} onEditStyle={props.onEditStyle} />;
     case 'styles':
       return <Styles sheet={props.sheet} onEditStyle={props.onEditStyle} onAddStyle={props.onAddStyle} onRenameStyle={props.onRenameStyle} />;
     case 'proofreader':
@@ -426,7 +426,7 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
             onChange={(saveDelay) => setSettings({ saveDelay })}
           />
         </Row>
-        <Row title="Undo history" help="Undo reaches back past closing the app, scene by scene. It is kept in the book’s hidden .cookbook folder." />
+        <Row title="Undo history" help="Undo reaches back past closing the app, page by page. It is kept in the book’s hidden .cookbook folder." />
       </Group>
       <Group title="Automatic backups">
         <Row title="Back up the book when I close it" help="A zip of the whole book folder, made when you close Cookbook or open another book.">
@@ -470,7 +470,7 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
         </Row>
       </Group>
       <Group title="Snapshots">
-        <Row title="Take a snapshot before splitting, merging or replacing all" help="Compare or roll back from the scene’s right-click menu, under Snapshots.">
+        <Row title="Take a snapshot before splitting, merging or replacing all" help="Compare or roll back from the page’s right-click menu, under Snapshots.">
           <Switch label="Automatic snapshots" on={s.autoSnapshot} onChange={(autoSnapshot) => setSettings({ autoSnapshot })} />
         </Row>
       </Group>
@@ -577,16 +577,17 @@ function Updates({ version, onCheck }: { version: string; onCheck: () => Promise
   );
 }
 
-function PageView({ book, onBook }: Pick<Props, 'book' | 'onBook'>) {
+function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'onBook' | 'sheet' | 'onEditStyle'>) {
   const page = pageOf(book?.page);
   const set = (changes: Partial<PageSettings>) => onBook({ page: { ...page, ...changes } });
-  if (!book) return <p className="set-row-help">Open a book to change its page.</p>;
+  const indent = resolveParagraphStyle(sheet, BODY).firstLineIndent;
+  if (!book) return <p className="set-row-help">Open a work to change its layout.</p>;
   return (
     <>
-      <Group title="Page setup">
-        <Row title="Page size" help="Used on screen, for printing, PDF and Word export.">
+      <Group title="Page">
+        <Row title="Size" help="Used on screen, for printing, PDF and Word export.">
           <Select
-            label="Page size"
+            label="Size"
             value={page.size}
             options={Object.entries(PAGE_SIZES).map(([id, p]) => [id as PageSettings['size'], `${p.label} (${p.width} × ${p.height} in)`])}
             onChange={(size) => set({ size })}
@@ -595,14 +596,17 @@ function PageView({ book, onBook }: Pick<Props, 'book' | 'onBook'>) {
         <Row title="Margins" help="Top, bottom, left and right.">
           <Select label="Margins" value={page.margins} options={Object.entries(MARGINS).map(([id, m]) => [id as PageSettings['margins'], `${m.label} (${m.inches} in)`])} onChange={(margins) => set({ margins })} />
         </Row>
+        <Row title="Indent first line" help="Off: every paragraph starts at the margin." words="indent paragraph">
+          <Switch label="Indent first line" on={indent > 0} onChange={(on) => onEditStyle(BODY, { firstLineIndent: on ? 0.5 : 0 })} />
+        </Row>
       </Group>
       <Group title="View">
-        <Row title="Show scenes as" help="Page shows the sheet of paper. Draft is a plain column of text.">
+        <Row title="Show pages as" help="Paper shows the sheet. Draft is a plain column of text.">
           <Seg
-            label="Show scenes as"
+            label="Show pages as"
             value={page.view}
             options={[
-              ['page', 'Page'],
+              ['page', 'Paper'],
               ['draft', 'Draft'],
             ]}
             onChange={(view) => set({ view })}
@@ -611,9 +615,6 @@ function PageView({ book, onBook }: Pick<Props, 'book' | 'onBook'>) {
         <Row title="Zoom" help={`${keys('Mod-=')} and ${keys('Mod--')} also zoom the page.`}>
           <Select label="Zoom" value={page.zoom} options={ZOOMS.map((z) => [z, zoomLabel(z)] as [number, string])} onChange={(zoom) => set({ zoom })} />
         </Row>
-        <Row title="Show the scene’s title above its text">
-          <Switch label="Show the scene’s title" on={page.showTitle} onChange={(showTitle) => set({ showTitle })} />
-        </Row>
       </Group>
     </>
   );
@@ -621,6 +622,12 @@ function PageView({ book, onBook }: Pick<Props, 'book' | 'onBook'>) {
 
 const SIZES = [9, 10, 10.5, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 const SPACINGS = [1, 1.15, 1.5, 2];
+const KERNING = {
+  auto: { kerning: 'auto', letterSpacing: 0 },
+  off: { kerning: 'none', letterSpacing: 0 },
+  tight: { kerning: 'auto', letterSpacing: -1 },
+  loose: { kerning: 'auto', letterSpacing: 2 },
+} as const;
 
 function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, 'sheet' | 'onEditStyle' | 'onAddStyle' | 'onRenameStyle'>) {
   const [picked, setPicked] = useState(sheet.paragraph[0]?.id ?? 'body');
@@ -628,7 +635,7 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
   const style = sheet.paragraph.find((p) => p.id === picked) ?? sheet.paragraph[0]!;
   const r = resolveParagraphStyle(sheet, style.id);
   const edit = (changes: Partial<ParagraphStyle>) => onEditStyle(style.id, changes);
-  const shownStyles = useMemo(() => sheet.paragraph.filter((p) => matches(query, p.name, 'paragraph style font size indent spacing')), [sheet, query]);
+  const shownStyles = useMemo(() => sheet.paragraph.filter((p) => matches(query, p.name, 'paragraph style font size indent spacing kerning')), [sheet, query]);
   if (query && shownStyles.length === 0 && !matches(query, 'character style strong emphasis underline')) return null;
   return (
     <>
@@ -679,6 +686,19 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
                   ))}
                 </select>
               </label>
+              <label>
+                <span className="set-row-help">Kerning</span>
+                <select
+                  className="set-sel"
+                  value={r.kerning === 'none' ? 'off' : r.letterSpacing < 0 ? 'tight' : r.letterSpacing > 0 ? 'loose' : 'auto'}
+                  onChange={(e) => edit(KERNING[e.target.value as keyof typeof KERNING])}
+                >
+                  <option value="auto">Auto</option>
+                  <option value="off">Off</option>
+                  <option value="tight">Tight</option>
+                  <option value="loose">Loose</option>
+                </select>
+              </label>
               <Measure label="First-line indent" unit="in" value={r.firstLineIndent} onChange={(firstLineIndent) => edit({ firstLineIndent })} />
               <Measure label="Left and right indent" unit="in" value={r.sideIndent} onChange={(sideIndent) => edit({ sideIndent })} />
               <Measure label="Space before" unit="pt" value={r.spaceBefore} onChange={(spaceBefore) => edit({ spaceBefore })} />
@@ -715,7 +735,7 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
               );
             })}
           </div>
-          <p className="set-row-help">Apply them from the toolbar or a right-click on the page.</p>
+          <p className="set-row-help">Apply them with the shortcuts, or a right-click on the page.</p>
         </div>
       </div>
     </>

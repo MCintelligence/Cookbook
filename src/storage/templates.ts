@@ -11,8 +11,8 @@ import { type DocumentKind } from './document';
 export type BookTemplateId = 'novel' | 'short-story' | 'nonfiction';
 
 export const BOOK_TEMPLATES: { id: BookTemplateId; name: string; description: string }[] = [
-  { id: 'novel', name: 'Novel', description: 'Chapters of scenes, with a main character and a setting in the Pantry.' },
-  { id: 'short-story', name: 'Short story', description: 'A single scene and a main character.' },
+  { id: 'novel', name: 'Novel', description: 'Chapters of pages, with a main character and a setting in the Pantry.' },
+  { id: 'short-story', name: 'Short story', description: 'A single page and a main character.' },
   { id: 'nonfiction', name: 'Nonfiction', description: 'Chapters of sections, with a note for your sources.' },
 ];
 
@@ -91,11 +91,11 @@ const blank = SCENE_TEMPLATES[0]!;
 /** Lays out a new book. Run right after `createBook`. */
 export async function applyBookTemplate(fs: StorageAdapter, template: BookTemplateId): Promise<void> {
   if (template === 'novel') {
-    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Chapter 1'), blank, 'Scene 1');
+    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Chapter 1'), blank, 'Page 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
     await createFromTemplate(fs, '', card('setting'), 'Main setting');
   } else if (template === 'short-story') {
-    await createFromTemplate(fs, BOOKSHELF, blank, 'Scene 1');
+    await createFromTemplate(fs, BOOKSHELF, blank, 'Page 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
   } else {
     await createFromTemplate(fs, joinPath(BOOKSHELF, 'Chapter 1'), blank, 'Section 1');

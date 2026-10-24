@@ -204,7 +204,7 @@ function stylesXml(sheet: StyleSheet): string {
     heading(2, 30),
     heading(3, 26),
     `<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="${body}"/><w:qFormat/><w:pPr><w:jc w:val="center"/><w:spacing w:before="4000" w:after="480"/><w:ind w:firstLine="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="56"/></w:rPr></w:style>`,
-    `<w:style w:type="paragraph" w:styleId="cbSceneBreak"><w:name w:val="Scene break"/><w:basedOn w:val="${body}"/><w:pPr><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr></w:style>`,
+    `<w:style w:type="paragraph" w:styleId="cbSceneBreak"><w:name w:val="Section break"/><w:basedOn w:val="${body}"/><w:pPr><w:jc w:val="center"/><w:ind w:firstLine="0"/></w:pPr></w:style>`,
     `<w:style w:type="paragraph" w:styleId="cbListItem"><w:name w:val="List item"/><w:basedOn w:val="${body}"/><w:pPr><w:ind w:left="360" w:hanging="360"/><w:jc w:val="left"/></w:pPr></w:style>`,
     `<w:style w:type="paragraph" w:styleId="cbCode"><w:name w:val="Code"/><w:basedOn w:val="${body}"/><w:pPr><w:spacing w:before="120" w:after="120" w:line="240" w:lineRule="auto"/><w:ind w:left="360" w:firstLine="0"/><w:jc w:val="left"/></w:pPr><w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/><w:sz w:val="20"/></w:rPr></w:style>`,
     `<w:style w:type="paragraph" w:styleId="cbTableText"><w:name w:val="Table text"/><w:basedOn w:val="${body}"/><w:pPr><w:spacing w:before="40" w:after="40" w:line="240" w:lineRule="auto"/><w:ind w:firstLine="0"/><w:jc w:val="left"/></w:pPr></w:style>`,

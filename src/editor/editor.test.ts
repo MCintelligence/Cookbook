@@ -74,6 +74,31 @@ describe('typing shortcuts', () => {
     expect(editor.getText()).toBe('-TD ');
   });
 
+  it('leaves the list completely on Enter in an empty item, even from a sub-list', () => {
+    const editor = make('- one\n  - two');
+    press(editor, 'Enter');
+    press(editor, 'Enter');
+    type(editor, 'after');
+    expect(md(editor)).toBe('- one\n  - two\n\nafter\n');
+  });
+
+  it('makes an empty item a paragraph on Backspace instead of joining the item above', () => {
+    const editor = make('- one');
+    press(editor, 'Enter');
+    press(editor, 'Backspace');
+    type(editor, 'two');
+    expect(md(editor)).toBe('- one\n\ntwo\n');
+  });
+
+  it('indents a plain paragraph with a tab that survives saving, and never starts a list', () => {
+    const editor = make();
+    press(editor, 'Tab');
+    type(editor, 'Once upon a time');
+    expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    expect(md(editor)).toBe('&#9;Once upon a time\n');
+    expect(parseMarkdown(md(editor)).content?.[0]?.content?.[0]?.text).toBe('\tOnce upon a time');
+  });
+
   it('applies plain bold, italic, underline, strikethrough and code from Markdown', () => {
     const editor = make();
     type(editor, 'a **bold** and *soft* and _under_ and ~~gone~~ and `x` end');

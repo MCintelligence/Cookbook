@@ -4,7 +4,7 @@ import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
 import { keysFor, pressed } from '../shortcuts';
 
-const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Scene', character: 'Character', setting: 'Setting', research: 'Research', journal: 'Journal' };
+const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Page', character: 'Character', setting: 'Setting', research: 'Research', journal: 'Journal' };
 
 interface Props {
   editor: Editor | null;

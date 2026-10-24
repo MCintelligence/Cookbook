@@ -48,7 +48,7 @@ describe('the manuscript', () => {
 
   it('prints and writes Word files on the book’s page size', async () => {
     const { m } = await sampleBook();
-    const page = { size: 'a5', margins: 'narrow', view: 'page', zoom: 100, showTitle: true } as const;
+    const page = { size: 'a5', margins: 'narrow', view: 'page', zoom: 100 } as const;
     expect(bookHtml(m, defaultStyles(), page)).toContain('@page { size: 5.83in 8.27in; margin: 0.6in; }');
     const xml = strFromU8(unzipSync(bookDocx(m, defaultStyles(), page))['word/document.xml']!);
     expect(xml).toContain('<w:pgSz w:w="8395" w:h="11909"/>');

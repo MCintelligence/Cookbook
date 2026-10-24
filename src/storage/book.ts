@@ -10,7 +10,8 @@ import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder,
  *     book.json          title, format version, word goal and spelling
  *     writing-history.csv words written per day
  *     dictionary.txt     the writer's own words for the proofreader
- *     bookshelf/         scenes, in nested folders (parts, chapters)
+ *     bookshelf/         pages, in nested folders (the Shelf's books: parts, chapters)
+ *     recipes/           sources and notes that guide work on a page, each naming its page
  *     pantry/
  *       characters/
  *       settings/
@@ -24,8 +25,8 @@ export const BOOK_FILE = 'book.json';
 export const HIDDEN_FOLDER = '.cookbook';
 export const BOOKSHELF = 'bookshelf';
 export const PANTRY = 'pantry';
-/** Writing that isn't part of the book: diaries, morning pages, ideas. */
-export const JOURNAL = 'journal';
+/** Recipes: each one names the page it belongs to, and is listed under that page on the Shelf. */
+export const RECIPES = 'recipes';
 export const PANTRY_SECTIONS = ['characters', 'settings', 'research'] as const;
 export const FORMAT_VERSION = 1;
 
@@ -50,7 +51,19 @@ export interface BookInfo {
   countPasted?: boolean;
   /** Saturdays and Sundays without writing don't end a streak. */
   weekendsOff?: boolean;
+  /** Seasonings: the characters picked, in the order shown, what Daniel tracks, and remarks removed for good. */
+  seasonings?: SeasoningsInfo;
 }
+
+export interface SeasoningsInfo {
+  chosen: string[];
+  /** Paths of the pages and books Daniel tracks. */
+  tracked: string[];
+  /** Remarks the writer removed, by key; issues removed go in .cookbook/ignored.json with the rest. */
+  gone: string[];
+}
+
+const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 export const DEFAULT_DAILY_GOAL = 1000;
 
@@ -66,7 +79,6 @@ export async function createBook(fs: StorageAdapter, title: string, now = new Da
   const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString() };
   await fs.makeFolder(BOOKSHELF);
   for (const section of PANTRY_SECTIONS) await fs.makeFolder(joinPath(PANTRY, section));
-  await fs.makeFolder(JOURNAL);
   await fs.makeFolder(HIDDEN_FOLDER);
   await fs.writeText(
     joinPath(HIDDEN_FOLDER, 'README.txt'),
@@ -112,6 +124,9 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(info.deadline) && { deadline: info.deadline }),
     ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
     ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
+    ...(info.seasonings && typeof info.seasonings === 'object' && {
+      seasonings: { chosen: strings(info.seasonings.chosen), tracked: strings(info.seasonings.tracked), gone: strings(info.seasonings.gone) },
+    }),
   };
 }
 

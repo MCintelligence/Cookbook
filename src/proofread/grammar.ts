@@ -5,7 +5,8 @@ import { type Dialect, type Issue, type IssueKind } from './check';
  * Grammar from Harper, which runs on the device as WebAssembly. Spelling is
  * left to Hunspell (see check.ts), so Harper's own spelling rules are off.
  */
-export const OFF_RULES = ['SpellCheck', 'Misspell'];
+// Unclosed quotes are Pete's own check (style.ts), which can offer the closing quote.
+export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes'];
 
 /** Harper's kinds of lint that read as style advice rather than mistakes. */
 const STYLE_KINDS = new Set<LintKind>(['Style', 'Readability', 'Enhancement', 'Redundancy']);

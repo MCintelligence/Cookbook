@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { type TreeNode } from '../storage/book';
 import { LABELS, STATUSES, isCard } from '../storage/document';
-import { type FolderDate, showDay } from '../storage/journal';
 import { type CardSummary } from '../storage/index';
 import { placeAt } from './zoom';
 
@@ -31,14 +30,17 @@ interface Props {
   onTrash?: (path: string) => void;
   /** The folder files dragged in from outside would land in. */
   dropTarget?: string | null;
-  /** Where folder names sit, to line up with the section's place in the switch above. */
-  align?: 'left' | 'center' | 'right';
-  /** Journal folders show a date in place of a word count. */
-  folderDates?: Map<string, FolderDate>;
+  /** Recipes, by the path of the page they belong to: they are listed under it, in italics. */
+  recipes?: Map<string, Recipe[]>;
   /** Shows a Pantry card's portrait beside its name. */
   loadPicture?: (path: string) => Promise<string>;
   /** Opens or closes every folder, or every one inside `under`. A new `at` asks again. */
   folding?: { open: boolean; under?: string; at: number } | null;
+}
+
+export interface Recipe {
+  path: string;
+  title: string;
 }
 
 type Where = 'before' | 'after' | 'inside';
@@ -63,8 +65,8 @@ function readCollapsed(key: string): Set<string> {
 }
 
 /**
- * The Bookshelf (or Pantry) as a stack of recipe cards in folders. Drag a
- * card or folder to reorder it or move it into another folder; on a touch
+ * The Shelf (or a Pantry group) as a compact list of pages in books. Drag a
+ * page or book to reorder it or move it into another book; on a touch
  * screen, press and hold first. Alt+↑ and Alt+↓ move the focused one.
  */
 export function Tree(props: Props) {
@@ -246,7 +248,7 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number; depth: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, align = 'left', folderDates, loadPicture } = shared;
+  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture } = shared;
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
   const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : (locked?.get(node.path) ?? node.name);
@@ -254,7 +256,6 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
   const children = node.children ?? [];
   const marker = drop?.row === node.path ? ` drop-${drop.where}` : dropTarget === node.path ? ' drop-inside' : '';
   const total = words.get(node.path) ?? 0;
-  const date = folderDates?.get(node.path);
 
   const rowProps = {
     'data-tree-path': node.path,
@@ -294,9 +295,8 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
 
   if (node.kind === 'file') {
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
-    // Scenes show their synopsis; Pantry cards show the other names they go by.
-    const subtitle = card?.kind === 'scene' ? card.synopsis : card && isCard(card.kind) && card.aka.length > 0 ? `Also ${card.aka.join(', ')}` : '';
     const colour = LABELS.find((l) => l.id === card?.label);
+    const own = recipes?.get(node.path) ?? [];
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         {renaming === node.path ? (
@@ -316,8 +316,41 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
             {colour && <span className="label-dot" style={{ background: colour.color }} title={`${colour.name} label`} aria-label={`${colour.name} label`} role="img" />}
             {total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>
-          {subtitle && <span className="tree-card-synopsis">{subtitle}</span>}
         </button>
+        )}
+        {own.length > 0 && (
+          <ul className="tree tree-recipes" role="group" aria-label="Recipes">
+            {own.map((r) => (
+              <li role="treeitem" aria-selected={selected === r.path} key={r.path}>
+                {renaming === r.path ? (
+                  <FolderName name={cards.get(r.path)?.title ?? r.title} onDone={(title) => onRename(r.path, title)} />
+                ) : (
+                  <button
+                    className="tree-recipe"
+                    data-recipe-path={r.path}
+                    onClick={() => onSelect(r.path)}
+                    onDoubleClick={() => onStartRename(r.path)}
+                    onContextMenu={(e) => {
+                      if (!onMenu) return;
+                      e.preventDefault();
+                      onMenu({ name: r.title, path: r.path, kind: 'file' }, e.clientX, e.clientY);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'F2') {
+                        e.preventDefault();
+                        onStartRename(r.path);
+                      } else if ((e.key === 'Delete' || e.key === 'Backspace') && onTrash) {
+                        e.preventDefault();
+                        onTrash(r.path);
+                      }
+                    }}
+                  >
+                    {cards.get(r.path)?.title ?? r.title}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </li>
     );
@@ -330,10 +363,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       ) : (
         <button
           {...rowProps}
-          className={`tree-folder align-${align}${marker}`}
-          // Centred and right-aligned folders line up with the switch, however deep they are.
-          style={align === 'left' ? undefined : { marginLeft: -12 * depth, width: `calc(100% + ${12 * depth}px)` }}
-          title={fixed ? undefined : 'Double-click to rename'}
+          className={`tree-folder${marker}`}
           onClick={() => !justDragged.current && toggle(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
@@ -343,15 +373,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
             </span>
             <span className="tree-card-title">{label}</span>
           </span>
-          {folderDates ? (
-            date && (
-              <span className="tree-date" title={date.pinned ? 'Date set by hand' : 'When anything in this folder last changed'}>
-                {showDay(date.date)}
-              </span>
-            )
-          ) : (
-            total > 0 && <span className="tree-words">{fmt(total)}</span>
-          )}
+          {total > 0 && <span className="tree-words">{fmt(total)}</span>}
         </button>
       )}
       {open && children.length > 0 && (

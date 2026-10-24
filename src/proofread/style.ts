@@ -195,6 +195,8 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
     out.push(issue(m.index, m.index + m[0].length, 'redundancy', `“${m[0]}” says it twice. “${short}” is enough.`, [matchCase(m[0], short)]));
   }
   for (const m of text.matchAll(CLICHE_RE)) out.push(issue(m.index, m.index + m[0].length, 'cliche', `“${m[0]}” is a cliché.`));
+  const open = unclosedQuote(text);
+  if (open) out.push(open);
 
   // Echoes: the same telling word again within a few words. Names, glue and
   // short words don't count, and nor does a word that starts a sentence in capitals.
@@ -218,6 +220,21 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
     kept.push(i);
   }
   return kept.sort((a, b) => a.from - b.from || b.to - a.to);
+}
+
+/**
+ * Speech that opens with a curly quote and never closes. The fix closes it
+ * after the paragraph's last word. A straight quote is left alone, since it
+ * may be an inch mark or a typo of its own.
+ */
+export function unclosedQuote(text: string): Issue | null {
+  const last = text.lastIndexOf('“');
+  if (last === -1 || text.indexOf('”', last) !== -1) return null;
+  const end = text.trimEnd().length;
+  const word = /\S+$/u.exec(text.slice(last, end));
+  if (!word || end <= last + 1) return null;
+  const from = last + word.index;
+  return { from, to: end, kind: 'grammar', rule: 'unclosed-quote', message: 'This quote is never closed.', suggestions: [`${text.slice(from, end)}”`] };
 }
 
 export const isSentenceRule = (rule: string) => rule === 'hard-sentence' || rule === 'very-hard-sentence' || rule === 'sticky-sentence';

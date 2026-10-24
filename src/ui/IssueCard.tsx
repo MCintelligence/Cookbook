@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
 import { type FoundIssue, applySuggestion, issueAt } from '../proofread/plugin';
-import { RULE_GROUPS } from '../proofread/rules';
+import { SEASONINGS, fixText, ownerOf, remark } from '../proofread/remarks';
 import { type Proofreader } from '../proofread/useProofreader';
+import { Face } from './Faces';
 import { placeAt } from './zoom';
-
-const KIND_LABEL = { spelling: 'Spelling', grammar: 'Grammar', style: 'Style' } as const;
 
 /** The replacements for an issue: a near-miss name's own, or the dictionary's, asked for only when shown. */
 export function useSuggestions(issue: FoundIssue | null, proof: Proofreader): string[] | null {
@@ -24,64 +23,6 @@ export function useSuggestions(issue: FoundIssue | null, proof: Proofreader): st
     };
   }, [issue?.word, issue?.issue.rule, issue?.issue.suggestions.join('\n')]);
   return found;
-}
-
-const ruleLabel = (id: string) => RULE_GROUPS.flatMap((g) => g.rules).find((r) => r.id === id)?.label;
-
-/** How a fix reads on its button, including the ones that only change spaces. */
-export function fixLabel(problem: string, fix: string): string {
-  if (fix === '') return problem.trim() ? `Remove “${problem.trim()}”` : 'Remove the space';
-  if (fix.trim() === '') return fix.length === 1 ? 'One space' : 'Spaces';
-  return fix;
-}
-
-/** What can be done about an issue: its fixes, then adding the word to the dictionary or ignoring it. */
-export function IssueActions({ editor, issue, proof, onDone }: { editor: Editor; issue: FoundIssue; proof: Proofreader; onDone?: () => void }) {
-  const suggestions = useSuggestions(issue, proof);
-  const [why, setWhy] = useState(false);
-  const done = (fn: () => void) => () => {
-    fn();
-    onDone?.();
-  };
-  return (
-    <>
-      <div className="issue-fixes">
-        {suggestions === null && <span className="issue-quiet">Finding suggestions…</span>}
-        {suggestions?.length === 0 && issue.issue.kind === 'spelling' && <span className="issue-quiet">No suggestions.</span>}
-        {suggestions?.map((s) => (
-          <button key={s} className="issue-fix" onClick={done(() => applySuggestion(editor, issue, s))}>
-            {fixLabel(issue.word, s)}
-          </button>
-        ))}
-      </div>
-      <div className="issue-actions">
-        {issue.issue.rule === 'spelling' && (
-          <button className="pill" onClick={done(() => proof.addWord(issue.word))}>
-            Add to dictionary
-          </button>
-        )}
-        <button className="pill" title="Only this one, here" onClick={done(() => proof.ignore(issue, 'once'))}>
-          Ignore
-        </button>
-        {issue.issue.rule !== 'spelling' && (
-          <button className="pill" title="This, everywhere in the book" onClick={done(() => proof.ignore(issue, 'always'))}>
-            Ignore everywhere
-          </button>
-        )}
-        {issue.issue.why && (
-          <button className="pill" aria-expanded={why} onClick={() => setWhy(!why)}>
-            Why?
-          </button>
-        )}
-      </div>
-      {why && <p className="issue-why">{issue.issue.why}</p>}
-      {ruleLabel(issue.group) && (
-        <button className="issue-off" onClick={done(() => proof.setRuleOn(issue.group, false))}>
-          Stop checking {ruleLabel(issue.group)!.toLowerCase()}
-        </button>
-      )}
-    </>
-  );
 }
 
 /**
@@ -131,18 +72,53 @@ export function IssueCard({ editor, proof }: { editor: Editor | null; proof: Pro
   }, [open]);
 
   if (!open || !editor) return null;
-  const { issue } = open;
+  return <IssueBody editor={editor} issue={open.issue} proof={proof} box={box} pos={pos} onDone={() => setOpen(null)} />;
+}
+
+/** What the card says: whose issue it is, their remark, the fix as text, and the same buttons every time. */
+function IssueBody({ editor, issue, proof, box, pos, onDone }: { editor: Editor; issue: FoundIssue; proof: Proofreader; box: React.RefObject<HTMLDivElement | null>; pos: { left: number; top: number } | null; onDone: () => void }) {
+  const suggestions = useSuggestions(issue, proof);
+  const owner = ownerOf(issue.issue);
+  const [fix, ...others] = suggestions ?? [];
+  const done = (fn: () => void) => () => {
+    fn();
+    onDone();
+  };
   return (
     <div
-      className={`issue-card issue-${issue.issue.kind}`}
+      className="issue-card"
       role="dialog"
-      aria-label={`${KIND_LABEL[issue.issue.kind]} suggestion`}
+      aria-label={SEASONINGS.find((s) => s.id === owner)!.name}
       ref={box}
       style={pos ? { left: pos.left, top: pos.top } : { left: -9999, top: 0 }}
     >
-      <span className="issue-kind">{issue.issue.rule === 'name' ? 'Story name' : KIND_LABEL[issue.issue.kind]}</span>
-      <p className="issue-message">{issue.issue.message}</p>
-      <IssueActions editor={editor} issue={issue} proof={proof} onDone={() => setOpen(null)} />
+      <div className="bubble-row">
+        <Face id={owner} size={22} />
+        <div className="bubble">{remark(issue.issue, issue.word)}</div>
+        <button className="remove" aria-label="Remove for good" title="Remove for good" onClick={done(() => proof.ignore(issue, 'once'))}>
+          ✕
+        </button>
+      </div>
+      <div className="fix">
+        <span className="sug">{fix !== undefined && <>→ <strong>{fixText(issue.word, fix)}</strong></>}</span>
+        <button className="btn btn-primary" disabled={fix === undefined} onClick={done(() => fix !== undefined && applySuggestion(editor, issue, fix))}>
+          Fix
+        </button>
+      </div>
+      {(others.length > 0 || issue.issue.rule === 'spelling') && (
+        <div className="issue-more">
+          {others.slice(0, 4).map((s) => (
+            <button key={s} className="text-link" onClick={done(() => applySuggestion(editor, issue, s))}>
+              {fixText(issue.word, s)}
+            </button>
+          ))}
+          {issue.issue.rule === 'spelling' && (
+            <button className="text-link" onClick={done(() => proof.addWord(issue.word))}>
+              Add to dictionary
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

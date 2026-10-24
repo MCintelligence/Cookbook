@@ -194,7 +194,7 @@ function Targets({
         <div className="goals-line">
           <span className="goals-t">
             <b>Book target</b>
-            <span className="goals-sub">{goals.bookTarget ? `${fmt(bookWords)} of ${fmt(goals.bookTarget)} words` : `${fmt(bookWords)} words on the Bookshelf`}</span>
+            <span className="goals-sub">{goals.bookTarget ? `${fmt(bookWords)} of ${fmt(goals.bookTarget)} words` : `${fmt(bookWords)} words on the Shelf`}</span>
           </span>
           <NumberInput value={goals.bookTarget ?? null} placeholder="No target" label="Book target in words" onCommit={(v) => onGoals({ bookTarget: v ?? undefined })} />
         </div>

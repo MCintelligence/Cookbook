@@ -167,7 +167,7 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   root.dataset.size = s.size;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
-  const bar = { light: '#F6EEDF', dark: '#1E1A17', sepia: '#EAD9BB' }[theme];
+  const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#EAD9BB' }[theme];
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) meta.content = bar;
 }
 

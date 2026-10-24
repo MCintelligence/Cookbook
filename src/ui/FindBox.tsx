@@ -4,7 +4,7 @@ import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
 import { keysFor, pressed } from '../shortcuts';
 
-const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Page', character: 'Character', setting: 'Setting', research: 'Research', journal: 'Journal' };
+const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Page', character: 'Character', setting: 'Place', research: 'Research', recipe: 'Recipe' };
 
 interface Props {
   editor: Editor | null;
@@ -19,8 +19,8 @@ interface Props {
 }
 
 /**
- * The one search box in the top bar. It finds and replaces in the open scene,
- * and lists the other scenes and cards that match.
+ * Search, under its button in the top bar. It finds and replaces in the open
+ * page, and lists the other pages and cards that match.
  */
 export function FindBox({ editor, search, currentPath, onOpenHit, request, beforeReplaceAll }: Props) {
   const [query, setQuery] = useState('');
@@ -59,7 +59,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
       if (!e.defaultPrevented && pressed(e, 'find')) {
         e.preventDefault();
         setOpen(true);
-        input.current?.select();
+        requestAnimationFrame(() => input.current?.select());
       }
     };
     const onClick = (e: MouseEvent) => {
@@ -77,7 +77,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
     if (!request) return;
     setQuery(request.query);
     setOpen(true);
-    input.current?.focus();
+    requestAnimationFrame(() => input.current?.focus());
   }, [request?.at]);
 
   const close = () => {
@@ -88,56 +88,68 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
 
   return (
     <div className="find" ref={box}>
-      <label className={`find-field${open ? ' is-open' : ''}`}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <path d="M20 20l-3.5-3.5" />
+      <button
+        className="panel-btn"
+        aria-expanded={open}
+        aria-pressed={open}
+        title={`Search (${keysFor('find')})`}
+        onClick={() => {
+          if (open) return close();
+          setOpen(true);
+          requestAnimationFrame(() => input.current?.select());
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6" />
+          <path d="m19.5 19.5-4-4" />
         </svg>
-        <input
-          ref={input}
-          value={query}
-          placeholder="Find in this book"
-          aria-label="Find"
-          onFocus={() => setOpen(true)}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && editor) stepFind(editor, e.shiftKey ? -1 : 1);
-            if (e.key === 'Escape') close();
-          }}
-        />
-        {query ? (
-          <span className="find-count">{find.count === 0 ? 'No matches' : `${find.current + 1} of ${find.count}`}</span>
-        ) : (
-          <kbd>{keysFor('find')}</kbd>
-        )}
-      </label>
+        Search
+      </button>
       {open && (
-        <section className="find-pop" aria-label="Find and replace">
+        <section className="find-pop" aria-label="Search and replace">
+          <label className="find-field">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6" />
+              <path d="m19.5 19.5-4-4" />
+            </svg>
+            <input
+              ref={input}
+              value={query}
+              placeholder="Search this work"
+              aria-label="Search"
+              autoFocus
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && editor) stepFind(editor, e.shiftKey ? -1 : 1);
+                if (e.key === 'Escape') close();
+              }}
+            />
+            {query && <span className="find-count">{find.count === 0 ? 'No matches' : `${find.current + 1} of ${find.count}`}</span>}
+          </label>
           <div className="find-row">
             <label className="find-replace">
               <span>Replace with</span>
               <input value={replacement} onChange={(e) => setReplacement(e.target.value)} aria-label="Replace with" />
             </label>
-            <button className="pill" disabled={!editor || find.count === 0} onClick={() => editor && replaceCurrent(editor, replacement)}>
+            <button className="btn" disabled={!editor || find.count === 0} onClick={() => editor && replaceCurrent(editor, replacement)}>
               Replace
             </button>
-            <button className="pill pill-accent" disabled={!editor || find.count === 0} onClick={() => editor && void (beforeReplaceAll?.() ?? Promise.resolve()).then(() => replaceAll(editor, replacement))}>
+            <button className="btn btn-primary" disabled={!editor || find.count === 0} onClick={() => editor && void (beforeReplaceAll?.() ?? Promise.resolve()).then(() => replaceAll(editor, replacement))}>
               All {find.count || ''}
             </button>
           </div>
           <div className="find-row">
-            <button className="chip" aria-pressed={wholeWord} onClick={() => setWholeWord(!wholeWord)}>
+            <button className="btn btn-toggle" aria-pressed={wholeWord} onClick={() => setWholeWord(!wholeWord)}>
               Whole word
             </button>
-            <button className="chip" aria-pressed={matchCase} onClick={() => setMatchCase(!matchCase)}>
+            <button className="btn btn-toggle" aria-pressed={matchCase} onClick={() => setMatchCase(!matchCase)}>
               Match case
             </button>
-            <span className="find-hint">↵ next · ⇧↵ previous · Esc close</span>
           </div>
           {query.trim() !== '' && (
             <div className="find-results">
               <div className="find-results-label">
-                <span>Elsewhere in the book</span>
+                <span>Elsewhere in this work</span>
                 <span>{elsewhere.length === 0 ? 'Nothing else' : elsewhere.length}</span>
               </div>
               {elsewhere.length > 0 && (

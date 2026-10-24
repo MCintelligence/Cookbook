@@ -31,6 +31,8 @@ interface Options {
   onDialect: (dialect: Dialect) => void;
   /** Rule groups the book has switched off. */
   off: string[] | undefined;
+  /** Rule groups nobody is checking for now, because their seasoning isn't picked. Not saved. */
+  resting?: string[];
   onOff: (off: string[]) => void;
   editor: Editor | null;
   /** The open scene or card, whose ignored words apply. */
@@ -43,7 +45,7 @@ interface Options {
 }
 
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, onOff, editor, docId, names, review, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -111,9 +113,10 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
   }, [editor, sceneIgnored, bookIgnored]);
 
   const off = useMemo(() => offRules ?? [], [offRules]);
+  const restingKey = (resting ?? []).join('\n');
   useEffect(() => {
-    if (editor) setRulesOff(editor, off);
-  }, [editor, off]);
+    if (editor) setRulesOff(editor, [...off, ...(resting ?? [])]);
+  }, [editor, off, restingKey]);
 
   const saveWords = useCallback(
     (next: string[]) => {

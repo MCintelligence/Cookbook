@@ -13,7 +13,7 @@ interface Props {
   onMenu?: (path: string, x: number, y: number) => void;
 }
 
-/** Cards pinned beside the draft, in the right-hand drawer, to keep a character in view while writing. */
+/** Cards pinned beside the page, in the right-hand drawer, to keep a character in view while writing. */
 export function PinnedCards({ paths, version, loadCard, loadPicture, onUnpin, onOpen, onMenu }: Props) {
   return (
     <section className="pins" aria-label="Pinned cards">

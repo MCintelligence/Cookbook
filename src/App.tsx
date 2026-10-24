@@ -3,8 +3,8 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
   BOOKSHELF,
-  JOURNAL,
   PANTRY,
+  RECIPES,
   PANTRY_SECTIONS,
   childrenOf,
   type BookInfo,
@@ -30,7 +30,6 @@ import {
   writeDocument,
 } from './storage/book';
 import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
-import { type FolderDate, type PinnedDates, folderDates as readFolderDates, loadPinned, movePinned, savePinned, withPinned } from './storage/journal';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -46,10 +45,9 @@ import { Menu, type MenuItem } from './ui/Menu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
-import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, JOURNAL_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
+import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { parseMarkdown, plainText } from './editor/markdown';
 import { friendlyError } from './storage/errors';
-import { TemplateMenu } from './ui/TemplateMenu';
 import { GoalsPopup, type Goals } from './ui/GoalsPopup';
 import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
@@ -96,9 +94,10 @@ import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
 import { FindBox } from './ui/FindBox';
-import { PageFootnotes } from './ui/PageFootnotes';
+import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
-import { IssueCard, fixLabel } from './ui/IssueCard';
+import { IssueCard } from './ui/IssueCard';
+import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
 import { type FoundIssue, applySuggestion, issueAt } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
@@ -113,36 +112,33 @@ import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnap
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
 import { checkForUpdates } from './ui/UpdateBanner';
-import { addNoteAnchor, deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
+import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
+import { dialogueRanges } from './editor/dialogue';
 import { isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
-import { DatePopover } from './ui/DatePopover';
 import { UpdateBanner } from './ui/UpdateBanner';
-import { type Notes, Seasonings, type SeasoningsTab, useSeasoningsCount } from './ui/Seasonings';
+import { Seasonings, type Tracked } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
-import { Tree } from './ui/Tree';
-import { type Section, SectionSwitch } from './ui/SectionSwitch';
+import { ZoomControl } from './ui/ZoomControl';
+import { type Recipe, Tree } from './ui/Tree';
 import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
-import { type PantryView, PantryBar, PantryResults } from './ui/PantryBar';
+import { PantryPanel } from './ui/PantryPanel';
 import { shrinkPicture } from './ui/pictures';
-import { SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
+import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
 
-type Tab = Section;
+type Notes = Record<string, string>;
+/** The panel open on the right of the page, if any. */
+type Panel = 'pantry' | 'seasonings';
 
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 
-const TEMPLATES: Record<Tab, DocTemplate[]> = { book: SCENE_TEMPLATES, pantry: CARD_TEMPLATES, journal: JOURNAL_TEMPLATES };
-const NOUN: Record<Tab, string> = { book: 'page', pantry: 'card', journal: 'entry' };
-const SECTION_NAME: Record<Tab, string> = { book: 'Bookshelf', pantry: 'Pantry', journal: 'Journal' };
-const TEMPLATE_LABEL: Record<Tab, string> = { book: 'New page from template', pantry: 'New card from template', journal: 'New entry from template' };
-
-const ROOTS: Record<Tab, string> = { book: BOOKSHELF, pantry: PANTRY, journal: JOURNAL };
-/** Folder names line up with the section's place in the switch above them. */
-const ALIGN = { book: 'left', pantry: 'center', journal: 'right' } as const;
+/** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
+const topOf = (p: string) => p.split('/')[0]!;
+const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order });
 
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
@@ -198,17 +194,21 @@ function folderName(location: BookLocation): string {
 export function App() {
   const [fs, setFs] = useState<StorageAdapter | null>(null);
   const [where, setWhere] = useState('');
+  /** Words typed since the last save, for the dot in the footer. */
+  const [dirty, setDirty] = useState(false);
   const [book, setBook] = useState<BookInfo | null>(null);
   const [sheet, setSheet] = useState<StyleSheet>(defaultStyles);
-  const [tab, setTab] = useState<Tab>('book');
+  /** The Shelf's pages and books, the Pantry's groups, and the recipes, each as read from its folder. */
   const [tree, setTree] = useState<TreeNode[]>([]);
+  const [pantryTree, setPantryTree] = useState<TreeNode[]>([]);
+  const [recipes, setRecipes] = useState<Map<string, Recipe[]>>(new Map());
   const [path, setPath] = useState<string | null>(null);
   const [doc, setDoc] = useState<CookbookDocument | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [seasoningsOpen, setSeasoningsOpen] = useState(false);
-  const [seasoningsTab, setSeasoningsTab] = useState<SeasoningsTab>('all');
-  const [seasoningsRequest, setSeasoningsRequest] = useState<(SeasoningsRequest & { at: number }) | null>(null);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const seasoningsOpen = panel === 'seasonings';
+  const togglePanel = (p: Panel) => setPanel((open) => (open === p ? null : p));
   const docRef = useRef<CookbookDocument | null>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSave = useRef<(() => Promise<void>) | null>(null);
@@ -223,24 +223,19 @@ export function App() {
   const [indexVersion, setIndexVersion] = useState(0);
   const order = useRef<Order>({});
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [pantryView, setPantryView] = useState<PantryView>('all');
+  const [pantryGroup, setPantryGroup] = useState<PantrySection>('characters');
   const [pantryQuery, setPantryQuery] = useState('');
   /** The Pantry shelf, and where the @ that opened it is. */
   const [shelf, setShelf] = useState<{ at: number | null } | null>(null);
   /** Where the / is that opened the insert menu. */
   const [slash, setSlash] = useState<number | null>(null);
   const [pins, setPinsState] = useState<string[]>([]);
-  /** Journal folder dates pinned by hand, and the date every Journal folder shows. */
-  const [pinned, setPinnedState] = useState<PinnedDates>({});
-  const [dates, setDates] = useState<Map<string, FolderDate>>(new Map());
-  /** The Bookshelf being read as one manuscript, or null while writing. */
+  /** The Shelf being read as one manuscript (Read book), or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
-  /** Words for the find box, from "Find everywhere" on a right-click. */
+  /** Words for Search, from "Search everywhere" on a right-click. */
   const [findRequest, setFindRequest] = useState<{ query: string; at: number } | null>(null);
   /** Opens or closes every folder (or every one inside `under`), from a right-click. */
   const [folding, setFolding] = useState<{ open: boolean; under?: string; at: number } | null>(null);
-  /** The Journal folder whose date is being changed. */
-  const [dating, setDating] = useState<{ path: string; x: number; y: number; date: string | null; pinned: boolean } | null>(null);
   const portraitInput = useRef<HTMLInputElement>(null);
   const portraitFor = useRef<string | null>(null);
   const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
@@ -358,12 +353,10 @@ export function App() {
     docRef.current = null;
     setDoc(null);
     setPath(null);
-    setTab('book');
     setBook(info);
     setSheet(await loadStyles(nextFs));
     setHistory(await loadHistory(nextFs));
     order.current = await loadOrder(nextFs);
-    setPinnedState(await loadPinned(nextFs));
     setFs(nextFs);
     setWhere(nextWhere);
     setLocation(target);
@@ -401,7 +394,7 @@ export function App() {
 
   const openFolder = () =>
     fromLibrary(async () => {
-      const picked = await pickFolder('Open a book folder');
+      const picked = await pickFolder('Open a work’s folder');
       if (!picked) return 'cancelled';
       try {
         await openAt(picked);
@@ -451,38 +444,33 @@ export function App() {
     })().catch((e: unknown) => setError(friendlyError(e)));
   }, []);
 
-  const root = ROOTS[tab];
-  /** The folder the sidebar shows: the Bookshelf, the whole Pantry, or one Pantry section. */
-  const viewRoot = tab === 'pantry' && pantryView !== 'all' ? joinPath(PANTRY, pantryView) : root;
   const refreshTree = useCallback(async () => {
-    // The Pantry's sections come in their usual order unless the writer has listed them otherwise.
     if (!fs) return;
-    // Books made before the Journal existed get its folder the first time it is shown.
-    if (root === JOURNAL && !(await fs.exists(JOURNAL))) await fs.makeFolder(JOURNAL);
-    setTree(await readTree(fs, root, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current }));
-  }, [fs, root]);
+    // The Pantry's groups come in their usual order unless the writer has listed them otherwise.
+    const ordered = ORDERED(order.current);
+    setTree(await readTree(fs, BOOKSHELF, ordered));
+    setPantryTree(await readTree(fs, PANTRY, ordered));
+    // Recipes are listed under the page they name, so they follow it wherever it moves.
+    const byPage = new Map<string, Recipe[]>();
+    if (await fs.exists(RECIPES)) {
+      const shelf = new Map<string, string>();
+      for (const [p, c] of index.current?.index.cards() ?? []) if (c.kind === 'scene') shelf.set(c.id, p);
+      for (const file of walkFiles(await readTree(fs, RECIPES, ordered))) {
+        const recipe = await readDocument(fs, file.path).catch(() => null);
+        const page = recipe && typeof recipe.fields.page === 'string' ? shelf.get(recipe.fields.page) : undefined;
+        if (!recipe || !page) continue;
+        byPage.set(page, [...(byPage.get(page) ?? []), { path: file.path, title: recipe.title }]);
+      }
+    }
+    setRecipes(byPage);
+  }, [fs]);
 
   useEffect(() => {
     void refreshTree();
-  }, [refreshTree]);
+  }, [refreshTree, indexVersion > 0]);
 
-  // Journal folders show when anything in them last changed, so the dates follow every save.
-  useEffect(() => {
-    if (!fs || tab !== 'journal') return;
-    let live = true;
-    readFolderDates(fs, tree, pinned).then(
-      (d) => live && setDates(d),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [fs, tab, tree, pinned, indexVersion]);
-
-  const setPinned = (next: PinnedDates) => {
-    setPinnedState(next);
-    if (fs) savePinned(fs, next).catch((e: unknown) => setError(friendlyError(e)));
-  };
+  /** The tree a path's top folder holds. */
+  const treeOf = (top: string) => (top === PANTRY ? pantryTree : tree);
 
   const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
   const [history, setHistoryState] = useState<WritingHistory>(() => new Map());
@@ -526,6 +514,7 @@ export function App() {
     if (!save) return;
     try {
       await save();
+      if (!pendingSave.current) setDirty(false);
       unsaved.current = null;
       dropRescue(window.localStorage);
     } catch (e) {
@@ -593,6 +582,7 @@ export function App() {
     const current = index.current;
     const text = serializeDocument(next);
     unsaved.current = { path: target, text, base: savedText.current ?? text };
+    setDirty(true);
     pendingSave.current = async () => {
       await writeDocument(fs, target, next);
       savedText.current = text;
@@ -627,9 +617,8 @@ export function App() {
     if (!fs) return;
     await flushSave();
     await saveUndoNow();
-    if (p.startsWith(PANTRY + '/')) setTab('pantry');
-    else if (p.startsWith(BOOKSHELF + '/')) setTab('book');
-    else if (p.startsWith(JOURNAL + '/')) setTab('journal');
+    const section = sectionOf(p);
+    if (section) setPantryGroup(section);
     const opened = await readDocument(fs, p);
     setManuscript(null);
     setSideOpen(false);
@@ -671,18 +660,23 @@ export function App() {
   }, [path]);
 
   const addScene = (template?: DocTemplate) => {
-    // New scenes and cards go in the folder of the one being written, so they land in the same chapter.
-    const folder = path && path.startsWith(viewRoot + '/') ? parentOf(path) : viewRoot;
-    if (tab === 'book') return addFrom(template ?? SCENE_TEMPLATES[0]!, folder);
-    if (tab === 'journal') return addFrom(template ?? JOURNAL_TEMPLATES[0]!, folder);
-    const section = pantryView !== 'all' ? pantryView : ((path && sectionOf(path)) ?? 'characters');
-    return addFrom(template ?? CARD_TEMPLATES.find((t) => t.folder === section)!, folder);
+    // New pages go in the book of the one being written, so they land in the same chapter.
+    const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
+    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder);
+  };
+
+  /** A new card in the Pantry group being shown, or in the folder of the open card if it is in that group. */
+  const addCard = () => {
+    const group = joinPath(PANTRY, pantryGroup);
+    const folder = path && path.startsWith(group + '/') ? parentOf(path) : group;
+    return addFrom(CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!, folder);
   };
 
   const addFrom = async (template: DocTemplate, folder: string) => {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
-    if (p.startsWith(root + '/')) order.current = await placeNew(fs, order.current, tree, root, p, path);
+    const top = topOf(p);
+    if (top === BOOKSHELF || top === PANTRY) order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
@@ -748,7 +742,8 @@ export function App() {
     await flushSave().finally(() => (movingWords.current = false));
     const title = `${scene.title}, part 2`;
     const p = await createDocument(fs, parentOf(path), title, scene.kind);
-    if (p.startsWith(root + '/')) order.current = await placeNew(fs, order.current, tree, root, p, path);
+    const top = topOf(p);
+    order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
     const created = await readDocument(fs, p);
     await writeDocument(fs, p, { ...created, body: moved, fields: Object.keys(go).length > 0 ? { notes: go } : {} });
     index.current?.index.upsert(toIndexed(p, { ...created, body: moved }, await fs.stamp(p)));
@@ -778,7 +773,7 @@ export function App() {
     if (!fs) return [];
     const top = folder.split('/')[0]!;
     if (!(await fs.exists(folder))) return [];
-    return childrenOf(await readTree(fs, top, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current }), top, folder).map((n) => n.name);
+    return childrenOf(await readTree(fs, top, ORDERED(order.current)), top, folder).map((n) => n.name);
   };
 
   /** The index catches up with files that came or went outside the editor. */
@@ -897,7 +892,7 @@ export function App() {
     if (!fs || files.length === 0) return;
     await flushSave();
     await saveUndoNow();
-    const folder = into ?? (path?.startsWith(viewRoot + '/') ? parentOf(path) : tab === 'pantry' && viewRoot === PANTRY ? joinPath(PANTRY, 'characters') : viewRoot);
+    const folder = into ?? (path?.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF);
     const top = folder.split('/')[0]!;
     const section = sectionOf(folder + '/x');
     const kind = top === PANTRY && section ? SECTION_KIND[section] : 'scene';
@@ -910,7 +905,7 @@ export function App() {
         const imported = importFile(file.name, new Uint8Array(await file.arrayBuffer()));
         const p = await createDocument(fs, folder, imported.title, kind);
         await writeDocument(fs, p, { ...(await readDocument(fs, p)), body: imported.body });
-        const shelf = await readTree(fs, top, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current });
+        const shelf = await readTree(fs, top, ORDERED(order.current));
         order.current = await placeNew(fs, order.current, shelf, top, p, after);
         after = p;
         first ??= p;
@@ -924,7 +919,7 @@ export function App() {
     if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
     if (first) {
       await select(first);
-      const where = folder === top ? (top === BOOKSHELF ? 'the Bookshelf' : 'the Pantry') : `“${baseName(folder)}”`;
+      const where = folder === top ? (top === BOOKSHELF ? 'the Shelf' : 'the Pantry') : `“${baseName(folder)}”`;
       say(`Imported ${count === 1 ? 'one file' : `${count} files`} into ${where}.`);
     }
   };
@@ -934,12 +929,12 @@ export function App() {
     importInput.current?.click();
   };
 
-  /** Where files dropped on the sidebar go: the folder under the pointer, or the folder a scene is in. */
+  /** Where files dropped on the Shelf go: the book under the pointer, or the book a page is in. */
   const dropFolder = (target: EventTarget | null): string => {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-tree-path]');
-    if (!row) return tab === 'pantry' && viewRoot === PANTRY ? joinPath(PANTRY, 'characters') : viewRoot;
+    if (!row) return BOOKSHELF;
     const p = row.dataset.treePath!;
-    return row.dataset.treeKind === 'folder' && !(p === PANTRY) ? p : parentOf(p) === PANTRY ? joinPath(PANTRY, 'characters') : parentOf(p);
+    return row.dataset.treeKind === 'folder' ? p : parentOf(p);
   };
 
   const backUpNow = async () => {
@@ -997,19 +992,19 @@ export function App() {
     }
   };
   const chooseNewBooksFolder = async () => {
-    const picked = await pickFolder('Choose where new books go').catch(() => null);
+    const picked = await pickFolder('Choose where new works go').catch(() => null);
     if (picked?.kind === 'folder') setSettings({ newBooksFolder: picked.path });
   };
 
   const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     setMenu({
-      label: 'Book',
+      label: 'Work',
       x: r.left,
       y: r.bottom + 4,
       items: [
-        { label: 'Your books…', onPick: () => setLibraryOpen(true) },
-        { label: 'Configure this book…', onPick: () => openSettings('page') },
+        { label: 'Your works…', onPick: () => setLibraryOpen(true) },
+        { label: 'Configure this work…', onPick: () => openSettings('page') },
         { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
         { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
@@ -1035,13 +1030,12 @@ export function App() {
     const label = RULE_GROUPS.flatMap((g) => g.rules).find((r) => r.id === issue.group)?.label;
     return [
       ...(fixes.length > 0
-        ? fixes.slice(0, 6).map((f) => ({ label: fixLabel(issue.word, f), onPick: () => applySuggestion(ed, issue, f) }))
+        ? fixes.slice(0, 6).map((f) => ({ label: fixText(issue.word, f), onPick: () => applySuggestion(ed, issue, f) }))
         : [{ label: issue.issue.kind === 'spelling' ? 'No suggestions' : issue.issue.message, onPick: () => {}, disabled: true }]),
       { separator: true },
       ...(issue.issue.rule === 'spelling' ? [{ label: 'Add to dictionary', onPick: () => proof.addWord(issue.word) }] : []),
-      { label: 'Ignore', onPick: () => proof.ignore(issue, 'once') },
-      ...(issue.issue.rule !== 'spelling' ? [{ label: 'Ignore everywhere', onPick: () => proof.ignore(issue, 'always') }] : []),
-      ...(issue.issue.why ? [{ label: 'Why?', onPick: () => say(issue.issue.why!) }] : []),
+      { label: 'Remove for good', onPick: () => proof.ignore(issue, 'once') },
+      ...(issue.issue.rule !== 'spelling' ? [{ label: 'Remove everywhere for good', onPick: () => proof.ignore(issue, 'always') }] : []),
       ...(label ? [{ label: `Stop checking ${label.toLowerCase()}`, onPick: () => proof.setRuleOn(issue.group, false) }] : []),
     ];
   };
@@ -1068,8 +1062,8 @@ export function App() {
       const card = nameEl.dataset.card;
       return showMenu('Name', x, y, [
         { label: 'Open the card', onPick: () => void select(card) },
-        { label: 'Pin it beside the draft', onPick: () => pin(card) },
-        { label: 'Find every mention', onPick: () => findEverywhere(cards.get(card)?.title ?? nameEl.textContent ?? '') },
+        { label: 'Pin beside page', onPick: () => pin(card) },
+        { label: 'Search every mention', onPick: () => findEverywhere(cards.get(card)?.title ?? nameEl.textContent ?? '') },
       ]);
     }
 
@@ -1104,8 +1098,7 @@ export function App() {
       const pos = ed.view.posAtDOM(footEl, 0);
       const index = Math.max(0, footnotes(ed.state.doc).findIndex((f) => f.pos === pos));
       return showMenu('Footnote', x, y, [
-        { label: 'Edit', onPick: () => showInSeasonings({ tab: 'footnotes', index }) },
-        { label: 'Go to it in Seasonings', onPick: () => showInSeasonings({ tab: 'footnotes', index }) },
+        { label: 'Edit', onPick: () => editFootnote(index) },
         { separator: true },
         { label: 'Delete footnote', danger: true, onPick: () => deleteFootnote(ed, index) },
       ]);
@@ -1115,9 +1108,6 @@ export function App() {
     if (noteEl?.dataset.note) {
       const id = noteEl.dataset.note;
       return showMenu('Note', x, y, [
-        { label: 'Edit', onPick: () => showInSeasonings({ tab: 'notes', id }) },
-        { label: 'Go to it in Seasonings', onPick: () => showInSeasonings({ tab: 'notes', id }) },
-        { separator: true },
         {
           label: 'Delete note',
           danger: true,
@@ -1157,16 +1147,7 @@ export function App() {
       { label: 'Italic', hint: keys('Mod-I'), checked: isFormatted(ed, 'emphasis'), onPick: () => void toggleFormat(ed, 'emphasis') },
       { label: 'Underline', hint: keys('Mod-U'), checked: isFormatted(ed, 'underline'), onPick: () => void toggleFormat(ed, 'underline') },
       { separator: true },
-      {
-        label: 'Add note',
-        hint: keys('Mod-Alt-M'),
-        disabled: ed.state.selection.empty,
-        onPick: () => {
-          const id = addNoteAnchor(ed, Object.keys(readNotes(docRef.current)));
-          if (id) showInSeasonings({ tab: 'notes', id });
-        },
-      },
-      { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => showInSeasonings({ tab: 'footnotes', index: insertFootnote(ed) }) },
+      { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => editFootnote(insertFootnote(ed)) },
       {
         label: 'Insert',
         items: [
@@ -1178,7 +1159,10 @@ export function App() {
         ],
       },
       { separator: true },
-      { label: 'Find in book', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
+      { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
+      { separator: true },
+      { label: 'Study', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
+      { label: 'Read book', hint: keysFor('bookread'), onPick: () => void readManuscript() },
     ];
     if (words) {
       const short = words.length > 24 ? `${words.slice(0, 23)}…` : words;
@@ -1186,7 +1170,7 @@ export function App() {
         { separator: true },
         { heading: `“${short}”` },
         { label: 'Look it up in the Pantry', onPick: () => lookUp(words) },
-        { label: 'Find everywhere', onPick: () => findEverywhere(words) },
+        { label: 'Search everywhere', onPick: () => findEverywhere(words) },
         {
           label: 'Make it a Pantry card',
           items: CARD_TEMPLATES.map((t) => ({ label: t.name, onPick: () => void makeCard(t, words) })),
@@ -1196,13 +1180,12 @@ export function App() {
     showMenu('Page', x, y, items);
   };
 
-  /** Searches the whole book from the find box in the top bar. */
+  /** Searches the whole work from Search in the top bar. */
   const findEverywhere = (query: string) => setFindRequest({ query, at: Date.now() });
 
   /** Shows the Pantry cards whose names or notes match. */
   const lookUp = (query: string) => {
-    setTab('pantry');
-    setPantryView('all');
+    setPanel('pantry');
     setPantryQuery(query);
   };
 
@@ -1210,51 +1193,63 @@ export function App() {
   const makeCard = async (template: DocTemplate, title: string) => {
     if (!fs) return;
     const p = await createFromTemplate(fs, '', template, title);
-    const shelf = await readTree(fs, PANTRY, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current });
+    const shelf = await readTree(fs, PANTRY, ORDERED(order.current));
     order.current = await placeNew(fs, order.current, shelf, PANTRY, p, null);
     index.current?.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
-    if (tab === 'pantry') await refreshTree();
+    await refreshTree();
     say(`Made a ${template.name.toLowerCase()} card for “${title}”.`);
   };
 
-  /** Right-click on the empty part of the Bookshelf, Pantry or Journal. */
+  /** Right-click on the empty part of the Shelf. */
   const shelfMenu = (x: number, y: number) => {
-    const noun = NOUN[tab];
-    showMenu(SECTION_NAME[tab], x, y, [
-      { label: `New ${noun}`, onPick: () => void addScene() },
-      { label: 'New folder', onPick: () => void addFolder() },
-      { label: `New ${noun} from template`, items: TEMPLATES[tab].map((t) => ({ label: t.name, onPick: () => void addScene(t) })) },
+    showMenu('Shelf', x, y, [
+      { label: 'New page', onPick: () => void addScene() },
+      { label: 'New book', onPick: () => void addFolder() },
+      { label: 'New page from template', items: SCENE_TEMPLATES.map((t) => ({ label: t.name, onPick: () => void addScene(t) })) },
       { label: 'Import files…', onPick: () => chooseImport(null) },
-      ...(tab === 'book' ? [{ separator: true } as const, { label: 'Bookread', onPick: () => void readManuscript() }] : []),
+      { separator: true },
+      { label: 'Read book', onPick: () => void readManuscript() },
       { separator: true },
       { label: 'Expand all', onPick: () => setFolding({ open: true, at: Date.now() }) },
       { label: 'Collapse all', onPick: () => setFolding({ open: false, at: Date.now() }) },
     ]);
   };
 
-  /** Every folder something could move to, with the top of the section first. */
+  /** Every folder something could move to, with the top of the Shelf first. */
   const moveTargets = (item: string): MenuItem[] => {
+    const top = topOf(item);
     const inside = (f: string) => f === item || f.startsWith(item + '/');
     const out: MenuItem[] = [];
-    if (root !== PANTRY && parentOf(item) !== root) out.push({ label: `Top of the ${SECTION_NAME[tab]}`, onPick: () => void moveInto(item, root) });
+    if (top === BOOKSHELF && parentOf(item) !== top) out.push({ label: 'Top of the Shelf', onPick: () => void moveInto(item, top) });
     const walk = (nodes: TreeNode[], depth: number) => {
       for (const n of nodes) {
         if (n.kind !== 'folder' || inside(n.path)) continue;
-        if (parentOf(item) !== n.path) out.push({ label: `${' '.repeat(depth)}${PANTRY_FOLDERS.get(n.path) ?? n.name}`, onPick: () => void moveInto(item, n.path) });
+        if (parentOf(item) !== n.path) out.push({ label: `${' '.repeat(depth)}${PANTRY_FOLDERS.get(n.path) ?? n.name}`, onPick: () => void moveInto(item, n.path) });
         walk(n.children ?? [], depth + 1);
       }
     };
-    walk(tree, 0);
-    return out.length > 0 ? out : [{ label: 'No other folders', onPick: () => {}, disabled: true }];
+    walk(treeOf(top), 0);
+    return out.length > 0 ? out : [{ label: top === BOOKSHELF ? 'No other books' : 'No other folders', onPick: () => {}, disabled: true }];
   };
-  const moveInto = (item: string, folder: string) => moveInTree(item, folder, childrenOf(tree, root, folder).length);
+  const moveInto = (item: string, folder: string) => moveInTree(item, folder, childrenOf(treeOf(topOf(item)), topOf(item), folder).length);
 
   const rowMenu = (node: TreeNode, x: number, y: number) => {
     const p = node.path;
+    const top = topOf(p);
+    const onShelf = top === BOOKSHELF;
     const fixed = PANTRY_FOLDERS.has(p);
     const card = cards.get(p);
     const trash: MenuItem[] = fixed ? [] : [{ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(p) }];
+    if (top === RECIPES) {
+      showMenu('Recipe', x, y, [
+        { label: 'Open', onPick: () => void select(p) },
+        ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
+        { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+        ...trash,
+      ]);
+      return;
+    }
     const common = {
       label: {
         label: 'Label',
@@ -1267,19 +1262,16 @@ export function App() {
       move: { label: 'Move to', items: moveTargets(p) },
     };
     if (node.kind === 'folder') {
-      const kids = childrenOf(tree, root, p);
-      const date = dates.get(p);
-      showMenu('Folder', x, y, [
+      const kids = childrenOf(treeOf(top), top, p);
+      showMenu(onShelf ? 'Book' : 'Folder', x, y, [
         {
-          label: tab === 'pantry' ? 'New card here' : tab === 'journal' ? 'New entry here' : 'New page here',
-          onPick: () => void addFrom(tab === 'pantry' ? CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))! : TEMPLATES[tab][0]!, p),
+          label: onShelf ? 'New page here' : 'New card here',
+          onPick: () => void addFrom(onShelf ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))!, p),
         },
-        { label: 'New folder inside', onPick: () => void addFolderIn(p) },
-        { label: 'Import files here…', onPick: () => chooseImport(p) },
+        { label: onShelf ? 'New book inside' : 'New folder inside', onPick: () => void addFolderIn(p) },
+        ...(onShelf ? [{ label: 'Import files here…', onPick: () => chooseImport(p) }] : []),
         { separator: true },
-        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate]),
-        ...(tab === 'journal' ? [{ label: 'Change date…', onPick: () => setDating({ path: p, x, y, date: date?.date ?? null, pinned: !!date?.pinned }) }] : []),
-        ...(fixed ? [] : [common.move]),
+        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move]),
         {
           label: 'Sort contents',
           disabled: kids.length < 2,
@@ -1288,7 +1280,7 @@ export function App() {
             { label: 'Z to A', onPick: () => void sortContents(p, true) },
           ],
         },
-        ...(tab === 'book' ? [{ label: 'Bookread this folder', onPick: () => void readManuscript(p) }, { label: 'Export folder', items: exportItems(p) }] : []),
+        ...(onShelf ? [{ label: 'Read this book', onPick: () => void readManuscript(p) }, { label: 'Export book', items: exportItems(p) }] : []),
         { label: 'Expand all inside', onPick: () => setFolding({ open: true, under: p, at: Date.now() }) },
         { label: 'Collapse all inside', onPick: () => setFolding({ open: false, under: p, at: Date.now() }) },
         ...trash,
@@ -1299,7 +1291,7 @@ export function App() {
       showMenu('Card', x, y, [
         { label: 'Open', onPick: () => void select(p) },
         { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
-        { label: 'Pin beside the draft', disabled: pins.includes(p), onPick: () => pin(p) },
+        { label: 'Pin beside page', disabled: pins.includes(p), onPick: () => pin(p) },
         { label: 'Insert name on the page', disabled: !editor || doc?.kind === undefined || isCard(doc.kind), onPick: () => editor?.chain().focus().insertContent(card!.title).run() },
         { label: 'Set portrait…', disabled: card?.kind === 'research', onPick: () => choosePortrait(p) },
         common.label,
@@ -1311,15 +1303,14 @@ export function App() {
       return;
     }
     const status = card?.status ?? 'not-started';
-    showMenu(tab === 'journal' ? 'Entry' : 'Page', x, y, [
+    showMenu('Page', x, y, [
       { label: 'Open', onPick: () => void select(p) },
       ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
       { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+      { label: 'Add recipe…', onPick: () => void addRecipe(p) },
       common.duplicate,
       common.label,
-      ...(tab === 'book'
-        ? [{ label: 'Include in export', checked: !card?.skipExport, onPick: () => void setFieldOf(p, 'export', card?.skipExport ? undefined : false) }]
-        : []),
+      { label: 'Include in export', checked: !card?.skipExport, onPick: () => void setFieldOf(p, 'export', card?.skipExport ? undefined : false) },
       {
         label: 'Snapshots',
         items: [
@@ -1327,23 +1318,38 @@ export function App() {
           { label: 'Compare and roll back…', onPick: () => void showSnapshots(p) },
         ],
       },
-      ...(tab === 'book'
-        ? [
-            {
-              label: 'Status',
-              items: STATUSES.map((st) => ({ label: st.label, checked: st.id === status, onPick: () => void setFieldOf(p, 'status', st.id === 'not-started' ? undefined : st.id) })),
-            },
-          ]
-        : []),
+      {
+        label: 'Status',
+        items: STATUSES.map((st) => ({ label: st.label, checked: st.id === status, onPick: () => void setFieldOf(p, 'status', st.id === 'not-started' ? undefined : st.id) })),
+      },
       { separator: true },
       common.move,
-      { label: 'Group into new folder', onPick: () => void groupIntoFolder(p) },
-      ...(tab === 'book' && p === path ? [{ label: 'Merge with next', disabled: !next, onPick: () => void mergeNext() }] : []),
+      { label: 'Group into new book', onPick: () => void groupIntoFolder(p) },
+      ...(p === path ? [{ label: 'Merge with next', disabled: !next, onPick: () => void mergeNext() }] : []),
       { separator: true },
       { label: 'Copy as Markdown', onPick: () => void copyMarkdown(p) },
-      ...(tab === 'book' ? [{ label: 'Export page', items: exportItems(p) }] : []),
+      { label: 'Export page', items: exportItems(p) },
       ...trash,
     ]);
+  };
+
+  /** A recipe for a page: a source or note to guide work on it, listed under the page and opened to write. */
+  const addRecipe = async (page: string) => {
+    if (!fs) return;
+    await flushSave();
+    try {
+      const target = page === path && docRef.current ? docRef.current : await readDocument(fs, page);
+      if (!(await fs.exists(RECIPES))) await fs.makeFolder(RECIPES);
+      const p = await createDocument(fs, RECIPES, 'New recipe', 'recipe');
+      await writeDocument(fs, p, withField(await readDocument(fs, p), 'page', target.id));
+      index.current?.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
+      indexChanged();
+      await refreshTree();
+      await select(p);
+      setRenaming(p);
+    } catch (e) {
+      setError(`Couldn’t add a recipe. ${friendlyError(e)}`);
+    }
   };
 
   /** Sets a front matter field on any scene, open or not. */
@@ -1360,7 +1366,7 @@ export function App() {
     if (!fs) return;
     await flushSave();
     try {
-      const copied = await duplicateItem(fs, order.current, tree, root, p);
+      const copied = await duplicateItem(fs, order.current, treeOf(topOf(p)), topOf(p), p);
       order.current = copied.order;
       await reindex();
       await refreshTree();
@@ -1372,7 +1378,7 @@ export function App() {
 
   const sortContents = async (folder: string, descending: boolean) => {
     if (!fs) return;
-    order.current = await sortFolder(fs, order.current, tree, root, folder, descending);
+    order.current = await sortFolder(fs, order.current, treeOf(topOf(folder)), topOf(folder), folder, descending);
     await refreshTree();
   };
 
@@ -1381,10 +1387,11 @@ export function App() {
     if (!fs) return;
     await flushSave();
     try {
+      const top = topOf(p);
       const created = await createFolder(fs, parentOf(p));
-      order.current = await placeNew(fs, order.current, tree, root, created, p);
-      const fresh = await readTree(fs, root, { [PANTRY]: [...PANTRY_SECTIONS], ...order.current });
-      const moved = await moveItem(fs, order.current, fresh, root, p, created, 0);
+      order.current = await placeNew(fs, order.current, treeOf(top), top, created, p);
+      const fresh = await readTree(fs, top, ORDERED(order.current));
+      const moved = await moveItem(fs, order.current, fresh, top, p, created, 0);
       order.current = moved.order;
       followMove(p, moved.path);
       await reindex();
@@ -1426,7 +1433,7 @@ export function App() {
     }
   };
 
-  /** Export › for one scene or folder of the Bookshelf. */
+  /** Export › for one page or book of the Shelf. */
   const exportItems = (p: string): MenuItem[] => {
     const part = async () => {
       const node = [...walkFolders(tree)].find((n) => n.path === p) ?? { name: baseName(p), path: p, kind: 'file' as const };
@@ -1440,7 +1447,7 @@ export function App() {
     ];
   };
 
-  /** A scene in Bookread. */
+  /** A page in Read book. */
   const readerMenu = (p: string, x: number, y: number) =>
     showMenu('Page', x, y, [
       { label: 'Open to write', onPick: () => void select(p) },
@@ -1480,7 +1487,8 @@ export function App() {
     const moved = (p: string) => p === from || p.startsWith(from + '/');
     if (path && moved(path)) setPath(to + path.slice(from.length));
     if (pins.some(moved)) setPins(pins.map((p) => (moved(p) ? to + p.slice(from.length) : p)));
-    if (Object.keys(pinned).some(moved)) setPinned(movePinned(pinned, from, to));
+    const tracked = bookRef.current?.seasonings?.tracked ?? [];
+    if (tracked.some(moved)) setSeasonings({ tracked: tracked.map((p) => (moved(p) ? to + p.slice(from.length) : p)) });
   };
 
   const moveInTree = async (from: string, folder: string, at: number) => {
@@ -1488,7 +1496,7 @@ export function App() {
     await flushSave();
     await saveUndoNow();
     try {
-      const moved = await moveItem(fs, order.current, tree, root, from, folder, at);
+      const moved = await moveItem(fs, order.current, treeOf(topOf(from)), topOf(from), from, folder, at);
       order.current = moved.order;
       followMove(from, moved.path);
     } catch (e) {
@@ -1497,14 +1505,13 @@ export function App() {
     await refreshTree();
   };
 
-  /** A new folder goes beside the folder of the scene being written, and its name is ready to type. */
+  /** A new book goes beside the book of the page being written, and its name is ready to type. */
   const addFolder = async () => {
     if (!fs) return;
-    const here = path && path.startsWith(viewRoot + '/') ? parentOf(path) : viewRoot;
-    // In the Pantry, folders go inside the section; the sections themselves stay as they are.
-    const parent = tab === 'pantry' ? (here === PANTRY ? joinPath(PANTRY, 'characters') : here) : here === root ? root : parentOf(here);
+    const here = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
+    const parent = here === BOOKSHELF ? BOOKSHELF : parentOf(here);
     const created = await createFolder(fs, parent);
-    order.current = await placeNew(fs, order.current, tree, root, created, here === root ? path : here);
+    order.current = await placeNew(fs, order.current, tree, BOOKSHELF, created, here === BOOKSHELF ? path : here);
     await refreshTree();
     setRenaming(created);
   };
@@ -1513,7 +1520,7 @@ export function App() {
   const addFolderIn = async (parent: string) => {
     if (!fs) return;
     const created = await createFolder(fs, parent);
-    order.current = await placeNew(fs, order.current, tree, root, created, null);
+    order.current = await placeNew(fs, order.current, treeOf(topOf(parent)), topOf(parent), created, null);
     await refreshTree();
     setRenaming(created);
   };
@@ -1525,7 +1532,7 @@ export function App() {
     await flushSave();
     await saveUndoNow();
     try {
-      const renamed = await renameFolder(fs, order.current, tree, root, from, title);
+      const renamed = await renameFolder(fs, order.current, treeOf(topOf(from)), topOf(from), from, title);
       order.current = renamed.order;
       followMove(from, renamed.path);
     } catch (e) {
@@ -1542,7 +1549,7 @@ export function App() {
     scheduleSave(updated);
   };
 
-  /** Bookread for the whole Bookshelf, or for one folder of it. */
+  /** Read book, for the whole Shelf or for one book on it. */
   const readManuscript = async (folder?: string) => {
     if (!fs) return;
     await flushSave();
@@ -1562,7 +1569,6 @@ export function App() {
     return added.id;
   };
 
-  const notes = readNotes(doc);
   const setNotes = (next: Notes) => {
     const base = docRef.current ?? doc;
     if (!base) return;
@@ -1572,22 +1578,24 @@ export function App() {
     scheduleSave(updated);
   };
 
-  const showInSeasonings = (request: SeasoningsRequest) => {
-    // A note added from the keyboard needs its entry in the front matter too.
-    if (request.tab === 'notes' && !(request.id in readNotes(docRef.current))) setNotes({ ...readNotes(docRef.current), [request.id]: '' });
-    setSeasoningsOpen(true);
-    setSeasoningsTab((t) => (t === 'all' || t === request.tab ? t : request.tab));
-    setSeasoningsRequest({ ...request, at: Date.now() });
+  /** A footnote added or clicked in the text is edited at the foot of the page. */
+  const showFootnote = (request: SeasoningsRequest) => editFootnote(request.index);
+
+  /** The seasonings picked for this work, what Daniel tracks, and remarks removed for good. */
+  const seas = book?.seasonings;
+  const chosen = useMemo(() => (seas?.chosen ?? []).filter(isSeasoning), [seas?.chosen]);
+  const setSeasonings = (changes: Partial<NonNullable<BookInfo['seasonings']>>) => {
+    const current = bookRef.current?.seasonings ?? { chosen: [], tracked: [], gone: [] };
+    updateBook({ seasonings: { ...current, ...changes } });
   };
-  const seasoningsCount = useSeasoningsCount(editor, notes);
+  const [tracked, setTracked] = useState<Tracked[]>([]);
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
   const pantryHits = useMemo(() => {
-    if (tab !== 'pantry' || !pantryQuery.trim()) return null;
-    const kinds = pantryView === 'all' ? PANTRY_SECTIONS.map((s) => SECTION_KIND[s]) : [SECTION_KIND[pantryView]];
-    return index.current?.index.search(pantryQuery, { kinds, limit: 40 }) ?? [];
-  }, [tab, pantryQuery, pantryView, indexVersion]);
+    if (!pantryQuery.trim()) return null;
+    return index.current?.index.search(pantryQuery, { kinds: PANTRY_SECTIONS.map((s) => SECTION_KIND[s]), limit: 40 }) ?? [];
+  }, [pantryQuery, indexVersion]);
   const cardChoices = useMemo<CardChoice[]>(
     () =>
       [...cards]
@@ -1649,7 +1657,49 @@ export function App() {
     },
     [fs, book],
   );
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
+  const resting = useMemo(() => rulesOff(chosen), [chosen]);
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
+
+  // Daniel counts the spoken words in what he tracks, the open page as it is now and the rest as saved.
+  const trackedKey = (seas?.tracked ?? []).join('\n');
+  useEffect(() => {
+    const paths = trackedKey ? trackedKey.split('\n') : [];
+    if (!fs || !chosen.includes('daniel') || paths.length === 0) return setTracked([]);
+    let live = true;
+    const titled = paths.map((p) => ({ path: p, title: cards.get(p)?.title ?? baseName(p).replace(/\.md$/, ''), share: null as number | null }));
+    setTracked((before) => titled.map((t) => ({ ...t, share: before.find((b) => b.path === t.path)?.share ?? null })));
+    const timer = window.setTimeout(async () => {
+      const counted: Tracked[] = [];
+      for (const t of titled) {
+        const files = t.path.endsWith('.md') ? [t.path] : [...walkFiles(childrenOf(tree, BOOKSHELF, t.path))].map((f) => f.path);
+        let spoken = 0;
+        let all = 0;
+        for (const f of files) {
+          const body = f === path && docRef.current ? docRef.current.body : await readDocument(fs, f).then((d) => d.body, () => '');
+          for (const line of plainText(body).split('\n')) {
+            all += countWords(line);
+            for (const [a, b] of dialogueRanges(line)) spoken += countWords(line.slice(a, b));
+          }
+        }
+        counted.push({ ...t, share: all > 0 ? Math.round((spoken / all) * 100) : 0 });
+      }
+      if (live) setTracked(counted);
+    }, 600);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [fs, trackedKey, chosen, tree, indexVersion]);
+  const trackMenu = (x: number, y: number) => {
+    const have = new Set(seas?.tracked ?? []);
+    const add = (p: string) => setSeasonings({ tracked: [...(bookRef.current?.seasonings?.tracked ?? []), p] });
+    const books = [...walkFolders(tree)].filter((n) => !have.has(n.path));
+    showMenu('Track', x, y, [
+      ...(path?.startsWith(BOOKSHELF + '/') && !have.has(path) ? [{ label: 'This page', onPick: () => add(path) }] : []),
+      ...(books.length > 0 ? [{ heading: 'Books' } as const, ...books.map((n) => ({ label: n.name, onPick: () => add(n.path) }))] : []),
+      ...(have.size === 0 && books.length === 0 && !path?.startsWith(BOOKSHELF + '/') ? [{ label: 'Open a page to track it', disabled: true, onPick: () => {} }] : []),
+    ]);
+  };
   const castIds = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? castOf(editor.state.doc, nameMatcherOf(editor.state)).map((c) => c.id).join('\n') : ''),
@@ -1740,7 +1790,7 @@ export function App() {
     if (id === 'palette') setPalette({ scenesOnly: false, at: Date.now() });
     else if (id === 'switcher') setPalette({ scenesOnly: true, at: Date.now() });
     else if (id === 'shelf') setShelf({ at: null });
-    else if (id === 'seasonings') doc && setSeasoningsOpen((o) => !o);
+    else if (id === 'seasonings') doc && togglePanel('seasonings');
     else if (id === 'focus') toggleFocus();
     else if (id === 'newScene') void addScene();
     else if (id === 'bookread') manuscript ? setManuscript(null) : void readManuscript();
@@ -1754,10 +1804,10 @@ export function App() {
   const toggleFocus = () => {
     const focus = !getSettings().focus;
     setSettings({ focus });
-    say(focus ? `Focus mode. ${keysFor('focus')} or Escape brings everything back.` : 'Focus mode off.');
+    say(focus ? `Study. ${keysFor('focus')} or Escape brings everything back.` : 'Study off.');
   };
   useEffect(() => {
-    // Escape leaves focus mode, unless something else (a menu, the find box) wanted it first.
+    // Escape leaves Study, unless something else (a menu, Search) wanted it first.
     if (!settings.focus) return;
     const onKey = (e: KeyboardEvent) => {
       // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
@@ -1891,12 +1941,12 @@ export function App() {
       item('numbers', 'Numbered list', 'Insert', 'list numbers ol ordered', () => void editor.chain().focus().toggleOrderedList().run()),
       item('checklist', 'Checklist', 'Insert', 'list todo tasks checkbox', () => void editor.chain().focus().toggleTaskList().run()),
       item('table', 'Table', 'Insert', 'table grid', () => void editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()),
-      item('footnote', 'Footnote', 'Insert', 'footnote note', () => showInSeasonings({ tab: 'footnotes', index: insertFootnote(editor) }), keysFor('footnote')),
+      item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
       item('name', 'Name from the Pantry', 'Insert', 'pantry character place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle]);
-  const drawerOpen = (seasoningsOpen && !!doc) || pins.length > 0;
+  const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
   const saveEverything = useCallback(async () => {
     await flushSave();
     await saveUndoNow();
@@ -1916,7 +1966,7 @@ export function App() {
       .map(([p, c]) => {
         const top = p.split('/')[0];
         const folder = parentOf(p) === top ? '' : ` · ${baseName(parentOf(p))}`;
-        const group = top === PANTRY ? 'Pantry' : top === JOURNAL ? 'Journal' : 'Bookshelf';
+        const group = top === PANTRY ? 'Pantry' : top === RECIPES ? 'Recipes' : 'Shelf';
         return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
       })
       .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
@@ -1929,39 +1979,38 @@ export function App() {
       ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
       ['shortcuts', 'Keyboard shortcuts', 'keys'],
       ['updates', 'Updates and privacy', 'version'],
-      ['page', 'Page and view', 'size margins zoom draft letter a4'],
+      ['page', 'Layout', 'page size margins zoom draft letter a4 indent'],
       ['styles', 'Styles', 'paragraph character font'],
       ['proofreader', 'Proofreader', 'spelling grammar dictionary british american'],
       ['goals', 'Goals', 'target deadline words a day pasted'],
     ];
     const page = pageOf(book?.page);
     return [
-      cmd('new', `New ${NOUN[tab]}`, () => void addScene(), 'Actions', keysFor('newScene')),
-      cmd('folder', 'New folder', () => void addFolder()),
-      cmd('bookread', manuscript ? 'Back to writing' : 'Bookread', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
-      cmd('find', 'Find in book', () => document.querySelector<HTMLInputElement>('.find-field input')?.focus(), 'Actions', keysFor('find'), 'search replace'),
-      cmd('shelf', 'Pantry shelf', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters'),
-      ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => setSeasoningsOpen((o) => !o), 'Actions', keysFor('seasonings'), 'notes footnotes proofreader')] : []),
+      cmd('new', 'New page', () => void addScene(), 'Actions', keysFor('newScene')),
+      cmd('card', 'New card', () => void addCard(), 'Actions', undefined, 'pantry character place research'),
+      cmd('folder', 'New book', () => void addFolder(), 'Actions', undefined, 'folder part chapter'),
+      cmd('bookread', manuscript ? 'Back to writing' : 'Read book', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
+      cmd('find', 'Search', () => setFindRequest({ query: '', at: Date.now() }), 'Actions', keysFor('find'), 'find replace'),
+      cmd('shelf', 'Name from the Pantry', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters insert'),
+      cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places research'),
+      ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this page', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this page…', () => path && void showSnapshots(path))] : []),
-      cmd('focus', settings.focus ? 'Focus mode off' : 'Focus mode on', toggleFocus, 'View', keysFor('focus')),
+      cmd('focus', settings.focus ? 'Study off' : 'Study', toggleFocus, 'View', keysFor('focus'), 'focus distraction'),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
       ...(['system', 'light', 'dark', 'sepia'] as const).map((t) => cmd(`theme-${t}`, `Theme: ${t[0]!.toUpperCase()}${t.slice(1)}`, () => setSettings({ theme: t }), 'View', settings.theme === t ? '✓' : undefined)),
-      cmd('show-book', 'Show the Bookshelf', () => setTab('book'), 'View'),
-      cmd('show-pantry', 'Show the Pantry', () => setTab('pantry'), 'View'),
-      cmd('show-journal', 'Show the Journal', () => setTab('journal'), 'View'),
-      cmd('goals', 'Goals', () => setGoalsRequest({ tab: 'targets', at: Date.now() }), 'Book', undefined, 'target daily words streak'),
-      cmd('history', 'Writing history', () => setGoalsRequest({ tab: 'history', at: Date.now() }), 'Book', undefined, 'words written days'),
-      cmd('docx', 'Export as Word…', () => void exportBook('docx'), 'Book', '.docx'),
-      cmd('epub', 'Export as EPUB…', () => void exportBook('epub'), 'Book', '.epub'),
-      cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Book', '.md'),
-      cmd('print', 'Print or save as PDF…', () => void exportBook('print'), 'Book'),
-      cmd('import', 'Import files…', () => chooseImport(null), 'Book', '.docx .md .txt'),
-      cmd('zip', 'Back up as a zip…', () => void backUp(), 'Book'),
-      cmd('backup', 'Back up now', () => void backUpNow(), 'Book', undefined, 'automatic backup'),
-      cmd('books', 'Your books…', () => setLibraryOpen(true), 'Book', undefined, 'open library switch'),
-      cmd('trash', 'Trash', openTrash, 'Book', undefined, 'deleted restore'),
+      cmd('goals', 'Goals', () => setGoalsRequest({ tab: 'targets', at: Date.now() }), 'Work', undefined, 'target daily words streak'),
+      cmd('history', 'Writing history', () => setGoalsRequest({ tab: 'history', at: Date.now() }), 'Work', undefined, 'words written days'),
+      cmd('docx', 'Export as Word…', () => void exportBook('docx'), 'Work', '.docx'),
+      cmd('epub', 'Export as EPUB…', () => void exportBook('epub'), 'Work', '.epub'),
+      cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Work', '.md'),
+      cmd('print', 'Print or save as PDF…', () => void exportBook('print'), 'Work'),
+      cmd('import', 'Import files…', () => chooseImport(null), 'Work', '.docx .md .txt'),
+      cmd('zip', 'Back up as a zip…', () => void backUp(), 'Work'),
+      cmd('backup', 'Back up now', () => void backUpNow(), 'Work', undefined, 'automatic backup'),
+      cmd('books', 'Your works…', () => setLibraryOpen(true), 'Work', undefined, 'books open library switch'),
+      cmd('trash', 'Trash', openTrash, 'Work', undefined, 'deleted restore'),
       cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
       ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
       ...places,
@@ -2001,6 +2050,9 @@ export function App() {
   // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft.
   const asDraft = page.view === 'draft' || (deskWidth > 0 && deskWidth < 640);
   const pageZoom = asDraft && (page.zoom === 0 || deskWidth < 640) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
+  // The right panel lies over the desk's edge; the page moves left only as far as it must to stay clear of it.
+  const pageWidth = asDraft ? Math.min(deskWidth - 48, 760 * pageZoom) : pageSize.width * 96 * pageZoom;
+  const clearOfPanel = drawerOpen && deskWidth > 0 && window.innerWidth > 900 ? Math.max(0, Math.min(2 * (336 - (deskWidth - pageWidth) / 2), deskWidth - 48 - pageWidth)) : 0;
   const pageStyle =
     asDraft
       ? { zoom: pageZoom }
@@ -2008,12 +2060,12 @@ export function App() {
 
   return (
     <div
-      className={`app${drawerOpen ? ' with-seasonings' : ''}${seasoningsOpen && doc ? ' seasonings-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
     >
       <style>{css}</style>
       <header className="topbar">
         <div className="brand-wrap">
-          <button className="side-toggle" aria-label="Bookshelf, Pantry and Journal" aria-expanded={sideOpen} onClick={() => setSideOpen(!sideOpen)}>
+          <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => setSideOpen(!sideOpen)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -2024,18 +2076,17 @@ export function App() {
             <button
               className="crumb-book"
               aria-haspopup="menu"
-              aria-expanded={menu?.label === 'Book'}
-              title="Your books, export, import, backup and trash. Right-click to configure the book."
+              aria-expanded={menu?.label === 'Work'}
               onClick={bookMenu}
               onContextMenu={(e) => {
                 e.preventDefault();
-                showMenu('Book', e.clientX, e.clientY, [
+                showMenu('Work', e.clientX, e.clientY, [
                   { label: 'Configure…', onPick: () => openSettings('page') },
                   { label: 'Goals…', onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
                   { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
                   { separator: true },
                   { label: 'Back up now', onPick: () => void backUpNow() },
-                  { label: 'Your books…', onPick: () => setLibraryOpen(true) },
+                  { label: 'Your works…', onPick: () => setLibraryOpen(true) },
                 ]);
               }}
             >
@@ -2048,32 +2099,31 @@ export function App() {
           </span>
         </div>
         <div className="top-actions">
-          <button
-            className="seasonings-button"
-            aria-pressed={seasoningsOpen}
-            aria-expanded={seasoningsOpen}
-            disabled={!doc}
-            onClick={() => setSeasoningsOpen((o) => !o)}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-              <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+          <button className="panel-btn" aria-pressed={panel === 'pantry'} aria-expanded={panel === 'pantry'} onClick={() => togglePanel('pantry')}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
+            </svg>
+            Pantry
+          </button>
+          <button className="panel-btn" aria-pressed={seasoningsOpen} aria-expanded={seasoningsOpen} disabled={!doc} onClick={() => togglePanel('seasonings')}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
+              <path d="M5 19 13 11" />
             </svg>
             Seasonings
-            {seasoningsCount > 0 && <span className="badge">{seasoningsCount}</span>}
           </button>
           <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
         </div>
       </header>
 
-      {/* Bookread is for reading, so the formatting toolbar steps aside. */}
+      {/* Read book is for reading, so the formatting toolbar steps aside. */}
       {!manuscript && (
         <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} onAddStyle={addStyle} onRenameStyle={(id, name) => changeSheet(renameParagraphStyle(sheet, id, name))} />
       )}
 
       <nav
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
-        aria-label="Book and Pantry"
+        aria-label="Shelf"
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
@@ -2095,28 +2145,14 @@ export function App() {
           void importFiles(Array.from(e.dataTransfer.files), dropFolder(e.target));
         }}
       >
-        <div className="tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'book'} onClick={() => setTab('book')}>
-            Book
-          </button>
-          <button role="tab" aria-selected={tab === 'pantry'} onClick={() => setTab('pantry')}>
-            Pantry
-          </button>
-        </div>
-        {/* New scenes, cards, entries and folders come from the right-click menu and the template button. */}
-        <SectionSwitch value={tab} onPick={setTab} />
-        {tab === 'pantry' && <PantryBar view={pantryView} onView={setPantryView} query={pantryQuery} onQuery={setPantryQuery} />}
-        {pantryHits ? (
-          <PantryResults hits={pantryHits} selected={path} onOpen={select} />
-        ) : (
+        <h2 className="panel-h shelf-h">Shelf</h2>
         <Tree
-          nodes={viewRoot === root ? tree : childrenOf(tree, root, viewRoot)}
-          root={viewRoot}
-          locked={tab === 'pantry' ? PANTRY_FOLDERS : undefined}
+          nodes={tree}
+          root={BOOKSHELF}
           selected={path}
           cards={cards}
           live={doc && path ? { path, words: words ?? 0 } : null}
-          collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${root}`}
+          collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
           renaming={renaming}
           onSelect={select}
           onMove={(from, folder, at) => void moveInTree(from, folder, at)}
@@ -2125,26 +2161,13 @@ export function App() {
           onMenu={rowMenu}
           onTrash={(p) => void trashPath(p)}
           dropTarget={fileDrop}
-          align={ALIGN[tab]}
           folding={folding}
-          folderDates={tab === 'journal' ? dates : undefined}
-          loadPicture={tab === 'pantry' ? loadPicture : undefined}
-        />
-        )}
-        {tab === 'book' && (
-          <button className="ms-open" aria-pressed={manuscript !== null} onClick={() => (manuscript ? setManuscript(null) : void readManuscript())}>
-            Bookread
-          </button>
-        )}
-        <TemplateMenu
-          label={TEMPLATE_LABEL[tab]}
-          templates={TEMPLATES[tab]}
-          onPick={(t) => void addScene(t)}
+          recipes={recipes}
         />
       </nav>
       {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
 
-      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
+      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk} style={clearOfPanel > 0 ? { paddingRight: 24 + clearOfPanel } : undefined}>
         <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <p role="alert" className="error">
@@ -2181,19 +2204,7 @@ export function App() {
           )}
           <div className="page-row">
           {doc && path ? (
-            <article className={`cb-page${asDraft ? ' draft' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
-              {isCard(doc.kind) && (
-              <input
-                className="scene-title"
-                aria-label="Card name"
-                value={doc.title}
-                onChange={(e) => {
-                  const next = { ...(docRef.current ?? doc), title: e.target.value };
-                  setDoc(next);
-                  scheduleSave(next);
-                }}
-              />
-              )}
+            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
               <PageEditor
                 initialBody={doc.body}
                 undoLog={undoLog}
@@ -2201,7 +2212,7 @@ export function App() {
                 nextStyle={nextStyle}
                 onReady={setEditor}
                 onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
-                onSeasonings={showInSeasonings}
+                onSeasonings={showFootnote}
               />
               <PageFootnotes editor={editor} />
               <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
@@ -2229,17 +2240,50 @@ export function App() {
               onMenu={pinMenu}
             />
           )}
+          {panel === 'pantry' && (
+            <PantryPanel
+              group={pantryGroup}
+              onGroup={setPantryGroup}
+              query={pantryQuery}
+              onQuery={setPantryQuery}
+              hits={pantryHits}
+              selected={path}
+              onOpen={(p) => void select(p)}
+              onNew={() => void addCard()}
+              onClose={() => setPanel(null)}
+            >
+              <Tree
+                nodes={childrenOf(pantryTree, PANTRY, joinPath(PANTRY, pantryGroup))}
+                root={joinPath(PANTRY, pantryGroup)}
+                selected={path}
+                cards={cards}
+                live={null}
+                collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${PANTRY}`}
+                renaming={renaming}
+                onSelect={select}
+                onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+                onStartRename={setRenaming}
+                onRename={(p, title) => void renameInTree(p, title)}
+                onMenu={rowMenu}
+                onTrash={(p) => void trashPath(p)}
+                folding={folding}
+                loadPicture={loadPicture}
+              />
+            </PantryPanel>
+          )}
           {seasoningsOpen && doc && (
             <Seasonings
               editor={editor}
-              notes={notes}
-              onNotesChange={setNotes}
-              tab={seasoningsTab}
-              onTab={setSeasoningsTab}
-              request={seasoningsRequest}
-              onRequest={showInSeasonings}
-              onClose={() => setSeasoningsOpen(false)}
+              pageId={doc.id}
               proof={proof}
+              chosen={chosen}
+              onChosen={(next) => setSeasonings({ chosen: next })}
+              tracked={tracked}
+              onTrack={trackMenu}
+              onUntrack={(p) => setSeasonings({ tracked: (seas?.tracked ?? []).filter((q) => q !== p) })}
+              gone={seas?.gone ?? []}
+              onGone={(key) => setSeasonings({ gone: [...new Set([...(seas?.gone ?? []), key])] })}
+              onClose={() => setPanel(null)}
               onIssueMenu={(i, x, y) => void issueItems(i).then((items) => showMenu('Suggestion', x, y, items))}
             />
           )}
@@ -2311,21 +2355,6 @@ export function App() {
 
       {menu && <Menu {...menu} onClose={closeMenu} />}
 
-      {dating && (
-        <DatePopover
-          name={baseName(dating.path)}
-          date={dating.date}
-          pinned={dating.pinned}
-          x={dating.x}
-          y={dating.y}
-          onClose={() => setDating(null)}
-          onDone={(date) => {
-            setPinned(withPinned(pinned, dating.path, date));
-            setDating(null);
-          }}
-        />
-      )}
-
       {trashItems !== undefined && (
         <Suspense fallback={null}><TrashDialog
           items={trashItems}
@@ -2333,7 +2362,7 @@ export function App() {
           onRestore={(name) =>
             void inTrash(async () => {
               const p = await putBack(name);
-              if (p) say(`Put “${baseName(p).replace(/\.md$/, '')}” back in ${parentOf(p) === BOOKSHELF ? 'the Bookshelf' : `“${baseName(parentOf(p))}”`}.`);
+              if (p) say(`Put “${baseName(p).replace(/\.md$/, '')}” back in ${parentOf(p) === BOOKSHELF ? 'the Shelf' : `“${baseName(parentOf(p))}”`}.`);
             })
           }
           onDelete={(name) =>
@@ -2416,17 +2445,19 @@ export function App() {
           onExport={exportHistoryCsv}
           request={goalsRequest}
         />
-        <button className="shelf-button" title={`Pantry shelf (${keysFor('shelf')}, or type @ while writing)`} onClick={() => setShelf({ at: null })}>
-          Pantry shelf <kbd>{keysFor('shelf')}</kbd>
-        </button>
         <span className="footer-end">
-          {doc && undoSteps > 0 && <span className="footer-undo">Undo remembers {undoSteps.toLocaleString('en')} {undoSteps === 1 ? 'step' : 'steps'}, even after closing</span>}
           {doc && (
-            <button className="footer-link" title="Page and view settings" onClick={() => openSettings('page')}>
-              {page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label} · {zoomLabel(page.zoom)}
-            </button>
+            <ZoomControl
+              zoom={page.zoom}
+              fitted={Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100)}
+              label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
+              onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
+            />
           )}
-          <span className="footer-where">{where}</span>
+          <span className={`saved${dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
+            <span className="saved-dot" aria-hidden="true" />
+            {dirty ? 'Saving…' : 'Saved'}
+          </span>
           <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />

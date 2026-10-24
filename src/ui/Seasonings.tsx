@@ -1,337 +1,263 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
-import {
-  addNoteAnchor,
-  deleteFootnote,
-  dialogueStats,
-  footnotes,
-  insertFootnote,
-  isDialogueFocus,
-  noteAnchors,
-  removeNoteAnchor,
-  selectFootnote,
-  selectRange,
-  setDialogueFocus,
-  setFootnoteText,
-  setTodoChecked,
-  todos,
-  type SeasoningsRequest,
-} from '../editor/seasonings';
-import { DIALECTS, type IssueKind } from '../proofread/check';
-import { RULE_GROUPS } from '../proofread/rules';
-import { type FoundIssue, issuesOf, selectIssue } from '../proofread/plugin';
+import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
+import { type FoundIssue, applySuggestion, issuesOf, selectIssue } from '../proofread/plugin';
+import { SEASONINGS, type SeasoningId, fixText, gradeRemark, ownerOf, remark, talkRemark } from '../proofread/remarks';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
-import { keysFor } from '../shortcuts';
-import { IssueActions } from './IssueCard';
+import { Face } from './Faces';
+import { useSuggestions } from './IssueCard';
 
-export type SeasoningsTab = 'all' | 'proofread' | 'notes' | 'footnotes' | 'dialogue';
-
-/** Left to right in the tabs, top to bottom under All. */
-const TABS: { id: SeasoningsTab; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'proofread', label: 'Proofread' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'footnotes', label: 'Footnotes' },
-  { id: 'dialogue', label: 'Dialogue' },
-];
-
-export type Notes = Record<string, string>;
+/** A page or book Daniel keeps an eye on, with how much of it is spoken once counted. */
+export interface Tracked {
+  path: string;
+  title: string;
+  /** Percent of its words inside quotes, or null while it is being counted. */
+  share: number | null;
+}
 
 interface Props {
   editor: Editor | null;
-  notes: Notes;
-  onNotesChange: (notes: Notes) => void;
-  tab: SeasoningsTab;
-  onTab: (tab: SeasoningsTab) => void;
-  /** The note or footnote to bring into view, set when one is added or clicked in the text. */
-  request: (SeasoningsRequest & { at: number }) | null;
-  onRequest: (r: SeasoningsRequest) => void;
-  onClose: () => void;
+  /** The open page's id, for remarks that belong to it. */
+  pageId: string;
   proof: Proofreader;
-  /** A right-click on an issue's card. */
+  chosen: SeasoningId[];
+  onChosen: (chosen: SeasoningId[]) => void;
+  tracked: Tracked[];
+  /** Opens the list of pages and books Daniel could track, at the pointer. */
+  onTrack: (x: number, y: number) => void;
+  onUntrack: (path: string) => void;
+  /** Remarks removed for good, and a way to remove one. */
+  gone: string[];
+  onGone: (key: string) => void;
+  onClose: () => void;
+  /** A right-click on an issue. */
   onIssueMenu?: (issue: FoundIssue, x: number, y: number) => void;
 }
 
-/** How many things Seasonings has for the writer, for the badge on its button. */
-export function useSeasoningsCount(editor: Editor | null, notes: Notes): number {
-  const anchored = useEditorState({
-    editor,
-    selector: ({ editor }) => (editor ? { ids: noteAnchors(editor.state.doc).map((a) => a.id), footnotes: footnotes(editor.state.doc).length } : null),
-  });
-  if (!anchored) return 0;
-  return new Set([...Object.keys(notes), ...anchored.ids]).size + anchored.footnotes;
-}
+/** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
+const MIN_GRADE_WORDS = 50;
 
-export function Seasonings({ editor, notes, onNotesChange, tab, onTab, request, onRequest, onClose, proof, onIssueMenu }: Props) {
-  const panel = useRef<HTMLDivElement>(null);
-  const [openIssue, setOpenIssue] = useState<string | null>(null);
-  const [kindFilter, setKindFilter] = useState<IssueKind | null>(null);
-  const scene = useEditorState({
-    editor,
-    selector: ({ editor }) => {
-      if (!editor) return null;
-      const { doc } = editor.state;
-      return {
-        anchors: noteAnchors(doc).map(({ id, quote, from, to }) => ({ id, quote, from, to })),
-        nothingSelected: editor.state.selection.empty,
-        footnotes: footnotes(doc),
-        todos: todos(doc),
-        dialogue: dialogueStats(doc),
-        focus: isDialogueFocus(editor.state),
-        issues: issuesOf(editor.state),
-        grade: textGrade(paragraphs(doc)),
-      };
-    },
-  });
-
+export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
+  // A new work starts with nothing picked, so the picker shows until Done.
+  const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
-    if (!request) return;
-    const key = request.tab === 'notes' ? `note-${request.id}` : `footnote-${request.index}`;
-    // Wait a frame so a note or footnote that was just added is on screen.
-    const frame = requestAnimationFrame(() => {
-      const card = panel.current?.querySelector<HTMLElement>(`[data-key="${key}"]`);
-      card?.scrollIntoView({ block: 'nearest' });
-      card?.querySelector('textarea')?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [request]);
+    if (chosen.length === 0) setPicking(true);
+  }, [chosen.length]);
+  const page = useEditorState({
+    editor,
+    selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: textGrade(paragraphs(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
+  });
+  if (!editor || !page) return null;
 
-  if (!editor || !scene) return null;
-
-  const anchoredIds = new Set(scene.anchors.map((a) => a.id));
-  const loose = Object.keys(notes).filter((id) => !anchoredIds.has(id));
-  const noteCount = scene.anchors.length + loose.length;
-  const { dialogueWords, totalWords } = scene.dialogue;
-  const share = totalWords > 0 ? Math.round((dialogueWords / totalWords) * 100) : 0;
-  const show = (t: SeasoningsTab) => tab === 'all' || tab === t;
-
-  const addNote = () => {
-    const id = addNoteAnchor(editor, Object.keys(notes));
-    if (!id) return;
-    onNotesChange({ ...notes, [id]: '' });
-    onRequest({ tab: 'notes', id });
+  const showPicker = picking;
+  const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
+    const rest = chosen.filter((c) => c !== id);
+    const at = chosen.indexOf(id);
+    const index = to === 'top' ? 0 : to === 'bottom' ? rest.length : to === 'up' ? Math.max(0, at - 1) : Math.min(rest.length, at + 1);
+    onChosen([...rest.slice(0, index), id, ...rest.slice(index)]);
   };
-  const deleteNote = (id: string) => {
-    removeNoteAnchor(editor, id);
-    const { [id]: _gone, ...rest } = notes;
-    onNotesChange(rest);
-  };
-  const addFootnote = () => onRequest({ tab: 'footnotes', index: insertFootnote(editor) });
+  const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
+  const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
+  const gradeKey = `sally:${pageId}:${page.grade.grade}`;
+  const graded = page.grade.words >= MIN_GRADE_WORDS && !gone.includes(gradeKey);
 
   return (
-    <aside className="seasonings" aria-label="Seasonings" ref={panel}>
-      <div className="seas-head">
-        <span className="seas-title">Seasonings</span>
-        <span className="seas-sub">Everything for reviewing</span>
-        <button className="seas-close" aria-label="Close Seasonings" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      <div className="seas-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button key={t.id} role="tab" aria-selected={tab === t.id} onClick={() => onTab(t.id)}>
-            {t.label}
+    <aside className="panel seasonings" aria-label="Seasonings">
+      <div className="panel-head">
+        <h2 className="panel-h">Seasonings</h2>
+        <span className="panel-tools">
+          {!showPicker && (
+            <button className="icon-btn icon-text" aria-label="Add a seasoning" onClick={() => setPicking(true)}>
+              + Add
+            </button>
+          )}
+          <button className="icon-btn" aria-label="Close Seasonings" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
           </button>
-        ))}
+        </span>
       </div>
 
-      {show('proofread') && (
-        <Section title="Proofread" count={scene.issues.length}>
-          <div className="seas-card seas-proof-settings">
-            <div className="seas-dialect" role="radiogroup" aria-label="Spelling">
-              {DIALECTS.map((d) => (
-                <button key={d.id} role="radio" aria-checked={proof.dialect === d.id} onClick={() => proof.setDialect(d.id)}>
-                  {d.label}
-                </button>
-              ))}
-            </div>
-            {scene.grade.sentences > 0 && scene.grade.words < MIN_GRADE_WORDS && (
-              <span className="seas-hint">Readability shows once the scene has {MIN_GRADE_WORDS} words.</span>
-            )}
-            {scene.grade.words >= MIN_GRADE_WORDS && (
-              <span className="seas-grade">
-                <span>
-                  Readability: <strong>grade {scene.grade.grade}</strong>
-                </span>
-                <span className="seas-hint">{gradeNote(scene.grade.grade)}</span>
-              </span>
-            )}
-            <span className="seas-hint">Spelling, grammar and style are checked on this device. Story names from the Pantry are always spelt right.</span>
+      {showPicker ? (
+        <>
+          <div className="sub-h">Pick your seasonings</div>
+          <div className="pick">
+            {SEASONINGS.map((s) => (
+              <button key={s.id} className="tile" aria-pressed={chosen.includes(s.id)} onClick={() => toggle(s.id)}>
+                {chosen.includes(s.id) && (
+                  <span className="tile-tick" aria-hidden="true">
+                    ✓
+                  </span>
+                )}
+                <Face id={s.id} />
+                <span className="tile-name">{s.name}</span>
+                <span className="tile-role">{s.role}</span>
+              </button>
+            ))}
           </div>
-          {scene.issues.length === 0 && <div className="seas-card seas-quiet">Nothing to fix here. Spelling, grammar and style all look good.</div>}
-          {scene.issues.length > 0 && (
-            <div className="seas-kinds" role="group" aria-label="Show">
-              {KINDS.map((k) => {
-                const n = scene.issues.filter((i) => i.issue.kind === k.id).length;
-                return (
-                  <button
-                    key={k.id}
-                    className={`seas-kind issue-${k.id}`}
-                    aria-pressed={kindFilter === k.id}
-                    disabled={n === 0}
-                    onClick={() => setKindFilter(kindFilter === k.id ? null : k.id)}
-                  >
-                    <strong>{n}</strong> {k.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {scene.issues.filter((i) => !kindFilter || i.issue.kind === kindFilter).map((i) => {
-            const key = issueKey(i);
+          <button className="btn btn-primary" disabled={chosen.length === 0} onClick={() => setPicking(false)}>
+            Done
+          </button>
+        </>
+      ) : (
+        <div className="panel-list">
+          {chosen.map((id, at) => {
+            const who = SEASONINGS.find((s) => s.id === id)!;
+            const issues = mine(id);
+            const count = id === 'daniel' ? tracked.length : id === 'sally' ? issues.length + (graded ? 1 : 0) : issues.length;
             return (
-              <div
-                className={`seas-card seas-issue issue-${i.issue.kind}`}
-                key={key}
-                onContextMenu={(e) => {
-                  if (!onIssueMenu) return;
-                  e.preventDefault();
-                  onIssueMenu(i, e.clientX, e.clientY);
-                }}
-              >
-                <button
-                  className="seas-quote"
-                  aria-expanded={openIssue === key}
-                  onClick={() => {
-                    setOpenIssue(openIssue === key ? null : key);
-                    selectIssue(editor, i);
-                  }}
-                >
-                  <span className="seas-issue-word">{shortQuote(i.word)}</span> {i.issue.message}
-                </button>
-                {openIssue === key && <IssueActions editor={editor} issue={i} proof={proof} onDone={() => setOpenIssue(null)} />}
-              </div>
+              <section className="sc" aria-label={who.name} key={id}>
+                <div className="sc-head">
+                  <Face id={id} size={30} />
+                  <span className="sub-h">{who.name}</span>
+                  {count > 0 && <span className="count">{count}</span>}
+                  <span className="handles">
+                    <Handle label="Move to top" disabled={at === 0} onClick={() => move(id, 'top')} d="M5 4h14M12 20V9M7 13l5-5 5 5" />
+                    <Handle label="Move up" disabled={at === 0} onClick={() => move(id, 'up')} d="M12 19V6M6 11l6-6 6 6" />
+                    <Handle label="Move down" disabled={at === chosen.length - 1} onClick={() => move(id, 'down')} d="M12 5v13M6 13l6 6 6-6" />
+                    <Handle label="Move to bottom" disabled={at === chosen.length - 1} onClick={() => move(id, 'bottom')} d="M5 20h14M12 4v11M7 11l5 5 5-5" />
+                  </span>
+                </div>
+
+                {id === 'daniel' && (
+                  <>
+                    <label className="switch-row">
+                      <span>Dim narration</span>
+                      <input type="checkbox" role="switch" className="switch" checked={page.dim} onChange={(e) => setDialogueFocus(editor, e.target.checked)} />
+                    </label>
+                    <div className="chips">
+                      {tracked.map((t) => (
+                        <span className="chip" key={t.path}>
+                          {t.title}
+                          <button aria-label={`Stop tracking ${t.title}`} onClick={() => onUntrack(t.path)}>
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                      <button className="chip chip-add" onClick={(e) => onTrack(e.clientX, e.clientY)}>
+                        + Track
+                      </button>
+                    </div>
+                    {tracked.map((t) => {
+                      const said = t.share === null ? null : talkRemark(t.share);
+                      const key = `daniel:${t.path}:${said}`;
+                      return (
+                        <div className="say" key={t.path}>
+                          <div className="track-row">
+                            <span className="track-title">{t.title}</span>
+                            <span className="track-share">{t.share === null ? 'Counting…' : `${t.share}% spoken`}</span>
+                          </div>
+                          <div className="meter" aria-hidden="true">
+                            <span style={{ width: `${t.share ?? 0}%` }} />
+                          </div>
+                          {said && !gone.includes(key) && <Bubble id="daniel" text={said} onRemove={() => onGone(key)} />}
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+
+                {id === 'sally' && graded && (
+                  <div className="say">
+                    <Bubble id="sally" text={gradeRemark(page.grade.grade)} onRemove={() => onGone(gradeKey)} />
+                    <div className="fix">
+                      <span className="sug" />
+                      <button className="btn btn-primary" disabled>
+                        Fix
+                      </button>
+                      <button className="btn" disabled={issues.length === 0} onClick={() => issues[0] && selectIssue(editor, issues[0])}>
+                        Show
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {issues.map((i) => (
+                  <Say key={`${i.from}:${i.issue.rule}:${i.word}`} editor={editor} issue={i} proof={proof} onMenu={onIssueMenu} />
+                ))}
+              </section>
             );
           })}
-          <details className="seas-card seas-dictionary">
-            <summary>Checks</summary>
-            {RULE_GROUPS.map((g) => (
-              <fieldset className="seas-rules" key={g.title}>
-                <legend>{g.title}</legend>
-                {g.rules.map((r) => (
-                  <label className="seas-todo" key={r.id}>
-                    <input type="checkbox" checked={!proof.off.includes(r.id)} onChange={(e) => proof.setRuleOn(r.id, e.target.checked)} />
-                    <span>{r.label}</span>
-                  </label>
-                ))}
-              </fieldset>
-            ))}
-            <span className="seas-hint">
-              Grammar and style are checked while Seasonings is open; spelling all the time.
-              {proof.ignoredCount > 0 && (
-                <>
-                  {' '}
-                  {proof.ignoredCount} ignored.{' '}
-                  <button className="seas-link" onClick={proof.clearIgnored}>
-                    Show them again
-                  </button>
-                </>
-              )}
-            </span>
-          </details>
-          <details className="seas-card seas-dictionary">
-            <summary>
-              Your dictionary · {proof.words.length} {proof.words.length === 1 ? 'word' : 'words'}
-            </summary>
-            {proof.words.length === 0 ? (
-              <span className="seas-hint">Words you add from a spelling card are kept in dictionary.txt in the book folder.</span>
-            ) : (
-              <div className="seas-words">
-                {[...proof.words].sort((a, b) => a.localeCompare(b, 'en')).map((w) => (
-                  <span className="seas-word" key={w}>
-                    {w}
-                    <button aria-label={`Remove ${w} from your dictionary`} onClick={() => proof.removeWord(w)}>
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </details>
-        </Section>
-      )}
-
-      {show('notes') && (
-        <Section title="Notes" count={noteCount} action={
-            <button className="ghost" disabled={scene.nothingSelected} title={scene.nothingSelected ? 'Select some words in the scene first' : `Add a note on the selected words (${keysFor('note')})`} onClick={addNote}>
-              + Add note
-            </button>
-          }>
-          {noteCount === 0 && <div className="seas-card seas-quiet">Select some words and press {keysFor('note')} to leave yourself a note.</div>}
-          {scene.anchors.map((a) => (
-            <div className="seas-card" key={a.id} data-key={`note-${a.id}`}>
-              <button className="seas-quote" onClick={() => selectRange(editor, a.from, a.to)}>
-                On “{a.quote.trim()}”
-              </button>
-              <NoteText value={notes[a.id] ?? ''} onChange={(text) => onNotesChange({ ...notes, [a.id]: text })} />
-              <button className="seas-delete" onClick={() => deleteNote(a.id)}>
-                Delete note
-              </button>
-            </div>
-          ))}
-          {loose.map((id) => (
-            <div className="seas-card" key={id} data-key={`note-${id}`}>
-              <span className="seas-quote">On the whole scene</span>
-              <NoteText value={notes[id] ?? ''} onChange={(text) => onNotesChange({ ...notes, [id]: text })} />
-              <button className="seas-delete" onClick={() => deleteNote(id)}>
-                Delete note
-              </button>
-            </div>
-          ))}
-          {scene.todos.length > 0 && (
-            <div className="seas-card">
-              <span className="seas-quote">Scene to-do</span>
-              {scene.todos.map((t) => (
-                <label className="seas-todo" key={t.pos}>
-                  <input type="checkbox" checked={t.checked} onChange={(e) => setTodoChecked(editor, t.pos, e.target.checked)} />
-                  <span className={t.checked ? 'is-done' : ''}>{t.text || 'Empty item'}</span>
-                </label>
-              ))}
-              <span className="seas-hint">Typed as “-TD ” on a new line</span>
-            </div>
-          )}
-        </Section>
-      )}
-
-      {show('footnotes') && (
-        <Section
-          title="Footnotes"
-          count={scene.footnotes.length}
-          action={<button className="ghost" onClick={addFootnote}>+ Add at cursor</button>}
-        >
-          {scene.footnotes.length === 0 && <div className="seas-card seas-quiet">Press {keysFor('footnote')} to add a footnote where the cursor is.</div>}
-          {scene.footnotes.map((f, i) => (
-            <div className="seas-card" key={f.pos} data-key={`footnote-${i}`}>
-              <button className="seas-quote" onClick={() => selectFootnote(editor, i)}>
-                <sup>{i + 1}</sup> Footnote {i + 1}
-              </button>
-              <NoteText value={f.text} placeholder="Footnote text" onChange={(text) => setFootnoteText(editor, i, text)} />
-              <button className="seas-delete" onClick={() => deleteFootnote(editor, i)}>
-                Delete footnote
-              </button>
-            </div>
-          ))}
-        </Section>
-      )}
-
-      {show('dialogue') && (
-        <Section title="Dialogue" detail={`${share}% of this scene`}>
-          <div className="seas-card">
-            <span className="seas-meter" aria-hidden="true">
-              <span style={{ width: `${share}%` }} />
-            </span>
-            <span className="seas-hint">
-              {dialogueWords.toLocaleString('en')} of {totalWords.toLocaleString('en')} words are spoken. Narration fades so only dialogue stands out.
-            </span>
-            <button className="seas-toggle" aria-pressed={scene.focus} onClick={() => setDialogueFocus(editor, !scene.focus)}>
-              {scene.focus ? 'Show everything again' : 'Dim everything but dialogue'}
-            </button>
-          </div>
-        </Section>
+        </div>
       )}
     </aside>
+  );
+}
+
+function Handle({ label, d, disabled, onClick }: { label: string; d: string; disabled: boolean; onClick: () => void }) {
+  return (
+    <button className="handle" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={d} />
+      </svg>
+    </button>
+  );
+}
+
+function Bubble({ id, text, onRemove }: { id: SeasoningId; text: string; onRemove: () => void }) {
+  return (
+    <div className="bubble-row">
+      <Face id={id} size={22} />
+      <div className="bubble">{text}</div>
+      <button className="remove" aria-label="Remove for good" title="Remove for good" onClick={onRemove}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** One issue: the character's remark, the words around it, and the same two buttons every time. */
+function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIssue; proof: Proofreader; onMenu?: (issue: FoundIssue, x: number, y: number) => void }) {
+  const suggestions = useSuggestions(issue, proof);
+  const fix = suggestions?.[0];
+  const sentence = issue.word.length > 40;
+  return (
+    <div
+      className="say"
+      onContextMenu={(e) => {
+        if (!onMenu) return;
+        e.preventDefault();
+        onMenu(issue, e.clientX, e.clientY);
+      }}
+    >
+      <Bubble id={ownerOf(issue.issue)} text={remark(issue.issue, issue.word)} onRemove={() => proof.ignore(issue, 'once')} />
+      {!sentence && <Context editor={editor} issue={issue} />}
+      <div className="fix">
+        <span className="sug">{fix !== undefined && <>→ <strong>{fixText(issue.word, fix)}</strong></>}</span>
+        <button className="btn btn-primary" disabled={fix === undefined} onClick={() => fix !== undefined && applySuggestion(editor, issue, fix)}>
+          Fix
+        </button>
+        <button className="btn" onClick={() => selectIssue(editor, issue)}>
+          Show
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const AROUND = 32;
+
+/** A few words either side of the issue, from its own paragraph. */
+function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
+  const { doc } = editor.state;
+  if (issue.to > doc.content.size) return null;
+  const $from = doc.resolve(issue.from);
+  const start = Math.max($from.start(), issue.from - AROUND);
+  const end = Math.min($from.end(), issue.to + AROUND);
+  // Cut at a space, so no word is shown in half.
+  let before = doc.textBetween(start, issue.from, ' ', ' ');
+  if (start > $from.start()) before = `…${before.replace(/^\S*\s/, '')}`;
+  let after = doc.textBetween(issue.to, end, ' ', ' ');
+  if (end < $from.end()) after = `${after.replace(/\s\S*$/, '')}…`;
+  return (
+    <div className="ctx">
+      {before}
+      <span className={`mark-${issue.issue.kind}`}>{issue.word}</span>
+      {after}
+    </div>
   );
 }
 
@@ -344,44 +270,4 @@ function paragraphs(doc: PMNode): string[] {
     return false;
   });
   return out;
-}
-
-/** A grade level from a few words means nothing, so it waits for a paragraph or two. */
-const MIN_GRADE_WORDS = 50;
-const gradeNote = (grade: number) =>
-  grade <= 6 ? 'Easy to read. Most novels sit between grades 4 and 8.' : grade <= 9 ? 'Comfortable for most readers.' : 'Hard going. Shorter sentences and plainer words will bring it down.';
-
-/** A whole sentence is too long for the list; its first words are enough to find it. */
-const shortQuote = (text: string) => {
-  const t = text.trim();
-  if (!t) return 'Space';
-  const ws = t.split(/\s+/);
-  return ws.length > 6 ? `${ws.slice(0, 6).join(' ')}…` : t;
-};
-
-const KINDS: { id: IssueKind; label: string }[] = [
-  { id: 'spelling', label: 'spelling' },
-  { id: 'grammar', label: 'grammar' },
-  { id: 'style', label: 'style' },
-];
-
-const issueKey = (i: FoundIssue) => `${i.from}:${i.issue.rule}:${i.word}`;
-
-function Section({ title, count, detail, action, children }: { title: string; count?: number; detail?: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="seas-section" aria-label={title}>
-      <div className="seas-label">
-        <span>{title}</span>
-        <span className="seas-label-end">
-          {action}
-          {detail ?? (count !== undefined && count > 0 ? count : '')}
-        </span>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function NoteText({ value, placeholder = 'Write a note to yourself', onChange }: { value: string; placeholder?: string; onChange: (text: string) => void }) {
-  return <textarea className="seas-text" rows={2} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />;
 }

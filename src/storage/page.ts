@@ -29,7 +29,10 @@ export const MARGINS: Record<Margins, { label: string; inches: number }> = {
   wide: { label: 'Wide', inches: 1.4 },
 };
 
+/** The steps for ⌘= and ⌘−, and the menu; the slider in the footer goes anywhere between the ends. 0 is Fit width. */
 export const ZOOMS = [75, 100, 125, 150, 0] as const;
+export const MIN_ZOOM = 50;
+export const MAX_ZOOM = 200;
 
 export const DEFAULT_PAGE: PageSettings = { size: 'letter', margins: 'normal', view: 'page', zoom: 100 };
 
@@ -40,7 +43,7 @@ export function pageOf(saved: unknown): PageSettings {
     size: typeof p.size === 'string' && p.size in PAGE_SIZES ? (p.size as PageSize) : DEFAULT_PAGE.size,
     margins: typeof p.margins === 'string' && p.margins in MARGINS ? (p.margins as Margins) : DEFAULT_PAGE.margins,
     view: p.view === 'draft' ? 'draft' : 'page',
-    zoom: typeof p.zoom === 'number' && (ZOOMS as readonly number[]).includes(p.zoom) ? p.zoom : DEFAULT_PAGE.zoom,
+    zoom: typeof p.zoom === 'number' && (p.zoom === 0 || (p.zoom >= MIN_ZOOM && p.zoom <= MAX_ZOOM)) ? Math.round(p.zoom) : DEFAULT_PAGE.zoom,
   };
 }
 

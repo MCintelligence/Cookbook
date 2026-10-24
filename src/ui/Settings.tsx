@@ -143,17 +143,19 @@ function NumberField({ label, value, placeholder, required, onCommit }: { label:
 }
 
 const THEMES: { id: Theme; label: string; bg: string; side: string; page: string }[] = [
-  { id: 'system', label: 'System', bg: 'linear-gradient(90deg, #f6eedf 50%, #1e1a17 50%)', side: '#d9c4a3', page: '#fffbf3' },
-  { id: 'light', label: 'Light', bg: '#f6eedf', side: '#f3e8d4', page: '#fffbf3' },
-  { id: 'dark', label: 'Dark', bg: '#1e1a17', side: '#262019', page: '#2b2520' },
+  { id: 'system', label: 'System', bg: 'linear-gradient(90deg, #f4f4f2 50%, #121212 50%)', side: '#a3a39e', page: '#fdfdfc' },
+  { id: 'light', label: 'Light', bg: '#f4f4f2', side: '#f1f1ef', page: '#fdfdfc' },
+  { id: 'dark', label: 'Dark', bg: '#121212', side: '#161616', page: '#1f1f1f' },
   { id: 'sepia', label: 'Sepia', bg: '#ead9bb', side: '#e4d0ad', page: '#f5e8cf' },
 ];
 
 const CHECK_HELP: Record<string, string> = {
-  spelling: 'Red underline as you write.',
-  name: '“Mamma Lou” when the Pantry has Mama Lou.',
-  grammar: 'Blue, while Seasonings is open.',
-  'harper-style': 'Blue, while Seasonings is open.',
+  spelling: 'Salty Sam: a red wavy underline.',
+  name: 'Salty Sam: “Mamma Lou” when the Pantry has Mama Lou.',
+  grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
+  'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
+  'hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
+  'very-hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
 };
 
 /**
@@ -256,7 +258,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Reopen where I left off" help="Open the last book at the page you were writing when Cookbook starts.">
               <Switch label="Reopen where I left off" on={s.reopenLast} onChange={(reopenLast) => set({ reopenLast })} />
             </Row>
-            <Row title="Where new books go" help={props.newBooksFolder ?? 'In this browser’s own storage. Use “Open a folder” in Your books to keep a book somewhere else.'}>
+            <Row title="Where new works go" help={props.newBooksFolder ?? 'In this browser’s own storage. Use “Open a work’s folder…” in Your works to keep a work somewhere else.'}>
               {props.newBooksFolder !== null && (
                 <button className="set-btn" onClick={props.onChooseNewBooksFolder}>
                   Choose folder…
@@ -359,12 +361,12 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             </Row>
           </Group>
           <Group title="While writing">
-            <Row title="Focus mode" help={`Hides the panels and fades everything but where you are. ${keys(binding('focus'))} turns it on and off.`}>
-              <Switch label="Focus mode" on={s.focus} onChange={(focus) => set({ focus })} />
+            <Row title="Study" help={`Hides the panels and fades everything but where you are. ${keys(binding('focus'))} turns it on and off.`}>
+              <Switch label="Study" on={s.focus} onChange={(focus) => set({ focus })} />
             </Row>
-            <Row title="Focus mode keeps bright" help="The rest of the page fades.">
+            <Row title="Study keeps bright" help="The rest of the page fades.">
               <Select
-                label="Focus mode keeps bright"
+                label="Study keeps bright"
                 value={s.fade}
                 options={[
                   ['paragraph', 'The paragraph'],
@@ -769,7 +771,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
   return (
     <>
       <Group title="Language">
-        <Row title="Spelling" help="Saved with the book, so a co-author gets the same.">
+        <Row title="American or British" help="Saved with the work, so a co-author gets the same.">
           <Seg
             label="Spelling"
             value={proof.dialect}
@@ -782,7 +784,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
         </Row>
         <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the book.`} words={proof.words.join(' ')}>
           <button className="set-btn" aria-expanded={editing} disabled={proof.words.length === 0} onClick={() => setEditing(!editing)}>
-            {editing ? 'Done' : 'See words…'}
+            Show words
           </button>
         </Row>
         {editing && (
@@ -800,14 +802,14 @@ function Proofreading({ proof }: { proof: Proofreader }) {
       </Group>
       <Group title="Checks">
         {RULE_GROUPS.flatMap((g) => g.rules).map((r) => (
-          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Purple, while Seasonings is open.'}>
+          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Peppery Pete: a blue highlight, while Seasonings is open.'}>
             <Switch label={r.label} on={!proof.off.includes(r.id)} onChange={(on) => proof.setRuleOn(r.id, on)} />
           </Row>
         ))}
       </Group>
       <div className="set-end">
         <button className="set-btn" disabled={proof.ignoredCount === 0} onClick={proof.clearIgnored}>
-          Bring back everything I ignored{proof.ignoredCount > 0 ? ` (${proof.ignoredCount})` : ''}
+          Bring back everything removed{proof.ignoredCount > 0 ? ` (${proof.ignoredCount})` : ''}
         </button>
       </div>
     </>
@@ -822,7 +824,7 @@ function GoalSettings({ book, onBook, onExport }: Pick<Props, 'book' | 'onBook'>
         <Row title="Words a day" help="Fills the ring in the bottom bar and keeps the streak.">
           <NumberField label="Words a day" value={book.dailyGoal ?? DEFAULT_DAILY_GOAL} required onCommit={(dailyGoal) => onBook({ dailyGoal })} />
         </Row>
-        <Row title="Whole book" help="Words on the Bookshelf you’re aiming for.">
+        <Row title="Whole book" help="Words on the Shelf you’re aiming for.">
           <NumberField label="Whole book target" value={book.bookTarget} placeholder="No target" onCommit={(bookTarget) => onBook({ bookTarget })} />
         </Row>
         <Row title="Deadline" help="Works out the words a day you need.">

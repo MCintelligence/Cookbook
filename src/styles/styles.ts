@@ -74,7 +74,7 @@ export function defaultStyles(): StyleSheet {
         next: BODY,
         font: 'Literata',
         size: 12,
-        color: '#3B2A20',
+        color: '#1C1C1B',
         align: 'justify',
         lineSpacing: 1.5,
         firstLineIndent: 0,

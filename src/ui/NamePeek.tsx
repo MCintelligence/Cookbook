@@ -141,7 +141,7 @@ export function NamePeek({ loadCard, loadPicture, onOpen, onPin }: Props) {
                 onPin(target.path);
               }}
             >
-              Pin beside draft
+              Pin beside page
             </button>
           </div>
         </>

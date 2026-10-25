@@ -802,7 +802,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
       </Group>
       <Group title="Checks">
         {RULE_GROUPS.flatMap((g) => g.rules).map((r) => (
-          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Spicy Sally: a blue highlight, while Seasonings is open.'}>
+          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Spicy Sally: 「 」 around the words, while Seasonings is open.'}>
             <Switch label={r.label} on={!proof.off.includes(r.id)} onChange={(on) => proof.setRuleOn(r.id, on)} />
           </Row>
         ))}

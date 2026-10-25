@@ -29,10 +29,10 @@
   --page-muted: #a6a6a1;
   --note: #fbefc8;
   --note-line: #e9b949;
-  /* The usual proofreading marks: red for spelling, blue for grammar and style. */
+  /* Red underline for spelling, blue for grammar; Spicy Sally's 「 」 in chili red for style. */
   --spelling: #d93025;
   --grammar: #1a73e8;
-  --style: #1a73e8;
+  --style: #d6452b;
   --danger-bg: #fbe7e2;
   --danger-text: #a3271b;
   --shadow: 0, 0, 0;
@@ -77,7 +77,7 @@
   --note-line: #b8902e;
   --spelling: #f28b82;
   --grammar: #8ab4f8;
-  --style: #8ab4f8;
+  --style: #f0805f;
 }
 
 :root[data-theme='sepia'] {
@@ -276,10 +276,13 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* Proofreader underlines: spelling crimson, grammar blue, style purple. The page is always paper, so the colours are fixed. */
 .cb-issue { --issue: var(--spelling); text-decoration: underline wavy var(--issue); text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-skip-ink: none; cursor: pointer; }
 .cb-issue-grammar { --issue: var(--grammar); }
-.cb-issue-sentence { text-decoration: none; cursor: text; background: color-mix(in srgb, var(--style) 9%, transparent); border-radius: 2px; }
-.cb-issue-sentence[data-rule='very-hard-sentence'] { background: color-mix(in srgb, var(--style) 16%, transparent); }
+.cb-issue-sentence { cursor: text; }
 .cb-issue-space { background: color-mix(in srgb, var(--issue) 22%, transparent); border-radius: 2px; }
-.cb-issue-style { --issue: var(--style); text-decoration-style: solid; text-decoration-thickness: 2px; }
+.cb-issue-style { text-decoration: none; }
+.cb-bracket { color: var(--style); font-weight: 700; font-style: normal; user-select: none; pointer-events: none; }
+/* The brackets are full-width glyphs inked on one half; the other half is pulled in so they hug the words. */
+.cb-bracket-open { margin-left: -0.5em; }
+.cb-bracket-close { margin-right: -0.5em; }
 .issue-card { --issue: var(--spelling); position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); }
 .card-details { flex-wrap: wrap; }
 .card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
@@ -804,7 +807,9 @@ button.seas-quote:hover { color: var(--accent); }
 .sug { margin-right: auto; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mark-spelling { text-decoration: underline wavy var(--spelling); text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-skip-ink: none; color: var(--text); }
 .mark-grammar { text-decoration: underline wavy var(--grammar); text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-skip-ink: none; color: var(--text); }
-.mark-style { background: color-mix(in srgb, var(--style) 14%, transparent); border-radius: 2px; color: var(--text); }
+.mark-style { color: var(--text); }
+.mark-style::before { content: '「'; color: var(--style); font-weight: 700; margin-left: -0.5em; }
+.mark-style::after { content: '」'; color: var(--style); font-weight: 700; margin-right: -0.5em; }
 .switch-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 2px 0 8px; }
 .switch { appearance: none; -webkit-appearance: none; position: relative; width: 32px; height: 18px; margin: 0; border-radius: 9px; background: var(--line-strong); cursor: pointer; transition: background 0.15s; }
 .switch::after { content: ''; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left 0.15s; }
@@ -833,10 +838,7 @@ button.seas-quote:hover { color: var(--accent); }
 .meter { height: 4px; margin: 5px 0 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .meter span { display: block; height: 100%; background: var(--accent); }
 
-/* Marks on the page: the usual colours, red wavy for spelling, blue wavy for grammar, a blue highlight for style */
-.cb-issue-style { text-decoration: none; background: color-mix(in srgb, var(--style) 14%, transparent); border-radius: 2px; }
-.cb-issue-sentence { background: color-mix(in srgb, var(--style) 8%, transparent); }
-.cb-issue-sentence[data-rule='very-hard-sentence'] { background: color-mix(in srgb, var(--style) 14%, transparent); }
+/* Marks on the page: the usual colours, red wavy for spelling, blue wavy for grammar, Sally’s 「 」 for style */
 
 /* The card that opens from a mark */
 .issue-card { gap: 6px; padding: 10px 12px; border-radius: 10px; border-top: 1px solid var(--line-strong); }

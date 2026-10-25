@@ -60,14 +60,19 @@ function mapOf(node: PMNode): TextMap {
   return map;
 }
 
-/** Sally's 「 」 around a passage with a style remark: page furniture, never part of the text. */
-function bracket(at: number, open: boolean, spec: object): Decoration {
+/**
+ * Sally's brackets around a style remark: 『 』 for a single word, 「 」 for a
+ * longer passage. Page furniture, never part of the text.
+ */
+export const bracketsFor = (word: string): [string, string] => (/\s/u.test(word.trim()) ? ['「', '」'] : ['『', '』']);
+
+function bracket(at: number, open: boolean, glyph: string, spec: object): Decoration {
   return Decoration.widget(
     at,
     () => {
       const el = document.createElement('span');
       el.className = `cb-bracket cb-bracket-${open ? 'open' : 'close'}`;
-      el.textContent = open ? '「' : '」';
+      el.textContent = glyph;
       el.setAttribute('aria-hidden', 'true');
       return el;
     },
@@ -85,7 +90,9 @@ function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Dec
   const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
   const spec = { issue, word, ...keys };
   const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, spec);
-  return issue.kind === 'style' ? [bracket(from, true, spec), mark, bracket(to, false, spec)] : [mark];
+  if (issue.kind !== 'style') return [mark];
+  const [open, close] = bracketsFor(word);
+  return [bracket(from, true, open, spec), mark, bracket(to, false, close, spec)];
 }
 
 /** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */

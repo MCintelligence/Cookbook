@@ -29,7 +29,7 @@
   --page-muted: #a6a6a1;
   --note: #fbefc8;
   --note-line: #e9b949;
-  /* Red underline for spelling, blue for grammar; Spicy Sally's 「 」 in chili red for style. */
+  /* Red underline for spelling, blue for grammar; Spicy Sally's 『 』 (a word) and 「 」 (a passage) in chili red for style. */
   --spelling: #d93025;
   --grammar: #1a73e8;
   --style: #d6452b;
@@ -810,6 +810,8 @@ button.seas-quote:hover { color: var(--accent); }
 .mark-style { color: var(--text); }
 .mark-style::before { content: '「'; color: var(--style); font-weight: 700; margin-left: -0.5em; }
 .mark-style::after { content: '」'; color: var(--style); font-weight: 700; margin-right: -0.5em; }
+.mark-style.mark-word::before { content: '『'; }
+.mark-style.mark-word::after { content: '』'; }
 .switch-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 2px 0 8px; }
 .switch { appearance: none; -webkit-appearance: none; position: relative; width: 32px; height: 18px; margin: 0; border-radius: 9px; background: var(--line-strong); cursor: pointer; transition: background 0.15s; }
 .switch::after { content: ''; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left 0.15s; }

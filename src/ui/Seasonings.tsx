@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
-import { type FoundIssue, applySuggestion, issuesOf, selectIssue } from '../proofread/plugin';
+import { type FoundIssue, applySuggestion, bracketsFor, issuesOf, selectIssue } from '../proofread/plugin';
 import { SEASONINGS, SPICE, type SeasoningId, fixText, gradeRemark, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
@@ -286,7 +286,7 @@ function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
   return (
     <div className="ctx">
       {before}
-      <span className={`mark-${issue.issue.kind}`}>{issue.word}</span>
+      <span className={`mark-${issue.issue.kind}${issue.issue.kind === 'style' && bracketsFor(issue.word)[0] === '『' ? ' mark-word' : ''}`}>{issue.word}</span>
       {after}
     </div>
   );

@@ -3,8 +3,9 @@ import { type SeasoningId } from '../proofread/remarks';
 /**
  * Each seasoning as a line drawing in the current colour, with an outline
  * of its own so they tell apart without colour or a name: Sam a salt shaker
- * with a domed cap, Pete a chilli pepper, Daniel a
- * bottle leaning over, hiccuping, and Sally a cupcake with a cherry.
+ * with a domed cap, Pete a barrel-shaped pepper grinder with a knob, turning
+ * and dropping pepper, Daniel a bottle leaning over, hiccuping, and Sally a
+ * cupcake with a cherry.
  */
 export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
   // Small faces get a heavier line so it stays a line.
@@ -39,12 +40,20 @@ export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
       )}
       {id === 'pete' && (
         <>
-          <path d="M13.5 13.5c-.5-4.5 1.5-7.5 5.5-9" />
-          <path d="M7.5 18.5c1.5-4 5.5-6 10-5 2.5-1.5 5.5-1 7 1" />
-          <path d="M7.5 18.5c-.5 6 4 10.5 11 15.5 6 4.5 13 7.5 22 9.5-3.5-6.5-6.5-14-9-20.5-2-5-4-8-7-9" />
-          <path d="M13 20.5l3.5 1.5M23.5 19.5l-3.5 2" />
-          <path d="M15 25v.1M21.5 24.5v.1" />
-          <path d="M16 29.5q3-1.5 6 .5" />
+          <circle cx="24" cy="4.5" r="2" />
+          <path d="M24 6.5v2" />
+          <path d="M15 15l3-6.5h12l3 6.5z" />
+          <path d="M17.5 15c-3 7.5-3 15 0 22.5M30.5 15c3 7.5 3 15 0 22.5" />
+          <path d="M16 37.5h16v3.5H16z" />
+          <path d="M9.5 8q-2.5 3.5 0 7M38.5 8q2.5 3.5 0 7" />
+          <g fill="currentColor" stroke="none">
+            <circle cx="20.5" cy="45" r="1.1" />
+            <circle cx="24.5" cy="46.5" r="1.1" />
+            <circle cx="28" cy="44.5" r="1.1" />
+          </g>
+          <path d="M19.5 20.5l3.5 2M28.5 20.5l-3.5 2" />
+          <path d="M21 25.5v.1M27 25.5v.1" />
+          <path d="M21.5 30.5h5" />
         </>
       )}
       {id === 'daniel' && (

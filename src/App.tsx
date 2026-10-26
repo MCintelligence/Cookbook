@@ -145,7 +145,7 @@ const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), 
 
 /** The search index is cheap to rebuild, so it is written back less often than scenes. */
 const INDEX_SAVE_DELAY_MS = 5000;
-const NOT_A_BOOK = 'This folder is not a Cookbook book.';
+const NOT_A_BOOK = 'This folder is not a Cookbook work.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
 const UNDO_SAVE_INTERVAL_MS = 10_000;
 
@@ -866,7 +866,7 @@ export function App() {
       const title = part?.title ?? book.title;
       if (await saveFile(fileNameFor(title), data, KINDS[kind])) say(`Exported “${title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.`);
     } catch (e) {
-      setError(`Couldn’t export the book. ${friendlyError(e)}`);
+      setError(`Couldn’t export “${part?.title ?? book.title}”. ${friendlyError(e)}`);
     }
   };
 
@@ -880,7 +880,7 @@ export function App() {
       const day = new Date().toLocaleDateString('en-CA');
       if (await saveFile(`${name} backup ${day}`, await backupZip(fs, name), KINDS.zip)) say(`Backed up “${book.title}”.`);
     } catch (e) {
-      setError(`Couldn’t back up the book. ${friendlyError(e)}`);
+      setError(`Couldn’t back up the work. ${friendlyError(e)}`);
     }
   };
 
@@ -943,9 +943,9 @@ export function App() {
       await saveUndoNow();
       await autoBackup(true);
       await refreshBackups();
-      say(`Backed up “${bookRef.current?.title ?? 'the book'}”.`);
+      say(`Backed up “${bookRef.current?.title ?? 'the work'}”.`);
     } catch (e) {
-      setError(`Couldn’t back up the book. ${friendlyError(e)}`);
+      setError(`Couldn’t back up the work. ${friendlyError(e)}`);
     }
   };
   /** Shows the book's backups; picking one opens a copy of the book as it was, beside this one. */
@@ -956,7 +956,7 @@ export function App() {
     const list = await listBackups(store.fs, current.title);
     const when = (d: Date) => d.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' });
     showMenu('Restore', x, y, [
-      { heading: 'Open a copy of the book as it was' },
+      { heading: 'Open a copy of the work as it was' },
       ...list.slice(0, 25).map((b) => ({ label: when(b.date), onPick: () => void restoreCopy(b) })),
       ...(list.length === 0 ? [{ label: 'No backups yet', disabled: true, onPick: () => {} }] : []),
     ]);
@@ -976,7 +976,7 @@ export function App() {
       }
       setSettingsAt(null);
       await openAt(target);
-      say(`Opened a copy of “${current.title}” from ${b.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. The book itself is unchanged.`);
+      say(`Opened a copy of “${current.title}” from ${b.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. The work itself is unchanged.`);
     } catch (e) {
       setError(`Couldn’t restore that backup. ${friendlyError(e)}`);
     }
@@ -1086,8 +1086,8 @@ export function App() {
     if (breakEl) {
       const pos = ed.view.posAtDOM(breakEl, 0);
       return showMenu('Section break', x, y, [
-        { label: 'Split into a new page here', onPick: () => void splitScene(pos), disabled: doc?.kind !== 'scene' },
-        { label: 'Merge with the next page', onPick: () => void mergeNext(), disabled: !next },
+        { label: 'Split into a new chapter here', onPick: () => void splitScene(pos), disabled: doc?.kind !== 'scene' },
+        { label: 'Merge with the next chapter', onPick: () => void mergeNext(), disabled: !next },
         { separator: true },
         { label: 'Remove the break', danger: true, onPick: () => ed.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run() },
       ]);
@@ -1162,7 +1162,7 @@ export function App() {
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
       { label: 'Study', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
-      { label: 'Read book', hint: keysFor('bookread'), onPick: () => void readManuscript() },
+      { label: 'Read the work', hint: keysFor('bookread'), onPick: () => void readManuscript() },
     ];
     if (words) {
       const short = words.length > 24 ? `${words.slice(0, 23)}…` : words;
@@ -1204,12 +1204,12 @@ export function App() {
   /** Right-click on the empty part of the Shelf. */
   const shelfMenu = (x: number, y: number) => {
     showMenu('Shelf', x, y, [
-      { label: 'New page', onPick: () => void addScene() },
-      { label: 'New book', onPick: () => void addFolder() },
-      { label: 'New page from template', items: SCENE_TEMPLATES.map((t) => ({ label: t.name, onPick: () => void addScene(t) })) },
+      { label: 'New chapter', onPick: () => void addScene() },
+      { label: 'New volume', onPick: () => void addFolder() },
+      { label: 'New chapter from template', items: SCENE_TEMPLATES.map((t) => ({ label: t.name, onPick: () => void addScene(t) })) },
       { label: 'Import files…', onPick: () => chooseImport(null) },
       { separator: true },
-      { label: 'Read book', onPick: () => void readManuscript() },
+      { label: 'Read the work', onPick: () => void readManuscript() },
       { separator: true },
       { label: 'Expand all', onPick: () => setFolding({ open: true, at: Date.now() }) },
       { label: 'Collapse all', onPick: () => setFolding({ open: false, at: Date.now() }) },
@@ -1230,7 +1230,7 @@ export function App() {
       }
     };
     walk(treeOf(top), 0);
-    return out.length > 0 ? out : [{ label: top === BOOKSHELF ? 'No other books' : 'No other folders', onPick: () => {}, disabled: true }];
+    return out.length > 0 ? out : [{ label: 'No other volumes', onPick: () => {}, disabled: true }];
   };
   const moveInto = (item: string, folder: string) => moveInTree(item, folder, childrenOf(treeOf(topOf(item)), topOf(item), folder).length);
 
@@ -1263,12 +1263,12 @@ export function App() {
     };
     if (node.kind === 'folder') {
       const kids = childrenOf(treeOf(top), top, p);
-      showMenu(onShelf ? 'Book' : 'Folder', x, y, [
+      showMenu('Volume', x, y, [
         {
-          label: onShelf ? 'New page here' : 'New card here',
+          label: onShelf ? 'New chapter here' : 'New card here',
           onPick: () => void addFrom(onShelf ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))!, p),
         },
-        { label: onShelf ? 'New book inside' : 'New folder inside', onPick: () => void addFolderIn(p) },
+        { label: 'New volume inside', onPick: () => void addFolderIn(p) },
         ...(onShelf ? [{ label: 'Import files here…', onPick: () => chooseImport(p) }] : []),
         { separator: true },
         ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move]),
@@ -1280,7 +1280,7 @@ export function App() {
             { label: 'Z to A', onPick: () => void sortContents(p, true) },
           ],
         },
-        ...(onShelf ? [{ label: 'Read this book', onPick: () => void readManuscript(p) }, { label: 'Export book', items: exportItems(p) }] : []),
+        ...(onShelf ? [{ label: 'Read this volume', onPick: () => void readManuscript(p) }, { label: 'Export volume', items: exportItems(p) }] : []),
         { label: 'Expand all inside', onPick: () => setFolding({ open: true, under: p, at: Date.now() }) },
         { label: 'Collapse all inside', onPick: () => setFolding({ open: false, under: p, at: Date.now() }) },
         ...trash,
@@ -1303,7 +1303,7 @@ export function App() {
       return;
     }
     const status = card?.status ?? 'not-started';
-    showMenu('Page', x, y, [
+    showMenu('Chapter', x, y, [
       { label: 'Open', onPick: () => void select(p) },
       ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
       { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
@@ -1324,11 +1324,11 @@ export function App() {
       },
       { separator: true },
       common.move,
-      { label: 'Group into new book', onPick: () => void groupIntoFolder(p) },
+      { label: 'Group into new volume', onPick: () => void groupIntoFolder(p) },
       ...(p === path ? [{ label: 'Merge with next', disabled: !next, onPick: () => void mergeNext() }] : []),
       { separator: true },
       { label: 'Copy as Markdown', onPick: () => void copyMarkdown(p) },
-      { label: 'Export page', items: exportItems(p) },
+      { label: 'Export chapter', items: exportItems(p) },
       ...trash,
     ]);
   };
@@ -1449,7 +1449,7 @@ export function App() {
 
   /** A page in Read book. */
   const readerMenu = (p: string, x: number, y: number) =>
-    showMenu('Page', x, y, [
+    showMenu('Chapter', x, y, [
       { label: 'Open to write', onPick: () => void select(p) },
       { label: 'Copy text', onPick: () => void copyText(p) },
       { label: 'Export', items: exportItems(p) },
@@ -1608,7 +1608,7 @@ export function App() {
   const incoming = useMemo(() => (doc && doc.kind !== 'scene' ? (index.current?.index.incoming(doc.id) ?? []) : []), [doc?.id, doc?.kind, indexVersion]);
   const loadPicture = useCallback(
     async (p: string) => {
-      if (!fs) throw new Error('No book is open.');
+      if (!fs) throw new Error('No work is open.');
       return URL.createObjectURL(new Blob([(await fs.readBytes(p)).slice()], { type: pictureType(p) }));
     },
     [fs],
@@ -1695,9 +1695,9 @@ export function App() {
     const add = (p: string) => setSeasonings({ tracked: [...(bookRef.current?.seasonings?.tracked ?? []), p] });
     const books = [...walkFolders(tree)].filter((n) => !have.has(n.path));
     showMenu('Track', x, y, [
-      ...(path?.startsWith(BOOKSHELF + '/') && !have.has(path) ? [{ label: 'This page', onPick: () => add(path) }] : []),
-      ...(books.length > 0 ? [{ heading: 'Books' } as const, ...books.map((n) => ({ label: n.name, onPick: () => add(n.path) }))] : []),
-      ...(have.size === 0 && books.length === 0 && !path?.startsWith(BOOKSHELF + '/') ? [{ label: 'Open a page to track it', disabled: true, onPick: () => {} }] : []),
+      ...(path?.startsWith(BOOKSHELF + '/') && !have.has(path) ? [{ label: 'This chapter', onPick: () => add(path) }] : []),
+      ...(books.length > 0 ? [{ heading: 'Volumes' } as const, ...books.map((n) => ({ label: n.name, onPick: () => add(n.path) }))] : []),
+      ...(have.size === 0 && books.length === 0 && !path?.startsWith(BOOKSHELF + '/') ? [{ label: 'Open a chapter to track it', disabled: true, onPick: () => {} }] : []),
     ]);
   };
   const castIds = useEditorState({
@@ -1725,7 +1725,7 @@ export function App() {
       live = false;
     };
   }, [fs, doc?.id, doc?.kind, indexVersion, matcher]); // the card's own edits show once saved
-  const loadCard = useCallback((p: string) => (fs ? readDocument(fs, p) : Promise.reject(new Error('No book is open.'))), [fs]);
+  const loadCard = useCallback((p: string) => (fs ? readDocument(fs, p) : Promise.reject(new Error('No work is open.'))), [fs]);
 
   // Pinned cards are remembered per book on this device.
   const pinsKey = `cookbook.pins:${JSON.stringify(location)}`;
@@ -1986,15 +1986,15 @@ export function App() {
     ];
     const page = pageOf(book?.page);
     return [
-      cmd('new', 'New page', () => void addScene(), 'Actions', keysFor('newScene')),
+      cmd('new', 'New chapter', () => void addScene(), 'Actions', keysFor('newScene'), 'page scene'),
       cmd('card', 'New card', () => void addCard(), 'Actions', undefined, 'pantry character place research'),
-      cmd('folder', 'New book', () => void addFolder(), 'Actions', undefined, 'folder part chapter'),
-      cmd('bookread', manuscript ? 'Back to writing' : 'Read book', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
+      cmd('folder', 'New volume', () => void addFolder(), 'Actions', undefined, 'book folder part'),
+      cmd('bookread', manuscript ? 'Back to writing' : 'Read the work', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
       cmd('find', 'Search', () => setFindRequest({ query: '', at: Date.now() }), 'Actions', keysFor('find'), 'find replace'),
       cmd('shelf', 'Name from the Pantry', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters insert'),
       cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places research'),
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
-      ...(doc ? [cmd('snapshot', 'Take a snapshot of this page', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this page…', () => path && void showSnapshots(path))] : []),
+      ...(doc ? [cmd('snapshot', 'Take a snapshot of this chapter', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this chapter…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Study off' : 'Study', toggleFocus, 'View', keysFor('focus'), 'focus distraction'),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
@@ -2035,7 +2035,7 @@ export function App() {
     return total;
   }, [cards, path, words]);
   const exportHistoryCsv = () =>
-    void saveFile(`${book?.title ?? 'Book'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
+    void saveFile(`${book?.title ?? 'Work'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
   // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
   const desk = useRef<HTMLElement>(null);
   const [deskWidth, setDeskWidth] = useState(0);
@@ -2090,7 +2090,7 @@ export function App() {
                 ]);
               }}
             >
-              {book?.title ?? 'Books'}
+              {book?.title ?? 'Works'}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M6 9l6 6 6-6" />
               </svg>
@@ -2222,7 +2222,7 @@ export function App() {
             <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onClose={() => setBeside(null)} /></Suspense>
           ) : null}
           </div>
-          {doc && path ? null : <p className="empty">Pick a page from the Shelf to start writing.</p>}
+          {doc && path ? null : <p className="empty">Pick a chapter from the Shelf to start writing.</p>}
           </>
         )}
       </main>
@@ -2499,7 +2499,7 @@ export function App() {
         </Suspense>
       )}
 
-      {palette && <Palette key={palette.at} items={paletteItems(palette.scenesOnly)} placeholder={palette.scenesOnly ? 'Go to a page or card' : 'Type a command, setting or page'} onClose={() => setPalette(null)} />}
+      {palette && <Palette key={palette.at} items={paletteItems(palette.scenesOnly)} placeholder={palette.scenesOnly ? 'Go to a chapter or card' : 'Type a command, setting or chapter'} onClose={() => setPalette(null)} />}
 
       {snapshots && (
         <SnapshotsDialog

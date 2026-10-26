@@ -27,12 +27,12 @@ export function SceneBreakActions({ editor, nextTitle, onSplit, onMerge }: Props
   return (
     <div className="break-actions" style={{ top: at.top - 14 }}>
       <button onMouseDown={(e) => e.preventDefault()} onClick={() => onSplit(at.pos)}>
-        Split into new page
+        Split into new chapter
       </button>
       <button
         onMouseDown={(e) => e.preventDefault()}
         disabled={!nextTitle}
-        title={nextTitle ? `Add “${nextTitle}” to the end of this page` : 'This is the last page in its book'}
+        title={nextTitle ? `Add “${nextTitle}” to the end of this chapter` : 'This is the last chapter in its volume'}
         onClick={onMerge}
       >
         Merge with next

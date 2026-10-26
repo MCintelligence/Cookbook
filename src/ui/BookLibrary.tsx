@@ -104,7 +104,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                           items: [
                             { label: open ? 'Back to writing' : 'Open', onPick: () => (open ? onClose() : onOpen(b.location)) },
                             ...(open && openBookItems.length > 0 ? [{ separator: true } as const, ...openBookItems] : []),
-                            ...(open ? [] : [{ separator: true } as const, { label: 'Remove from this list', hint: 'The book is kept', onPick: forget }]),
+                            ...(open ? [] : [{ separator: true } as const, { label: 'Remove from this list', hint: 'The work is kept', onPick: forget }]),
                           ],
                         });
                       }}
@@ -117,7 +117,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                         <button
                           className="lib-forget"
                           aria-label={`Remove ${b.title} from this list`}
-                          title="Remove from this list (the book itself is kept)"
+                          title="Remove from this list (the work itself is kept)"
                           onClick={() => {
                             forgetBook(b.location);
                             setRecent(recentBooks());
@@ -148,7 +148,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
               }}
             >
               <label htmlFor="lib-new-title">Start a new work</label>
-              <div className="lib-templates" role="radiogroup" aria-label="Kind of book">
+              <div className="lib-templates" role="radiogroup" aria-label="Kind of work">
                 {BOOK_TEMPLATES.map((t) => (
                   <button key={t.id} type="button" role="radio" aria-checked={template === t.id} title={t.description} onClick={() => setTemplate(t.id)}>
                     {t.name}

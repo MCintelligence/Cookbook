@@ -76,23 +76,25 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  if (!items) return <p className="empty">Gathering every page…</p>;
+  if (!items) return <p className="empty">Gathering every chapter…</p>;
   const scenes = items.filter((i) => i.type === 'scene');
   const words = scenes.reduce((sum, s) => sum + s.words, 0);
+  // Read this volume passes one volume; the whole work is everything on the Shelf.
+  const title = tree.length === 1 && tree[0]!.kind === 'folder' ? tree[0]!.name : 'The whole work';
 
   return (
     <>
       <div className="ms-bar">
         <span>
-          <strong>Read book</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'page' : 'pages'} · {words.toLocaleString('en')} words · about{' '}
+          <strong>{title}</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'chapter' : 'chapters'} · {words.toLocaleString('en')} words · about{' '}
           {readingTime(words)} to read
         </span>
         <button className="pill" onClick={onClose}>
           Back to writing
         </button>
       </div>
-      <article className="cb-page manuscript" aria-label="Read book">
-        {scenes.length === 0 && <p className="empty">The Shelf has no pages yet.</p>}
+      <article className="cb-page manuscript" aria-label={title}>
+        {scenes.length === 0 && <p className="empty">The Shelf has no chapters yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
             <h2 key={item.path} className={`ms-folder ms-depth-${Math.min(item.depth, 2)}`}>
@@ -136,7 +138,7 @@ export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchem
       const doc = PMNode.fromJSON(schema, body);
       el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
     } catch {
-      el.textContent = 'This page could not be shown.';
+      el.textContent = 'This chapter could not be shown.';
     }
   }, [schema, body]);
   return <div className="cb-prose ms-text" ref={box} />;

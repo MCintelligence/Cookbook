@@ -141,15 +141,15 @@ The Seasonings button in the top bar opens four characters who each read the pag
 
 - **Salty Sam** checks spelling.
 - **Peppery Pete** checks grammar and style.
-- **Drunk Daniel** watches dialogue: he can dim the narration so only the speech stands out, and tracks how much of any chapter or volume you pick is spoken.
-- **Sweet Sally** checks readability: hard sentences and the chapter's grade level (the Automated Readability Index, as Hemingway uses).
+- **Drunk Daniel** watches dialogue: he can dim the narration so only the speech stands out, and tracks how much of any page or book you pick is spoken.
+- **Sweet Sally** checks readability: hard sentences and the page's grade level (the Automated Readability Index, as Hemingway uses).
 
 Each remark comes with the words around it, a Fix button for the suggested change and a Show button that finds it on the page. ✕ removes a remark for good; right-click it to remove it everywhere. Underlines follow the usual colours: red for spelling, blue for grammar, and a blue highlight for style.
 
 Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - Every character's and place's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
-- Your dictionary is `dictionary.txt` in the work's folder, one word a line, and can be edited by hand.
+- Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
 - Removed remarks are kept in `.cookbook/ignored.json`. Settings can bring them all back.
 
 Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running on the device as WebAssembly. It checks agreement, articles, repeated words, punctuation and word choice. Harper is about 20 MB (8 MB compressed), so it loads the first time it's needed, and the offline web app keeps a copy.

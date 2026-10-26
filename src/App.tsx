@@ -232,6 +232,7 @@ export function App() {
   const [pins, setPinsState] = useState<string[]>([]);
   /** The Shelf being read as one manuscript (Read book), or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
+  const [manuscriptTitle, setManuscriptTitle] = useState('');
   /** Words for Search, from "Search everywhere" on a right-click. */
   const [findRequest, setFindRequest] = useState<{ query: string; at: number } | null>(null);
   /** Opens or closes every folder (or every one inside `under`), from a right-click. */
@@ -340,7 +341,8 @@ export function App() {
       } catch (e) {
         if (!(e instanceof Error && e.message === NOT_A_BOOK)) throw e;
         if (mode.adopt) info = await makeBookOrUndo(nextFs, () => createBook(nextFs, folderName(target)));
-        else if (sameLocation(target, await defaultLocation())) info = await startBook(nextFs, DEFAULT_BOOK);
+        // The first work keeps the old location name, so existing ones are still found, but is titled in today's words.
+        else if (sameLocation(target, await defaultLocation())) info = await startBook(nextFs, 'My Work');
         else throw e;
       }
     }
@@ -1555,6 +1557,7 @@ export function App() {
     await flushSave();
     const shelf = await readTree(fs, BOOKSHELF, order.current);
     const only = folder ? [...walkFolders(shelf)].find((n) => n.path === folder) : undefined;
+    setManuscriptTitle(only ? only.name : 'The whole work');
     setManuscript(only ? [only] : shelf);
   };
 
@@ -2175,7 +2178,7 @@ export function App() {
           </p>
         )}
         {manuscript && fs ? (
-          <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
+          <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} title={manuscriptTitle} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
         ) : (
           <>
           {doc && path && doc.kind === 'scene' && (

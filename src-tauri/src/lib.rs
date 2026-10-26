@@ -83,6 +83,38 @@ mod menu {
     }
 }
 
+/// The font families installed on this computer, by name, for the font menus.
+/// Read straight from the system's font folders, so it works offline and asks nothing.
+/// Names starting with a dot are the system's own hidden fonts on a Mac.
+#[cfg(desktop)]
+#[tauri::command]
+async fn system_fonts() -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut db = fontdb::Database::new();
+        db.load_system_fonts();
+        let mut names: Vec<String> = db
+            .faces()
+            .filter_map(|face| {
+                let english = face.families.iter().find(|(_, lang)| *lang == fontdb::Language::English_UnitedStates);
+                english.or(face.families.first()).map(|(name, _)| name.trim().to_string())
+            })
+            .filter(|name| !name.is_empty() && !name.starts_with('.'))
+            .collect();
+        names.sort_by_key(|name| name.to_lowercase());
+        names.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+        names
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// The phone apps keep to Cookbook's own fonts.
+#[cfg(not(desktop))]
+#[tauri::command]
+async fn system_fonts() -> Vec<String> {
+    Vec::new()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -90,6 +122,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
+        .invoke_handler(tauri::generate_handler![system_fonts])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;

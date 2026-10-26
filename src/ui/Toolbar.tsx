@@ -1,7 +1,8 @@
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
-import { type Alignment, BODY, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, defaultStyles, resolveParagraphStyle } from '../styles/styles';
+import { type Alignment, BODY, type ParagraphStyle, type StyleSheet, darkPageColor, defaultStyles, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
+import { FontOptions, pickFont } from './FontOptions';
 import { ColourWheel } from './ColourWheel';
 
 interface Props {
@@ -99,12 +100,8 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
       )}
       <span className="tb-sep" />
       <label className="tb-select tb-font" title={edits}>
-        <select value={style.font} disabled={disabled} onChange={(e) => edit({ font: e.target.value })} aria-label="Font">
-          {FONTS.map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
+        <select value={style.font} disabled={disabled} onChange={(e) => pickFont(e.target.value, (font) => edit({ font }))} aria-label="Font">
+          <FontOptions current={style.font} />
         </select>
       </label>
       <label className="tb-select tb-size" title={edits}>

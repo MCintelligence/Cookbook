@@ -862,3 +862,63 @@ button.seas-quote:hover { color: var(--accent); }
 .pantry-card { margin: 0; border-radius: 8px 8px 0 0; border-bottom: none; background: var(--paper); }
 .cb-page.card-page { border-radius: 0 0 8px 8px; border-top: 1px dashed var(--page-line); }
 .pc-name { width: 100%; margin: 0 0 6px; padding: 0; border: none; outline: none; background: transparent; color: var(--text); font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 20px; line-height: 28px; }
+
+/* ---------- The accent, carried further ----------
+   One warm colour marks what is chosen, open, focused or in progress: a quiet tint behind
+   it, the full colour only on a thin edge, a tick or a label. Every theme mixes its own. */
+:root {
+  --accent-soft: color-mix(in srgb, var(--accent) 11%, transparent);
+  --accent-softer: color-mix(in srgb, var(--accent) 6%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  --accent-label: color-mix(in srgb, var(--accent) 70%, var(--muted));
+  --accent-select: color-mix(in srgb, var(--accent) 24%, transparent);
+  --accent-track: color-mix(in srgb, var(--accent) 16%, var(--line));
+  accent-color: var(--accent);
+  caret-color: var(--accent);
+}
+:root[data-theme='dark'] {
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-softer: color-mix(in srgb, var(--accent) 9%, transparent);
+  --accent-select: color-mix(in srgb, var(--accent) 34%, transparent);
+  --accent-track: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+:root[data-theme='sepia'] {
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-select: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+::selection { background: var(--accent-select); }
+
+/* Focus from the keyboard: a soft accent ring rather than the browser's blue. */
+:where(:focus-visible) { outline: 2px solid color-mix(in srgb, var(--accent) 65%, transparent); outline-offset: 2px; }
+.panel-search:focus-within, .tb-select:focus-within, .set-num:focus, .set-sel:focus { border-color: var(--accent-line); outline: none; }
+
+/* Small section labels take a muted accent, so each panel and menu has one warm note. */
+.sub-h, .menu-heading, .palette-group, .set-h3, .set-scope, .find-results-label, .lib-new label { color: var(--accent-label); }
+
+/* Menus: the right-click and book menus, toolbar pop-ups, the / menu, the palette and Search. */
+.menu button:hover:not(:disabled), .menu button:focus-visible, .menu button.menu-open { background: var(--accent-soft); }
+.menu .menu-danger:hover:not(:disabled), .menu .menu-danger:focus-visible { background: var(--danger-bg); }
+.menu-check { color: var(--accent); font-weight: 700; }
+.tb-menu button:hover { background: var(--accent-soft); }
+.tb-menu button[aria-checked='true'] { background: var(--accent-softer); }
+.insert-item[aria-selected='true'], .palette-item[aria-selected='true'] { background: var(--accent-soft); }
+.palette-item[aria-selected='true'] .palette-hint { color: var(--accent-label); }
+.find-hit:hover, .find-hit:focus-visible { background: var(--accent-softer); }
+.lib-book:hover { background: var(--accent-softer); }
+.lib-book[aria-current='true'] { border-color: var(--accent-line); background: var(--accent-softer); }
+
+/* Top bar and toolbar: the open panel and the open pop-up show it. */
+.panel-btn[aria-pressed='true'] { background: var(--accent-soft); }
+.crumb-book[aria-expanded='true'] { background: var(--accent-soft); color: var(--text); }
+.tb-select[aria-expanded='true'] { border-color: var(--accent-line); background: var(--accent-softer); }
+
+/* The Shelf and Pantry: the chosen row is tinted, with its title in the accent. */
+.tree li[aria-selected='true'] > .tree-card, .tree li[aria-selected='true'] > .tree-recipe { background: var(--accent-soft); box-shadow: none; }
+.segmented button[aria-selected='true'] { color: var(--accent); }
+
+/* Settings: the open section, and the picked option in a row of choices. */
+.set-nav-item.on { background: var(--accent-soft); box-shadow: none; }
+.set-seg button[aria-pressed='true'] { color: var(--accent); }
+
+/* Progress: meters and the goal ring run on an accent-tinted track. */
+.meter, .goals-meter { background: var(--accent-track); }

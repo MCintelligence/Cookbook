@@ -350,6 +350,9 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: var(--page-text); border: 1px solid var(--page-line); border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 var(--line), 0 12px 28px rgba(var(--shadow), 0.08); }
 .cb-page { position: relative; }
+/* Zooming eases, except under Fit width, which follows the window as it's dragged. */
+.cb-page.eased { transition: zoom 140ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .cb-page.eased { transition: none; } }
 .break-actions { position: absolute; right: 84px; display: flex; gap: 4px; font-family: 'Nunito', sans-serif; z-index: 1; }
 .break-actions button { min-height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(var(--shadow), 0.12); }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }

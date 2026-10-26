@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MAX_ZOOM, MIN_ZOOM, zoomLabel } from '../storage/page';
-
-const STEP = 10;
+import { MAX_ZOOM, MIN_ZOOM, zoomLabel, zoomStep } from '../storage/page';
 
 /** The page's zoom in the footer: a slider that opens from it, with − and + at its ends and Fit width. */
 export function ZoomControl({ zoom, fitted, label, onZoom }: { zoom: number; /** The zoom Fit width works out to now. */ fitted: number; label: string; onZoom: (zoom: number) => void }) {
@@ -27,11 +25,11 @@ export function ZoomControl({ zoom, fitted, label, onZoom }: { zoom: number; /**
       </button>
       {open && (
         <div className="zoom-pop" role="dialog" aria-label="Zoom">
-          <button className="icon-btn" aria-label="Zoom out" onClick={() => set(now - STEP)}>
+          <button className="icon-btn" aria-label="Zoom out" onClick={() => set(zoomStep(now, -1))}>
             −
           </button>
           <input type="range" aria-label="Zoom" min={MIN_ZOOM} max={MAX_ZOOM} step={5} value={now} onChange={(e) => set(Number(e.target.value))} />
-          <button className="icon-btn" aria-label="Zoom in" onClick={() => set(now + STEP)}>
+          <button className="icon-btn" aria-label="Zoom in" onClick={() => set(zoomStep(now, 1))}>
             +
           </button>
           <span className="zoom-value">{now}%</span>

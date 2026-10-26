@@ -871,8 +871,8 @@ button.seas-quote:hover { color: var(--accent); }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 :root[data-theme='dark'] ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* The window's top edge, in the writing view and in Settings. */
-.topbar, .set-top { box-shadow: inset 0 3px 0 var(--accent); }
+/* The top bar's lower edge, in the writing view and in Settings, is the accent instead of a grey line. */
+.topbar, .set-top { border-bottom: var(--trim) solid var(--accent); }
 
 /* Everything that floats wears an accent cap. */
 .menu, .tb-popover, .insert-menu, .palette, .goals-pop, .zoom-pop, .find-pop, .peek, .lib, .notice { border-top: var(--trim) solid var(--accent); }
@@ -897,8 +897,7 @@ button.seas-quote:hover { color: var(--accent); }
 .panel-h.shelf-h::after { left: 8px; }
 .sub-h, .menu-heading, .palette-group, .set-h3, .set-scope, .find-results-label, .lib-new label { color: var(--accent); }
 
-/* The open panel button and the open toolbar pop-up get an accent underline and edge. */
-.panel-btn[aria-pressed='true'] { box-shadow: inset 0 calc(-1 * var(--trim)) 0 var(--accent); border-radius: 8px 8px 0 0; }
+/* The open toolbar pop-up gets an accent edge. */
 .tb-select[aria-expanded='true'], .tb-select:focus-within { border-color: var(--accent); }
 /* Panel tabs are plain words on a hairline; the open one is marked by its accent underline alone. */
 .segmented { padding: 0; border-radius: 0; background: transparent; box-shadow: inset 0 -1px 0 var(--line); }

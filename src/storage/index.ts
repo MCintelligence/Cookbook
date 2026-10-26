@@ -199,6 +199,11 @@ export class BookIndex {
     return rows.map(([path, title, text]) => ({ path, title, count: count(text) })).filter((m) => m.count > 0);
   }
 
+  /** The words of every page, for the proofreader to learn the book's own way with words. */
+  pageTexts(): string[] {
+    return (this.db.selectArrays(`select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.kind = 'scene'`) as [string][]).map(([t]) => t);
+  }
+
   /** The relationships other cards have with the card whose id this is. */
   incoming(id: string): IncomingRelationship[] {
     const rows = this.db.selectArrays(

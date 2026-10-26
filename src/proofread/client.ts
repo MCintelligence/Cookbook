@@ -1,11 +1,13 @@
 import { type Dialect, type Issue } from './check';
+import { type Around } from './context';
 import { type Request, type Response } from './worker';
 
 /** What the editor needs from a proofreader. Tests give it one that runs in place. */
 export interface Checker {
   /** Spelling; with `review`, grammar and style too. */
   check(texts: string[], review: boolean): Promise<Issue[][]>;
-  suggest(word: string): Promise<string[]>;
+  /** Spelling suggestions, best first; `around` puts them in order by the words on either side. */
+  suggest(word: string, around?: Around): Promise<string[]>;
 }
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
@@ -44,8 +46,13 @@ export class WorkerChecker implements Checker {
     return this.ask({ type: 'check', texts, review });
   }
 
-  suggest(word: string): Promise<string[]> {
-    return this.ask({ type: 'suggest', word });
+  suggest(word: string, around?: Around): Promise<string[]> {
+    return this.ask({ type: 'suggest', word, ...(around && { around }) });
+  }
+
+  /** The book's text, whose words and pairs count for more than the books Sam learnt from. */
+  learn(texts: string[]): Promise<void> {
+    return this.ask({ type: 'learn', texts });
   }
 
   destroy(): void {

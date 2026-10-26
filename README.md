@@ -149,6 +149,7 @@ Each remark comes with the words around it, a Fix button for the suggested chang
 Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - Every character's and place's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
+- Suggestions come in the order that fits the words around the misspelling, so in “she sat on the bech by the river”, Sam offers *bench* before *beech*. He knows which words follow which from the counts of word pairs in English fiction, and words and pairs from your own book count for more, so a word you use often comes first.
 - Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
 - Removed remarks are kept in `.cookbook/ignored.json`. Settings can bring them all back.
 
@@ -156,7 +157,7 @@ Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running o
 
 Style checks are Cookbook's own (`src/proofread/style.ts`): adverbs, simpler words, passive voice, crutch words, echoes, clichés, redundancies, quotes left open, and sticky sentences. Adverbs and crutch words inside dialogue are left alone, since that's how people talk.
 
-The word lists come from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) (MIT and BSD); their licences are in `public/dictionaries/`.
+The word lists come from [wooorm/dictionaries](https://github.com/wooorm/dictionaries) (MIT and BSD); their licences are in `public/dictionaries/`. The word-pair counts (`public/dictionaries/word-pairs.txt`, 3 MB, or 1.2 MB as downloaded) are from the [Google Books Ngram Viewer](https://books.google.com/ngrams/info)'s English Fiction 2-grams, under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/); `scripts/build-word-pairs.mjs` makes them.
 
 ## Running it
 

@@ -2,6 +2,7 @@
 import nspell from 'nspell';
 import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
+import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
 import { isSentenceRule, styleIssues } from './style';
 
 /**
@@ -13,7 +14,8 @@ import { isSentenceRule, styleIssues } from './style';
 export type Request =
   | { id: number; type: 'configure'; dialect: Dialect; words: string[]; names: string[] }
   | { id: number; type: 'check'; texts: string[]; review: boolean }
-  | { id: number; type: 'suggest'; word: string };
+  | { id: number; type: 'suggest'; word: string; around?: Around }
+  | { id: number; type: 'learn'; texts: string[] };
 
 export type Response = { id: number; result: unknown } | { id: number; error: string };
 
@@ -25,6 +27,17 @@ let config: { dialect: Dialect; words: string[] } = { dialect: 'en-US', words: [
 /** Harper is large, so it is only loaded the first time grammar is wanted. */
 let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues }> | null = null;
 let grammarConfigured: Promise<void> | null = null;
+/** Which words follow which in the books, loaded the first time a suggestion is wanted; empty if it can't be. */
+let pairs: Promise<Counts> | null = null;
+/** The same for the writer's own book. */
+let book: Counts = emptyCounts();
+
+function loadPairs() {
+  pairs ??= fetch(`${import.meta.env.BASE_URL}dictionaries/word-pairs.txt`)
+    .then((r) => (r.ok ? r.text() : ''))
+    .then(parseCounts, () => emptyCounts());
+  return pairs;
+}
 
 function files(dialect: Dialect) {
   let files = loaded.get(dialect);
@@ -71,13 +84,20 @@ async function handle(req: Request): Promise<unknown> {
       grammarConfigured = g.then(async ({ linter }) => (await import('./grammar')).setUpLinter(linter, req.dialect, words));
     }
     await ready;
+    // Read the word pairs while the writer is busy, so the first suggestion doesn't wait for them.
+    void loadPairs();
+    return null;
+  }
+  if (req.type === 'learn') {
+    book = countText(req.texts);
     return null;
   }
   if (!ready) throw new Error('The proofreader is not set up yet.');
   const { speller, names } = await ready;
   if (req.type === 'suggest') {
     const word = req.word.replace(/’/g, "'");
-    return rankSuggestions(word, speller.suggest(word));
+    const found = speller.suggest(word);
+    return rankSuggestions(word, found, 6, found.length > 1 ? fitter(req.around, await loadPairs(), book) : undefined);
   }
   const spelling = req.texts.map((t): Issue[] => checkSpelling(t, speller, names));
   if (!req.review) return spelling;

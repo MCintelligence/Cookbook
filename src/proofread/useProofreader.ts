@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
 import { type StorageAdapter } from '../storage/adapter';
 import { type Dialect } from './check';
+import { type Around } from './context';
 import { WorkerChecker } from './client';
 import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
 import { BOOK_WIDE, type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
@@ -21,7 +22,8 @@ export interface Proofreader {
   /** Rule groups switched off (see rules.ts). */
   off: string[];
   setRuleOn: (rule: string, on: boolean) => void;
-  suggest: (word: string) => Promise<string[]>;
+  /** Suggestions for a misspelling, in the order that fits the words around it. */
+  suggest: (word: string, around?: Around) => Promise<string[]>;
 }
 
 interface Options {
@@ -41,11 +43,15 @@ interface Options {
   names: string[];
   /** Reviewing (Seasonings is open): grammar and style are checked too. */
   review: boolean;
+  /** Every page's text, whose words count for more in suggestions; read only when one is wanted. */
+  bookTexts?: () => string[];
+  /** Goes up when the book's text may have changed. */
+  bookVersion?: number;
   onError: (message: string) => void;
 }
 
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, bookTexts, bookVersion = 0, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -53,6 +59,9 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
   const dialect = chosen ?? defaultDialect();
   const errorRef = useRef(onError);
   errorRef.current = onError;
+  const bookRef = useRef({ texts: bookTexts, version: bookVersion, learnt: -1 });
+  bookRef.current.texts = bookTexts;
+  bookRef.current.version = bookVersion;
 
   useEffect(() => {
     if (typeof Worker === 'undefined') return;
@@ -67,6 +76,7 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
   useEffect(() => {
     setWords([]);
     setIgnoredWords({});
+    bookRef.current.learnt = -1;
     if (!fs) return;
     let live = true;
     Promise.all([readDictionary(fs), readIgnored(fs)]).then(
@@ -151,7 +161,17 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
       },
       off,
       setRuleOn: (rule, on) => onOff(on ? off.filter((r) => r !== rule) : [...new Set([...off, rule])]),
-      suggest: (word) => checker.current?.suggest(word) ?? Promise.resolve([]),
+      suggest: (word, around) => {
+        const c = checker.current;
+        if (!c) return Promise.resolve([]);
+        // The book is read again only when a suggestion is wanted after it changed.
+        const book = bookRef.current;
+        if (book.texts && book.learnt !== book.version) {
+          book.learnt = book.version;
+          c.learn(book.texts()).catch(() => {});
+        }
+        return c.suggest(word, around);
+      },
     }),
     [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, onOff],
   );

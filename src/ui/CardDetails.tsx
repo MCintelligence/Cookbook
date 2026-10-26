@@ -1,18 +1,21 @@
-import { useEffect, useRef } from 'react';
-import { STATUSES, type SceneStatus } from '../storage/document';
+import { type CSSProperties, useEffect, useRef } from 'react';
 import { type NamedCard } from '../editor/names';
 
 interface Props {
-  status: SceneStatus;
   synopsis: string;
-  onStatus: (status: SceneStatus) => void;
   onSynopsis: (synopsis: string) => void;
   /** The characters and settings named in the scene, in order of appearance. */
   cast: NamedCard[];
+  /** Its width, the same as the page below. */
+  style?: CSSProperties;
 }
 
-/** The recipe card for the open scene: where it is up to and what happens in it. Sits above the page, never on it. */
-export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Props) {
+/**
+ * The recipe card for the open scene: what happens in it and who is in it.
+ * Sits above the page, never on it. Where the page is up to lives on the
+ * Shelf and in the footer, not here.
+ */
+export function CardDetails({ synopsis, onSynopsis, cast, style }: Props) {
   const box = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -24,15 +27,7 @@ export function CardDetails({ status, synopsis, onStatus, onSynopsis, cast }: Pr
   }, [synopsis]);
 
   return (
-    <section className="card-details" aria-label="Page card">
-      <div className="card-status" role="radiogroup" aria-label="Status">
-        {STATUSES.map((s) => (
-          <button key={s.id} role="radio" aria-checked={status === s.id} onClick={() => onStatus(s.id)}>
-            <span className={`status-dot status-${s.id}`} aria-hidden="true" />
-            {s.label}
-          </button>
-        ))}
-      </div>
+    <section className="card-details" aria-label="Page card" style={style}>
       <textarea
         ref={box}
         className="card-synopsis"

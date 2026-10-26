@@ -120,6 +120,7 @@ import { Seasonings, type Tracked } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
+import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
@@ -1320,7 +1321,7 @@ export function App() {
       },
       {
         label: 'Status',
-        items: STATUSES.map((st) => ({ label: st.label, checked: st.id === status, onPick: () => void setFieldOf(p, 'status', st.id === 'not-started' ? undefined : st.id) })),
+        items: STATUSES.map((st) => ({ label: st.label, icon: <StatusIcon status={st.id} decorative />, checked: st.id === status, onPick: () => void setFieldOf(p, 'status', st.id === 'not-started' ? undefined : st.id) })),
       },
       { separator: true },
       common.move,
@@ -2057,6 +2058,8 @@ export function App() {
     asDraft
       ? { zoom: pageZoom }
       : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
+  // The cards above the page are as wide as the page itself, at any size and zoom.
+  const cardStyle = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
   return (
     <div
@@ -2180,15 +2183,15 @@ export function App() {
           <>
           {doc && path && doc.kind === 'scene' && (
             <CardDetails
-              status={statusOf(doc.fields)}
+              style={cardStyle}
               synopsis={synopsisOf(doc.fields)}
-              onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)}
               onSynopsis={(text) => setCardField('synopsis', text)}
               cast={cast}
             />
           )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
+              style={cardStyle}
               doc={doc}
               choices={cardChoices}
               incoming={incoming}
@@ -2454,8 +2457,15 @@ export function App() {
               onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
             />
           )}
+          {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <span className={`saved${dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
-            <span className="saved-dot" aria-hidden="true" />
+            {dirty ? (
+              <span className="saved-dot" aria-hidden="true" />
+            ) : (
+              <svg className="saved-tick" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 8.5 6.5 12 13 4.5" />
+              </svg>
+            )}
             {dirty ? 'Saving…' : 'Saved'}
           </span>
           <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>

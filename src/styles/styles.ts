@@ -205,10 +205,10 @@ export function updateParagraphStyle(sheet: StyleSheet, id: string, changes: Par
   };
 }
 
-const PX_PER_PT = 4 / 3;
+export const PX_PER_PT = 4 / 3;
 const PX_PER_IN = 96;
 
-function fontStack(font: string): string {
+export function fontStack(font: string): string {
   const fallback = font === 'Courier Prime' ? 'monospace' : font === 'Nunito' ? 'sans-serif' : 'serif';
   return `'${font.replace(/'/g, '')}', ${fallback}`;
 }

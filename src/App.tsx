@@ -114,7 +114,7 @@ const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside
 import { checkForUpdates } from './ui/UpdateBanner';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
 import { dialogueRanges } from './editor/dialogue';
-import { type BasicStyle, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
+import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings, type Tracked } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
@@ -1136,7 +1136,7 @@ export function App() {
       { separator: true },
       {
         label: 'Paragraph style',
-        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id })) })),
+        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id, align: null, lineSpacing: null })) })),
       },
       {
         // Strong, Emphasis and Underline are what ⌘B, ⌘I and ⌘U apply, so they carry those keys here.
@@ -1154,6 +1154,13 @@ export function App() {
             },
           };
         }),
+      },
+      {
+        label: 'Clear formatting',
+        onPick: () => {
+          ed.commands.focus();
+          clearFormatting(ed);
+        },
       },
       { separator: true },
       { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => editFootnote(insertFootnote(ed)) },

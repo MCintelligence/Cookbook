@@ -1,7 +1,9 @@
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { type Alignment, BODY, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, defaultStyles, resolveParagraphStyle } from '../styles/styles';
+import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
+import { paragraphFormatOf } from '../editor/format';
+import { dropTakenFormat, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
 import { ColourWheel } from './ColourWheel';
 import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
@@ -30,23 +32,31 @@ const Chevron = () => (
 );
 
 /**
- * One row, five controls. The Style menu applies a style to the paragraph;
- * the font, size, colour, alignment and line spacing edit that style, so every
- * paragraph in it changes together. Bold, italic and underline are on the
- * keyboard and in Markdown; indents, spacing and kerning are in Settings › Styles.
+ * One row of controls that work like Word's and Scrivener's. The Style box
+ * applies a paragraph style. Font, size and colour change the selected words,
+ * or what is typed next when nothing is selected; alignment and line spacing
+ * change the paragraphs the selection touches. None of them change a style:
+ * that is Settings › Styles, or "Update style to match" in the Style list.
  */
 export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle }: Props) {
-  const current =
+  const at =
     useEditorState({
       editor,
       selector: ({ editor }) => {
         if (!editor) return null;
         const { $from } = editor.state.selection;
         const block = $from.parent;
-        if (block.type.name !== 'paragraph' || $from.depth !== 1) return null;
-        return (block.attrs.style as string) || BODY_STYLE;
+        const top = block.type.name === 'paragraph' && $from.depth === 1;
+        return {
+          // The paragraph style, only for top-level paragraphs (lists and tables have their own look).
+          style: top ? (block.attrs.style as string) || BODY_STYLE : null,
+          inText: block.isTextblock,
+          text: textFormatAt(editor),
+          paragraph: top ? paragraphFormatOf(block.attrs) : {},
+        };
       },
     }) ?? null;
+  const current = at?.style ?? null;
   // Naming a new style, or renaming the current one, takes the Style menu's place.
   const [naming, setNaming] = useState<'new' | 'rename' | null>(null);
   const [open, setOpen] = useState<'colour' | 'align' | null>(null);
@@ -56,11 +66,23 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
   const style = resolveParagraphStyle(sheet, styleId);
   const named = sheet.paragraph.find((s) => s.id === styleId)?.name ?? 'Body';
   const disabled = !editor || current === null;
-  const edits = `Changes every paragraph in the ${named} style`;
-  const alignment = ALIGNMENTS.find((a) => a.value === style.align) ?? ALIGNMENTS[0]!;
+  const textDisabled = !editor || !at?.inText;
+  const text = at?.text ?? { font: null, size: null, color: null };
+  const paragraph = at?.paragraph ?? {};
+  const font = text.font === 'mixed' ? '' : (text.font ?? style.font);
+  const size = text.size === 'mixed' || text.size === null ? style.size : text.size;
+  const color = text.color === 'mixed' || text.color === null ? style.color : text.color;
+  const align = paragraph.align ?? style.align;
+  const lineSpacing = paragraph.lineSpacing ?? style.lineSpacing;
+  const onWords = 'Changes the selected words, or what you type next';
+  const onParagraphs = 'Changes the selected paragraphs';
+  const alignment = ALIGNMENTS.find((a) => a.value === align) ?? ALIGNMENTS[0]!;
+  // Anything set by hand here, which "Update style to match" can take into the style.
+  const handSet = !!(paragraph.align || paragraph.lineSpacing || (text.font && text.font !== 'mixed') || (text.size && text.size !== 'mixed') || (text.color && text.color !== 'mixed'));
 
   const applyStyle = (id: string) => {
-    editor?.chain().focus().updateAttributes('paragraph', { style: id }).run();
+    // A new style brings its own alignment and spacing, as in Word.
+    editor?.chain().focus().updateAttributes('paragraph', { style: id, align: null, lineSpacing: null }).run();
   };
   const finishNaming = (name: string | null) => {
     const mode = naming;
@@ -70,13 +92,30 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
     else applyStyle(onAddStyle(name, styleId));
     editor?.commands.focus();
   };
-  const edit = (changes: Partial<ParagraphStyle>, keepFocus = false) => {
+  /** Makes the style look like this paragraph, then lets the paragraph follow the style again. */
+  const updateStyle = () => {
+    if (!editor) return;
+    const changes: Partial<ParagraphStyle> = { ...paragraph };
+    if (text.font && text.font !== 'mixed') changes.font = text.font;
+    if (text.size && text.size !== 'mixed') changes.size = text.size;
+    if (text.color && text.color !== 'mixed') changes.color = text.color;
     onEditStyle(styleId, changes);
-    if (!keepFocus) editor?.commands.focus();
+    dropTakenFormat(editor, editor.state.selection.$from.before(1), changes);
+    editor.view.focus();
+  };
+  const words = (changes: Parameters<typeof setTextFormat>[1], keepFocus = false) => {
+    if (!editor) return;
+    setTextFormat(editor, changes);
+    if (!keepFocus) editor.view.focus();
+  };
+  const paragraphs = (changes: Parameters<typeof setParagraphFormat>[1], keepFocus = false) => {
+    if (!editor) return;
+    setParagraphFormat(editor, changes);
+    if (!keepFocus) editor.view.focus();
   };
   const close = () => {
     setOpen(null);
-    editor?.commands.focus();
+    editor?.view.focus();
   };
 
   return (
@@ -93,14 +132,15 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
           current={styleId}
           disabled={disabled}
           actions={[
+            ...(handSet ? [{ id: 'update', label: `Update “${named}” to match this paragraph` }] : []),
             { id: 'new', label: 'New style from this paragraph…' },
             { id: 'rename', label: `Rename “${named}”…` },
           ]}
           missing={(typed) => `No style is called “${typed}”.`}
           onPick={(id) => applyStyle(id)}
-          onAction={(id) => setNaming(id === 'new' ? 'new' : 'rename')}
+          onAction={(id) => (id === 'update' ? updateStyle() : setNaming(id === 'new' ? 'new' : 'rename'))}
           onCreate={(name) => applyStyle(onAddStyle(name, styleId))}
-          onCancel={() => editor?.commands.focus()}
+          onCancel={() => editor?.view.focus()}
         />
       )}
       <span className="tb-sep" />
@@ -108,46 +148,48 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
         label="Font"
         listLabel="Fonts"
         className="tb-font"
-        title={edits}
+        title={onWords}
         items={FONTS.map((f) => ({ id: f, name: f }))}
-        current={style.font}
-        disabled={disabled}
+        current={font}
+        disabled={textDisabled}
         missing={(typed) => `Cookbook has no font called “${typed}”.`}
-        onPick={(font, keepFocus) => edit({ font }, keepFocus)}
-        onCancel={() => editor?.commands.focus()}
+        onPick={(font, keepFocus) => words({ font }, keepFocus)}
+        onCancel={() => editor?.view.focus()}
       />
       <NumberBox
         label="Size in points"
         listLabel="Sizes"
         className="tb-size"
-        title={edits}
-        value={style.size}
+        title={onWords}
+        value={size}
+        blank={text.size === 'mixed'}
         presets={SIZES}
-        disabled={disabled}
+        disabled={textDisabled}
         parse={parseSize}
         step={stepSize}
         invalid={`Type a size from ${MIN_SIZE} to ${MAX_SIZE} points.`}
-        onValue={(size, keepFocus) => edit({ size }, keepFocus)}
-        onCancel={() => editor?.commands.focus()}
+        onValue={(size, keepFocus) => words({ size }, keepFocus)}
+        onCancel={() => editor?.view.focus()}
       />
       <span className="tb-sep" />
       <Pop
         open={open === 'colour'}
         onClose={close}
         button={
-          <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title={edits} disabled={disabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
+          <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title={onWords} disabled={textDisabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
             <span className="tb-wheel" aria-hidden="true" />
-            <span className="tb-ink" style={{ '--ink': style.color, '--ink-dark': darkPageColor(style.color) } as CSSProperties} aria-hidden="true" />
+            <span className="tb-ink" style={{ '--ink': color, '--ink-dark': darkPageColor(color) } as CSSProperties} aria-hidden="true" />
             <Chevron />
           </button>
         }
       >
-        <div className="tb-popover tb-colour" role="dialog" aria-label={`Text colour for ${named}`}>
+        <div className="tb-popover tb-colour" role="dialog" aria-label="Text colour">
           <ColourWheel
-            value={style.color}
-            onPick={(color) => edit({ color }, true)}
+            value={color}
+            onPick={(color) => words({ color }, true)}
             onAutomatic={() => {
-              edit({ color: styleId === BODY ? defaultStyles().paragraph[0]!.color : undefined }, true);
+              // Back to the style's colour.
+              words({ color: null }, true);
               close();
             }}
           />
@@ -157,7 +199,7 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
         open={open === 'align'}
         onClose={close}
         button={
-          <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={open === 'align'} title={edits} disabled={disabled} onClick={() => setOpen(open === 'align' ? null : 'align')}>
+          <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={open === 'align'} title={onParagraphs} disabled={disabled} onClick={() => setOpen(open === 'align' ? null : 'align')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d={alignment.lines} />
             </svg>
@@ -170,9 +212,10 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
             <button
               key={a.value}
               role="menuitemradio"
-              aria-checked={style.align === a.value}
+              aria-checked={align === a.value}
               onClick={() => {
-                edit({ align: a.value });
+                // Picking the style's own alignment takes the paragraph's off, so it follows the style again.
+                paragraphs({ align: a.value === style.align ? null : a.value });
                 setOpen(null);
               }}
             >
@@ -188,20 +231,20 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
         label="Line spacing"
         listLabel="Line spacings"
         className="tb-spacing"
-        title={edits}
+        title={onParagraphs}
         icon={
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />
           </svg>
         }
-        value={style.lineSpacing}
+        value={lineSpacing}
         presets={SPACINGS}
         disabled={disabled}
         parse={parseSpacing}
         step={stepSpacing}
         invalid={`Type a spacing from ${MIN_SPACING} to ${MAX_SPACING}.`}
-        onValue={(lineSpacing, keepFocus) => edit({ lineSpacing }, keepFocus)}
-        onCancel={() => editor?.commands.focus()}
+        onValue={(spacing, keepFocus) => paragraphs({ lineSpacing: spacing === style.lineSpacing ? null : spacing }, keepFocus)}
+        onCancel={() => editor?.view.focus()}
       />
     </div>
   );
@@ -507,6 +550,7 @@ function NumberBox({
   title,
   icon,
   value,
+  blank = false,
   presets,
   disabled,
   parse,
@@ -521,6 +565,8 @@ function NumberBox({
   title: string;
   icon?: ReactNode;
   value: number;
+  /** Shows nothing, as when the selection has more than one size; stepping starts from `value`. */
+  blank?: boolean;
   presets: readonly number[];
   disabled: boolean;
   parse: (text: string) => number | null;
@@ -574,7 +620,7 @@ function NumberBox({
           aria-controls={listId}
           aria-invalid={bad || undefined}
           inputMode="decimal"
-          value={text ?? String(value)}
+          value={text ?? (blank ? '' : String(value))}
           disabled={disabled}
           spellCheck={false}
           autoComplete="off"
@@ -611,8 +657,8 @@ function NumberBox({
               key={v}
               role="option"
               tabIndex={-1}
-              aria-selected={v === value}
-              className={v === value ? 'tb-list-current' : undefined}
+              aria-selected={!blank && v === value}
+              className={!blank && v === value ? 'tb-list-current' : undefined}
               onClick={() => {
                 reset();
                 onValue(v, false);

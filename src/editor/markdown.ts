@@ -19,6 +19,8 @@
  *   **bold**  *italic*  [underline]{.ul}  ~~struck~~  `code`  [a link](https://…)
  *   ![a picture](pantry/pictures/lou.jpg)
  *   [any character style]{.thought}   [text a note is attached to]{.note #n1}
+ *   [words set by hand]{font="EB Garamond" size=14 color=#7a2e1f}
+ *   ::: {.letter align=center spacing=2}     a paragraph's own alignment and spacing (see format.ts)
  *   ^[an inline footnote]     a line ending in \ breaks the line there
  *
  * Bold, italic and so on are plain formatting; character styles such as
@@ -28,9 +30,12 @@
  * need no editor, so they run in tests and on any platform.
  */
 
+import { type ParagraphFormat, type TextFormat, paragraphFormatOf, parseParagraphFormat, parseTextFormat, textFormatOf, writeParagraphFormat, writeTextFormat } from './format';
+
 export type PlainMark = 'bold' | 'italic' | 'underline' | 'strike' | 'code';
 export type MarkJSON =
   | { type: 'charStyle'; attrs: { style: string } }
+  | { type: 'textStyle'; attrs: TextFormat }
   | { type: 'note'; attrs: { id: string } }
   | { type: 'link'; attrs: { href: string } }
   | { type: PlainMark; attrs?: undefined };
@@ -51,15 +56,18 @@ const SCENE_BREAK = '* * *';
 const FENCE = ':::';
 const NOTE_PREFIX = 'note#';
 const LINK_PREFIX = '@';
+/** Direct formatting's key is % and its attributes as written, which keeps equal formats equal. */
+const FORMAT_PREFIX = '%';
 /** Internal keys for plain formatting. Style ids can't start with *, so they never clash. */
 const PLAIN_KEY: Record<PlainMark, string> = { bold: '*b', italic: '*i', underline: '*u', strike: '*s', code: '*c' };
 const KEY_PLAIN = Object.fromEntries(Object.entries(PLAIN_KEY).map(([k, v]) => [v, k])) as Record<string, PlainMark>;
 /** Outermost first: notes, links, character styles, then bold, italic, underline, strike, and code innermost. */
 const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*c': 5 };
 
-/** Marks are handled internally as string keys: a style id, *b for bold, note#<id>, @<href>. */
+/** Marks are handled internally as string keys: a style id, *b for bold, note#<id>, @<href>, %<format>. */
 export function markKey(m: MarkJSON): string {
   if (m.type === 'note') return NOTE_PREFIX + m.attrs.id;
+  if (m.type === 'textStyle') return FORMAT_PREFIX + writeTextFormat(textFormatOf(m.attrs));
   if (m.type === 'charStyle') return m.attrs.style;
   if (m.type === 'link') return LINK_PREFIX + m.attrs.href;
   return PLAIN_KEY[m.type];
@@ -68,6 +76,7 @@ export function markKey(m: MarkJSON): string {
 function keyToMark(key: string): MarkJSON {
   if (key.startsWith(NOTE_PREFIX)) return { type: 'note', attrs: { id: key.slice(NOTE_PREFIX.length) } };
   if (key.startsWith(LINK_PREFIX)) return { type: 'link', attrs: { href: key.slice(LINK_PREFIX.length) } };
+  if (key.startsWith(FORMAT_PREFIX)) return { type: 'textStyle', attrs: parseTextFormat(key.slice(FORMAT_PREFIX.length)) ?? {} };
   if (KEY_PLAIN[key]) return { type: KEY_PLAIN[key]! };
   return { type: 'charStyle', attrs: { style: key } };
 }
@@ -92,6 +101,9 @@ export function parseMarkdown(markdown: string): NodeJSON {
   const lines = markdown.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
   const content: NodeJSON[] = [];
   let style = BODY_STYLE;
+  // Inside a ::: fence, and the alignment and spacing it gives its paragraphs.
+  let fenced = false;
+  let format: ParagraphFormat = {};
   let paragraph: string[] = [];
   let lists: OpenList[] = [];
   // Each list item's lines, made into its paragraph when the list ends.
@@ -99,7 +111,7 @@ export function parseMarkdown(markdown: string): NodeJSON {
 
   const flushParagraph = () => {
     if (paragraph.length === 0) return;
-    content.push(paragraphNode(paragraph, style));
+    content.push(paragraphNode(paragraph, style, true, format));
     paragraph = [];
   };
   const flushList = () => {
@@ -138,15 +150,18 @@ export function parseMarkdown(markdown: string): NodeJSON {
       continue;
     }
 
-    const fence = /^:::\s*\{?\.?([A-Za-z0-9_-]+)\}?\s*$/.exec(trimmed);
-    if (fence && style === BODY_STYLE) {
+    const fence = fenced ? null : openFence(trimmed);
+    if (fence) {
       flush();
-      style = fence[1]!;
+      ({ style, format } = fence);
+      fenced = true;
       continue;
     }
-    if (trimmed === FENCE && style !== BODY_STYLE) {
+    if (trimmed === FENCE && fenced) {
       flush();
       style = BODY_STYLE;
+      format = {};
+      fenced = false;
       continue;
     }
 
@@ -255,6 +270,15 @@ export function parseMarkdown(markdown: string): NodeJSON {
   return { type: 'doc', content };
 }
 
+/** `::: letter`, `::: {.letter}`, `::: {.letter align=center}` or `::: {align=center}` (Body). */
+function openFence(line: string): { style: string; format: ParagraphFormat } | null {
+  const plain = /^:::\s*\.?([A-Za-z0-9_-]+)\s*$/.exec(line);
+  if (plain) return { style: plain[1]!, format: {} };
+  const braced = /^:::\s*\{\s*(?:\.([A-Za-z0-9_-]+))?\s*([^{}]*)\}\s*$/.exec(line);
+  if (!braced || (!braced[1] && !braced[2]!.trim())) return null;
+  return { style: braced[1] ?? BODY_STYLE, format: parseParagraphFormat(braced[2]!.trim()) };
+}
+
 /** A table row's cells, split at unescaped pipes. */
 function splitRow(row: string): string[] {
   const cells: string[] = [];
@@ -280,7 +304,7 @@ function splitRow(row: string): string[] {
  * Joins a paragraph's lines. A line ending in a backslash (or two spaces)
  * breaks the line there; otherwise lines run together with a space.
  */
-function paragraphNode(lines: string[], style: string, withStyle = true): NodeJSON {
+function paragraphNode(lines: string[], style: string, withStyle = true, format: ParagraphFormat = {}): NodeJSON {
   let source = '';
   lines.forEach((raw, i) => {
     let line = raw.trim();
@@ -295,7 +319,7 @@ function paragraphNode(lines: string[], style: string, withStyle = true): NodeJS
   });
   const inline = parseInline(source).map(untab);
   const node: NodeJSON = { type: 'paragraph' };
-  if (withStyle) node.attrs = { style };
+  if (withStyle) node.attrs = { style, ...format };
   if (inline.length > 0) node.content = inline;
   return node;
 }
@@ -425,6 +449,14 @@ function tokenize(src: string): Token[] {
         i += m[0].length;
         continue;
       }
+      const attrs = /^\]\{([^{}\n]*)\}/.exec(rest);
+      const format = attrs && parseTextFormat(attrs[1]!.trim());
+      if (attrs && format && Object.keys(format).length > 0) {
+        pushText();
+        tokens.push({ kind: 'close', style: FORMAT_PREFIX + writeTextFormat(format), raw: attrs[0] });
+        i += attrs[0].length;
+        continue;
+      }
       const link = /^\]\((<[^>\n]*>|(?:\\.|[^()\s\\]|\((?:\\.|[^()\s\\])*\))*)(?:\s+"(?:\\.|[^"\\])*")?\)/.exec(rest);
       if (link) {
         pushText();
@@ -507,6 +539,8 @@ function sameMarks(a: MarkJSON[] | undefined, b: MarkJSON[]): boolean {
 
 function rank(key: string): number {
   if (key.startsWith(NOTE_PREFIX)) return -2;
+  // Inside character styles, so what's set by hand shows through them.
+  if (key.startsWith(FORMAT_PREFIX)) return 0.5;
   if (key.startsWith(LINK_PREFIX)) return -1;
   return RANK[key] ?? 0;
 }
@@ -521,6 +555,7 @@ const STAR: Record<string, string> = { '*b': '**', '*i': '*', '*s': '~~' };
 
 export function serializeMarkdown(doc: NodeJSON): string {
   const blocks: string[] = [];
+  // The open fence's first line, which paragraphs with the same style and format share.
   let fenced: string | null = null;
   let quoting = false;
   const closeFence = () => {
@@ -532,15 +567,16 @@ export function serializeMarkdown(doc: NodeJSON): string {
       const text = serializeInline(node.content ?? []);
       if (text.trim() === '') continue;
       const style = (node.attrs?.style as string | undefined) || BODY_STYLE;
+      const format = writeParagraphFormat(paragraphFormatOf(node.attrs));
       const heading = HEADING_STYLES.indexOf(style as (typeof HEADING_STYLES)[number]);
-      if (heading !== -1) {
+      if (heading !== -1 && !format) {
         closeFence();
         quoting = false;
         // A heading is one line, so its line breaks become spaces.
         blocks.push(`${'#'.repeat(heading + 1)} ${text.replace(/\\\n/g, ' ')}`);
         continue;
       }
-      if (style === QUOTE_STYLE) {
+      if (style === QUOTE_STYLE && !format) {
         closeFence();
         const quoted = linesOf(text).map((l) => `> ${l}`).join('\n');
         // Quote paragraphs in a row stay one quote, separated by a bare >.
@@ -550,12 +586,11 @@ export function serializeMarkdown(doc: NodeJSON): string {
         continue;
       }
       quoting = false;
-      if (style !== fenced) {
+      const open = format ? `${FENCE} {${style === BODY_STYLE ? '' : `.${style} `}${format}}` : style === BODY_STYLE ? null : `${FENCE} ${style}`;
+      if (open !== fenced) {
         closeFence();
-        if (style !== BODY_STYLE) {
-          blocks.push(`${FENCE} ${style}`);
-          fenced = style;
-        }
+        if (open) blocks.push(open);
+        fenced = open;
       }
       blocks.push(linesOf(text).join('\n'));
       continue;
@@ -690,9 +725,11 @@ function serializeInline(nodes: NodeJSON[]): string {
       ? `]{.note #${style.slice(NOTE_PREFIX.length)}}`
       : style.startsWith(LINK_PREFIX)
         ? `](${linkTarget(style.slice(LINK_PREFIX.length))})`
-        : style === PLAIN_KEY.underline
-          ? ']{.ul}'
-          : `]{.${style}}`);
+        : style.startsWith(FORMAT_PREFIX)
+          ? `]{${style.slice(FORMAT_PREFIX.length)}}`
+          : style === PLAIN_KEY.underline
+            ? ']{.ul}'
+            : `]{.${style}}`);
   const open = (style: string) => STAR[style] ?? '[';
   for (const p of pieces) {
     if (p.raw !== undefined) {

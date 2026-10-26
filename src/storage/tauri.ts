@@ -5,6 +5,17 @@ import { type Entry, type StorageAdapter, joinPath } from './adapter';
 export class TauriAdapter implements StorageAdapter {
   constructor(private root: string) {}
 
+  /** The write still going on to each file, so a second write waits for it instead of racing it for the same temporary file. */
+  private writing = new Map<string, Promise<void>>();
+
+  private oneAtATime(path: string, write: () => Promise<void>): Promise<void> {
+    const run = (this.writing.get(path) ?? Promise.resolve()).then(write);
+    const done = run.catch(() => {});
+    this.writing.set(path, done);
+    void done.then(() => this.writing.get(path) === done && this.writing.delete(path));
+    return run;
+  }
+
   private abs(path: string): string {
     const p = joinPath(path);
     return p === '' ? this.root : `${this.root}/${p}`;
@@ -14,21 +25,25 @@ export class TauriAdapter implements StorageAdapter {
     return readTextFile(this.abs(path));
   }
 
-  async writeText(path: string, text: string): Promise<void> {
+  writeText(path: string, text: string): Promise<void> {
     // Write beside the real file, then swap, so a crash never leaves half a scene.
     const tmp = this.abs(path) + '.cookbook-tmp';
-    await writeTextFile(tmp, text);
-    await rename(tmp, this.abs(path));
+    return this.oneAtATime(this.abs(path), async () => {
+      await writeTextFile(tmp, text);
+      await rename(tmp, this.abs(path));
+    });
   }
 
   readBytes(path: string): Promise<Uint8Array> {
     return readFile(this.abs(path));
   }
 
-  async writeBytes(path: string, data: Uint8Array): Promise<void> {
+  writeBytes(path: string, data: Uint8Array): Promise<void> {
     const tmp = this.abs(path) + '.cookbook-tmp';
-    await writeFile(tmp, data);
-    await rename(tmp, this.abs(path));
+    return this.oneAtATime(this.abs(path), async () => {
+      await writeFile(tmp, data);
+      await rename(tmp, this.abs(path));
+    });
   }
 
   async stamp(path: string): Promise<string> {

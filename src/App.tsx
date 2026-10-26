@@ -1639,24 +1639,9 @@ export function App() {
     if (editor) setNameMatcher(editor, matcher);
   }, [editor, matcher]);
   const storyNames = useMemo(() => namedCards.flatMap((c) => [c.title, ...c.aka]), [namedCards]);
-  const onDialect = useCallback(
-    (dialect: 'en-US' | 'en-GB') => {
-      if (!fs || !book) return;
-      const updated = { ...book, dialect };
-      setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
-    },
-    [fs, book],
-  );
-  const onOff = useCallback(
-    (proofreadOff: string[]) => {
-      if (!fs || !book) return;
-      const updated = { ...book, proofreadOff };
-      setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
-    },
-    [fs, book],
-  );
+  // Through updateBook, so a change made a moment before isn't written back over with the old settings.
+  const onDialect = useCallback((dialect: 'en-US' | 'en-GB') => updateBook({ dialect }), [fs, book]);
+  const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
   const resting = useMemo(() => rulesOff(chosen), [chosen]);
   const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
 

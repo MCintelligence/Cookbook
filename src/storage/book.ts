@@ -27,6 +27,11 @@ export const BOOKSHELF = 'bookshelf';
 export const PANTRY = 'pantry';
 /** Recipes: each one names the page it belongs to, and is listed under that page on the Shelf. */
 export const RECIPES = 'recipes';
+/**
+ * Recipe notes are set aside for now: "recipe" names the whole project instead. Their files stay in
+ * `recipes/` untouched, and turning this back on brings back Add note…, the Shelf listing and search.
+ */
+export const NOTES_ON = false;
 export const PANTRY_SECTIONS = ['characters', 'settings', 'research'] as const;
 export const FORMAT_VERSION = 1;
 
@@ -75,7 +80,7 @@ export interface TreeNode {
 }
 
 export async function createBook(fs: StorageAdapter, title: string, now = new Date()): Promise<BookInfo> {
-  if (await fs.exists(BOOK_FILE)) throw new Error('There is already a work in this folder.');
+  if (await fs.exists(BOOK_FILE)) throw new Error('There is already a recipe in this folder.');
   const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString() };
   await fs.makeFolder(BOOKSHELF);
   for (const section of PANTRY_SECTIONS) await fs.makeFolder(joinPath(PANTRY, section));
@@ -106,14 +111,14 @@ export async function makeBookOrUndo<T>(fs: StorageAdapter, steps: () => Promise
 }
 
 export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
-  if (!(await fs.exists(BOOK_FILE))) throw new Error('This folder is not a Cookbook work.');
+  if (!(await fs.exists(BOOK_FILE))) throw new Error('This folder is not a Cookbook recipe.');
   const info = JSON.parse(await fs.readText(BOOK_FILE)) as Partial<BookInfo>;
   if (typeof info.format !== 'number' || info.format > FORMAT_VERSION) {
-    throw new Error('This work was made by a newer version of Cookbook.');
+    throw new Error('This recipe was made by a newer version of Cookbook.');
   }
   return {
     format: info.format,
-    title: info.title ?? 'Untitled work',
+    title: info.title ?? 'Untitled recipe',
     created: info.created ?? '',
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
     ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
@@ -185,7 +190,7 @@ export async function moveItem(
   folder: string,
   index: number,
 ): Promise<{ path: string; order: Order }> {
-  if (folder === from || folder.startsWith(from + '/')) throw new Error('A volume cannot go inside itself.');
+  if (folder === from || folder.startsWith(from + '/')) throw new Error('A group cannot go inside itself.');
   const current = childrenOf(tree, root, folder).map((n) => n.name);
   let name = baseName(from);
   let path = from;
@@ -265,8 +270,8 @@ export async function sortFolder(fs: StorageAdapter, order: Order, tree: TreeNod
   return next;
 }
 
-/** Makes a new folder, named "New volume" (or "New volume 2"…), and returns its path. */
-export async function createFolder(fs: StorageAdapter, parent: string, title = 'New volume'): Promise<string> {
+/** Makes a new folder, named "New group" (or "New group 2"…), and returns its path. */
+export async function createFolder(fs: StorageAdapter, parent: string, title = 'New group'): Promise<string> {
   const path = joinPath(parent, await freeName(fs, parent, fileNameFor(title)));
   await fs.makeFolder(path);
   return path;

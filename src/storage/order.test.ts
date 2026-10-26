@@ -86,8 +86,8 @@ describe('bookshelf order', () => {
     const order = await placeNew(fs, {}, tree, 'bookshelf', p, 'bookshelf/Chapter 1/Arrival.md');
     expect(names((await readTree(fs, 'bookshelf', order))[0]!.children!)).toEqual(['Arrival.md', 'Aaa.md', 'Dishes.md', 'Supper.md']);
     const f = await createFolder(fs, 'bookshelf');
-    expect(f).toBe('bookshelf/New volume');
-    expect(await createFolder(fs, 'bookshelf')).toBe('bookshelf/New volume 2');
+    expect(f).toBe('bookshelf/New group');
+    expect(await createFolder(fs, 'bookshelf')).toBe('bookshelf/New group 2');
   });
 
   it('shrugs off a missing or damaged order file', async () => {

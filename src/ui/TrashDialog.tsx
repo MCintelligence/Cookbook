@@ -21,7 +21,7 @@ const when = (iso: string) => {
 };
 
 const titleOf = (item: TrashItem) => item.from.slice(item.from.lastIndexOf('/') + 1).replace(/\.md$/, '');
-const TOP_LABEL: Record<string, string> = { bookshelf: 'Shelf', pantry: 'Pantry', recipes: 'Recipes' };
+const TOP_LABEL: Record<string, string> = { bookshelf: 'Shelf', pantry: 'Pantry', recipes: 'Notes' };
 const placeOf = (item: TrashItem) => {
   const folders = item.from.split('/').slice(0, -1);
   return folders.map((f, i) => (i === 0 ? (TOP_LABEL[f] ?? f) : f)).join(' › ');
@@ -52,10 +52,10 @@ export function TrashDialog({ items, busy, onRestore, onDelete, onEmpty, onClose
         {items === null ? (
           <p className="trash-empty">Looking…</p>
         ) : items.length === 0 ? (
-          <p className="trash-empty">Nothing in the trash. Chapters and volumes you delete wait here until you put them back or empty it.</p>
+          <p className="trash-empty">Nothing in the trash. Items and groups you delete wait here until you put them back or empty it.</p>
         ) : (
           <>
-            <ul className="lib-list trash-list" aria-label="Deleted chapters and volumes">
+            <ul className="lib-list trash-list" aria-label="Deleted items and groups">
               {items.map((item) => (
                 <li key={item.name}>
                   <div className="trash-item">

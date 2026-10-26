@@ -16,12 +16,12 @@ async function files(template: BookTemplateId) {
 describe('templates', () => {
   it('lays out each kind of book', async () => {
     expect(await files('novel')).toEqual([
-      'bookshelf/Volume 1/Chapter 1.md',
+      'bookshelf/Group 1/Item 1.md',
       'pantry/characters/Main character.md',
       'pantry/settings/Main setting.md',
     ]);
-    expect(await files('short-story')).toEqual(['bookshelf/Chapter 1.md', 'pantry/characters/Main character.md']);
-    expect(await files('nonfiction')).toEqual(['bookshelf/Volume 1/Chapter 1.md', 'bookshelf/Volume 1/Chapter 2.md', 'pantry/research/Sources.md']);
+    expect(await files('short-story')).toEqual(['bookshelf/Item 1.md', 'pantry/characters/Main character.md']);
+    expect(await files('nonfiction')).toEqual(['bookshelf/Group 1/Item 1.md', 'bookshelf/Group 1/Item 2.md', 'pantry/research/Sources.md']);
   });
 
   it('fills a card with its fields and puts it in its Pantry shelf', async () => {

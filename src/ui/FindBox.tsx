@@ -4,7 +4,7 @@ import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
 import { keysFor, pressed } from '../shortcuts';
 
-const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Chapter', character: 'Character', setting: 'Place', research: 'Research', recipe: 'Recipe' };
+const KIND_LABEL: Record<SearchHit['kind'], string> = { scene: 'Item', character: 'Character', setting: 'Place', research: 'Research', recipe: 'Note' };
 
 interface Props {
   editor: Editor | null;
@@ -115,7 +115,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
             <input
               ref={input}
               value={query}
-              placeholder="Search this work"
+              placeholder="Search this recipe"
               aria-label="Search"
               autoFocus
               onChange={(e) => setQuery(e.target.value)}
@@ -149,7 +149,7 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
           {query.trim() !== '' && (
             <div className="find-results">
               <div className="find-results-label">
-                <span>Elsewhere in this work</span>
+                <span>Elsewhere in this recipe</span>
                 <span>{elsewhere.length === 0 ? 'Nothing else' : elsewhere.length}</span>
               </div>
               {elsewhere.length > 0 && (

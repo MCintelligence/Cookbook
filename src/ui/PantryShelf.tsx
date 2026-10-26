@@ -36,7 +36,7 @@ interface Row {
   card: ShelfCard;
   /** The name to insert: the one the writer typed towards, or the card's title. */
   name: string;
-  group: 'In this chapter' | 'Pantry' | 'Mentioned inside';
+  group: 'In this item' | 'Pantry' | 'Mentioned inside';
 }
 
 const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -75,7 +75,7 @@ export function PantryShelf({ cards, castIds, search, inserting, typed, canInser
     if (!q) {
       const cast = castIds.flatMap((id) => cards.find((c) => c.id === id) ?? []);
       const rest = byTitle.filter((c) => !castIds.includes(c.id));
-      return [...cast.map((card) => ({ card, name: card.title, group: 'In this chapter' as const })), ...rest.map((card) => ({ card, name: card.title, group: 'Pantry' as const }))];
+      return [...cast.map((card) => ({ card, name: card.title, group: 'In this item' as const })), ...rest.map((card) => ({ card, name: card.title, group: 'Pantry' as const }))];
     }
     const named = byTitle
       .map((card) => ({ card, best: bestName(card, q) }))
@@ -86,7 +86,7 @@ export function PantryShelf({ cards, castIds, search, inserting, typed, canInser
       .filter((h) => !seen.has(h.path))
       .flatMap((h) => cards.find((c) => c.path === h.path) ?? []);
     return [
-      ...named.map(({ card, best }) => ({ card, name: best.name, group: (castIds.includes(card.id) ? 'In this chapter' : 'Pantry') as Row['group'] })),
+      ...named.map(({ card, best }) => ({ card, name: best.name, group: (castIds.includes(card.id) ? 'In this item' : 'Pantry') as Row['group'] })),
       ...inside.map((card) => ({ card, name: card.title, group: 'Mentioned inside' as const })),
     ];
   }, [cards, castIds, query, search]);

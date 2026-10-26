@@ -11,9 +11,9 @@ import { type DocumentKind } from './document';
 export type BookTemplateId = 'novel' | 'short-story' | 'nonfiction';
 
 export const BOOK_TEMPLATES: { id: BookTemplateId; name: string; description: string }[] = [
-  { id: 'novel', name: 'Novel', description: 'A volume of chapters, with a main character and a place in the Pantry.' },
-  { id: 'short-story', name: 'Short story', description: 'A single chapter and a main character.' },
-  { id: 'nonfiction', name: 'Nonfiction', description: 'A volume of chapters, with a note for your sources.' },
+  { id: 'novel', name: 'Novel', description: 'A group of items, with a main character and a place in the Pantry.' },
+  { id: 'short-story', name: 'Short story', description: 'A single item and a main character.' },
+  { id: 'nonfiction', name: 'Nonfiction', description: 'A group of items, with a note for your sources.' },
 ];
 
 export interface DocTemplate {
@@ -28,7 +28,7 @@ export interface DocTemplate {
 }
 
 export const SCENE_TEMPLATES: DocTemplate[] = [
-  { id: 'scene', name: 'Blank chapter', kind: 'scene', title: 'New chapter', body: '' },
+  { id: 'scene', name: 'Blank item', kind: 'scene', title: 'New item', body: '' },
   {
     id: 'chapter-opener',
     name: 'Chapter opener',
@@ -85,15 +85,15 @@ const blank = SCENE_TEMPLATES[0]!;
 /** Lays out a new book. Run right after `createBook`. */
 export async function applyBookTemplate(fs: StorageAdapter, template: BookTemplateId): Promise<void> {
   if (template === 'novel') {
-    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Volume 1'), blank, 'Chapter 1');
+    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Group 1'), blank, 'Item 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
     await createFromTemplate(fs, '', card('setting'), 'Main setting');
   } else if (template === 'short-story') {
-    await createFromTemplate(fs, BOOKSHELF, blank, 'Chapter 1');
+    await createFromTemplate(fs, BOOKSHELF, blank, 'Item 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
   } else {
-    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Volume 1'), blank, 'Chapter 1');
-    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Volume 1'), blank, 'Chapter 2');
+    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Group 1'), blank, 'Item 1');
+    await createFromTemplate(fs, joinPath(BOOKSHELF, 'Group 1'), blank, 'Item 2');
     await createFromTemplate(fs, '', card('research'), 'Sources');
   }
 }

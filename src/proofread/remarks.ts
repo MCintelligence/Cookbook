@@ -93,7 +93,7 @@ export function talkRemark(share: number): string {
   if (share === 0) return 'Not a word out loud. Shhh… hic.';
   if (share < 20) return 'Shhh. Everyone’s thinking, nobody’s talking.';
   if (share < 45) return 'A nice mix of talk and walk. Cheers!';
-  if (share < 70) return 'Chatty chapter! Mostly talk… hic. Lovely.';
+  if (share < 70) return 'Chatty one! Mostly talk… hic. Lovely.';
   return 'All talk! Now that’s a party.';
 }
 

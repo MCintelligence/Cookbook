@@ -35,7 +35,7 @@ export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChan
       (request) => onSeasoningsRef.current(request),
     ),
     content: undoLog ? undoLog.base : parseMarkdown(initialBody),
-    editorProps: { attributes: { class: 'cb-prose', spellcheck: 'false', 'aria-label': 'Chapter text' } },
+    editorProps: { attributes: { class: 'cb-prose', spellcheck: 'false', 'aria-label': 'Item text' } },
     onUpdate: ({ editor }) => {
       if (recorder.current?.isReplaying) return;
       onChangeRef.current(serializeMarkdown(editor.getJSON() as NodeJSON));

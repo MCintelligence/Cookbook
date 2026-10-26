@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { plainText } from '../editor/markdown';
 import { type CookbookDocument, akaOf, cardFieldsOf, portraitOf } from '../storage/document';
 
-const KIND_LABEL: Record<string, string> = { character: 'Character', setting: 'Place', research: 'Research', scene: 'Chapter' };
+const KIND_LABEL: Record<string, string> = { character: 'Character', setting: 'Place', research: 'Research', scene: 'Item' };
 
 /** A blob URL for a picture in the book, released when it is no longer shown. */
 export function usePicture(path: string | null, load: (path: string) => Promise<string>): string | null {

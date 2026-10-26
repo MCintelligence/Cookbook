@@ -113,7 +113,7 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
             {fmt(today)} / {fmt(goals.dailyGoal)}
           </strong>{' '}
           words today{streakText}
-          {scene && (scene.goal ? ` · Chapter ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
+          {scene && (scene.goal ? ` · Item ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
         </span>
       </button>
       {open && (
@@ -185,25 +185,25 @@ function Targets({
       </div>
       <div className="goals-row">
         <span className="goals-t">
-          <b>This chapter</b>
-          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open a chapter to give it a goal'}</span>
+          <b>This item</b>
+          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open an item to give it a goal'}</span>
         </span>
-        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Chapter goal in words" disabled={!scene} onCommit={onSceneGoal} />
+        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Item goal in words" disabled={!scene} onCommit={onSceneGoal} />
       </div>
       <div className="goals-row goals-book">
         <div className="goals-line">
           <span className="goals-t">
-            <b>Work target</b>
+            <b>Recipe target</b>
             <span className="goals-sub">{goals.bookTarget ? `${fmt(bookWords)} of ${fmt(goals.bookTarget)} words` : `${fmt(bookWords)} words on the Shelf`}</span>
           </span>
-          <NumberInput value={goals.bookTarget ?? null} placeholder="No target" label="Work target in words" onCommit={(v) => onGoals({ bookTarget: v ?? undefined })} />
+          <NumberInput value={goals.bookTarget ?? null} placeholder="No target" label="Recipe target in words" onCommit={(v) => onGoals({ bookTarget: v ?? undefined })} />
         </div>
         <div className="goals-meter" aria-hidden="true">
           <i style={{ width: `${goals.bookTarget ? Math.min(100, (bookWords / goals.bookTarget) * 100) : 0}%` }} />
         </div>
         <div className="goals-line">
           <span className="goals-sub">Finish by</span>
-          <input className="goals-date" type="date" aria-label="Work deadline" value={goals.deadline ?? ''} onChange={(e) => onGoals({ deadline: e.target.value || undefined })} />
+          <input className="goals-date" type="date" aria-label="Recipe deadline" value={goals.deadline ?? ''} onChange={(e) => onGoals({ deadline: e.target.value || undefined })} />
         </div>
         <span className="goals-sub">
           {!goals.bookTarget

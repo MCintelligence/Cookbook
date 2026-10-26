@@ -36,13 +36,13 @@ export function Beside({ path, load, version, onWrite, onClose }: Props) {
   }, [path, load, version]);
 
   return (
-    <aside className="beside" aria-label={`Beside: ${doc?.title ?? 'chapter'}`}>
+    <aside className="beside" aria-label={`Beside: ${doc?.title ?? 'item'}`}>
       <div className="beside-bar">
-        <span className="beside-title">{doc?.title || (missing ? 'Chapter not found' : '…')}</span>
-        <button className="pill" disabled={missing} onClick={() => onWrite(path)} title="Write in this chapter, and put the other one here">
+        <span className="beside-title">{doc?.title || (missing ? 'Item not found' : '…')}</span>
+        <button className="pill" disabled={missing} onClick={() => onWrite(path)} title="Write in this item, and put the other one here">
           Swap
         </button>
-        <button className="notice-close beside-close" aria-label="Close the chapter beside" onClick={onClose}>
+        <button className="notice-close beside-close" aria-label="Close the item beside" onClick={onClose}>
           ×
         </button>
       </div>

@@ -11,7 +11,7 @@ interface Props {
   fs: StorageAdapter;
   /** The Bookshelf, in order. */
   tree: TreeNode[];
-  /** The volume being read, or the whole work. */
+  /** The group being read, or the whole work. */
   title: string;
   /** Opens a scene for writing. */
   onOpen: (path: string) => void;
@@ -78,7 +78,7 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  if (!items) return <p className="empty">Gathering every chapter…</p>;
+  if (!items) return <p className="empty">Gathering every item…</p>;
   const scenes = items.filter((i) => i.type === 'scene');
   const words = scenes.reduce((sum, s) => sum + s.words, 0);
 
@@ -86,7 +86,7 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
     <>
       <div className="ms-bar">
         <span>
-          <strong>{title}</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'chapter' : 'chapters'} · {words.toLocaleString('en')} words · about{' '}
+          <strong>{title}</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'item' : 'items'} · {words.toLocaleString('en')} words · about{' '}
           {readingTime(words)} to read
         </span>
         <button className="pill" onClick={onClose}>
@@ -94,7 +94,7 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
         </button>
       </div>
       <article className="cb-page manuscript" aria-label={title}>
-        {scenes.length === 0 && <p className="empty">The Shelf has no chapters yet.</p>}
+        {scenes.length === 0 && <p className="empty">The Shelf has no items yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
             <h2 key={item.path} className={`ms-folder ms-depth-${Math.min(item.depth, 2)}`}>
@@ -138,7 +138,7 @@ export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchem
       const doc = PMNode.fromJSON(schema, body);
       el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
     } catch {
-      el.textContent = 'This chapter could not be shown.';
+      el.textContent = 'This item could not be shown.';
     }
   }, [schema, body]);
   return <div className="cb-prose ms-text" ref={box} />;

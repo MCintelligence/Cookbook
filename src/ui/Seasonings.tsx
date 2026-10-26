@@ -86,13 +86,9 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
           <div className="sub-h">Pick your seasonings</div>
           <div className="pick">
             {SEASONINGS.map((s) => (
+              // No box: the drawing is grey until picked, then the accent colour.
               <button key={s.id} className="tile" aria-pressed={chosen.includes(s.id)} onClick={() => toggle(s.id)}>
-                {chosen.includes(s.id) && (
-                  <span className="tile-tick" aria-hidden="true">
-                    ✓
-                  </span>
-                )}
-                <Face id={s.id} />
+                <Face id={s.id} size={56} />
                 <span className="tile-name">{s.name}</span>
                 <span className="tile-role">{s.role}</span>
               </button>

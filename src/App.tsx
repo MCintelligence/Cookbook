@@ -104,7 +104,7 @@ import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type BackupInfo, type SettingsSection } from './ui/Settings';
-import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel } from './storage/page';
+import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
 import { type Backup, listBackups, makeBackup, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
@@ -1789,14 +1789,13 @@ export function App() {
       return;
     }
     if (!id) {
-      // ⌘= and ⌘− zoom the page; ⌘0 goes back to 100%.
+      // ⌘= and ⌘− zoom the page as far as the zoom pop-up goes; ⌘0 goes back to 100%.
       if (!(IS_MAC ? e.metaKey : e.ctrlKey) || e.altKey || !book || manuscript) return;
-      const steps = ZOOMS.filter((z) => z > 0);
-      const now = pageOf(book.page).zoom || 100;
-      const zoom = e.key === '=' || e.key === '+' ? steps.find((z) => z > now) : e.key === '-' ? [...steps].reverse().find((z) => z < now) : e.key === '0' ? 100 : null;
-      if (zoom === null) return;
+      const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : null;
+      if (dir === null && e.key !== '0') return;
       e.preventDefault();
-      if (zoom !== undefined) updateBook({ page: { ...pageOf(book.page), zoom } });
+      if (dir === null) updateBook({ page: { ...pageOf(book.page), zoom: 100 } });
+      else zoomPage.current(dir);
       return;
     }
     e.preventDefault();
@@ -1813,6 +1812,29 @@ export function App() {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
+  const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});
+  const zoomOk = useRef(false);
+  zoomOk.current = !!book && !manuscript && !settingsAt;
+  // Ctrl and the mouse wheel (or a pinch on a trackpad) zoom the page too, instead of the whole window.
+  useEffect(() => {
+    let spun = 0;
+    let last = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      if (!zoomOk.current) return;
+      // A wheel notch is about 100; a pinch comes in many small turns, gathered up until they make a step.
+      if (e.timeStamp - last > 300) spun = 0;
+      last = e.timeStamp;
+      spun += e.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? e.deltaY : e.deltaY * 40;
+      if (Math.abs(spun) < 50) return;
+      zoomPage.current(spun < 0 ? 1 : -1);
+      spun = 0;
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
   }, []);
   const toggleFocus = () => {
     const focus = !getSettings().focus;
@@ -2066,6 +2088,8 @@ export function App() {
   // The right panel lies over the desk's edge; the page moves left only as far as it must to stay clear of it.
   const pageWidth = asDraft ? Math.min(deskWidth - 48, 760 * pageZoom) : pageSize.width * 96 * pageZoom;
   const clearOfPanel = drawerOpen && deskWidth > 0 && window.innerWidth > 900 ? Math.max(0, Math.min(2 * (336 - (deskWidth - pageWidth) / 2), deskWidth - 48 - pageWidth)) : 0;
+  const fittedZoom = Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100);
+  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || fittedZoom, dir) } });
   const pageStyle =
     asDraft
       ? { zoom: pageZoom }
@@ -2222,7 +2246,7 @@ export function App() {
           )}
           <div className="page-row">
           {doc && path ? (
-            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
+            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
               <PageEditor
                 initialBody={doc.body}
                 undoLog={undoLog}
@@ -2474,7 +2498,7 @@ export function App() {
           {doc && (
             <ZoomControl
               zoom={page.zoom}
-              fitted={Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100)}
+              fitted={fittedZoom}
               label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
               onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
             />

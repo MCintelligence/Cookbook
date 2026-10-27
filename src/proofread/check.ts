@@ -69,7 +69,19 @@ export function isCorrect(word: string, speller: Speller): boolean {
   const base = w.replace(/'s$/i, '');
   if (base !== w && speller.correct(base)) return true;
   if (w.includes('-')) return w.split('-').every((part) => part === '' || isCorrect(part, speller));
-  return false;
+  return isAffixed(w, speller);
+}
+
+/** Prefixes and suffixes English adds to almost any word, so “untextured” and “textureless” count when “textured” and “texture” do. */
+const PREFIXES = ['un', 're', 'non', 'pre', 'mis', 'over', 'under', 'out', 'anti', 'semi', 'multi', 'sub', 'super', 'counter'];
+const SUFFIXES = ['less', 'like', 'ness'];
+/** The base has to be a real word of some length, so a typo can't hide behind a short one. */
+const MIN_BASE = 5;
+
+function isAffixed(word: string, speller: Speller): boolean {
+  const lower = word.toLowerCase();
+  const real = (base: string) => base.length >= MIN_BASE && speller.correct(base);
+  return PREFIXES.some((p) => lower.startsWith(p) && real(lower.slice(p.length))) || SUFFIXES.some((x) => lower.endsWith(x) && real(lower.slice(0, -x.length)));
 }
 
 /** Misspelt words. `ignored` holds words the writer has said to leave alone in this scene. */

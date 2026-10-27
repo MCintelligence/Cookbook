@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
-import { type FoundIssue, applySuggestion, issuesOf, selectIssue } from '../proofread/plugin';
-import { SEASONINGS, type SeasoningId, fixText, gradeRemark, ownerOf, remark, talkRemark } from '../proofread/remarks';
+import { type FoundIssue, applySuggestion, bracketsFor, issuesOf, selectIssue } from '../proofread/plugin';
+import { SEASONINGS, SPICE, type SeasoningId, fixText, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
@@ -19,8 +19,6 @@ export interface Tracked {
 
 interface Props {
   editor: Editor | null;
-  /** The open page's id, for remarks that belong to it. */
-  pageId: string;
   proof: Proofreader;
   chosen: SeasoningId[];
   onChosen: (chosen: SeasoningId[]) => void;
@@ -39,7 +37,7 @@ interface Props {
 /** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
 const MIN_GRADE_WORDS = 50;
 
-export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
+export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -60,8 +58,6 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
   };
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
   const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
-  const gradeKey = `sally:${pageId}:${page.grade.grade}`;
-  const graded = page.grade.words >= MIN_GRADE_WORDS && !gone.includes(gradeKey);
 
   return (
     <aside className="panel seasonings" aria-label="Seasonings">
@@ -103,7 +99,7 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
             const issues = mine(id);
-            const count = id === 'daniel' ? tracked.length : id === 'sally' ? issues.length + (graded ? 1 : 0) : issues.length;
+            const count = id === 'daniel' ? tracked.length : issues.length;
             return (
               <section className="sc" aria-label={who.name} key={id}>
                 <div className="sc-head">
@@ -156,21 +152,7 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
                   </>
                 )}
 
-                {id === 'sally' && graded && (
-                  <div className="say">
-                    <Bubble id="sally" text={gradeRemark(page.grade.grade)} onRemove={() => onGone(gradeKey)} />
-                    <div className="fix">
-                      <span className="sug" />
-                      <button className="btn btn-primary" disabled>
-                        Fix
-                      </button>
-                      <button className="btn" disabled={issues.length === 0} onClick={() => issues[0] && selectIssue(editor, issues[0])}>
-                        Show
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+                {id === 'sally' && page.grade.words >= MIN_GRADE_WORDS && <SpiceMeter grade={page.grade.grade} />}
                 {issues.map((i) => (
                   <Say key={`${i.from}:${i.issue.rule}:${i.word}`} editor={editor} issue={i} proof={proof} onMenu={onIssueMenu} />
                 ))}
@@ -180,6 +162,28 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
         </div>
       )}
     </aside>
+  );
+}
+
+/** How hot the page reads, from Mild to Inferno. */
+function SpiceMeter({ grade }: { grade: number }) {
+  const at = spiceOf(grade);
+  return (
+    <div className="spice" role="meter" aria-label="Spice" aria-valuemin={0} aria-valuemax={SPICE.length - 1} aria-valuenow={at} aria-valuetext={`${SPICE[at]!.level}, grade ${grade}`}>
+      <div className="spice-row">
+        <span className="spice-level">{SPICE[at]!.level}</span>
+        <span className="spice-grade">Grade {grade}</span>
+      </div>
+      <div className="spice-bar" aria-hidden="true">
+        {SPICE.map((s, i) => (
+          <span key={s.level} className={`spice-step spice-${i}${i <= at ? ' is-on' : ''}`} />
+        ))}
+      </div>
+      <div className="spice-ends" aria-hidden="true">
+        <span>Mild</span>
+        <span>Inferno</span>
+      </div>
+    </div>
   );
 }
 
@@ -220,7 +224,13 @@ function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIss
       }}
     >
       <Bubble id={ownerOf(issue.issue)} text={remark(issue.issue, issue.word)} onRemove={() => proof.ignore(issue, 'once')} />
-      {!sentence && <Context editor={editor} issue={issue} />}
+      {sentence ? (
+        <div className="ctx">
+          <span className={`mark-${issue.issue.kind}`}>{issue.word.length > LONG ? `${issue.word.slice(0, LONG).replace(/\s\S*$/, '')}…` : issue.word}</span>
+        </div>
+      ) : (
+        <Context editor={editor} issue={issue} />
+      )}
       <div className="fix">
         <span className="sug">{fix !== undefined && <>→ <strong>{fixText(issue.word, fix)}</strong></>}</span>
         <button className="btn btn-primary" disabled={fix === undefined} onClick={() => fix !== undefined && applySuggestion(editor, issue, fix)}>
@@ -235,6 +245,8 @@ function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIss
 }
 
 const AROUND = 32;
+/** How much of a long sentence its remark quotes. */
+const LONG = 90;
 
 /** A few words either side of the issue, from its own paragraph. */
 function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
@@ -251,7 +263,7 @@ function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
   return (
     <div className="ctx">
       {before}
-      <span className={`mark-${issue.issue.kind}`}>{issue.word}</span>
+      <span className={`mark-${issue.issue.kind}${issue.issue.kind === 'style' && bracketsFor(issue.word)[0] === '『' ? ' mark-word' : ''}`}>{issue.word}</span>
       {after}
     </div>
   );

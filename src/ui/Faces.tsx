@@ -5,7 +5,7 @@ import { type SeasoningId } from '../proofread/remarks';
  * of its own so they tell apart without colour or a name: Sam a salt shaker
  * with a domed cap, Pete a barrel-shaped pepper grinder with a knob, turning
  * and dropping pepper, Daniel a bottle leaning over, hiccuping, and Sally a
- * cupcake with a cherry.
+ * chilli giving off heat, with lashes, a bow on her stem and a wink.
  */
 export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
   // Small faces get a heavier line so it stays a line.
@@ -71,13 +71,14 @@ export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
       )}
       {id === 'sally' && (
         <>
-          <path d="M26 9.5c.2-3 1.5-5 4-6.5" />
-          <circle cx="25" cy="11.5" r="2.5" />
-          <path d="M11.5 27c-2.5-4 0-8 4-7.5-.5-4.5 4-7 8-5.5 3-2.5 9-1 9.5 4 4-.5 6.5 4 4 9z" />
-          <path d="M12.5 27 16 43.5h16L35.5 27" />
-          <path d="M19 27l1.5 16.5M24 27v16.5M29 27l-1.5 16.5" />
-          <path d="M18.5 21.5q1.8-1.8 3.6 0M25.9 21.5q1.8-1.8 3.6 0" />
-          <path d="M21.5 24.5q2.5 1.6 5 0" />
+          <path d="M18 8.5c.5-2.5 2-4.5 4.5-5.5" />
+          <path d="M17.5 10.5c-2.5-3.5-7-3.5-6.5-.5.3 2 3.5 2.5 6.5.5zM17.5 10.5c2.5-3.5 7-3.5 6.5-.5-.3 2-3.5 2.5-6.5.5z" />
+          <path d="M7.5 18.5c1.5-4 5.5-6 10-5 2.5-1.5 5.5-1 7 1" />
+          <path d="M7.5 18.5c-.5 6 4 10.5 11 15.5 6 4.5 13 7.5 22 9.5-3.5-6.5-6.5-14-9-20.5-2-5-4-8-7-9" />
+          <path d="M33 5q-2 2.5 0 5t0 5M39 8.5q-2 2.5 0 5t0 5" />
+          <path d="M13 22.5v.1M11.8 20.6l-1.3-1.1M13.4 20.2l-.2-1.6" />
+          <path d="M19 22.5q1.9-1.7 3.8 0" />
+          <path d="M14.5 27.5q1.8-1.4 3.2-.2 1.4-1.2 3.2.2-3.2 3-6.4 0z" />
         </>
       )}
     </svg>

@@ -2,7 +2,8 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import { type AppSettings, type Theme, setSettings, useSettings } from '../settings';
 import { SHORTCUTS, binding, bindingOf, keys, setBinding } from '../shortcuts';
 import { type BookInfo, DEFAULT_DAILY_GOAL } from '../storage/book';
-import { MARGINS, PAGE_SIZES, type PageSettings, ZOOMS, pageOf, zoomLabel } from '../storage/page';
+import { MARGINS, PAGE_SIZES, type PageSettings, pageOf } from '../storage/page';
+import { ZoomSlider } from './ZoomControl';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
 import { BODY, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
@@ -154,8 +155,7 @@ const CHECK_HELP: Record<string, string> = {
   name: 'Salty Sam: “Mamma Lou” when the Pantry has Mama Lou.',
   grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
-  'hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
-  'very-hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
+  'stray-capitals': 'Peppery Pete: “MOnster” or “mONSTER”, while Seasonings is open.',
 };
 
 /**
@@ -615,7 +615,7 @@ function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'on
           />
         </Row>
         <Row title="Zoom" help={`${keys('Mod-=')} and ${keys('Mod--')} also zoom the page.`}>
-          <Select label="Zoom" value={page.zoom} options={ZOOMS.map((z) => [z, zoomLabel(z)] as [number, string])} onChange={(zoom) => set({ zoom })} />
+          <ZoomSlider zoom={page.zoom} fitted={100} onZoom={(zoom) => set({ zoom })} />
         </Row>
       </Group>
     </>
@@ -802,7 +802,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
       </Group>
       <Group title="Checks">
         {RULE_GROUPS.flatMap((g) => g.rules).map((r) => (
-          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Peppery Pete: a blue highlight, while Seasonings is open.'}>
+          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Spicy Sally: 「 」 around the words, while Seasonings is open.'}>
             <Switch label={r.label} on={!proof.off.includes(r.id)} onChange={(on) => proof.setRuleOn(r.id, on)} />
           </Row>
         ))}

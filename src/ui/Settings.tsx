@@ -205,7 +205,7 @@ export function Settings(props: Props) {
     >
       <header className="set-top">
         <div className="set-brand">
-          <span className="brand">Cookbook</span>
+          <span className="brand">cookbook</span>
           <span className="set-crumb">· Settings</span>
         </div>
         <div className="set-top-actions">

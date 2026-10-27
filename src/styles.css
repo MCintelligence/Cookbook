@@ -134,7 +134,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 /* Top bar */
 .topbar { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bar); position: relative; z-index: 3; }
 .brand-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.brand { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 19px; }
+.logo { flex: none; color: var(--accent); }
+.brand { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 19px; color: var(--accent); }
 .crumb { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crumb-book { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; padding: 4px 6px; margin: 0 -2px; border-radius: 8px; color: inherit; font-size: inherit; }
 .crumb-book:hover { background: var(--sidebar); color: var(--text); }

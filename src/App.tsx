@@ -2122,7 +2122,7 @@ export function App() {
             </svg>
           </button>
           <Logo />
-          <span className="brand">Cookbook</span>
+          <span className="brand">cookbook</span>
           <span className="crumb">
             <button
               className="crumb-book"

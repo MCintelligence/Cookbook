@@ -148,6 +148,7 @@ const INDEX_SAVE_DELAY_MS = 5000;
 const NOT_A_BOOK = 'This folder is not a Cookbook book.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
 const UNDO_SAVE_INTERVAL_MS = 10_000;
+const SAVE_RETRY_MS = 5_000;
 
 /** Notes to self live in the scene's front matter, keyed by the id of their anchor in the text. */
 function readNotes(doc: CookbookDocument | null): Notes {
@@ -196,6 +197,8 @@ export function App() {
   const [where, setWhere] = useState('');
   /** Words typed since the last save, for the dot in the footer. */
   const [dirty, setDirty] = useState(false);
+  /** The last save of the page failed; it is tried again until it works. */
+  const [saveFailed, setSaveFailed] = useState(false);
   const [book, setBook] = useState<BookInfo | null>(null);
   const [sheet, setSheet] = useState<StyleSheet>(defaultStyles);
   /** The Shelf's pages and books, the Pantry's groups, and the recipes, each as read from its folder. */
@@ -514,13 +517,23 @@ export function App() {
     if (!save) return;
     try {
       await save();
-      if (!pendingSave.current) setDirty(false);
-      unsaved.current = null;
-      dropRescue(window.localStorage);
+      setSaveFailed(false);
+      if (!pendingSave.current) {
+        setDirty(false);
+        unsaved.current = null;
+        dropRescue(window.localStorage);
+      }
     } catch (e) {
       setError(friendlyError(e));
+      setSaveFailed(true);
+      // Keep the words and try again shortly, unless a newer save is already waiting.
+      pendingSave.current ??= save;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => void flushRef.current(), SAVE_RETRY_MS);
     }
   }, []);
+  const flushRef = useRef(flushSave);
+  flushRef.current = flushSave;
 
   useEffect(() => {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
@@ -2170,9 +2183,14 @@ export function App() {
       <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk} style={clearOfPanel > 0 ? { paddingRight: 24 + clearOfPanel } : undefined}>
         <UpdateBanner beforeRestart={saveEverything} />
         {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
+          <div role="alert" className="error" title={error}>
+            <span>{error.replace(/ \([^]*\)$/, '')}</span>
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => setError(null)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         )}
         {manuscript && fs ? (
           <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
@@ -2274,7 +2292,6 @@ export function App() {
           {seasoningsOpen && doc && (
             <Seasonings
               editor={editor}
-              pageId={doc.id}
               proof={proof}
               chosen={chosen}
               onChosen={(next) => setSeasonings({ chosen: next })}
@@ -2446,6 +2463,14 @@ export function App() {
           request={goalsRequest}
         />
         <span className="footer-end">
+          {settings.focus && (
+            <button className="study-exit" title={`Leave Study (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
+              Study
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          )}
           {doc && (
             <ZoomControl
               zoom={page.zoom}
@@ -2454,9 +2479,9 @@ export function App() {
               onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
             />
           )}
-          <span className={`saved${dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
+          <span className={`saved${saveFailed ? ' is-failed' : dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
             <span className="saved-dot" aria-hidden="true" />
-            {dirty ? 'Saving…' : 'Saved'}
+            {saveFailed ? 'Not saved' : dirty ? 'Saving…' : 'Saved'}
           </span>
           <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

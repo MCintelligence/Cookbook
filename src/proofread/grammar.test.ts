@@ -23,6 +23,10 @@ describe('grammar', () => {
     expect(found.every((i) => i.why && !i.message.includes('`'))).toBe(true);
   });
 
+  it('leaves names alone rather than turning them into acronyms', async () => {
+    expect(await check('I told Sam to go home.')).toEqual([]);
+  });
+
   it('leaves spelling to Hunspell and skips issues that overlap a misspelling', async () => {
     expect(await check('Earleen recieved irregardless the grits.')).toEqual([]);
     const text = 'He could of left.';

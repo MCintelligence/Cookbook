@@ -83,6 +83,29 @@ mod menu {
     }
 }
 
+/// What the clipboard holds, for Paste in the right-click menu. Reading it here
+/// rather than in the page keeps the webview from asking the writer's permission,
+/// which on Windows also stops the menu pasting at all once it is refused.
+#[derive(serde::Serialize)]
+struct ClipboardContents {
+    text: Option<String>,
+    html: Option<String>,
+}
+
+#[tauri::command]
+fn read_clipboard() -> Result<ClipboardContents, String> {
+    #[cfg(desktop)]
+    {
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        let html = clipboard.get().html().ok().filter(|h| !h.trim().is_empty());
+        let text = clipboard.get_text().ok();
+        Ok(ClipboardContents { text, html })
+    }
+    // The phones read it in the page instead.
+    #[cfg(not(desktop))]
+    Err("not on this device".into())
+}
+
 /// The font families installed on this computer, by name, for the font menus.
 /// Read straight from the system's font folders, so it works offline and asks nothing.
 /// Names starting with a dot are the system's own hidden fonts on a Mac.
@@ -122,7 +145,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![system_fonts])
+        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;
@@ -140,3 +163,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running Cookbook");
 }
+

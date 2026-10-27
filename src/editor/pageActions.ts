@@ -1,4 +1,5 @@
 import { type Editor } from '@tiptap/core';
+import { isTauri } from '../storage/platform';
 
 /** The selected words, or the word under the cursor, trimmed; '' when there is none. */
 export function selectedWords(editor: Editor): string {
@@ -18,29 +19,60 @@ export function clip(editor: Editor, action: 'cut' | 'copy'): void {
   document.execCommand(action);
 }
 
+/** What the clipboard holds as text and as formatted HTML; either may be missing. */
+export interface ClipboardContents {
+  text: string | null;
+  html: string | null;
+}
+
+/**
+ * Reads the clipboard for a menu paste. The desktop app reads it natively, since
+ * the webview's own clipboard API asks the writer's permission first (and, on
+ * Windows, never pastes again once that's refused). A browser asks as usual.
+ */
+async function readClipboard(): Promise<ClipboardContents> {
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke<ClipboardContents>('read_clipboard');
+    } catch {
+      // The phone apps have no native reader; the webview's own is next.
+    }
+  }
+  let html: string | null = null;
+  if (navigator.clipboard.read) {
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        if (item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+      }
+    } catch {
+      // Some browsers only allow plain text.
+    }
+  }
+  const text = await navigator.clipboard.readText();
+  return { text, html };
+}
+
 /**
  * Paste from a menu. Formatting comes through the same cleanup as a
- * keyboard paste; with `plain`, only the words. Returns false when the
- * clipboard can't be read this way, so the caller can suggest the keyboard.
+ * keyboard paste; with `plain`, only the words. Says 'empty' when the
+ * clipboard holds no words (a picture, say), and 'unreadable' when it can't
+ * be read this way, so the caller can suggest the keyboard.
  */
-export async function pasteInto(editor: Editor, plain: boolean): Promise<boolean> {
+export async function pasteInto(editor: Editor, plain: boolean): Promise<{ pasted: string } | 'empty' | 'unreadable'> {
   const { view } = editor;
+  let clip: ClipboardContents;
   try {
-    if (!plain && navigator.clipboard.read) {
-      for (const item of await navigator.clipboard.read()) {
-        if (item.types.includes('text/html')) {
-          view.focus();
-          view.pasteHTML(await (await item.getType('text/html')).text());
-          return true;
-        }
-      }
-    }
-    const text = await navigator.clipboard.readText();
-    view.focus();
-    if (plain) editor.chain().insertContent(text.replace(/\r\n?/g, '\n').split('\n').map((line) => ({ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] }))).run();
-    else view.pasteText(text);
-    return true;
+    clip = await readClipboard();
   } catch {
-    return false;
+    return 'unreadable';
   }
+  const text = clip.text ?? '';
+  const html = plain || editor.isActive('codeBlock') ? null : clip.html;
+  if (!html && !text) return 'empty';
+  view.focus();
+  if (html) view.pasteHTML(html);
+  else if (plain) editor.chain().insertContent(text.replace(/\r\n?/g, '\n').split('\n').map((line) => ({ type: 'paragraph', content: line ? [{ type: 'text', text: line }] : [] }))).run();
+  else view.pasteText(text);
+  return { pasted: text };
 }

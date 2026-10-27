@@ -142,6 +142,7 @@ describe('round trips', () => {
   }
   const words = ['Lou', 'greens', 'pie', '*', '[', ']', '\\', 'a', '“quoted”', 'x_y', '{.z}', 'it’s', '_', '~~', '`', '#', '1.', '|', '!', '(x)', 'Wow!'];
   const styles = ['strong', 'emphasis', 'thought', 'bold', 'italic', 'ul', 'strike', 'code', '@https://example.com/a(b)'];
+  const FORMATS = [{ font: 'EB Garamond', size: 14 }, { color: '#7a2e1f' }, { size: 10.5, color: '#000000' }];
 
   it('survives 500 random paragraphs', () => {
     const rand = rng(Number(process.env.SEED ?? 42));
@@ -154,6 +155,8 @@ describe('round trips', () => {
         if (i > 0) pieces.push(t(' '));
         const node = t(word, ...marks.filter((m) => !m.startsWith('@')));
         if (marks.some((m) => m.startsWith('@'))) node.marks = [...(node.marks ?? []), { type: 'link', attrs: { href: 'https://example.com/a(b)' } }];
+        const format = FORMATS[Math.floor(rand() * FORMATS.length * 2)];
+        if (format) node.marks = [...(node.marks ?? []), { type: 'textStyle', attrs: format }];
         pieces.push(node);
       }
       // Normalise the way the editor would: merge neighbours with identical styles.
@@ -306,5 +309,52 @@ describe('more Markdown', () => {
     const lines = ['# hash', '> quote', '| pipe', '+ plus', '```', '1) one', '~~~'];
     const d = doc(...lines.map((l) => p('body', t(l))));
     expect(parseMarkdown(serializeMarkdown(d))).toEqual(d);
+  });
+});
+
+describe('direct formatting', () => {
+  const fmt = (text: string, attrs: Record<string, unknown>): NodeJSON => ({ type: 'text', text, marks: [{ type: 'textStyle', attrs }] as NodeJSON['marks'] });
+
+  it('writes fonts, sizes and colours set by hand as Pandoc attributes', () => {
+    const doc = { type: 'doc', content: [p('body', t('Plain and '), fmt('big red', { font: 'EB Garamond', size: 18, color: '#AA0000' }), t(' words.'))] };
+    const md = serializeMarkdown(doc);
+    expect(md).toBe('Plain and [big red]{font="EB Garamond" size=18 color=#aa0000} words.\n');
+    expect(parseMarkdown(md).content?.[0]?.content?.[1]).toEqual(fmt('big red', { font: 'EB Garamond', size: 18, color: '#aa0000' }));
+  });
+
+  it('keeps a character style around direct formatting', () => {
+    const node: NodeJSON = { type: 'text', text: 'Hm', marks: [{ type: 'charStyle', attrs: { style: 'thought' } }, { type: 'textStyle', attrs: { size: 9 } }] };
+    const md = serializeMarkdown({ type: 'doc', content: [p('body', node)] });
+    expect(md).toBe('[[Hm]{size=9}]{.thought}\n');
+    expect(parseMarkdown(md).content?.[0]?.content?.[0]).toEqual(node);
+  });
+
+  it('leaves brackets with other attributes as text', () => {
+    expect(parseInline('[x]{size=big}')).toEqual([t('[x]{size=big}')]);
+    expect(parseInline('[x]{weight=9}')).toEqual([t('[x]{weight=9}')]);
+  });
+
+  it('fences paragraphs with their own alignment or spacing, sharing a fence when they match', () => {
+    const doc = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', attrs: { style: 'chapter-title', align: 'left' }, content: [t('One')] },
+        { type: 'paragraph', attrs: { style: 'body', align: 'center', lineSpacing: 2 }, content: [t('Centred.')] },
+        { type: 'paragraph', attrs: { style: 'body', align: 'center', lineSpacing: 2 }, content: [t('Also.')] },
+        { type: 'paragraph', attrs: { style: 'letter', lineSpacing: 1 }, content: [t('Dear Lou,')] },
+        { type: 'paragraph', attrs: { style: 'letter' }, content: [t('Yours.')] },
+        { type: 'paragraph', attrs: { style: 'quote', align: 'right' }, content: [t('Said.')] },
+        p('body', t('Plain.')),
+      ],
+    };
+    const md = serializeMarkdown(doc);
+    expect(md).toBe(
+      '::: {.chapter-title align=left}\nOne\n:::\n\n::: {align=center spacing=2}\nCentred.\n\nAlso.\n:::\n\n::: {.letter spacing=1}\nDear Lou,\n:::\n\n::: letter\nYours.\n:::\n\n::: {.quote align=right}\nSaid.\n:::\n\nPlain.\n',
+    );
+    expect(parseMarkdown(md)).toEqual(doc);
+  });
+
+  it('still reads fences without formatting', () => {
+    expect(parseMarkdown('::: {.letter}\nDear Lou,\n:::\n')).toEqual({ type: 'doc', content: [p('letter', t('Dear Lou,'))] });
   });
 });

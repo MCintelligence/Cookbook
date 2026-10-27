@@ -19,10 +19,10 @@ export const RULE_GROUPS: { title: string; rules: { id: string; label: string }[
     rules: [
       { id: 'grammar', label: 'Grammar and punctuation' },
       { id: 'unclosed-quote', label: 'Unclosed quotes' },
-      { id: 'harper-style', label: 'Word choice and wordiness' },
+      { id: 'stray-capitals', label: 'Capitals in the wrong place' },
     ],
   },
-  { title: 'Style', rules: STYLE_RULES.map(({ id, label }) => ({ id, label })) },
+  { title: 'Style', rules: [{ id: 'harper-style', label: 'Word choice and wordiness' }, ...STYLE_RULES.map(({ id, label }) => ({ id, label }))] },
 ];
 
 const OURS = new Set(RULE_GROUPS.flatMap((g) => g.rules.map((r) => r.id)));

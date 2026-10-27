@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate';
 import { type NodeJSON, BODY_STYLE, HEADING_STYLES } from '../editor/markdown';
 import { type StyleSheet, resolveParagraphStyle } from '../styles/styles';
+import { type TextFormat, paragraphFormatOf, textFormatOf } from '../editor/format';
 import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
 
@@ -20,9 +21,11 @@ interface Run {
   styles: string[];
   plain: Set<string>;
   link: boolean;
+  /** Font, size and colour set by hand. */
+  format?: TextFormat;
 }
 
-function runProps(sheet: StyleSheet, { styles, plain, link }: Run): string {
+function runProps(sheet: StyleSheet, { styles, plain, link, format = {} }: Run): string {
   // One character style per run is all Word allows; the others are applied directly.
   const [first, ...rest] = styles;
   const props: string[] = [];
@@ -39,12 +42,16 @@ function runProps(sheet: StyleSheet, { styles, plain, link }: Run): string {
     underline ||= !!c?.underline;
     smallCaps ||= !!c?.smallCaps;
   }
+  // Word wants run properties in its own order: fonts, then bold to strike, then colour, size and underline.
   if (plain.has('code')) props.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>');
+  else if (format.font) props.push(`<w:rFonts w:ascii="${xml(format.font)}" w:hAnsi="${xml(format.font)}" w:cs="${xml(format.font)}"/>`);
   if (bold) props.push('<w:b/>');
   if (italic) props.push('<w:i/>');
   if (smallCaps) props.push('<w:smallCaps/>');
   if (plain.has('strike')) props.push('<w:strike/>');
   if (link && first) props.push('<w:color w:val="0563C1"/>');
+  else if (format.color) props.push(`<w:color w:val="${format.color.replace('#', '')}"/>`);
+  if (format.size) props.push(`<w:sz w:val="${Math.round(format.size * 2)}"/><w:szCs w:val="${Math.round(format.size * 2)}"/>`);
   if (underline || (link && first)) props.push('<w:u w:val="single"/>');
   return props.length > 0 ? `<w:rPr>${props.join('')}</w:rPr>` : '';
 }
@@ -83,7 +90,8 @@ class DocxBody {
         if (n.type !== 'text') return '';
         const link = n.marks?.find((m) => m.type === 'link');
         const plain = new Set((n.marks ?? []).map((m) => m.type).filter((t) => PLAIN.has(t)));
-        const run = textRun(n.text ?? '', runProps(this.sheet, { styles: charStyles(n), plain, link: !!link }));
+        const format = textFormatOf(n.marks?.find((m) => m.type === 'textStyle')?.attrs);
+        const run = textRun(n.text ?? '', runProps(this.sheet, { styles: charStyles(n), plain, link: !!link, format }));
         if (!link || link.type !== 'link') return run;
         this.links.push(link.attrs.href);
         return `<w:hyperlink r:id="rLink${this.links.length}">${run}</w:hyperlink>`;
@@ -92,7 +100,12 @@ class DocxBody {
   }
 
   block(n: NodeJSON): string {
-    if (n.type === 'paragraph') return this.paragraph(styleId(String(n.attrs?.style ?? BODY_STYLE)), this.inline(n.content ?? []));
+    if (n.type === 'paragraph') {
+      // Alignment and spacing set by hand, in the order Word wants them.
+      const { align, lineSpacing } = paragraphFormatOf(n.attrs);
+      const extra = (lineSpacing ? `<w:spacing w:line="${Math.round(lineSpacing * 240)}" w:lineRule="auto"/>` : '') + (align ? `<w:jc w:val="${ALIGN[align]}"/>` : '');
+      return this.paragraph(styleId(String(n.attrs?.style ?? BODY_STYLE)), this.inline(n.content ?? []), extra);
+    }
     if (n.type === 'sceneBreak') return this.paragraph('cbSceneBreak', textRun('* * *'));
     if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') return this.list(n, 0);
     if (n.type === 'codeBlock') {

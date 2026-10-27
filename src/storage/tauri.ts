@@ -5,6 +5,9 @@ import { type Entry, type StorageAdapter, joinPath } from './adapter';
 export class TauriAdapter implements StorageAdapter {
   constructor(private root: string) {}
 
+  /** The last write to each file, so writes to one file land in order and never share a temporary file. */
+  private writing = new Map<string, Promise<void>>();
+
   private abs(path: string): string {
     const p = joinPath(path);
     return p === '' ? this.root : `${this.root}/${p}`;
@@ -14,21 +17,37 @@ export class TauriAdapter implements StorageAdapter {
     return readTextFile(this.abs(path));
   }
 
-  async writeText(path: string, text: string): Promise<void> {
-    // Write beside the real file, then swap, so a crash never leaves half a scene.
-    const tmp = this.abs(path) + '.cookbook-tmp';
-    await writeTextFile(tmp, text);
-    await rename(tmp, this.abs(path));
+  writeText(path: string, text: string): Promise<void> {
+    return this.swap(path, (tmp) => writeTextFile(tmp, text));
   }
 
   readBytes(path: string): Promise<Uint8Array> {
     return readFile(this.abs(path));
   }
 
-  async writeBytes(path: string, data: Uint8Array): Promise<void> {
-    const tmp = this.abs(path) + '.cookbook-tmp';
-    await writeFile(tmp, data);
-    await rename(tmp, this.abs(path));
+  writeBytes(path: string, data: Uint8Array): Promise<void> {
+    return this.swap(path, (tmp) => writeFile(tmp, data));
+  }
+
+  /**
+   * Writes beside the real file, then swaps it in, so a crash never leaves half a page.
+   * Two quick saves of one file wait their turn: if they shared the temporary file, the
+   * second rename would find it already gone.
+   */
+  private swap(path: string, write: (tmp: string) => Promise<void>): Promise<void> {
+    const abs = this.abs(path);
+    const run = async () => {
+      const tmp = `${abs}.cookbook-tmp`;
+      await write(tmp);
+      await rename(tmp, abs);
+    };
+    const next = (this.writing.get(abs) ?? Promise.resolve()).then(run, run);
+    this.writing.set(abs, next);
+    const done = () => {
+      if (this.writing.get(abs) === next) this.writing.delete(abs);
+    };
+    next.then(done, done);
+    return next;
   }
 
   async stamp(path: string): Promise<string> {

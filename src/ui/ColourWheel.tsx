@@ -124,6 +124,7 @@ export function ColourWheel({ value, onPick, onAutomatic }: { value: string; onP
           <span>Hex</span>
           <input
             aria-label="Hex colour"
+            maxLength={7}
             value={text}
             spellCheck={false}
             onChange={(e) => {

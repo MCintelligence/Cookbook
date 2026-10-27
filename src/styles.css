@@ -928,3 +928,52 @@ button.seas-quote:hover { color: var(--accent); }
 /* Colours set on words by hand (see editor/format.ts), redone for the dark page like the styles' colours. */
 .cb-page span[data-format][data-color] { color: var(--ink); }
 :root[data-page='dark'] .cb-page span[data-format][data-color] { color: var(--ink-dark); }
+
+/* ---------- Accent trim ----------
+   The signature orange runs as thin, solid trim: a line under the top bar, a cap
+   on everything that floats (menus, pop-ups, dialogs), an edge bar on whatever is chosen, and
+   the small section labels. Surfaces stay neutral; the accent is never watered down. */
+:root { accent-color: var(--accent); caret-color: var(--accent); --trim: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+:root[data-theme='dark'] ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* The top bar's lower edge, in the writing view and in Settings, is the accent instead of a grey line. */
+.topbar, .set-top { border-bottom: var(--trim) solid var(--accent); }
+
+/* Everything that floats wears an accent cap. */
+.menu, .tb-popover, .insert-menu, .palette, .goals-pop, .zoom-pop, .find-pop, .peek, .lib, .notice { border-top: var(--trim) solid var(--accent); }
+
+/* A thin bar marks the item under the pointer or keys in a menu, and the chosen row elsewhere. */
+.menu button, .tb-menu button, .insert-item, .palette-item, .find-hit, .set-nav-item, .lib-book { position: relative; }
+.menu button:hover:not(:disabled)::before, .menu button:focus-visible::before, .menu button.menu-open::before,
+.tb-menu button:hover::before, .tb-list button[aria-selected='true']::before, .insert-item[aria-selected='true']::before, .palette-item[aria-selected='true']::before,
+.find-hit:hover::before, .find-hit:focus-visible::before, .set-nav-item.on::before, .lib-book[aria-current='true']::before {
+  content: ''; position: absolute; left: 0; top: 5px; bottom: 5px; width: var(--trim); border-radius: 1px; background: var(--accent);
+}
+.menu .menu-danger:hover:not(:disabled)::before, .menu .menu-danger:focus-visible::before { background: var(--danger-text); }
+.menu-check { color: var(--accent); font-weight: 700; }
+.tree li[aria-selected='true'] > .tree-card, .tree li[aria-selected='true'] > .tree-recipe { position: relative; }
+.tree li[aria-selected='true'] > .tree-card::before, .tree li[aria-selected='true'] > .tree-recipe::before {
+  content: ''; position: absolute; left: -1px; top: 4px; bottom: 4px; width: var(--trim); border-radius: 1px; background: var(--accent);
+}
+
+/* Panel titles carry a short underline; small section labels are in the accent. */
+.panel-h { position: relative; }
+.panel-h::after { content: ''; position: absolute; left: 0; bottom: -3px; width: 18px; height: var(--trim); border-radius: 1px; background: var(--accent); }
+.panel-h.shelf-h::after { left: 8px; }
+.sub-h, .menu-heading, .palette-group, .set-h3, .set-scope, .find-results-label, .lib-new label { color: var(--accent); }
+
+/* The open toolbar pop-up gets an accent edge. */
+.tb-select[aria-expanded='true'], .tb-select:focus-within { border-color: var(--accent); }
+/* Panel tabs are plain words on a hairline; the open one is marked by its accent underline alone. */
+.segmented { padding: 0; border-radius: 0; background: transparent; box-shadow: inset 0 -1px 0 var(--line); }
+.segmented button, .segmented button[aria-selected='true'] { border-radius: 0; background: transparent; box-shadow: none; }
+.segmented button[aria-selected='true'] { color: var(--text); box-shadow: inset 0 calc(-1 * var(--trim)) 0 var(--accent); }
+
+/* Settings choices: the picked one is underlined; with keyboard focus the focus ring takes the underline's place, so the trim shows once. */
+.set-seg button[aria-pressed='true'] { box-shadow: inset 0 calc(-1 * var(--trim)) 0 var(--accent), 0 1px 2px rgba(var(--shadow), 0.15); }
+.set-seg button[aria-pressed='true']:focus-visible { box-shadow: 0 1px 2px rgba(var(--shadow), 0.15); }
+
+/* Fields and keyboard focus. */
+.panel-search:focus-within, .set-search:focus-within, .set-num:focus, .set-sel:focus { border-color: var(--accent); outline: none; }
+:where(:focus-visible) { outline: var(--trim) solid var(--accent); outline-offset: 2px; }

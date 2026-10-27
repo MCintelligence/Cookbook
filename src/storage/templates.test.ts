@@ -18,7 +18,7 @@ describe('templates', () => {
     expect(await files('novel')).toEqual([
       'bookshelf/Chapter 1/Page 1.md',
       'pantry/characters/Main character.md',
-      'pantry/settings/Main setting.md',
+      'pantry/settings/Main place.md',
     ]);
     expect(await files('short-story')).toEqual(['bookshelf/Page 1.md', 'pantry/characters/Main character.md']);
     expect(await files('nonfiction')).toEqual(['bookshelf/Chapter 1/Section 1.md', 'bookshelf/Chapter 2/Section 1.md', 'pantry/research/Sources.md']);

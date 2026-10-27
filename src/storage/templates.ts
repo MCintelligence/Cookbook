@@ -45,6 +45,55 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
   },
 ];
 
+/**
+ * The character and place cards share one shape, so the Pantry reads the
+ * same whichever you open: what it is, what it wants or offers, what stands
+ * in the way, where it comes from, and its terrible trouble. Each prompt is
+ * one line the writer writes over. A card holds one character or one place,
+ * so nothing here asks about the cast or the plot as a whole.
+ */
+const CHARACTER_BODY = [
+  '## Who they are',
+  'How they look, how they move, how they talk, and what they would never say out loud.',
+  '## What they want',
+  'The goal they chase, the need underneath it they may not see, and what they will do to get it.',
+  '## What stands in their way',
+  'What keeps them from getting it: another person, the world around them, or something in themselves.',
+  '## Where they come from',
+  'The past that made them want this. Keep only what still shapes them now.',
+  '## Their terrible trouble',
+  '### The worst of it',
+  'The worst predicament this story could plunge them into.',
+  '### It gets worse',
+  'The complications that make things worse, one after another.',
+  '### The darkest moment',
+  'What their most hopeless moment looks like.',
+  '### What they learn',
+  'What all this teaches them, and how it gives them what they need to win in the end.',
+];
+
+const PLACE_BODY = [
+  '## What it is',
+  'How it looks, what it smells and sounds like, and who belongs here.',
+  '## What it offers',
+  'Why people come here, why they stay, and what they would give to keep it.',
+  '## What stands in the way',
+  'What makes it hard to reach, to live in, or to leave: its walls, its weather, its rules, or the people who guard it.',
+  '## Where it comes from',
+  'The history that made it this way. Keep only what still shows today.',
+  '## Its terrible trouble',
+  '### The worst of it',
+  'The worst thing this story could bring down on it: a flood, a siege, a sale, a secret let out.',
+  '### It gets worse',
+  'The complications that make things worse, one after another.',
+  '### The darkest moment',
+  'What it looks like at its most hopeless.',
+  '### What remains',
+  'What is still standing in the end, and what it gives the people who fought for it.',
+];
+
+const lines = (list: string[]) => list.join('\n\n') + '\n';
+
 export const CARD_TEMPLATES: DocTemplate[] = [
   {
     id: 'character',
@@ -53,7 +102,7 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     folder: 'characters',
     title: 'New character',
     fields: { role: '', age: '', wants: '', fears: '' },
-    body: 'How they look, how they talk, and what they would never say out loud.\n',
+    body: lines(CHARACTER_BODY),
   },
   {
     id: 'setting',
@@ -61,8 +110,8 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     kind: 'setting',
     folder: 'settings',
     title: 'New place',
-    fields: { when: '' },
-    body: 'What it smells like, what it sounds like, and who belongs here.\n',
+    fields: { role: '', when: '', offers: '', threatens: '' },
+    body: lines(PLACE_BODY),
   },
   { id: 'research', name: 'Research note', kind: 'research', folder: 'research', title: 'New note', body: '' },
 ];
@@ -87,7 +136,7 @@ export async function applyBookTemplate(fs: StorageAdapter, template: BookTempla
   if (template === 'novel') {
     await createFromTemplate(fs, joinPath(BOOKSHELF, 'Chapter 1'), blank, 'Page 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
-    await createFromTemplate(fs, '', card('setting'), 'Main setting');
+    await createFromTemplate(fs, '', card('setting'), 'Main place');
   } else if (template === 'short-story') {
     await createFromTemplate(fs, BOOKSHELF, blank, 'Page 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');

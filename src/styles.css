@@ -861,4 +861,7 @@ button.seas-quote:hover { color: var(--accent); }
 /* A Pantry card is one card: its details run straight on into its page. */
 .pantry-card { margin: 0; border-radius: 8px 8px 0 0; border-bottom: none; background: var(--paper); }
 .cb-page.card-page { border-radius: 0 0 8px 8px; border-top: 1px dashed var(--page-line); }
+/* A Pantry card reads like a reference sheet, so its headings sit at the left whatever the book centres. */
+.cb-page.card-page p[data-style="heading-2"],
+.cb-page.card-page p[data-style="heading-3"] { text-align: left; text-indent: 0; }
 .pc-name { width: 100%; margin: 0 0 6px; padding: 0; border: none; outline: none; background: transparent; color: var(--text); font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 20px; line-height: 28px; }

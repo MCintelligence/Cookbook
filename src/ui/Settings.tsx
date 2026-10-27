@@ -164,7 +164,7 @@ const CHECK_HELP: Record<string, string> = {
  * saved in the book's folder, so they travel with it. Every change saves at once.
  */
 export function Settings(props: Props) {
-  const { section, onSection, onClose, book } = props;
+  const { section, onSection, onClose } = props;
   const [query, setQuery] = useState('');
   const box = useRef<HTMLDivElement>(null);
   const searching = query.trim() !== '';
@@ -224,11 +224,11 @@ export function Settings(props: Props) {
       </header>
       <div className="set-body">
         <nav className="set-nav" aria-label="Settings sections">
-          <div className="set-scope">The app, on this device</div>
+          <div className="set-scope">App Settings</div>
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
           ))}
-          <div className="set-scope">This recipe: {book?.title ?? 'none open'}</div>
+          <div className="set-scope">Recipe Settings</div>
           {BOOK_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
           ))}

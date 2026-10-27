@@ -11,6 +11,8 @@ interface Props {
   fs: StorageAdapter;
   /** The Bookshelf, in order. */
   tree: TreeNode[];
+  /** The group being read, or the whole work. */
+  title: string;
   /** Opens a scene for writing. */
   onOpen: (path: string) => void;
   /** A right-click on a scene. */
@@ -51,7 +53,7 @@ export function readingTime(words: number): string {
  * Read book: the whole manuscript as one document to read, every scene in
  * Bookshelf order under its chapter headings. Click a scene's title to write in it.
  */
-export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
+export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) {
   const [items, setItems] = useState<Item[] | null>(null);
   const schema = useMemo(() => getSchema(cookbookExtensions((s) => s)), []);
 
@@ -76,7 +78,7 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  if (!items) return <p className="empty">Gathering every page…</p>;
+  if (!items) return <p className="empty">Gathering every item…</p>;
   const scenes = items.filter((i) => i.type === 'scene');
   const words = scenes.reduce((sum, s) => sum + s.words, 0);
 
@@ -84,15 +86,15 @@ export function Manuscript({ fs, tree, onOpen, onClose, onMenu }: Props) {
     <>
       <div className="ms-bar">
         <span>
-          <strong>Read book</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'page' : 'pages'} · {words.toLocaleString('en')} words · about{' '}
+          <strong>{title}</strong> · {scenes.length.toLocaleString('en')} {scenes.length === 1 ? 'item' : 'items'} · {words.toLocaleString('en')} words · about{' '}
           {readingTime(words)} to read
         </span>
         <button className="pill" onClick={onClose}>
           Back to writing
         </button>
       </div>
-      <article className="cb-page manuscript" aria-label="Read book">
-        {scenes.length === 0 && <p className="empty">The Shelf has no pages yet.</p>}
+      <article className="cb-page manuscript" aria-label={title}>
+        {scenes.length === 0 && <p className="empty">The Shelf has no items yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
             <h2 key={item.path} className={`ms-folder ms-depth-${Math.min(item.depth, 2)}`}>
@@ -136,7 +138,7 @@ export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchem
       const doc = PMNode.fromJSON(schema, body);
       el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
     } catch {
-      el.textContent = 'This page could not be shown.';
+      el.textContent = 'This item could not be shown.';
     }
   }, [schema, body]);
   return <div className="cb-prose ms-text" ref={box} />;

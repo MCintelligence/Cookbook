@@ -319,7 +319,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         </button>
         )}
         {own.length > 0 && (
-          <ul className="tree tree-recipes" role="group" aria-label="Recipes">
+          <ul className="tree tree-recipes" role="group" aria-label="Notes">
             {own.map((r) => (
               <li role="treeitem" aria-selected={selected === r.path} key={r.path}>
                 {renaming === r.path ? (

@@ -227,11 +227,11 @@ export function Settings(props: Props) {
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
           ))}
-          <div className="set-scope">This book: {book?.title ?? 'none open'}</div>
+          <div className="set-scope">This recipe: {book?.title ?? 'none open'}</div>
           {BOOK_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
           ))}
-          <p className="set-note">Book settings are saved in the book’s folder, so they travel with it. App settings stay on this device.</p>
+          <p className="set-note">Recipe settings are saved in the recipe’s folder, so they travel with it. App settings stay on this device.</p>
         </nav>
         <main className="set-main">
           <Query.Provider value={query}>
@@ -269,10 +269,10 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
       return (
         <>
           <Group title="Starting up">
-            <Row title="Reopen where I left off" help="Open the last book at the page you were writing when Cookbook starts.">
+            <Row title="Reopen where I left off" help="Open the last recipe at the item you were writing when Cookbook starts.">
               <Switch label="Reopen where I left off" on={s.reopenLast} onChange={(reopenLast) => set({ reopenLast })} />
             </Row>
-            <Row title="Where new works go" help={props.newBooksFolder ?? 'In this browser’s own storage. Use “Open a work’s folder…” in Your works to keep a work somewhere else.'}>
+            <Row title="Where new recipes go" help={props.newBooksFolder ?? 'In this browser’s own storage. Use “Open a recipe’s folder…” in Your recipes to keep a recipe somewhere else.'}>
               {props.newBooksFolder !== null && (
                 <button className="set-btn" onClick={props.onChooseNewBooksFolder}>
                   Choose folder…
@@ -330,7 +330,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
                 onChange={(paper) => set({ paper })}
               />
             </Row>
-            <Row title="Interface size" help="Menus, sidebar and buttons. The page has its own zoom, in Page and view.">
+            <Row title="Interface size" help="Menus, sidebar and buttons. The page has its own zoom, in Layout.">
               <Seg
                 label="Interface size"
                 value={s.size}
@@ -442,10 +442,10 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
             onChange={(saveDelay) => setSettings({ saveDelay })}
           />
         </Row>
-        <Row title="Undo history" help="Undo reaches back past closing the app, page by page. It is kept in the book’s hidden .cookbook folder." />
+        <Row title="Undo history" help="Undo reaches back past closing the app, item by item. It is kept in the recipe’s hidden .cookbook folder." />
       </Group>
       <Group title="Automatic backups">
-        <Row title="Back up the book when I close it" help="A zip of the whole book folder, made when you close Cookbook or open another book.">
+        <Row title="Back up the recipe when I close it" help="A zip of the whole recipe’s folder, made when you close Cookbook or open another recipe.">
           <Switch label="Back up on close" on={s.backupOnClose} onChange={(backupOnClose) => setSettings({ backupOnClose })} />
         </Row>
         <Row title="Keep" help="Older automatic backups are removed.">
@@ -467,7 +467,7 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
             </button>
           )}
         </Row>
-        <Row title="Last backup" help={`${last} · ${backups.count} ${backups.count === 1 ? 'backup' : 'backups'} of this book`}>
+        <Row title="Last backup" help={`${last} · ${backups.count} ${backups.count === 1 ? 'backup' : 'backups'} of this recipe`}>
           <div className="set-actions">
             <button className="set-btn" disabled={backups.count === 0} onClick={onRestore}>
               Restore…
@@ -486,7 +486,7 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
         </Row>
       </Group>
       <Group title="Snapshots">
-        <Row title="Take a snapshot before splitting, merging or replacing all" help="Compare or roll back from the page’s right-click menu, under Snapshots.">
+        <Row title="Take a snapshot before splitting, merging or replacing all" help="Compare or roll back from the item’s right-click menu on the Shelf, under Snapshots.">
           <Switch label="Automatic snapshots" on={s.autoSnapshot} onChange={(autoSnapshot) => setSettings({ autoSnapshot })} />
         </Row>
       </Group>
@@ -597,7 +597,7 @@ function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'on
   const page = pageOf(book?.page);
   const set = (changes: Partial<PageSettings>) => onBook({ page: { ...page, ...changes } });
   const indent = resolveParagraphStyle(sheet, BODY).firstLineIndent;
-  if (!book) return <p className="set-row-help">Open a work to change its layout.</p>;
+  if (!book) return <p className="set-row-help">Open a recipe to change its layout.</p>;
   return (
     <>
       <Group title="Page">
@@ -785,7 +785,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
   return (
     <>
       <Group title="Language">
-        <Row title="American or British" help="Saved with the work, so a co-author gets the same.">
+        <Row title="American or British" help="Saved with the recipe, so a co-author gets the same.">
           <Seg
             label="Spelling"
             value={proof.dialect}
@@ -796,7 +796,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
             onChange={proof.setDialect}
           />
         </Row>
-        <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the book.`} words={proof.words.join(' ')}>
+        <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the recipe.`} words={proof.words.join(' ')}>
           <button className="set-btn" aria-expanded={editing} disabled={proof.words.length === 0} onClick={() => setEditing(!editing)}>
             Show words
           </button>
@@ -831,15 +831,15 @@ function Proofreading({ proof }: { proof: Proofreader }) {
 }
 
 function GoalSettings({ book, onBook, onExport }: Pick<Props, 'book' | 'onBook'> & { onExport: () => void }) {
-  if (!book) return <p className="set-row-help">Open a book to set its goals.</p>;
+  if (!book) return <p className="set-row-help">Open a recipe to set its goals.</p>;
   return (
     <>
       <Group title="Targets">
         <Row title="Words a day" help="Fills the ring in the bottom bar and keeps the streak.">
           <NumberField label="Words a day" value={book.dailyGoal ?? DEFAULT_DAILY_GOAL} required onCommit={(dailyGoal) => onBook({ dailyGoal })} />
         </Row>
-        <Row title="Whole book" help="Words on the Shelf you’re aiming for.">
-          <NumberField label="Whole book target" value={book.bookTarget} placeholder="No target" onCommit={(bookTarget) => onBook({ bookTarget })} />
+        <Row title="Whole recipe" help="Words on the Shelf you’re aiming for.">
+          <NumberField label="Whole recipe target" value={book.bookTarget} placeholder="No target" onCommit={(bookTarget) => onBook({ bookTarget })} />
         </Row>
         <Row title="Deadline" help="Works out the words a day you need.">
           <input className="set-num set-date" type="date" aria-label="Deadline" value={book.deadline ?? ''} onChange={(e) => onBook({ deadline: e.target.value || undefined })} />
@@ -852,7 +852,7 @@ function GoalSettings({ book, onBook, onExport }: Pick<Props, 'book' | 'onBook'>
         <Row title="Count pasted text as written" help="Off, so pasting a chapter doesn’t fill today’s goal.">
           <Switch label="Count pasted text as written" on={!!book.countPasted} onChange={(countPasted) => onBook({ countPasted })} />
         </Row>
-        <Row title="Writing history" help="writing-history.csv in the book folder.">
+        <Row title="Writing history" help="writing-history.csv in the recipe’s folder.">
           <button className="set-btn" onClick={onExport}>
             Export CSV
           </button>

@@ -177,7 +177,7 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
         {appearsIn && (
           <div className="pc-relations">
             <span className="pc-heading">Appears in</span>
-            {appearsIn.length === 0 && <span className="pc-quiet">No page names {doc.title} yet.</span>}
+            {appearsIn.length === 0 && <span className="pc-quiet">No item names {doc.title} yet.</span>}
             {appearsIn.map((m) => (
               <div className="pc-row pc-incoming" key={m.path}>
                 <button className="pc-link" onClick={() => onOpen(m.path)}>

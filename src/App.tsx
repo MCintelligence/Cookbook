@@ -53,6 +53,7 @@ import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
 import { TextSelection } from '@tiptap/pm/state';
 import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
+import { type BookPage } from './ui/CharacterStrip';
 import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
@@ -1723,6 +1724,7 @@ export function App() {
   }, [castIds, namedCards]);
 
   const [appearsIn, setAppearsIn] = useState<SceneMention[] | null>(null);
+  const [bookPages, setBookPages] = useState<BookPage[]>([]);
   useEffect(() => {
     const current = index.current;
     if (!fs || !current || !doc || (doc.kind !== 'character' && doc.kind !== 'setting')) return setAppearsIn(null);
@@ -1731,7 +1733,10 @@ export function App() {
     let live = true;
     // In the order the scenes come on the Bookshelf.
     readTree(fs, BOOKSHELF, order.current).then((shelf) => {
-      const at = new Map([...walkFiles(shelf)].map((f, i) => [f.path, i]));
+      const files = [...walkFiles(shelf)];
+      const at = new Map(files.map((f, i) => [f.path, i]));
+      const summaries = current.index.cards();
+      if (live) setBookPages(files.flatMap((f) => (summaries.get(f.path)?.kind === 'scene' ? [{ path: f.path, title: summaries.get(f.path)!.title, words: summaries.get(f.path)!.words }] : [])));
       if (live) setAppearsIn(mentions.sort((a, b) => (at.get(a.path) ?? Infinity) - (at.get(b.path) ?? Infinity)));
     }, () => live && setAppearsIn(mentions));
     return () => {
@@ -2211,6 +2216,7 @@ export function App() {
               choices={cardChoices}
               incoming={incoming}
               appearsIn={appearsIn}
+              bookPages={bookPages}
               loadPicture={loadPicture}
               onChange={(next) => {
                 setDoc(next);

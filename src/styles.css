@@ -888,3 +888,11 @@ button.seas-quote:hover { color: var(--accent); }
 .pantry-card { margin: 0; border-radius: 8px 8px 0 0; border-bottom: none; background: var(--paper); }
 .cb-page.card-page { border-radius: 0 0 8px 8px; border-top: 1px dashed var(--page-line); }
 .pc-name { width: 100%; margin: 0 0 6px; padding: 0; border: none; outline: none; background: transparent; color: var(--text); font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 20px; line-height: 28px; }
+
+/* Where a character or place is named, across the whole book. */
+.strip { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 6px; }
+.strip-bar { display: flex; gap: 1px; height: 14px; border-radius: 3px; overflow: hidden; }
+.strip-page { flex-basis: 0; min-width: 2px; padding: 0; border: 0; border-radius: 0; background: var(--line); cursor: pointer; }
+.strip-page.is-named { background: var(--accent); }
+.strip-page:hover { filter: brightness(0.85); }
+.strip-page:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

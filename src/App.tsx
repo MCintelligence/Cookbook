@@ -114,7 +114,7 @@ const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside
 import { checkForUpdates } from './ui/UpdateBanner';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
 import { dialogueRanges } from './editor/dialogue';
-import { isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
+import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings, type Tracked } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
@@ -138,6 +138,12 @@ const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Se
 /** The right-hand panel's column; matches .app.drawer-open in styles.css. */
 const DRAWER_WIDTH = 320;
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+/** The character styles that ⌘B, ⌘I and ⌘U apply. */
+const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
+  strong: { key: 'Mod-B', style: 'strong' },
+  emphasis: { key: 'Mod-I', style: 'emphasis' },
+  underline: { key: 'Mod-U', style: 'underline' },
+};
 
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
@@ -1155,22 +1161,32 @@ export function App() {
       { separator: true },
       {
         label: 'Paragraph style',
-        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id })) })),
+        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id, align: null, lineSpacing: null })) })),
       },
       {
+        // Strong, Emphasis and Underline are what ⌘B, ⌘I and ⌘U apply, so they carry those keys here.
         label: 'Character style',
-        items: sheet.character.map((st) => ({
-          label: st.name,
-          checked: ed.isActive('charStyle', { style: st.id }),
-          onPick: () => {
+        items: sheet.character.map((st) => {
+          const basic = BASIC_KEYS[st.id];
+          return {
+            label: st.name,
+            hint: basic && keys(basic.key),
+            checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
+            onPick: () => {
               ed.commands.focus();
-              toggleCharStyle(ed, st.id);
+              if (basic) toggleFormat(ed, basic.style);
+              else toggleCharStyle(ed, st.id);
             },
-          })),
+          };
+        }),
       },
-      { label: 'Bold', hint: keys('Mod-B'), checked: isFormatted(ed, 'strong'), onPick: () => void toggleFormat(ed, 'strong') },
-      { label: 'Italic', hint: keys('Mod-I'), checked: isFormatted(ed, 'emphasis'), onPick: () => void toggleFormat(ed, 'emphasis') },
-      { label: 'Underline', hint: keys('Mod-U'), checked: isFormatted(ed, 'underline'), onPick: () => void toggleFormat(ed, 'underline') },
+      {
+        label: 'Clear formatting',
+        onPick: () => {
+          ed.commands.focus();
+          clearFormatting(ed);
+        },
+      },
       { separator: true },
       { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => editFootnote(insertFootnote(ed)) },
       {

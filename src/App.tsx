@@ -1140,11 +1140,18 @@ export function App() {
 
     const words = selectedWords(ed);
     const styleId = (ed.state.selection.$from.parent.attrs.style as string | undefined) ?? 'body';
+    // Words pasted from the menu count as pasted, as Ctrl+V's do.
+    const menuPaste = (plain: boolean) =>
+      void pasteInto(ed, plain).then((result) => {
+        if (result === 'unreadable') say(`To paste, press ${keys('Mod-V')}.`);
+        else if (result === 'empty') say('There are no words on the clipboard to paste.');
+        else pastedWords.current += countWords(result.pasted);
+      });
     const items: MenuItem[] = [
       { label: 'Cut', hint: keys('Mod-X'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'cut') },
       { label: 'Copy', hint: keys('Mod-C'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'copy') },
-      { label: 'Paste', hint: keys('Mod-V'), onPick: () => void pasteInto(ed, false).then((ok) => ok || say(`To paste, press ${keys('Mod-V')}.`)) },
-      { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), onPick: () => void pasteInto(ed, true).then((ok) => ok || say(`To paste, press ${keys('Mod-V')}.`)) },
+      { label: 'Paste', hint: keys('Mod-V'), onPick: () => menuPaste(getSettings().pastePlain) },
+      { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), onPick: () => menuPaste(true) },
       { separator: true },
       {
         label: 'Paragraph style',

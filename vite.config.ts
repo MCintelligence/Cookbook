@@ -23,7 +23,7 @@ export default defineConfig({
         includeAssets: ['icon.svg'],
         // Precache the fonts and the search engine too, so everything works with no connection.
         // The grammar engine's WebAssembly is about 20 MB, above Workbox's usual limit.
-        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,aff,dic}'], maximumFileSizeToCacheInBytes: 32 * 1024 * 1024 },
+        workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,aff,dic}', 'dictionaries/word-pairs.txt'], maximumFileSizeToCacheInBytes: 32 * 1024 * 1024 },
         manifest: {
           name: 'Cookbook',
           short_name: 'Cookbook',

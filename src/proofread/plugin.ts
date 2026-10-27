@@ -7,6 +7,7 @@ import { type Issue } from './check';
 import { type Hiding, type IssueKeys, isHidden, keysOf } from './rules';
 import { isSentenceRule } from './style';
 import { type Checker } from './client';
+import { type Around } from './context';
 
 /**
  * The proofreader in the editor. Each paragraph's text is checked in the
@@ -60,7 +61,27 @@ function mapOf(node: PMNode): TextMap {
   return map;
 }
 
-function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Decoration {
+/**
+ * Sally's brackets around a style remark: 『 』 for a single word, 「 」 for a
+ * longer passage. Page furniture, never part of the text.
+ */
+export const bracketsFor = (word: string): [string, string] => (/\s/u.test(word.trim()) ? ['「', '」'] : ['『', '』']);
+
+function bracket(at: number, open: boolean, glyph: string, spec: object): Decoration {
+  return Decoration.widget(
+    at,
+    () => {
+      const el = document.createElement('span');
+      el.className = `cb-bracket cb-bracket-${open ? 'open' : 'close'}`;
+      el.textContent = glyph;
+      el.setAttribute('aria-hidden', 'true');
+      return el;
+    },
+    { ...spec, bracket: true, side: open ? -1 : 1, ignoreSelection: true },
+  );
+}
+
+function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Decoration[] {
   const from = pos + 1 + map.positions[issue.from]!;
   const to = pos + 2 + map.positions[issue.to - 1]!;
   const word = map.text.slice(issue.from, issue.to);
@@ -68,7 +89,11 @@ function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Dec
   const space = word.trim() === '' ? ' cb-issue-space' : '';
   // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
   const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
-  return Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, { issue, word, ...keys });
+  const spec = { issue, word, ...keys };
+  const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, spec);
+  if (issue.kind !== 'style') return [mark];
+  const [open, close] = bracketsFor(word);
+  return [bracket(from, true, open, spec), mark, bracket(to, false, close, spec)];
 }
 
 /** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */
@@ -81,7 +106,7 @@ function build(doc: PMNode, cache: Map<string, Issue[]>, hiding: Hiding, old: De
     if (issues) {
       for (const issue of issues) {
         const keys = keysOf(issue, map.text);
-        if (!isHidden(keys, hiding)) decos.push(decorate(pos, map, issue, keys));
+        if (!isHidden(keys, hiding)) decos.push(...decorate(pos, map, issue, keys));
       }
     } else {
       decos.push(...old.find(pos, pos + node.nodeSize).filter((d) => !isHidden(d.spec as IssueKeys, hiding)));
@@ -257,6 +282,9 @@ export function forgetWord(editor: Editor, word: string): void {
   send(editor, { forget: word });
 }
 
+/** The issues themselves, not Sally's brackets around them. */
+const isIssue = (spec: { bracket?: boolean }) => !spec.bracket;
+
 function found(d: Decoration): FoundIssue {
   const spec = d.spec as { issue: Issue; word: string } & IssueKeys;
   return { from: d.from, to: d.to, word: spec.word, issue: spec.issue, key: spec.key, once: spec.once, group: spec.group };
@@ -265,16 +293,29 @@ function found(d: Decoration): FoundIssue {
 /** Every issue shown in the scene, in order. */
 export function issuesOf(state: EditorState): FoundIssue[] {
   const ps = proofreadKey.getState(state);
-  return ps ? ps.set.find().map(found).sort((a, b) => a.from - b.from) : [];
+  return ps ? ps.set.find(undefined, undefined, isIssue).map(found).sort((a, b) => a.from - b.from) : [];
 }
 
 /** The issue under a document position, for the card that opens when an underline is clicked. */
 export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const ps = proofreadKey.getState(state);
   // The narrowest one: a word's issue, not the sentence around it.
-  const here = (ps?.set.find(pos, pos) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
+  const here = (ps?.set.find(pos, pos, isIssue) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
   const d = here[0];
   return d ? found(d) : null;
+}
+
+const AROUND = 60;
+
+/** The text on either side of an issue within its paragraph, for suggestions that fit it. */
+export function aroundIssue(doc: PMNode, at: Pick<FoundIssue, 'from' | 'to'>): Around | undefined {
+  if (at.to > doc.content.size) return undefined;
+  const $from = doc.resolve(at.from);
+  if (!$from.parent.isTextblock || at.to > $from.end()) return undefined;
+  return {
+    before: doc.textBetween(Math.max($from.start(), at.from - AROUND), at.from, '\n', '\n'),
+    after: doc.textBetween(at.to, Math.min($from.end(), at.to + AROUND), '\n', '\n'),
+  };
 }
 
 /** Puts a suggestion in place of an issue, keeping the text's character styles. */

@@ -1,5 +1,6 @@
 import { type NodeJSON, BODY_STYLE } from '../editor/markdown';
-import { type StyleSheet, stylesToCss } from '../styles/styles';
+import { PX_PER_PT, type StyleSheet, fontStack, stylesToCss } from '../styles/styles';
+import { paragraphFormatOf, textFormatOf } from '../editor/format';
 import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
 
@@ -36,7 +37,10 @@ export class HtmlWriter {
       case 'paragraph': {
         const style = String(n.attrs?.style ?? BODY_STYLE);
         const attr = style === BODY_STYLE ? '' : ` data-style="${escapeHtml(style)}"`;
-        return `<p${attr}>${this.inline(n.content ?? [])}</p>`;
+        // Alignment and spacing set by hand go over the style's.
+        const { align, lineSpacing } = paragraphFormatOf(n.attrs);
+        const css = [align && `text-align: ${align}`, lineSpacing && `line-height: ${lineSpacing}`].filter(Boolean).join('; ');
+        return `<p${attr}${css ? ` style="${css}"` : ''}>${this.inline(n.content ?? [])}</p>`;
       }
       case 'sceneBreak':
         return '<p class="scene-break">* * *</p>';
@@ -94,7 +98,11 @@ export class HtmlWriter {
         const styles = charStyles(n);
         // Innermost first, the same nesting the editor uses.
         for (const m of [...(n.marks ?? [])].reverse()) {
-          if (m.type === 'link') html = `<a href="${escapeHtml(m.attrs.href)}">${html}</a>`;
+          if (m.type === 'textStyle') {
+            const { font, size, color } = textFormatOf(m.attrs);
+            const css = [font && `font-family: ${fontStack(font)}`, size && `font-size: ${size * PX_PER_PT}px`, color && `color: ${color}`].filter(Boolean).join('; ');
+            if (css) html = `<span style="${escapeHtml(css)}">${html}</span>`;
+          } else if (m.type === 'link') html = `<a href="${escapeHtml(m.attrs.href)}">${html}</a>`;
           else if (m.type in PLAIN_TAGS) html = `<${PLAIN_TAGS[m.type]}>${html}</${PLAIN_TAGS[m.type]}>`;
         }
         return styles.length > 0 ? `<span data-char="${escapeHtml(styles.join(' '))}">${html}</span>` : html;

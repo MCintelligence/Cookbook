@@ -55,7 +55,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
     <div className="lib-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="lib" role="dialog" aria-modal="true" aria-labelledby="lib-title" ref={box}>
         <div className="lib-head">
-          <h2 id="lib-title">Your works</h2>
+          <h2 id="lib-title">Your recipes</h2>
           <button className="lib-close" aria-label="Close" onClick={onClose}>
             ×
           </button>
@@ -70,7 +70,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
         {adopting ? (
           <div className="lib-adopt">
             <p>
-              <strong>{describeLocation(adopting)}</strong> isn’t a Cookbook work yet. Make it one? Cookbook adds <code>book.json</code>,{' '}
+              <strong>{describeLocation(adopting)}</strong> isn’t a Cookbook recipe yet. Make it one? Cookbook adds <code>book.json</code>,{' '}
               <code>bookshelf/</code>, <code>pantry/</code> and a hidden <code>.cookbook/</code> folder. Nothing already in the folder is changed.
             </p>
             <div className="lib-row">
@@ -78,14 +78,14 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                 Cancel
               </button>
               <button className="btn btn-primary" disabled={busy} onClick={() => onAdopt(adopting)}>
-                Make it a work
+                Make it a recipe
               </button>
             </div>
           </div>
         ) : (
           <>
             {(recent.length > 0 || others.length > 0) && (
-              <ul className="lib-list" aria-label="Recent works">
+              <ul className="lib-list" aria-label="Recent recipes">
                 {recent.map((b) => {
                   const open = current !== null && sameLocation(b.location, current);
                   return (
@@ -104,7 +104,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                           items: [
                             { label: open ? 'Back to writing' : 'Open', onPick: () => (open ? onClose() : onOpen(b.location)) },
                             ...(open && openBookItems.length > 0 ? [{ separator: true } as const, ...openBookItems] : []),
-                            ...(open ? [] : [{ separator: true } as const, { label: 'Remove from this list', hint: 'The book is kept', onPick: forget }]),
+                            ...(open ? [] : [{ separator: true } as const, { label: 'Remove from this list', hint: 'The recipe is kept', onPick: forget }]),
                           ],
                         });
                       }}
@@ -117,7 +117,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                         <button
                           className="lib-forget"
                           aria-label={`Remove ${b.title} from this list`}
-                          title="Remove from this list (the book itself is kept)"
+                          title="Remove from this list (the recipe itself is kept)"
                           onClick={() => {
                             forgetBook(b.location);
                             setRecent(recentBooks());
@@ -147,8 +147,8 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
                 if (canCreate) onCreate(title.trim(), template, false);
               }}
             >
-              <label htmlFor="lib-new-title">Start a new work</label>
-              <div className="lib-templates" role="radiogroup" aria-label="Kind of book">
+              <label htmlFor="lib-new-title">Start a new recipe</label>
+              <div className="lib-templates" role="radiogroup" aria-label="Kind of recipe">
                 {BOOK_TEMPLATES.map((t) => (
                   <button key={t.id} type="button" role="radio" aria-checked={template === t.id} title={t.description} onClick={() => setTemplate(t.id)}>
                     {t.name}
@@ -171,7 +171,7 @@ export function BookLibrary({ current, adopting, error, busy, onOpen, onOpenFold
 
             {canPickFolder() && (
               <button className="lib-open-folder" disabled={busy} onClick={onOpenFolder}>
-                Open a work’s folder…
+                Open a recipe’s folder…
               </button>
             )}
           </>

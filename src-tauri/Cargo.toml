@@ -1,6 +1,6 @@
 [package]
 name = "cookbook"
-version = "0.2.0"
+version = "0.3.0"
 description = "An offline writing app with an on-device proofreader"
 license = "Apache-2.0"
 edition = "2021"
@@ -24,3 +24,7 @@ tauri-plugin-persisted-scope = "2"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
+# Reads the clipboard for the right-click Paste, which the webview would otherwise ask permission for.
+arboard = { version = "3.6", default-features = false, features = ["wayland-data-control"] }
+# Lists the fonts installed on the computer for the font menus.
+fontdb = "0.23"

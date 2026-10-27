@@ -1,7 +1,7 @@
 import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
-import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
+import { BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
 import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
 
 /**
@@ -199,6 +199,11 @@ export class BookIndex {
     return rows.map(([path, title, text]) => ({ path, title, count: count(text) })).filter((m) => m.count > 0);
   }
 
+  /** The words of every page, for the proofreader to learn the book's own way with words. */
+  pageTexts(): string[] {
+    return (this.db.selectArrays(`select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.kind = 'scene'`) as [string][]).map(([t]) => t);
+  }
+
   /** The relationships other cards have with the card whose id this is. */
   incoming(id: string): IncomingRelationship[] {
     const rows = this.db.selectArrays(
@@ -282,7 +287,7 @@ export async function refreshIndex(fs: StorageAdapter, index: BookIndex): Promis
   const known = index.stamps();
   const seen = new Set<string>();
   let touched = 0;
-  for (const root of [BOOKSHELF, PANTRY, RECIPES]) {
+  for (const root of NOTES_ON ? [BOOKSHELF, PANTRY, RECIPES] : [BOOKSHELF, PANTRY]) {
     if (!(await fs.exists(root))) continue;
     for (const file of walkFiles(await readTree(fs, root))) {
       seen.add(file.path);

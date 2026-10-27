@@ -55,6 +55,30 @@ function Ring({ ratio, size, stroke, label }: { ratio: number; size: number; str
 }
 
 /**
+ * Today's day key, which moves on by itself at midnight (and when the window
+ * comes back after the computer slept through it), so the counts reset
+ * without waiting for the next keystroke.
+ */
+function useToday(): string {
+  const [day, setDay] = useState(() => dayKey(new Date()));
+  useEffect(() => {
+    const check = () => setDay(dayKey(new Date()));
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    // A second past midnight, so the clock is surely on the new day.
+    const timer = window.setTimeout(check, midnight + 1000);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [day]);
+  return day;
+}
+
+/**
  * The goal ring and today's words in the bottom bar, and the pop-up they
  * open: targets for the day, the scene and the book, and the whole writing
  * history. Both tabs are the same size, so switching never moves anything.
@@ -66,8 +90,9 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
   const box = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const options = { dailyGoal: goals.dailyGoal, weekendsOff: goals.weekendsOff };
-  const today = netWords(history.get(dayKey(new Date())));
-  const streak = useMemo(() => streakOf(history, options), [history, goals.dailyGoal, goals.weekendsOff]);
+  const day = useToday();
+  const today = netWords(history.get(day));
+  const streak = useMemo(() => streakOf(history, options), [history, goals.dailyGoal, goals.weekendsOff, day]);
   const ratio = Math.min(1, today / Math.max(1, goals.dailyGoal));
 
   useEffect(() => {
@@ -113,7 +138,7 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
             {fmt(today)} / {fmt(goals.dailyGoal)}
           </strong>{' '}
           words today{streakText}
-          {scene && (scene.goal ? ` · Page ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
+          {scene && (scene.goal ? ` · Item ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
         </span>
       </button>
       {open && (
@@ -185,25 +210,25 @@ function Targets({
       </div>
       <div className="goals-row">
         <span className="goals-t">
-          <b>This page</b>
-          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open a page to give it a goal'}</span>
+          <b>This item</b>
+          <span className="goals-sub">{scene ? `${scene.title || 'Untitled'} · ${fmt(scene.words)} words so far` : 'Open an item to give it a goal'}</span>
         </span>
-        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Page goal in words" disabled={!scene} onCommit={onSceneGoal} />
+        <NumberInput value={scene?.goal ?? null} placeholder="No goal" label="Item goal in words" disabled={!scene} onCommit={onSceneGoal} />
       </div>
       <div className="goals-row goals-book">
         <div className="goals-line">
           <span className="goals-t">
-            <b>Book target</b>
+            <b>Recipe target</b>
             <span className="goals-sub">{goals.bookTarget ? `${fmt(bookWords)} of ${fmt(goals.bookTarget)} words` : `${fmt(bookWords)} words on the Shelf`}</span>
           </span>
-          <NumberInput value={goals.bookTarget ?? null} placeholder="No target" label="Book target in words" onCommit={(v) => onGoals({ bookTarget: v ?? undefined })} />
+          <NumberInput value={goals.bookTarget ?? null} placeholder="No target" label="Recipe target in words" onCommit={(v) => onGoals({ bookTarget: v ?? undefined })} />
         </div>
         <div className="goals-meter" aria-hidden="true">
           <i style={{ width: `${goals.bookTarget ? Math.min(100, (bookWords / goals.bookTarget) * 100) : 0}%` }} />
         </div>
         <div className="goals-line">
           <span className="goals-sub">Finish by</span>
-          <input className="goals-date" type="date" aria-label="Book deadline" value={goals.deadline ?? ''} onChange={(e) => onGoals({ deadline: e.target.value || undefined })} />
+          <input className="goals-date" type="date" aria-label="Recipe deadline" value={goals.deadline ?? ''} onChange={(e) => onGoals({ deadline: e.target.value || undefined })} />
         </div>
         <span className="goals-sub">
           {!goals.bookTarget
@@ -238,8 +263,9 @@ function History({
   onView: (v: HistoryView) => void;
   onExport: () => void;
 }) {
-  const stats = useMemo(() => historyStats(history, options), [history, options.dailyGoal, options.weekendsOff]);
-  const rows = useMemo(() => historyRows(history, view, options), [history, view, options.dailyGoal, options.weekendsOff]);
+  const day = useToday();
+  const stats = useMemo(() => historyStats(history, options), [history, options.dailyGoal, options.weekendsOff, day]);
+  const rows = useMemo(() => historyRows(history, view, options), [history, view, options.dailyGoal, options.weekendsOff, day]);
   const bestDay = stats.best ? new Date(stats.best.day + 'T12:00').toLocaleDateString('en', { month: 'short', day: 'numeric' }) : '';
   return (
     <div className="goals-panel goals-hist" role="tabpanel" aria-label="History">

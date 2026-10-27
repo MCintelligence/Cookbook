@@ -2,7 +2,8 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import { type AppSettings, type Theme, setSettings, useSettings } from '../settings';
 import { SHORTCUTS, binding, bindingOf, keys, setBinding } from '../shortcuts';
 import { type BookInfo, DEFAULT_DAILY_GOAL } from '../storage/book';
-import { MARGINS, PAGE_SIZES, type PageSettings, ZOOMS, pageOf, zoomLabel } from '../storage/page';
+import { MARGINS, PAGE_SIZES, type PageSettings, pageOf } from '../storage/page';
+import { ZoomSlider } from './ZoomControl';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
 import { BODY, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
@@ -154,8 +155,7 @@ const CHECK_HELP: Record<string, string> = {
   name: 'Salty Sam: “Mamma Lou” when the Pantry has Mama Lou.',
   grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
-  'hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
-  'very-hard-sentence': 'Sweet Sally: a light blue highlight, while Seasonings is open.',
+  'stray-capitals': 'Peppery Pete: “MOnster” or “mONSTER”, while Seasonings is open.',
 };
 
 /**
@@ -173,6 +173,25 @@ export function Settings(props: Props) {
     box.current?.querySelector<HTMLElement>('.set-main h2')?.focus();
   }, [section]);
 
+  // Escape is heard from anywhere, not only from inside the dialog: a click on
+  // the background leaves the keyboard on the page itself, and Escape still
+  // has to close Settings from there.
+  const escape = useRef(() => {});
+  escape.current = () => (searching ? setQuery('') : onClose());
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !(e.target instanceof Node)) return;
+      const inside = box.current?.contains(e.target) ?? false;
+      // Something inside that took the Escape itself (a field, the shortcut recorder) keeps it,
+      // and an open menu closes first.
+      if ((inside && e.defaultPrevented) || (e.target instanceof Element && e.target.closest('.set-recording')) || document.querySelector('.menu')) return;
+      e.preventDefault();
+      escape.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const sections = searching ? [...APP_SECTIONS, ...BOOK_SECTIONS].map(([id]) => id) : [section];
   return (
     <div
@@ -181,17 +200,12 @@ export function Settings(props: Props) {
       aria-modal="true"
       aria-label="Settings"
       ref={box}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !e.defaultPrevented && !(e.target as Element).closest('.set-recording')) {
-          e.preventDefault();
-          if (searching) setQuery('');
-          else onClose();
-        }
-      }}
+      // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
+      tabIndex={-1}
     >
       <header className="set-top">
         <div className="set-brand">
-          <span className="brand">Cookbook</span>
+          <span className="brand">cookbook</span>
           <span className="set-crumb">· Settings</span>
         </div>
         <div className="set-top-actions">
@@ -615,7 +629,7 @@ function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'on
           />
         </Row>
         <Row title="Zoom" help={`${keys('Mod-=')} and ${keys('Mod--')} also zoom the page.`}>
-          <Select label="Zoom" value={page.zoom} options={ZOOMS.map((z) => [z, zoomLabel(z)] as [number, string])} onChange={(zoom) => set({ zoom })} />
+          <ZoomSlider zoom={page.zoom} fitted={100} onZoom={(zoom) => set({ zoom })} />
         </Row>
       </Group>
     </>
@@ -802,7 +816,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
       </Group>
       <Group title="Checks">
         {RULE_GROUPS.flatMap((g) => g.rules).map((r) => (
-          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Peppery Pete: a blue highlight, while Seasonings is open.'}>
+          <Row key={r.id} title={r.label} help={CHECK_HELP[r.id] ?? 'Spicy Sally: 「 」 around the words, while Seasonings is open.'}>
             <Switch label={r.label} on={!proof.off.includes(r.id)} onChange={(on) => proof.setRuleOn(r.id, on)} />
           </Row>
         ))}

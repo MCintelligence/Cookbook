@@ -187,6 +187,34 @@ describe('the new formatting', () => {
   });
 });
 
+describe('formatting set by hand', () => {
+  async function formattedBook() {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Hand');
+    const p = await createDocument(fs, 'bookshelf', 'Set by hand');
+    const body = 'Some [big red]{font="EB Garamond" size=18 color=#aa0000} words.\n\n::: {align=center spacing=2}\nCentred.\n:::\n';
+    await writeDocument(fs, p, { ...(await readDocument(fs, p)), body });
+    return collect(fs, 'Hand', await readTree(fs, 'bookshelf'));
+  }
+
+  it('prints and makes e-books with it', async () => {
+    const html = bookHtml(await formattedBook(), defaultStyles());
+    expect(html).toContain(`<span style="font-family: 'EB Garamond', serif; font-size: 24px; color: #aa0000">big red</span>`);
+    expect(html).toContain('<p style="text-align: center; line-height: 2">Centred.</p>');
+    const files = unzipSync(bookEpub(await formattedBook(), defaultStyles(), 'id'));
+    const chapter = strFromU8(files['OEBPS/chapter1.xhtml']!);
+    expect(new DOMParser().parseFromString(chapter, 'application/xhtml+xml').getElementsByTagName('parsererror')).toHaveLength(0);
+  });
+
+  it('writes it into Word files as direct formatting', async () => {
+    const files = unzipSync(bookDocx(await formattedBook(), defaultStyles()));
+    const xml = strFromU8(files['word/document.xml']!);
+    expect(new DOMParser().parseFromString(xml, 'application/xml').getElementsByTagName('parsererror')).toHaveLength(0);
+    expect(xml).toContain('<w:rPr><w:rFonts w:ascii="EB Garamond" w:hAnsi="EB Garamond" w:cs="EB Garamond"/><w:color w:val="aa0000"/><w:sz w:val="36"/><w:szCs w:val="36"/></w:rPr><w:t xml:space="preserve">big red</w:t>');
+    expect(xml).toContain('<w:pStyle w:val="cbbody"/><w:spacing w:line="480" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>');
+  });
+});
+
 describe('backup', () => {
   it('zips every file and folder, but not the hidden folder', async () => {
     const { fs } = await sampleBook();

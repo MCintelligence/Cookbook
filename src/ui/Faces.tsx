@@ -41,12 +41,16 @@ export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
       )}
       {id === 'sally' && (
         <>
-          <rect x="11" y="4" width="18" height="9" rx="4" fill="#f0c6d4" />
-          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#fff4f7" stroke="#c8c8c3" strokeWidth="1.2" />
-          <path d="M14 23.5q2-2.4 4 0M22 23.5q2-2.4 4 0" fill="none" stroke="#1c1c1b" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M16 28.5q4 3 8 0" fill="none" stroke="#1c1c1b" strokeWidth="1.6" strokeLinecap="round" />
-          <circle cx="13.5" cy="27" r="1.8" fill="#f0a6bd" />
-          <circle cx="26.5" cy="27" r="1.8" fill="#f0a6bd" />
+          <rect x="11" y="4" width="18" height="9" rx="4" fill="#2f6b2a" />
+          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#d6452b" stroke="#a8321e" strokeWidth="1.2" />
+          <circle cx="16" cy="8.5" r="1" fill="#9fd08a" />
+          <circle cx="20" cy="7.5" r="1" fill="#9fd08a" />
+          <circle cx="24" cy="8.5" r="1" fill="#9fd08a" />
+          <path d="M13.5 19.5l4 1.6M26.5 19.5l-4 1.6" stroke="#fff4ee" strokeWidth="1.6" strokeLinecap="round" />
+          <circle cx="16" cy="23.5" r="1.7" fill="#fff4ee" />
+          <circle cx="24" cy="23.5" r="1.7" fill="#fff4ee" />
+          <path d="M15 28.5q5 4 10 0" fill="none" stroke="#fff4ee" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M31 4q2 3 0 5q3-1 3-4q0-2-1.5-3q.5 1.5-1.5 2z" fill="#e8792f" />
         </>
       )}
     </svg>

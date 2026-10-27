@@ -45,6 +45,27 @@ describe('styles', () => {
     await saveStyles(fs, changed);
     expect(resolveParagraphStyle(await loadStyles(fs), 'body').lineSpacing).toBe(2);
   });
+
+  it('drops the old "Body, first after break" style when it was never changed', async () => {
+    const fs = new MemoryAdapter();
+    const old = defaultStyles();
+    old.paragraph.splice(1, 0, { id: 'body-first', name: 'Body, first after break', basedOn: 'body', next: 'body', firstLineIndent: 0 });
+    old.paragraph = old.paragraph.map((s) => (s.id === 'chapter-title' ? { ...s, next: 'body-first' } : s));
+    await saveStyles(fs, old);
+    const sheet = await loadStyles(fs);
+    expect(sheet.paragraph.some((s) => s.id === 'body-first')).toBe(false);
+    expect(sheet.paragraph.find((s) => s.id === 'chapter-title')?.next).toBe('body');
+    // Paragraphs still marked with it are drawn as Body.
+    expect(stylesToCss(sheet)).toContain('.cb-page p[data-style="body"], .cb-page p[data-style="body-first"] {');
+  });
+
+  it('keeps "Body, first after break" when someone has changed it', async () => {
+    const fs = new MemoryAdapter();
+    const old = defaultStyles();
+    old.paragraph.splice(1, 0, { id: 'body-first', name: 'Body, first after break', basedOn: 'body', next: 'body', firstLineIndent: 0, spaceBefore: 6 });
+    await saveStyles(fs, old);
+    expect((await loadStyles(fs)).paragraph.find((s) => s.id === 'body-first')?.spaceBefore).toBe(6);
+  });
 });
 
 describe('darkPageColor', () => {

@@ -36,11 +36,10 @@ describe('style', () => {
     ]);
   });
 
-  it('marks hard, very hard and sticky sentences', () => {
+  it('marks sticky sentences but not long or hard ones', () => {
     const hard = 'The extraordinarily complicated recipe demanded considerable patience, meticulous preparation and remarkable concentration from everybody involved in the kitchen.';
-    expect(said(hard).map((x) => x[0])).toContain('very-hard-sentence');
-    const medium = 'The cooks in the kitchen prepared the gravy and biscuits carefully while everyone waited patiently at the table outside.';
-    expect(said(medium).map((x) => x[0])).toContain('hard-sentence');
+    expect(said(hard).map((x) => x[0])).not.toContain('very-hard-sentence');
+    expect(said(hard).map((x) => x[0])).not.toContain('hard-sentence');
     const sticky = 'It was the end of the day and it was time for all of us to go to the house.';
     expect(said(sticky).map((x) => x[0])).toEqual(['sticky-sentence']);
     expect(said('She cooked. He ate. They laughed.')).toEqual([]);

@@ -55,6 +55,30 @@ function Ring({ ratio, size, stroke, label }: { ratio: number; size: number; str
 }
 
 /**
+ * Today's day key, which moves on by itself at midnight (and when the window
+ * comes back after the computer slept through it), so the counts reset
+ * without waiting for the next keystroke.
+ */
+function useToday(): string {
+  const [day, setDay] = useState(() => dayKey(new Date()));
+  useEffect(() => {
+    const check = () => setDay(dayKey(new Date()));
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    // A second past midnight, so the clock is surely on the new day.
+    const timer = window.setTimeout(check, midnight + 1000);
+    window.addEventListener('focus', check);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [day]);
+  return day;
+}
+
+/**
  * The goal ring and today's words in the bottom bar, and the pop-up they
  * open: targets for the day, the scene and the book, and the whole writing
  * history. Both tabs are the same size, so switching never moves anything.
@@ -66,8 +90,9 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
   const box = useRef<HTMLSpanElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const options = { dailyGoal: goals.dailyGoal, weekendsOff: goals.weekendsOff };
-  const today = netWords(history.get(dayKey(new Date())));
-  const streak = useMemo(() => streakOf(history, options), [history, goals.dailyGoal, goals.weekendsOff]);
+  const day = useToday();
+  const today = netWords(history.get(day));
+  const streak = useMemo(() => streakOf(history, options), [history, goals.dailyGoal, goals.weekendsOff, day]);
   const ratio = Math.min(1, today / Math.max(1, goals.dailyGoal));
 
   useEffect(() => {
@@ -238,8 +263,9 @@ function History({
   onView: (v: HistoryView) => void;
   onExport: () => void;
 }) {
-  const stats = useMemo(() => historyStats(history, options), [history, options.dailyGoal, options.weekendsOff]);
-  const rows = useMemo(() => historyRows(history, view, options), [history, view, options.dailyGoal, options.weekendsOff]);
+  const day = useToday();
+  const stats = useMemo(() => historyStats(history, options), [history, options.dailyGoal, options.weekendsOff, day]);
+  const rows = useMemo(() => historyRows(history, view, options), [history, view, options.dailyGoal, options.weekendsOff, day]);
   const bestDay = stats.best ? new Date(stats.best.day + 'T12:00').toLocaleDateString('en', { month: 'short', day: 'numeric' }) : '';
   return (
     <div className="goals-panel goals-hist" role="tabpanel" aria-label="History">

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
@@ -104,7 +104,7 @@ import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type BackupInfo, type SettingsSection } from './ui/Settings';
-import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel } from './storage/page';
+import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
 import { type Backup, listBackups, makeBackup, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
@@ -114,13 +114,14 @@ const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside
 import { checkForUpdates } from './ui/UpdateBanner';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
 import { dialogueRanges } from './editor/dialogue';
-import { isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
+import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings, type Tracked } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { type Recipe, Tree } from './ui/Tree';
+import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
@@ -134,7 +135,15 @@ type Panel = 'pantry' | 'seasonings';
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
+/** The right-hand panel's column; matches .app.drawer-open in styles.css. */
+const DRAWER_WIDTH = 320;
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+/** The character styles that ⌘B, ⌘I and ⌘U apply. */
+const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
+  strong: { key: 'Mod-B', style: 'strong' },
+  emphasis: { key: 'Mod-I', style: 'emphasis' },
+  underline: { key: 'Mod-U', style: 'underline' },
+};
 
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
@@ -148,6 +157,7 @@ const INDEX_SAVE_DELAY_MS = 5000;
 const NOT_A_BOOK = 'This folder is not a Cookbook book.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
 const UNDO_SAVE_INTERVAL_MS = 10_000;
+const SAVE_RETRY_MS = 5_000;
 
 /** Notes to self live in the scene's front matter, keyed by the id of their anchor in the text. */
 function readNotes(doc: CookbookDocument | null): Notes {
@@ -196,6 +206,8 @@ export function App() {
   const [where, setWhere] = useState('');
   /** Words typed since the last save, for the dot in the footer. */
   const [dirty, setDirty] = useState(false);
+  /** The last save of the page failed; it is tried again until it works. */
+  const [saveFailed, setSaveFailed] = useState(false);
   const [book, setBook] = useState<BookInfo | null>(null);
   const [sheet, setSheet] = useState<StyleSheet>(defaultStyles);
   /** The Shelf's pages and books, the Pantry's groups, and the recipes, each as read from its folder. */
@@ -253,6 +265,8 @@ export function App() {
   const settings = useSettings();
   /** On a phone, the sidebar slides out over the page. */
   const [sideOpen, setSideOpen] = useState(false);
+  const [shelfWidth, setShelfWidth] = useShelfWidth();
+  const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   const lastSection = useRef<SettingsSection>('general');
@@ -514,13 +528,23 @@ export function App() {
     if (!save) return;
     try {
       await save();
-      if (!pendingSave.current) setDirty(false);
-      unsaved.current = null;
-      dropRescue(window.localStorage);
+      setSaveFailed(false);
+      if (!pendingSave.current) {
+        setDirty(false);
+        unsaved.current = null;
+        dropRescue(window.localStorage);
+      }
     } catch (e) {
       setError(friendlyError(e));
+      setSaveFailed(true);
+      // Keep the words and try again shortly, unless a newer save is already waiting.
+      pendingSave.current ??= save;
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => void flushRef.current(), SAVE_RETRY_MS);
     }
   }, []);
+  const flushRef = useRef(flushSave);
+  flushRef.current = flushSave;
 
   useEffect(() => {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
@@ -1122,30 +1146,47 @@ export function App() {
 
     const words = selectedWords(ed);
     const styleId = (ed.state.selection.$from.parent.attrs.style as string | undefined) ?? 'body';
+    // Words pasted from the menu count as pasted, as Ctrl+V's do.
+    const menuPaste = (plain: boolean) =>
+      void pasteInto(ed, plain).then((result) => {
+        if (result === 'unreadable') say(`To paste, press ${keys('Mod-V')}.`);
+        else if (result === 'empty') say('There are no words on the clipboard to paste.');
+        else pastedWords.current += countWords(result.pasted);
+      });
     const items: MenuItem[] = [
       { label: 'Cut', hint: keys('Mod-X'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'cut') },
       { label: 'Copy', hint: keys('Mod-C'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'copy') },
-      { label: 'Paste', hint: keys('Mod-V'), onPick: () => void pasteInto(ed, false).then((ok) => ok || say(`To paste, press ${keys('Mod-V')}.`)) },
-      { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), onPick: () => void pasteInto(ed, true).then((ok) => ok || say(`To paste, press ${keys('Mod-V')}.`)) },
+      { label: 'Paste', hint: keys('Mod-V'), onPick: () => menuPaste(getSettings().pastePlain) },
+      { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), onPick: () => menuPaste(true) },
       { separator: true },
       {
         label: 'Paragraph style',
-        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id })) })),
+        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id, align: null, lineSpacing: null })) })),
       },
       {
+        // Strong, Emphasis and Underline are what ⌘B, ⌘I and ⌘U apply, so they carry those keys here.
         label: 'Character style',
-        items: sheet.character.map((st) => ({
-          label: st.name,
-          checked: ed.isActive('charStyle', { style: st.id }),
-          onPick: () => {
+        items: sheet.character.map((st) => {
+          const basic = BASIC_KEYS[st.id];
+          return {
+            label: st.name,
+            hint: basic && keys(basic.key),
+            checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
+            onPick: () => {
               ed.commands.focus();
-              toggleCharStyle(ed, st.id);
+              if (basic) toggleFormat(ed, basic.style);
+              else toggleCharStyle(ed, st.id);
             },
-          })),
+          };
+        }),
       },
-      { label: 'Bold', hint: keys('Mod-B'), checked: isFormatted(ed, 'strong'), onPick: () => void toggleFormat(ed, 'strong') },
-      { label: 'Italic', hint: keys('Mod-I'), checked: isFormatted(ed, 'emphasis'), onPick: () => void toggleFormat(ed, 'emphasis') },
-      { label: 'Underline', hint: keys('Mod-U'), checked: isFormatted(ed, 'underline'), onPick: () => void toggleFormat(ed, 'underline') },
+      {
+        label: 'Clear formatting',
+        onPick: () => {
+          ed.commands.focus();
+          clearFormatting(ed);
+        },
+      },
       { separator: true },
       { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => editFootnote(insertFootnote(ed)) },
       {
@@ -1639,24 +1680,9 @@ export function App() {
     if (editor) setNameMatcher(editor, matcher);
   }, [editor, matcher]);
   const storyNames = useMemo(() => namedCards.flatMap((c) => [c.title, ...c.aka]), [namedCards]);
-  const onDialect = useCallback(
-    (dialect: 'en-US' | 'en-GB') => {
-      if (!fs || !book) return;
-      const updated = { ...book, dialect };
-      setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
-    },
-    [fs, book],
-  );
-  const onOff = useCallback(
-    (proofreadOff: string[]) => {
-      if (!fs || !book) return;
-      const updated = { ...book, proofreadOff };
-      setBook(updated);
-      saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
-    },
-    [fs, book],
-  );
+  // Through updateBook, so a change made a moment before isn't written back over with the old settings.
+  const onDialect = useCallback((dialect: 'en-US' | 'en-GB') => updateBook({ dialect }), [fs, book]);
+  const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
   const resting = useMemo(() => rulesOff(chosen), [chosen]);
   const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
 
@@ -1776,14 +1802,13 @@ export function App() {
       return;
     }
     if (!id) {
-      // ⌘= and ⌘− zoom the page; ⌘0 goes back to 100%.
+      // ⌘= and ⌘− zoom the page as far as the zoom pop-up goes; ⌘0 goes back to 100%.
       if (!(IS_MAC ? e.metaKey : e.ctrlKey) || e.altKey || !book || manuscript) return;
-      const steps = ZOOMS.filter((z) => z > 0);
-      const now = pageOf(book.page).zoom || 100;
-      const zoom = e.key === '=' || e.key === '+' ? steps.find((z) => z > now) : e.key === '-' ? [...steps].reverse().find((z) => z < now) : e.key === '0' ? 100 : null;
-      if (zoom === null) return;
+      const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : null;
+      if (dir === null && e.key !== '0') return;
       e.preventDefault();
-      if (zoom !== undefined) updateBook({ page: { ...pageOf(book.page), zoom } });
+      if (dir === null) updateBook({ page: { ...pageOf(book.page), zoom: 100 } });
+      else zoomPage.current(dir);
       return;
     }
     e.preventDefault();
@@ -1800,6 +1825,29 @@ export function App() {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
+  const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});
+  const zoomOk = useRef(false);
+  zoomOk.current = !!book && !manuscript && !settingsAt;
+  // Ctrl and the mouse wheel (or a pinch on a trackpad) zoom the page too, instead of the whole window.
+  useEffect(() => {
+    let spun = 0;
+    let last = 0;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      if (!zoomOk.current) return;
+      // A wheel notch is about 100; a pinch comes in many small turns, gathered up until they make a step.
+      if (e.timeStamp - last > 300) spun = 0;
+      last = e.timeStamp;
+      spun += e.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? e.deltaY : e.deltaY * 40;
+      if (Math.abs(spun) < 50) return;
+      zoomPage.current(spun < 0 ? 1 : -1);
+      spun = 0;
+    };
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWheel);
   }, []);
   const toggleFocus = () => {
     const focus = !getSettings().focus;
@@ -2047,12 +2095,14 @@ export function App() {
     return () => watch.disconnect();
   }, []);
   const pageSize = PAGE_SIZES[page.size];
-  // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft.
-  const asDraft = page.view === 'draft' || (deskWidth > 0 && deskWidth < 640);
-  const pageZoom = asDraft && (page.zoom === 0 || deskWidth < 640) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
-  // The right panel lies over the desk's edge; the page moves left only as far as it must to stay clear of it.
-  const pageWidth = asDraft ? Math.min(deskWidth - 48, 760 * pageZoom) : pageSize.width * 96 * pageZoom;
-  const clearOfPanel = drawerOpen && deskWidth > 0 && window.innerWidth > 900 ? Math.max(0, Math.min(2 * (336 - (deskWidth - pageWidth) / 2), deskWidth - 48 - pageWidth)) : 0;
+  // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft. A side panel takes
+  // its own column beside the desk, but opening one shouldn't switch the page between views.
+  const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? DRAWER_WIDTH : 0;
+  const small = deskWidth > 0 && deskWidth + panelColumn < 640;
+  const asDraft = page.view === 'draft' || small;
+  const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
+  const fittedZoom = Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100);
+  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || fittedZoom, dir) } });
   const pageStyle =
     asDraft
       ? { zoom: pageZoom }
@@ -2060,7 +2110,8 @@ export function App() {
 
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
@@ -2071,7 +2122,7 @@ export function App() {
             </svg>
           </button>
           <Logo />
-          <span className="brand">Cookbook</span>
+          <span className="brand">cookbook</span>
           <span className="crumb">
             <button
               className="crumb-book"
@@ -2122,6 +2173,7 @@ export function App() {
       )}
 
       <nav
+        ref={shelfRef}
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
         aria-label="Shelf"
         onDragOver={(e) => {
@@ -2165,14 +2217,20 @@ export function App() {
           recipes={recipes}
         />
       </nav>
+      <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
       {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
 
-      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk} style={clearOfPanel > 0 ? { paddingRight: 24 + clearOfPanel } : undefined}>
+      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         <UpdateBanner beforeRestart={saveEverything} />
         {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
+          <div role="alert" className="error" title={error}>
+            <span>{error.replace(/ \([^]*\)$/, '')}</span>
+            <button className="icon-btn" aria-label="Dismiss" onClick={() => setError(null)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         )}
         {manuscript && fs ? (
           <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
@@ -2204,7 +2262,7 @@ export function App() {
           )}
           <div className="page-row">
           {doc && path ? (
-            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
+            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
               <PageEditor
                 initialBody={doc.body}
                 undoLog={undoLog}
@@ -2274,7 +2332,6 @@ export function App() {
           {seasoningsOpen && doc && (
             <Seasonings
               editor={editor}
-              pageId={doc.id}
               proof={proof}
               chosen={chosen}
               onChosen={(next) => setSeasonings({ chosen: next })}
@@ -2446,17 +2503,25 @@ export function App() {
           request={goalsRequest}
         />
         <span className="footer-end">
+          {settings.focus && (
+            <button className="study-exit" title={`Leave Study (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
+              Study
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          )}
           {doc && (
             <ZoomControl
               zoom={page.zoom}
-              fitted={Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100)}
+              fitted={fittedZoom}
               label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
               onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
             />
           )}
-          <span className={`saved${dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
+          <span className={`saved${saveFailed ? ' is-failed' : dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
             <span className="saved-dot" aria-hidden="true" />
-            {dirty ? 'Saving…' : 'Saved'}
+            {saveFailed ? 'Not saved' : dirty ? 'Saving…' : 'Saved'}
           </span>
           <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

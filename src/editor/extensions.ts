@@ -7,14 +7,17 @@ import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
 import { type Mark as PMMark, type NodeType } from '@tiptap/pm/model';
 import { liftListItem } from '@tiptap/pm/schema-list';
-import { Plugin, Selection, TextSelection, type Transaction } from '@tiptap/pm/state';
+import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
 import { type AppSettings, getSettings } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
+import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
+import { PX_PER_PT, darkPageColor, fontStack } from '../styles/styles';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
+import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
 import { DialogueFocus, Footnote, Note, type SeasoningsRequest, insertFootnote } from './seasonings';
 
@@ -61,6 +64,19 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         parseHTML: (el) => el.getAttribute('data-style') || TAG_STYLE[el.tagName] || (el.closest('blockquote') ? QUOTE_STYLE : BODY_STYLE),
         renderHTML: (attrs) => (attrs.style && attrs.style !== BODY_STYLE ? { 'data-style': attrs.style } : {}),
       },
+      // Alignment and spacing set on this paragraph by hand, over its style's.
+      align: {
+        default: null,
+        keepOnSplit: true,
+        parseHTML: (el) => el.getAttribute('data-align'),
+        renderHTML: (attrs) => (attrs.align ? { 'data-align': attrs.align, style: `text-align: ${attrs.align}` } : {}),
+      },
+      lineSpacing: {
+        default: null,
+        keepOnSplit: true,
+        parseHTML: (el) => Number(el.getAttribute('data-spacing')) || null,
+        renderHTML: (attrs) => (attrs.lineSpacing ? { 'data-spacing': attrs.lineSpacing, style: `line-height: ${attrs.lineSpacing}` } : {}),
+      },
     };
   },
   parseHTML() {
@@ -85,8 +101,11 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
             return true;
           });
         }
-        const next = this.options.nextStyle($from.parent.attrs.style as string);
-        return editor.chain().splitBlock().updateAttributes(this.name, { style: next }).run();
+        const style = $from.parent.attrs.style as string;
+        const next = this.options.nextStyle(style);
+        // A new paragraph in the same style keeps its alignment and spacing, as in Word; a heading's don't carry into Body.
+        const reset = next === style ? {} : { align: null, lineSpacing: null };
+        return editor.chain().splitBlock().updateAttributes(this.name, { style: next, ...reset }).run();
       },
     };
   },
@@ -125,6 +144,152 @@ export const CharStyle = Mark.create({
     return ['span', mergeAttributes(HTMLAttributes), 0];
   },
 });
+
+/**
+ * Font, size and colour set on words by hand (see format.ts). One mark holds
+ * all three, so setting one keeps the others.
+ */
+export const TextStyle = Mark.create({
+  name: 'textStyle',
+  addAttributes() {
+    return {
+      font: { default: null, parseHTML: (el) => el.getAttribute('data-font') || null, renderHTML: () => ({}) },
+      size: { default: null, parseHTML: (el) => Number(el.getAttribute('data-size')) || null, renderHTML: () => ({}) },
+      color: { default: null, parseHTML: (el) => el.getAttribute('data-color') || null, renderHTML: () => ({}) },
+    };
+  },
+  parseHTML() {
+    // Only Cookbook's own; pasted fonts and colours from other apps are left behind.
+    return [{ tag: 'span[data-format]' }];
+  },
+  renderHTML({ mark }) {
+    const { font, size, color } = textFormatOf(mark.attrs);
+    const css: string[] = [];
+    const data: Record<string, string> = { 'data-format': '' };
+    if (font) {
+      css.push(`font-family: ${fontStack(font)}`);
+      data['data-font'] = font;
+    }
+    if (size) {
+      css.push(`font-size: ${size * PX_PER_PT}px`);
+      data['data-size'] = String(size);
+    }
+    if (color) {
+      // The page's stylesheet picks between these, so the colour reads on a dark page too.
+      css.push(`--ink: ${color}; --ink-dark: ${darkPageColor(color)}`);
+      data['data-color'] = color;
+    }
+    return ['span', { ...data, style: css.join('; ') }, 0];
+  },
+});
+
+type Unset<T> = { [K in keyof T]?: T[K] | null };
+
+/**
+ * Sets font, size or colour on the selected words, or on what is typed next
+ * when nothing is selected. Null takes that part off, back to the style's.
+ */
+export function setTextFormat(editor: Editor, changes: Unset<TextFormat>): void {
+  const { state } = editor;
+  const type = state.schema.marks.textStyle!;
+  const { from, to, empty, $from } = state.selection;
+  const tr = state.tr;
+  const merged = (mark?: PMMark) => {
+    const attrs = { font: null, size: null, color: null, ...mark?.attrs, ...changes };
+    return attrs.font || attrs.size || attrs.color ? type.create(attrs) : null;
+  };
+  if (empty) {
+    const current = state.storedMarks ?? $from.marks();
+    const next = merged(current.find((m) => m.type === type));
+    const rest = current.filter((m) => m.type !== type);
+    tr.setStoredMarks(next ? [...rest, next] : rest);
+  } else {
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isText) return;
+      const start = Math.max(pos, from);
+      const end = Math.min(pos + node.nodeSize, to);
+      const next = merged(node.marks.find((m) => m.type === type));
+      if (next) tr.addMark(start, end, next);
+      else tr.removeMark(start, end, type);
+    });
+  }
+  editor.view.dispatch(tr);
+}
+
+/** The top-level paragraphs the selection touches, with their positions. */
+function selectedParagraphs(editor: Editor): { pos: number; attrs: Record<string, unknown> }[] {
+  const { doc, selection } = editor.state;
+  const out: { pos: number; attrs: Record<string, unknown> }[] = [];
+  const first = selection.$from.depth >= 1 ? selection.$from.before(1) : 0;
+  const last = selection.$to.depth >= 1 ? selection.$to.before(1) : first;
+  doc.forEach((node, pos) => {
+    if (pos >= first && pos <= last && node.type.name === 'paragraph') out.push({ pos, attrs: node.attrs });
+  });
+  return out;
+}
+
+/** Sets alignment or spacing on the paragraphs the selection touches. Null goes back to the style's. */
+export function setParagraphFormat(editor: Editor, changes: Unset<ParagraphFormat>): void {
+  const tr = editor.state.tr;
+  for (const { pos, attrs } of selectedParagraphs(editor)) tr.setNodeMarkup(pos, undefined, { ...attrs, ...changes });
+  if (tr.docChanged) editor.view.dispatch(tr);
+}
+
+/**
+ * After a style has taken in what was set by hand in a paragraph, takes those
+ * values off the paragraph, so it follows the style again. Other words keep theirs.
+ */
+export function dropTakenFormat(editor: Editor, pos: number, taken: TextFormat & ParagraphFormat): void {
+  const { state } = editor;
+  const type = state.schema.marks.textStyle!;
+  const node = state.doc.nodeAt(pos);
+  if (!node) return;
+  const tr = state.tr;
+  const attrs = { ...node.attrs };
+  if (taken.align) attrs.align = null;
+  if (taken.lineSpacing) attrs.lineSpacing = null;
+  tr.setNodeMarkup(pos, undefined, attrs);
+  node.descendants((child, offset) => {
+    const mark = child.isText ? child.marks.find((m) => m.type === type) : undefined;
+    if (!mark) return;
+    const next = { ...mark.attrs };
+    for (const key of ['font', 'size', 'color'] as const) if (taken[key] && next[key] === taken[key]) next[key] = null;
+    const from = pos + 1 + offset;
+    if (next.font || next.size || next.color) tr.addMark(from, from + child.nodeSize, type.create(next));
+    else tr.removeMark(from, from + child.nodeSize, type);
+  });
+  editor.view.dispatch(tr);
+}
+
+/** Takes off everything set by hand in the selection, leaving the styles. */
+export function clearFormatting(editor: Editor): void {
+  const { state } = editor;
+  const { from, to, empty } = state.selection;
+  const tr = state.tr;
+  const type = state.schema.marks.textStyle!;
+  if (empty) tr.setStoredMarks((state.storedMarks ?? state.selection.$from.marks()).filter((m) => m.type !== type));
+  else tr.removeMark(from, to, type);
+  for (const { pos, attrs } of selectedParagraphs(editor)) if (attrs.align || attrs.lineSpacing) tr.setNodeMarkup(pos, undefined, { ...attrs, align: null, lineSpacing: null });
+  editor.view.dispatch(tr);
+}
+
+/** One format part across the selection: its value if it's the same everywhere, 'mixed' if not, null if unset. */
+export function textFormatAt(editor: Editor): { [K in keyof TextFormat]-?: NonNullable<TextFormat[K]> | null | 'mixed' } {
+  const { state } = editor;
+  const type = state.schema.marks.textStyle!;
+  const { from, to, empty, $from } = state.selection;
+  const formats: TextFormat[] = [];
+  if (empty) formats.push(textFormatOf((state.storedMarks ?? $from.marks()).find((m) => m.type === type)?.attrs));
+  else
+    state.doc.nodesBetween(from, to, (node) => {
+      if (node.isText) formats.push(textFormatOf(node.marks.find((m) => m.type === type)?.attrs));
+    });
+  const one = <K extends keyof TextFormat>(key: K): NonNullable<TextFormat[K]> | null | 'mixed' => {
+    const values = new Set(formats.map((f) => f[key] ?? null));
+    return values.size > 1 ? 'mixed' : ([...values][0] ?? null);
+  };
+  return { font: one('font'), size: one('size'), color: one('color') };
+}
 
 /**
  * The page's own shortcuts, which the writer can change in Settings: notes,
@@ -304,8 +469,11 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,
     CharStyle,
+    // After CharStyle, so it sits inside character styles and its colour and size show.
+    TextStyle,
     PageShortcuts.configure({ onRequest }),
     ListKeys,
+    PageKeys,
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
     Bold,
@@ -348,15 +516,6 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     ),
     TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
     Table.extend({
-      addKeyboardShortcuts() {
-        // The browser's own Ctrl+End stops short of a table at the end of the scene.
-        const go = (end: boolean) => ({ editor }: { editor: Editor }) => {
-          const { doc, tr } = editor.state;
-          editor.view.dispatch(tr.setSelection(end ? Selection.atEnd(doc) : Selection.atStart(doc)).scrollIntoView());
-          return true;
-        };
-        return { ...this.parent?.(), 'Mod-End': go(true), 'Mod-Home': go(false) };
-      },
       addCommands() {
         return {
           ...this.parent?.(),

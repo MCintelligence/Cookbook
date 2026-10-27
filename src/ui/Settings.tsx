@@ -6,7 +6,8 @@ import { MARGINS, PAGE_SIZES, type PageSettings, pageOf } from '../storage/page'
 import { ZoomSlider } from './ZoomControl';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
-import { BODY, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
+import { FontOptions, pickFont } from './FontOptions';
+import { BODY, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 
 export type SettingsSection = 'general' | 'appearance' | 'writing' | 'saving' | 'shortcuts' | 'updates' | 'page' | 'styles' | 'proofreader' | 'goals';
 
@@ -676,10 +677,8 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
               </label>
               <label>
                 <span className="set-row-help">Font</span>
-                <select className="set-sel" value={r.font} onChange={(e) => edit({ font: e.target.value })}>
-                  {FONTS.map((f) => (
-                    <option key={f}>{f}</option>
-                  ))}
+                <select className="set-sel" value={r.font} onChange={(e) => pickFont(e.target.value, (font) => edit({ font }))}>
+                  <FontOptions current={r.font} />
                 </select>
               </label>
               <label>

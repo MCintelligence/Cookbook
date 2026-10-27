@@ -1,10 +1,11 @@
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
 import { dropTakenFormat, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
 import { ColourWheel } from './ColourWheel';
+import { askForSystemFonts, useFontList } from '../systemFonts';
 import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
 interface Props {
@@ -70,6 +71,15 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
   const text = at?.text ?? { font: null, size: null, color: null };
   const paragraph = at?.paragraph ?? {};
   const font = text.font === 'mixed' ? '' : (text.font ?? style.font);
+  // Cookbook's own fonts, then the ones installed on this computer.
+  const installed = useFontList();
+  const fonts = useMemo(
+    () => [
+      ...FONTS.map((f, i) => ({ id: f, name: f, heading: i === 0 && installed.system.length ? 'Cookbook fonts' : undefined })),
+      ...installed.system.map((f, i) => ({ id: f, name: f, heading: i === 0 ? 'On this computer' : undefined })),
+    ],
+    [installed.system],
+  );
   const size = text.size === 'mixed' || text.size === null ? style.size : text.size;
   const color = text.color === 'mixed' || text.color === null ? style.color : text.color;
   const align = paragraph.align ?? style.align;
@@ -149,11 +159,13 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
         listLabel="Fonts"
         className="tb-font"
         title={onWords}
-        items={FONTS.map((f) => ({ id: f, name: f }))}
+        items={fonts}
         current={font}
         disabled={textDisabled}
-        missing={(typed) => `Cookbook has no font called “${typed}”.`}
+        actions={installed.canAsk ? [{ id: 'system', label: 'Show all fonts on this computer…' }] : []}
+        missing={(typed) => (installed.complete ? `No font called “${typed}” is on this computer.` : `Cookbook has no font called “${typed}”.`)}
         onPick={(font, keepFocus) => words({ font }, keepFocus)}
+        onAction={() => void askForSystemFonts()}
         onCancel={() => editor?.view.focus()}
       />
       <NumberBox
@@ -364,9 +376,11 @@ function OpenList({ label, open, disabled, input, onToggle }: { label: string; o
 interface Named {
   id: string;
   name: string;
+  /** Starts a group in the full list, under this heading. */
+  heading?: string;
 }
 
-type Choice = { kind: 'item'; id: string; name: string } | { kind: 'create'; name: string } | { kind: 'action'; id: string; label: string };
+type Choice = { kind: 'item'; id: string; name: string; heading?: string } | { kind: 'create'; name: string } | { kind: 'action'; id: string; label: string };
 
 /**
  * A box of names, like Word's Style and Font boxes: pick from the list, or
@@ -436,7 +450,7 @@ function NameBox({
   });
 
   const matches = typed === null ? items : matchStyles(items, typed);
-  const choices: Choice[] = matches.map((s) => ({ kind: 'item', id: s.id, name: s.name }));
+  const choices: Choice[] = matches.map((s) => ({ kind: 'item', id: s.id, name: s.name, heading: typed === null ? s.heading : undefined }));
   if (onCreate && typed !== null && typed.trim() && !matches.length) choices.push({ kind: 'create', name: typed.trim() });
   if (typed === null) choices.push(...actions.map((a) => ({ kind: 'action' as const, ...a })));
 
@@ -518,7 +532,12 @@ function NameBox({
       {open && (
         <ListPopup id={listId} label={listLabel}>
           {typed !== null && !matches.length && <div className="tb-list-note">{missing(typed.trim())}</div>}
-          {choices.map((c, i) => (
+          {choices.map((c, i) => [
+            c.kind === 'item' && c.heading && (
+              <div key={`\u0000heading-${i}`} className="tb-list-heading" role="presentation">
+                {c.heading}
+              </div>
+            ),
             <button
               key={c.kind === 'create' ? '\u0000create' : c.id}
               id={`${listId}-${i}`}
@@ -530,8 +549,8 @@ function NameBox({
               onClick={() => choose(c)}
             >
               {c.kind === 'item' ? c.name : c.kind === 'create' ? `New style called “${c.name}”` : c.label}
-            </button>
-          ))}
+            </button>,
+          ])}
         </ListPopup>
       )}
     </div>

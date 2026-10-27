@@ -26,3 +26,5 @@ tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 # Reads the clipboard for the right-click Paste, which the webview would otherwise ask permission for.
 arboard = { version = "3.6", default-features = false, features = ["wayland-data-control"] }
+# Lists the fonts installed on the computer for the font menus.
+fontdb = "0.23"

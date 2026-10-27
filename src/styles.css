@@ -194,6 +194,7 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .tb-list button[aria-selected='true'] { background: var(--sidebar); }
 .tb-list .tb-list-current { color: var(--accent); }
 .tb-list .tb-list-action { color: var(--muted); }
+.tb-list-heading { padding: 8px 10px 2px; font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .tb-list .tb-list-first-action { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
 .tb-number-list { min-width: 0; }
 .tb-number-list .tb-list-note { max-width: 120px; }

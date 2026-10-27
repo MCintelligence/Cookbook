@@ -83,6 +83,29 @@ mod menu {
     }
 }
 
+/// What the clipboard holds, for Paste in the right-click menu. Reading it here
+/// rather than in the page keeps the webview from asking the writer's permission,
+/// which on Windows also stops the menu pasting at all once it is refused.
+#[derive(serde::Serialize)]
+struct ClipboardContents {
+    text: Option<String>,
+    html: Option<String>,
+}
+
+#[tauri::command]
+fn read_clipboard() -> Result<ClipboardContents, String> {
+    #[cfg(desktop)]
+    {
+        let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+        let html = clipboard.get().html().ok().filter(|h| !h.trim().is_empty());
+        let text = clipboard.get_text().ok();
+        Ok(ClipboardContents { text, html })
+    }
+    // The phones read it in the page instead.
+    #[cfg(not(desktop))]
+    Err("not on this device".into())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -90,6 +113,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
+        .invoke_handler(tauri::generate_handler![read_clipboard])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;
@@ -107,3 +131,4 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running Cookbook");
 }
+

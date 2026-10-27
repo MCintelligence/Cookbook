@@ -33,6 +33,14 @@ export const MARGINS: Record<Margins, { label: string; inches: number }> = {
 export const ZOOMS = [75, 100, 125, 150, 0] as const;
 export const MIN_ZOOM = 50;
 export const MAX_ZOOM = 200;
+/** How far one press of ⌘=, ⌘−, a wheel notch or the zoom pop-up's − and + moves. */
+export const ZOOM_STEP = 10;
+
+/** The next zoom in (`1`) or out (`-1`) from `now`, on the 10% steps and inside the limits. */
+export function zoomStep(now: number, dir: 1 | -1): number {
+  const next = dir > 0 ? Math.floor(now / ZOOM_STEP) * ZOOM_STEP + ZOOM_STEP : Math.ceil(now / ZOOM_STEP) * ZOOM_STEP - ZOOM_STEP;
+  return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next));
+}
 
 export const DEFAULT_PAGE: PageSettings = { size: 'letter', margins: 'normal', view: 'page', zoom: 100 };
 

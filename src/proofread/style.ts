@@ -3,7 +3,7 @@ import { type Issue, words } from './check';
 
 /**
  * Style and readability: Hemingway-style highlights (adverbs, simpler words,
- * passive voice, hard sentences, grade level) and ProWritingAid-style ones
+ * passive voice, grade level) and ProWritingAid-style ones
  * (crutch words, sticky sentences, echoes, clichés, redundancies). All are
  * suggestions, never mistakes, and are only shown while reviewing.
  */
@@ -12,8 +12,6 @@ export const STYLE_RULES: { id: string; label: string; why: string }[] = [
   { id: 'adverb', label: 'Adverbs', why: 'Adverbs often prop up a weak verb. “Ran quickly” is “dashed”. Keep the ones that earn their place.' },
   { id: 'simpler-word', label: 'Simpler words', why: 'A shorter, plainer word usually says the same thing with less effort for the reader.' },
   { id: 'passive', label: 'Passive voice', why: 'In the passive voice the doer of the action comes last or not at all. Saying who did what is usually livelier.' },
-  { id: 'hard-sentence', label: 'Hard sentences', why: 'Long sentences with long words are hard to follow. Splitting it, or trimming it, will help.' },
-  { id: 'very-hard-sentence', label: 'Very hard sentences', why: 'A reader is likely to lose the thread of this sentence. Try breaking it in two.' },
   { id: 'sticky-sentence', label: 'Sticky sentences', why: 'Almost half of this sentence is glue words (the, of, to, it, that…), which carry little meaning. Cut some to tighten it.' },
   { id: 'crutch-word', label: 'Crutch words', why: 'Words like “just”, “really” and “suddenly” creep into every draft and rarely add anything. Speech is left alone, since that is how people talk.' },
   { id: 'echo', label: 'Echoes', why: 'The same word twice in quick succession can sound like an echo. Change one if it wasn’t on purpose.' },
@@ -141,9 +139,6 @@ export function textGrade(paragraphs: string[]): { grade: number; words: number;
   return { grade: count > 0 ? Math.max(1, Math.round(gradeLevel(letters, count, total))) : 0, words: count, sentences: total };
 }
 
-const HARD = 10;
-const VERY_HARD = 14;
-const MIN_HARD_WORDS = 14;
 const ECHO_WINDOW = 30;
 
 function issue(from: number, to: number, rule: string, message: string, suggestions: string[] = []): Issue {
@@ -158,10 +153,7 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   const out: Issue[] = [];
 
   for (const s of sentences(text)) {
-    const grade = gradeLevel(s.letters, s.words, 1);
-    if (s.words >= MIN_HARD_WORDS && grade >= VERY_HARD) out.push(issue(s.from, s.to, 'very-hard-sentence', 'This sentence is very hard to read.'));
-    else if (s.words >= MIN_HARD_WORDS && grade >= HARD) out.push(issue(s.from, s.to, 'hard-sentence', 'This sentence is hard to read.'));
-    else if (s.words >= 12) {
+    if (s.words >= 12) {
       const ws = words(text.slice(s.from, s.to));
       const glue = ws.filter((w) => GLUE.has(w.word.toLowerCase().replace(/’/g, "'"))).length;
       if (glue / ws.length >= 0.45) out.push(issue(s.from, s.to, 'sticky-sentence', `This sentence is sticky: ${Math.round((glue / ws.length) * 100)}% glue words.`));
@@ -197,6 +189,7 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   for (const m of text.matchAll(CLICHE_RE)) out.push(issue(m.index, m.index + m[0].length, 'cliche', `“${m[0]}” is a cliché.`));
   const open = unclosedQuote(text);
   if (open) out.push(open);
+  out.push(...strayCapitals(text, names));
 
   // Echoes: the same telling word again within a few words. Names, glue and
   // short words don't count, and nor does a word that starts a sentence in capitals.
@@ -213,7 +206,7 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
 
   // One issue per stretch of text: the more specific rules win over adverbs and crutch words.
   const order = ['redundancy', 'cliche', 'simpler-word', 'passive', 'crutch-word', 'adverb', 'echo'];
-  const sentenceRules = new Set(['hard-sentence', 'very-hard-sentence', 'sticky-sentence']);
+  const sentenceRules = new Set(['sticky-sentence']);
   const kept: Issue[] = [];
   for (const i of [...out].sort((a, b) => order.indexOf(a.rule) - order.indexOf(b.rule))) {
     if (!sentenceRules.has(i.rule) && kept.some((k) => !sentenceRules.has(k.rule) && i.from < k.to && i.to > k.from)) continue;
@@ -237,4 +230,25 @@ export function unclosedQuote(text: string): Issue | null {
   return { from, to: end, kind: 'grammar', rule: 'unclosed-quote', message: 'This quote is never closed.', suggestions: [`${text.slice(from, end)}”`] };
 }
 
-export const isSentenceRule = (rule: string) => rule === 'hard-sentence' || rule === 'very-hard-sentence' || rule === 'sticky-sentence';
+/**
+ * Capitals in the wrong place, as when Shift is held a moment too long
+ * (“MOnster”, “THe”) or Caps Lock is on (“mONSTER”). Acronyms with a plural
+ * (“DVDs”), degrees (“MSc”), short ones like “iOS” and the story's names are left alone.
+ */
+export function strayCapitals(text: string, names: string[] = []): Issue[] {
+  const known = new Set(names.flatMap((n) => n.split(/\s+/)));
+  const out: Issue[] = [];
+  for (const w of words(text)) {
+    if (known.has(w.word) || w.word.includes('-')) continue;
+    // One trailing small letter is usually a plural or a degree (“DVDs”, “MSc”); a vowel there is a word (“THe”).
+    const held = /^\p{Lu}{2,}(?:\p{Ll}{2,}|[aeiouy])$/u.test(w.word);
+    const locked = /^\p{Ll}\p{Lu}{3,}$/u.test(w.word);
+    if (!held && !locked) continue;
+    // Held Shift meant one capital; Caps Lock turned every letter over.
+    const fix = held ? w.word[0]! + w.word.slice(1).toLowerCase() : [...w.word].map((c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase())).join('');
+    out.push({ from: w.from, to: w.to, kind: 'grammar', rule: 'stray-capitals', message: `“${w.word}” has capitals in the wrong place.`, suggestions: [fix] });
+  }
+  return out;
+}
+
+export const isSentenceRule = (rule: string) => rule === 'sticky-sentence';

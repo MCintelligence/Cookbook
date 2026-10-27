@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeAt } from './zoom';
 
 export type MenuItem =
-  | { label: string; onPick: () => void; disabled?: boolean; danger?: boolean; hint?: string; checked?: boolean }
+  | { label: string; onPick: () => void; disabled?: boolean; danger?: boolean; hint?: string; checked?: boolean; icon?: ReactNode }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | { separator: true }
   | { heading: string };
@@ -157,6 +157,7 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
                     {item.checked ? '✓' : ''}
                   </span>
                 )}
+                {item.icon}
                 {item.label}
               </span>
               {item.hint && <span className="menu-hint">{item.hint}</span>}

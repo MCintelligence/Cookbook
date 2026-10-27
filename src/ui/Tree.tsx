@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 import { type TreeNode } from '../storage/book';
 import { LABELS, STATUSES, isCard } from '../storage/document';
 import { type CardSummary } from '../storage/index';
+import { StatusIcon } from './StatusIcon';
 import { placeAt } from './zoom';
 
 interface Props {
@@ -309,7 +310,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span className="tree-card-top">
-            {status && <span className={`status-dot status-${status.id}`} title={status.label} aria-label={status.label} role="img" />}
+            {status && <StatusIcon status={status.id} />}
             {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
             {card?.skipExport && <span className="tree-flag">Not exported</span>}

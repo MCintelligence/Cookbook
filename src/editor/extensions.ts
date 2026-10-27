@@ -7,7 +7,7 @@ import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
 import { type Mark as PMMark, type NodeType } from '@tiptap/pm/model';
 import { liftListItem } from '@tiptap/pm/schema-list';
-import { Plugin, Selection, TextSelection, type Transaction } from '@tiptap/pm/state';
+import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
 import { type AppSettings, getSettings } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
@@ -15,6 +15,7 @@ import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, 
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
+import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
 import { DialogueFocus, Footnote, Note, type SeasoningsRequest, insertFootnote } from './seasonings';
 
@@ -306,6 +307,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     CharStyle,
     PageShortcuts.configure({ onRequest }),
     ListKeys,
+    PageKeys,
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
     Bold,
@@ -348,15 +350,6 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     ),
     TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
     Table.extend({
-      addKeyboardShortcuts() {
-        // The browser's own Ctrl+End stops short of a table at the end of the scene.
-        const go = (end: boolean) => ({ editor }: { editor: Editor }) => {
-          const { doc, tr } = editor.state;
-          editor.view.dispatch(tr.setSelection(end ? Selection.atEnd(doc) : Selection.atStart(doc)).scrollIntoView());
-          return true;
-        };
-        return { ...this.parent?.(), 'Mod-End': go(true), 'Mod-Home': go(false) };
-      },
       addCommands() {
         return {
           ...this.parent?.(),

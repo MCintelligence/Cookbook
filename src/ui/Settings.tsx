@@ -173,6 +173,25 @@ export function Settings(props: Props) {
     box.current?.querySelector<HTMLElement>('.set-main h2')?.focus();
   }, [section]);
 
+  // Escape is heard from anywhere, not only from inside the dialog: a click on
+  // the background leaves the keyboard on the page itself, and Escape still
+  // has to close Settings from there.
+  const escape = useRef(() => {});
+  escape.current = () => (searching ? setQuery('') : onClose());
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !(e.target instanceof Node)) return;
+      const inside = box.current?.contains(e.target) ?? false;
+      // Something inside that took the Escape itself (a field, the shortcut recorder) keeps it,
+      // and an open menu closes first.
+      if ((inside && e.defaultPrevented) || (e.target instanceof Element && e.target.closest('.set-recording')) || document.querySelector('.menu')) return;
+      e.preventDefault();
+      escape.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const sections = searching ? [...APP_SECTIONS, ...BOOK_SECTIONS].map(([id]) => id) : [section];
   return (
     <div
@@ -181,13 +200,8 @@ export function Settings(props: Props) {
       aria-modal="true"
       aria-label="Settings"
       ref={box}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !e.defaultPrevented && !(e.target as Element).closest('.set-recording')) {
-          e.preventDefault();
-          if (searching) setQuery('');
-          else onClose();
-        }
-      }}
+      // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
+      tabIndex={-1}
     >
       <header className="set-top">
         <div className="set-brand">

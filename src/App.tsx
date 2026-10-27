@@ -98,7 +98,7 @@ import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
 import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
-import { type FoundIssue, applySuggestion, issueAt } from './proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
@@ -1050,7 +1050,7 @@ export function App() {
   const issueItems = async (issue: FoundIssue): Promise<MenuItem[]> => {
     const ed = editor;
     if (!ed) return [];
-    const fixes = issue.issue.suggestions.length > 0 || issue.issue.rule !== 'spelling' ? issue.issue.suggestions : await proof.suggest(issue.word).catch(() => []);
+    const fixes = issue.issue.suggestions.length > 0 || issue.issue.rule !== 'spelling' ? issue.issue.suggestions : await proof.suggest(issue.word, aroundIssue(ed.state.doc, issue)).catch(() => []);
     const label = RULE_GROUPS.flatMap((g) => g.rules).find((r) => r.id === issue.group)?.label;
     return [
       ...(fixes.length > 0
@@ -1684,7 +1684,8 @@ export function App() {
   const onDialect = useCallback((dialect: 'en-US' | 'en-GB') => updateBook({ dialect }), [fs, book]);
   const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
   const resting = useMemo(() => rulesOff(chosen), [chosen]);
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, onError: setError });
+  const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: indexVersion, onError: setError });
 
   // Daniel counts the spoken words in what he tracks, the open page as it is now and the rest as saved.
   const trackedKey = (seas?.tracked ?? []).join('\n');

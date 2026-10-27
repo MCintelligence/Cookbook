@@ -1,56 +1,84 @@
 import { type SeasoningId } from '../proofread/remarks';
 
-/** Each seasoning's face: a shaker with a look of its own. */
+/**
+ * Each seasoning as a line drawing in the current colour, with an outline
+ * of its own so they tell apart without colour or a name: Sam a salt shaker
+ * with a domed cap, Pete a barrel-shaped pepper grinder with a knob, turning
+ * and dropping pepper, Daniel a bottle leaning over, hiccuping, and Sally a
+ * chilli giving off heat, with lashes, a bow on her stem and a wink.
+ */
 export function Face({ id, size = 28 }: { id: SeasoningId; size?: number }) {
+  // Small faces get a heavier line so it stays a line.
+  const stroke = size >= 48 ? 2 : size >= 30 ? 2.6 : 3.2;
   return (
-    <svg className="face" width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
+    <svg
+      className="face"
+      width={size}
+      height={size}
+      viewBox="0 0 48 48"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={stroke}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       {id === 'sam' && (
         <>
-          <rect x="11" y="4" width="18" height="9" rx="4" fill="#cfd6dc" />
-          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#ffffff" stroke="#c8c8c3" strokeWidth="1.2" />
-          <circle cx="16" cy="23" r="1.7" fill="#1c1c1b" />
-          <circle cx="24" cy="23" r="1.7" fill="#1c1c1b" />
-          <path d="M13 19.5l4.5 1.5M27 19.5l-4.5 1.5" stroke="#1c1c1b" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M16 30q4-2.6 8 0" fill="none" stroke="#1c1c1b" strokeWidth="1.6" strokeLinecap="round" />
-          <circle cx="16" cy="8.5" r="1" fill="#6b6b67" />
-          <circle cx="20" cy="7.5" r="1" fill="#6b6b67" />
-          <circle cx="24" cy="8.5" r="1" fill="#6b6b67" />
+          <path d="M15 16a9 9 0 0 1 18 0z" />
+          <path d="M14 16h20v3.5H14z" />
+          <path d="M15 19.5 13.5 41a2 2 0 0 0 2 2.2h17a2 2 0 0 0 2-2.2L33 19.5" />
+          <g fill="currentColor" stroke="none">
+            <circle cx="20.5" cy="12" r="1.2" />
+            <circle cx="24" cy="10" r="1.2" />
+            <circle cx="27.5" cy="12" r="1.2" />
+          </g>
+          <path d="M18.5 26.5l4 1.6M29.5 26.5l-4 1.6" />
+          <path d="M20.5 31v.1M27.5 31v.1" />
+          <path d="M21 37.5q3-2.2 6 0" />
         </>
       )}
       {id === 'pete' && (
         <>
-          <rect x="11" y="4" width="18" height="9" rx="4" fill="#1c1c1b" />
-          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#7a4a2c" stroke="#5a3a26" strokeWidth="1.2" />
-          <circle cx="16" cy="23" r="1.7" fill="#fdfdfc" />
-          <circle cx="24" cy="23" r="1.7" fill="#fdfdfc" />
-          <path d="M13 18.5l4.5 2.5M27 18.5l-4.5 2.5" stroke="#fdfdfc" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M15 28q5 4.5 10 0z" fill="#fdfdfc" />
+          <circle cx="24" cy="4.5" r="2" />
+          <path d="M24 6.5v2" />
+          <path d="M15 15l3-6.5h12l3 6.5z" />
+          <path d="M17.5 15c-3 7.5-3 15 0 22.5M30.5 15c3 7.5 3 15 0 22.5" />
+          <path d="M16 37.5h16v3.5H16z" />
+          <path d="M9.5 8q-2.5 3.5 0 7M38.5 8q2.5 3.5 0 7" />
+          <g fill="currentColor" stroke="none">
+            <circle cx="20.5" cy="45" r="1.1" />
+            <circle cx="24.5" cy="46.5" r="1.1" />
+            <circle cx="28" cy="44.5" r="1.1" />
+          </g>
+          <path d="M19.5 20.5l3.5 2M28.5 20.5l-3.5 2" />
+          <path d="M21 25.5v.1M27 25.5v.1" />
+          <path d="M21.5 30.5h5" />
         </>
       )}
       {id === 'daniel' && (
         <>
-          <rect x="11" y="4" width="18" height="9" rx="4" fill="#6b2a3c" />
-          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#e9c3a8" stroke="#c8c8c3" strokeWidth="1.2" />
-          <path d="M14 23q2-1.8 4 0M22 22.4q2 1.8 4 0" fill="none" stroke="#1c1c1b" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M16 29.5q5 1.5 8-1.5" fill="none" stroke="#1c1c1b" strokeWidth="1.6" strokeLinecap="round" />
-          <circle cx="13.5" cy="27" r="1.8" fill="#e07a7a" />
-          <circle cx="26.5" cy="27" r="1.8" fill="#e07a7a" />
-          <circle cx="33" cy="9" r="1.6" fill="none" stroke="#8e8e89" strokeWidth="1" />
-          <circle cx="36" cy="5" r="1.1" fill="none" stroke="#8e8e89" strokeWidth="1" />
+          <g transform="rotate(14 24 30)">
+            <path d="M21 3.5h6v5h-6z" />
+            <path d="M21.5 8.5v6c0 4-5.5 5-5.5 10.5v16a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-16c0-5.5-5.5-6.5-5.5-10.5v-6" />
+            <path d="M16 28h16M16 39h16" />
+            <path d="M19.5 32.5q1.5-1.2 3 0M25.5 32.5h3" />
+            <path d="M21 36q3 1.8 6-.6" />
+          </g>
+          <circle cx="38.5" cy="12" r="2" />
+          <circle cx="42.5" cy="6" r="1.3" />
         </>
       )}
       {id === 'sally' && (
         <>
-          <rect x="11" y="4" width="18" height="9" rx="4" fill="#2f6b2a" />
-          <path d="M10 13h20l1.5 21a3 3 0 0 1-3 3h-17a3 3 0 0 1-3-3z" fill="#d6452b" stroke="#a8321e" strokeWidth="1.2" />
-          <circle cx="16" cy="8.5" r="1" fill="#9fd08a" />
-          <circle cx="20" cy="7.5" r="1" fill="#9fd08a" />
-          <circle cx="24" cy="8.5" r="1" fill="#9fd08a" />
-          <path d="M13.5 19.5l4 1.6M26.5 19.5l-4 1.6" stroke="#fff4ee" strokeWidth="1.6" strokeLinecap="round" />
-          <circle cx="16" cy="23.5" r="1.7" fill="#fff4ee" />
-          <circle cx="24" cy="23.5" r="1.7" fill="#fff4ee" />
-          <path d="M15 28.5q5 4 10 0" fill="none" stroke="#fff4ee" strokeWidth="1.7" strokeLinecap="round" />
-          <path d="M31 4q2 3 0 5q3-1 3-4q0-2-1.5-3q.5 1.5-1.5 2z" fill="#e8792f" />
+          <path d="M18 8.5c.5-2.5 2-4.5 4.5-5.5" />
+          <path d="M17.5 10.5c-2.5-3.5-7-3.5-6.5-.5.3 2 3.5 2.5 6.5.5zM17.5 10.5c2.5-3.5 7-3.5 6.5-.5-.3 2-3.5 2.5-6.5.5z" />
+          <path d="M7.5 18.5c1.5-4 5.5-6 10-5 2.5-1.5 5.5-1 7 1" />
+          <path d="M7.5 18.5c-.5 6 4 10.5 11 15.5 6 4.5 13 7.5 22 9.5-3.5-6.5-6.5-14-9-20.5-2-5-4-8-7-9" />
+          <path d="M33 5q-2 2.5 0 5t0 5M39 8.5q-2 2.5 0 5t0 5" />
+          <path d="M13 22.5v.1M11.8 20.6l-1.3-1.1M13.4 20.2l-.2-1.6" />
+          <path d="M19 22.5q1.9-1.7 3.8 0" />
+          <path d="M14.5 27.5q1.8-1.4 3.2-.2 1.4-1.2 3.2.2-3.2 3-6.4 0z" />
         </>
       )}
     </svg>

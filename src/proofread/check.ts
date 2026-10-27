@@ -177,23 +177,32 @@ export function checkSpelling(text: string, speller: Speller, names: string[], i
 const sorted = (w: string) => [...w.toLowerCase()].sort().join('');
 
 /**
+ * What one more edit costs against how well a suggestion fits (in natural
+ * logs): one letter further off, it has to be about 150 times likelier where
+ * it stands to come first.
+ */
+const EDIT_COST = 5;
+
+/**
  * Hunspell's suggestions, best first: the fewest edits (a swap of two
  * letters counts as one), then the same letters rearranged, so "teh" offers
  * "the" before "ten". Acronyms only for words in capitals, and names after
- * ordinary words when the word is in lower case.
+ * ordinary words when the word is in lower case. With `fit` (see
+ * context.ts), how well each suggestion fits the words around it is weighed
+ * against its edits, so "the stroe was" offers "store" before "strobe".
  */
-export function rankSuggestions(word: string, suggestions: string[], limit = 6): string[] {
+export function rankSuggestions(word: string, suggestions: string[], limit = 6, fit?: (suggestion: string) => number): string[] {
   const shouting = word.length > 1 && word === word.toUpperCase();
   const lower = word === word.toLowerCase();
   return suggestions
     .filter((s) => shouting || !(s.length > 1 && s === s.toUpperCase()))
-    .map((s, i) => ({
-      s,
-      i,
-      cost: editDistance(word.toLowerCase(), s.toLowerCase()),
-      anagram: sorted(s) === sorted(word) ? 0 : 1,
-      name: lower && s !== s.toLowerCase() ? 1 : 0,
-    }))
+    .map((s, i) => {
+      const edits = editDistance(word.toLowerCase(), s.toLowerCase());
+      const anagram = sorted(s) === sorted(word) ? 0 : 1;
+      // Letters typed in the wrong order are the likeliest slip, so they count as half an edit against the fit.
+      const cost = fit ? EDIT_COST * (edits - (1 - anagram) / 2) - fit(s) : edits;
+      return { s, i, cost, anagram, name: lower && s !== s.toLowerCase() ? 1 : 0 };
+    })
     .sort((a, b) => a.cost - b.cost || a.anagram - b.anagram || a.name - b.name || a.i - b.i)
     .slice(0, limit)
     .map((r) => r.s);

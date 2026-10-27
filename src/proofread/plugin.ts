@@ -7,6 +7,7 @@ import { type Issue } from './check';
 import { type Hiding, type IssueKeys, isHidden, keysOf } from './rules';
 import { isSentenceRule } from './style';
 import { type Checker } from './client';
+import { type Around } from './context';
 
 /**
  * The proofreader in the editor. Each paragraph's text is checked in the
@@ -302,6 +303,19 @@ export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const here = (ps?.set.find(pos, pos, isIssue) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
   const d = here[0];
   return d ? found(d) : null;
+}
+
+const AROUND = 60;
+
+/** The text on either side of an issue within its paragraph, for suggestions that fit it. */
+export function aroundIssue(doc: PMNode, at: Pick<FoundIssue, 'from' | 'to'>): Around | undefined {
+  if (at.to > doc.content.size) return undefined;
+  const $from = doc.resolve(at.from);
+  if (!$from.parent.isTextblock || at.to > $from.end()) return undefined;
+  return {
+    before: doc.textBetween(Math.max($from.start(), at.from - AROUND), at.from, '\n', '\n'),
+    after: doc.textBetween(at.to, Math.min($from.end(), at.to + AROUND), '\n', '\n'),
+  };
 }
 
 /** Puts a suggestion in place of an issue, keeping the text's character styles. */

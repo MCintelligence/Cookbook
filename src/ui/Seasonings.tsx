@@ -82,13 +82,9 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
           <div className="sub-h">Pick your seasonings</div>
           <div className="pick">
             {SEASONINGS.map((s) => (
+              // No box: the drawing is grey until picked, then the accent colour.
               <button key={s.id} className="tile" aria-pressed={chosen.includes(s.id)} onClick={() => toggle(s.id)}>
-                {chosen.includes(s.id) && (
-                  <span className="tile-tick" aria-hidden="true">
-                    ✓
-                  </span>
-                )}
-                <Face id={s.id} />
+                <Face id={s.id} size={56} />
                 <span className="tile-name">{s.name}</span>
                 <span className="tile-role">{s.role}</span>
               </button>
@@ -215,7 +211,7 @@ function Bubble({ id, text, onRemove }: { id: SeasoningId; text: string; onRemov
 
 /** One issue: the character's remark, the words around it, and the same two buttons every time. */
 function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIssue; proof: Proofreader; onMenu?: (issue: FoundIssue, x: number, y: number) => void }) {
-  const suggestions = useSuggestions(issue, proof);
+  const suggestions = useSuggestions(editor, issue, proof);
   const fix = suggestions?.[0];
   const sentence = issue.word.length > 40;
   return (

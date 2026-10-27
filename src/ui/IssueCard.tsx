@@ -1,27 +1,30 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
-import { type FoundIssue, applySuggestion, issueAt } from '../proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from '../proofread/plugin';
 import { SEASONINGS, fixText, ownerOf, remark } from '../proofread/remarks';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
 import { placeAt } from './zoom';
 
-/** The replacements for an issue: a near-miss name's own, or the dictionary's, asked for only when shown. */
-export function useSuggestions(issue: FoundIssue | null, proof: Proofreader): string[] | null {
+/** The replacements for an issue: a near-miss name's own, or the dictionary's in the order that fits the words around it, asked for only when shown. */
+export function useSuggestions(editor: Editor | null, issue: FoundIssue | null, proof: Proofreader): string[] | null {
   const [found, setFound] = useState<string[] | null>(null);
+  const around = editor && issue?.issue.rule === 'spelling' ? aroundIssue(editor.state.doc, issue) : undefined;
+  // Only the words nearby matter, so typing elsewhere doesn't ask again.
+  const aroundKey = around ? `${around.before}\u0000${around.after}` : '';
   useEffect(() => {
     setFound(null);
     if (!issue) return;
     if (issue.issue.suggestions.length > 0 || issue.issue.rule !== 'spelling') return setFound(issue.issue.suggestions);
     let live = true;
-    proof.suggest(issue.word).then(
+    proof.suggest(issue.word, around).then(
       (s) => live && setFound(s),
       () => live && setFound([]),
     );
     return () => {
       live = false;
     };
-  }, [issue?.word, issue?.issue.rule, issue?.issue.suggestions.join('\n')]);
+  }, [issue?.word, aroundKey, issue?.issue.rule, issue?.issue.suggestions.join('\n')]);
   return found;
 }
 
@@ -77,7 +80,7 @@ export function IssueCard({ editor, proof }: { editor: Editor | null; proof: Pro
 
 /** What the card says: whose issue it is, their remark, the fix as text, and the same buttons every time. */
 function IssueBody({ editor, issue, proof, box, pos, onDone }: { editor: Editor; issue: FoundIssue; proof: Proofreader; box: React.RefObject<HTMLDivElement | null>; pos: { left: number; top: number } | null; onDone: () => void }) {
-  const suggestions = useSuggestions(issue, proof);
+  const suggestions = useSuggestions(editor, issue, proof);
   const owner = ownerOf(issue.issue);
   const [fix, ...others] = suggestions ?? [];
   const done = (fn: () => void) => () => {

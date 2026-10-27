@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Issue } from './check';
-import { SPICE, fixText, gradeRemark, ownerOf, remark, rulesOff, spiceOf, talkRemark } from './remarks';
+import { SPICE, fixText, ownerOf, remark, rulesOff, spiceOf, talkRemark } from './remarks';
 import { strayCapitals, unclosedQuote } from './style';
 
 const issue = (kind: Issue['kind'], rule: string, message = ''): Issue => ({ from: 0, to: 1, kind, rule, message, suggestions: [] });
@@ -8,7 +8,7 @@ const issue = (kind: Issue['kind'], rule: string, message = ''): Issue => ({ fro
 describe('seasonings', () => {
   it('hands each issue to the character who looks after it', () => {
     expect(ownerOf(issue('spelling', 'spelling'))).toBe('sam');
-    expect(ownerOf(issue('style', 'hard-sentence'))).toBe('sally');
+    expect(ownerOf(issue('style', 'sticky-sentence'))).toBe('sally');
     expect(ownerOf(issue('style', 'adverb'))).toBe('sally');
     expect(ownerOf(issue('style', 'harper-style'))).toBe('sally');
     expect(ownerOf(issue('grammar', 'stray-capitals'))).toBe('pete');
@@ -18,7 +18,7 @@ describe('seasonings', () => {
   it('switches off the checks of characters nobody picked', () => {
     const off = rulesOff(['pete']);
     expect(off).toContain('spelling');
-    expect(off).toContain('hard-sentence');
+    expect(off).toContain('sticky-sentence');
     expect(off).toContain('adverb');
     expect(off).not.toContain('grammar');
     expect(off).not.toContain('stray-capitals');
@@ -35,7 +35,6 @@ describe('seasonings', () => {
 
   it('turns the grade into heat, with most fiction at Medium', () => {
     expect([2, 4, 5, 7, 8, 9, 10, 12, 13, 20].map((g) => SPICE[spiceOf(g)]!.level)).toEqual(['Mild', 'Mild', 'Medium', 'Medium', 'Hot', 'Hot', 'Extra hot', 'Extra hot', 'Inferno', 'Inferno']);
-    expect(gradeRemark(5)).toMatch(/^Medium\./);
   });
 
   it('remarks on talk', () => {

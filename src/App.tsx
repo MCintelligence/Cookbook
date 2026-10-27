@@ -2292,7 +2292,6 @@ export function App() {
           {seasoningsOpen && doc && (
             <Seasonings
               editor={editor}
-              pageId={doc.id}
               proof={proof}
               chosen={chosen}
               onChosen={(next) => setSeasonings({ chosen: next })}

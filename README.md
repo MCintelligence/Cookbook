@@ -4,7 +4,7 @@ A warm, cozy writing app for novelists. It works fully offline, needs no account
 
 - **Shelf:** write pages on a quiet page, organised into books that nest inside each other.
 - **Pantry:** character, place and research cards that stay linked to the manuscript.
-- **Seasonings:** four characters who proofread on the device: spelling, grammar and style, dialogue, and readability.
+- **Seasonings:** four characters who proofread on the device: spelling, grammar, dialogue, and style with a spice meter for how hard the page is to read.
 
 Cookbook is free and open source under the [Apache 2.0 licence](LICENSE).
 
@@ -142,7 +142,7 @@ The Seasonings button in the top bar opens four characters who each read the pag
 - **Salty Sam** checks spelling.
 - **Peppery Pete** checks grammar: agreement, punctuation, quotes left open, and capitals in the wrong place (“MOnster”, “mONSTER”).
 - **Drunk Daniel** watches dialogue: he can dim the narration so only the speech stands out, and tracks how much of any page or book you pick is spoken.
-- **Spicy Sally** checks style and readability, and rates the page on a spice meter from Mild to Inferno. The meter follows the page's grade level (the Automated Readability Index, as Hemingway uses): most published fiction sits around grades 5 to 9, so grades 5 to 7 are Medium, 4 and under Mild, 8 to 9 Hot, 10 to 12 Extra hot, and 13 and up Inferno.
+- **Spicy Sally** checks style, and rates the page on a spice meter from Mild to Inferno. The meter follows the page's grade level (the Automated Readability Index, as Hemingway uses): most published fiction sits around grades 5 to 9, so grades 5 to 7 are Medium, 4 and under Mild, 8 to 9 Hot, 10 to 12 Extra hot, and 13 and up Inferno.
 
 Each remark comes with the words around it, a Fix button for the suggested change and a Show button that finds it on the page. ✕ removes a remark for good; right-click it to remove it everywhere. Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 

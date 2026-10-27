@@ -3,7 +3,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
 import { type FoundIssue, applySuggestion, bracketsFor, issuesOf, selectIssue } from '../proofread/plugin';
-import { SEASONINGS, SPICE, type SeasoningId, fixText, gradeRemark, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
+import { SEASONINGS, SPICE, type SeasoningId, fixText, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
 import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
@@ -19,8 +19,6 @@ export interface Tracked {
 
 interface Props {
   editor: Editor | null;
-  /** The open page's id, for remarks that belong to it. */
-  pageId: string;
   proof: Proofreader;
   chosen: SeasoningId[];
   onChosen: (chosen: SeasoningId[]) => void;
@@ -39,7 +37,7 @@ interface Props {
 /** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
 const MIN_GRADE_WORDS = 50;
 
-export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
+export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -60,8 +58,6 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
   };
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
   const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
-  const gradeKey = `sally:${pageId}:${page.grade.grade}`;
-  const graded = page.grade.words >= MIN_GRADE_WORDS && !gone.includes(gradeKey);
 
   return (
     <aside className="panel seasonings" aria-label="Seasonings">
@@ -107,7 +103,7 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
             const issues = mine(id);
-            const count = id === 'daniel' ? tracked.length : id === 'sally' ? issues.length + (graded ? 1 : 0) : issues.length;
+            const count = id === 'daniel' ? tracked.length : issues.length;
             return (
               <section className="sc" aria-label={who.name} key={id}>
                 <div className="sc-head">
@@ -161,21 +157,6 @@ export function Seasonings({ editor, pageId, proof, chosen, onChosen, tracked, o
                 )}
 
                 {id === 'sally' && page.grade.words >= MIN_GRADE_WORDS && <SpiceMeter grade={page.grade.grade} />}
-                {id === 'sally' && graded && (
-                  <div className="say">
-                    <Bubble id="sally" text={gradeRemark(page.grade.grade)} onRemove={() => onGone(gradeKey)} />
-                    <div className="fix">
-                      <span className="sug" />
-                      <button className="btn btn-primary" disabled>
-                        Fix
-                      </button>
-                      <button className="btn" disabled={issues.length === 0} onClick={() => issues[0] && selectIssue(editor, issues[0])}>
-                        Show
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {issues.map((i) => (
                   <Say key={`${i.from}:${i.issue.rule}:${i.word}`} editor={editor} issue={i} proof={proof} onMenu={onIssueMenu} />
                 ))}

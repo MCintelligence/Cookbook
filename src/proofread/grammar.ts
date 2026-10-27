@@ -7,7 +7,8 @@ import { type Dialect, type Issue, type IssueKind } from './check';
  */
 // Unclosed quotes are Pete's own check (style.ts), which can offer the closing quote.
 // OrthographicConsistency turns names such as Sam into acronyms (SAM).
-export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes', 'OrthographicConsistency'];
+// Sentence length is left to Sally's spice meter.
+export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes', 'OrthographicConsistency', 'LongSentences'];
 
 /** Harper's kinds of lint that read as style advice rather than mistakes. */
 const STYLE_KINDS = new Set<LintKind>(['Style', 'Readability', 'Enhancement', 'Redundancy']);

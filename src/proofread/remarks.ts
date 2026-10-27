@@ -12,7 +12,7 @@ export const SEASONINGS: { id: SeasoningId; name: string; role: string }[] = [
   { id: 'sam', name: 'Salty Sam', role: 'Spelling' },
   { id: 'pete', name: 'Peppery Pete', role: 'Grammar' },
   { id: 'daniel', name: 'Drunk Daniel', role: 'Dialogue' },
-  { id: 'sally', name: 'Spicy Sally', role: 'Style, readability' },
+  { id: 'sally', name: 'Spicy Sally', role: 'Style' },
 ];
 
 export const isSeasoning = (id: unknown): id is SeasoningId => SEASONINGS.some((s) => s.id === id);
@@ -64,8 +64,6 @@ export function remark(issue: Issue, word: string): string {
     if (issue.rule === 'stray-capitals') return `Capitals! “${word}” has its big letters in the wrong place.`;
     return `Grammar! ${issue.message}`;
   }
-  if (issue.rule === 'very-hard-sentence') return 'Inferno! I lost my place twice in this one. Make it two sentences.';
-  if (issue.rule === 'hard-sentence') return 'Too hot to swallow in one go. Split it for me?';
   if (issue.rule === 'passive') return 'Passive voice, how bland. Who’s doing the doing here?';
   if (issue.rule === 'crutch-word') return `Crutch word! Does the sentence really need “${word}”?`;
   if (issue.rule === 'adverb') return `Adverb alert! Could a stronger verb bring the heat instead of “${word}”?`;
@@ -82,21 +80,16 @@ export function remark(issue: Issue, word: string): string {
  * honey (6 and under) is Mild to Medium, smooth (7 to 9) is Medium to Hot,
  * chewy (10 and up) is Hot to Inferno.
  */
-export const SPICE: { level: string; upTo: number; say: string }[] = [
-  { level: 'Mild', upTo: 4, say: 'Mild. Goes down easy, anyone could read this.' },
-  { level: 'Medium', upTo: 7, say: 'Medium. Right where most novels sit. Nice.' },
-  { level: 'Hot', upTo: 9, say: 'Hot! Readers will feel it. Trim a few long sentences.' },
-  { level: 'Extra hot', upTo: 12, say: 'Extra hot! Shorter sentences and plainer words will cool it.' },
-  { level: 'Inferno', upTo: Infinity, say: 'Inferno! Readers are sweating. Break it up.' },
+export const SPICE: { level: string; upTo: number }[] = [
+  { level: 'Mild', upTo: 4 },
+  { level: 'Medium', upTo: 7 },
+  { level: 'Hot', upTo: 9 },
+  { level: 'Extra hot', upTo: 12 },
+  { level: 'Inferno', upTo: Infinity },
 ];
 
 export function spiceOf(grade: number): number {
   return SPICE.findIndex((s) => grade <= s.upTo);
-}
-
-/** Sally on the whole page, from its grade level; the meter beside it shows the grade. */
-export function gradeRemark(grade: number): string {
-  return SPICE[spiceOf(grade)]!.say;
 }
 
 /** Daniel on how much of a page or book is spoken. */

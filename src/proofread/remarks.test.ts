@@ -31,6 +31,9 @@ describe('seasonings', () => {
     expect(a).toContain('recieve');
     expect(remark(issue('style', 'passive'), 'was eaten')).toMatch(/^Passive voice/);
     expect(remark(issue('grammar', 'grammar', 'Use “an” here.'), 'a')).toBe('Grammar! Use “an” here.');
+    expect(remark({ ...issue('grammar', 'ThenThan'), suggestions: ['than'] }, 'then')).toBe('Mix-up! You mean “than”.');
+    expect(remark(issue('grammar', 'ThenThan', 'Did you mean “than”?'), 'then')).toBe('Grammar! Did you mean “than”?');
+    expect(remark(issue('grammar', 'agreement', 'With “they”, it’s “were”.'), 'was')).toBe('Agreement! With “they”, it’s “were”.');
   });
 
   it('turns the grade into heat, with most fiction at Medium', () => {

@@ -3,6 +3,7 @@ import nspell from 'nspell';
 import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
 import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
+import { combine, peteIssues } from './pete';
 import { isSentenceRule, styleIssues } from './style';
 
 /**
@@ -104,11 +105,11 @@ async function handle(req: Request): Promise<unknown> {
   const g = await loadGrammar();
   await grammarConfigured;
   const found = await g.grammarIssues(g.linter, req.texts, spelling, g.why);
+  const counts = [await loadPairs(), book];
+  const isWord = (w: string) => speller.correct(w);
   return spelling.map((s, i) => {
-    const marked = [...s, ...found[i]!];
-    // Our style notes give way to a mistake on the same words; whole sentences can hold both.
-    const style = styleIssues(req.texts[i]!, names).filter((st) => isSentenceRule(st.rule) || !marked.some((m) => st.from < m.to && st.to > m.from));
-    return [...marked, ...style].sort((a, b) => a.from - b.from);
+    const text = req.texts[i]!;
+    return combine(s, found[i]!, peteIssues(text, isWord, counts), styleIssues(text, names), isSentenceRule);
   });
 }
 

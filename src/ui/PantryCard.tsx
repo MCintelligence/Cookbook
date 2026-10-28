@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
-import { type CookbookDocument, type Relationship, akaOf, cardFieldsOf, portraitOf, relationshipsOf } from '../storage/document';
+import { type CookbookDocument, type Relationship, akaOf, cardFieldKeys, cardFieldsOf, portraitOf, relationshipsOf, withCardFields } from '../storage/document';
 import { type IncomingRelationship, type SceneMention } from '../storage/index';
 
 export interface CardChoice {
@@ -26,13 +26,22 @@ interface Props {
 
 const label = (key: string) => key.charAt(0).toUpperCase() + key.slice(1);
 
+/** One of the writer's fields as it stands on screen, with an id of its own so typing never moves it. */
+interface FieldRow {
+  id: number;
+  name: string;
+  value: string;
+}
+
+let nextRowId = 1;
+const rowsOf = (doc: CookbookDocument): FieldRow[] => cardFieldsOf(doc.fields).map(([key, value]) => ({ id: nextRowId++, name: label(key), value }));
+
 /**
  * The top of a character, setting or research card: portrait, other names,
  * the writer's own fields and relationships. The free writing is the page
  * below, in the same editor as a scene.
  */
 export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onChange, onPickPortrait, onOpen, style }: Props) {
-  const fields = cardFieldsOf(doc.fields);
   const relationships = relationshipsOf(doc.fields);
   const portrait = portraitOf(doc.fields);
   const isResearch = doc.kind === 'research';
@@ -41,8 +50,16 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
   const filePicker = useRef<HTMLInputElement>(null);
   const byId = new Map(choices.map((c) => [c.id, c]));
 
-  // Reset the nicknames box only when another card opens, not while typing in it.
-  useEffect(() => setAka(akaOf(doc.fields).join(', ')), [doc.id]);
+  // The fields are kept as typed while the card is open, so a name that is blank, repeated or
+  // one Cookbook keeps for itself never makes a field jump, merge with another or vanish.
+  const [rows, setRows] = useState<FieldRow[]>(() => rowsOf(doc));
+  const rowList = useRef<HTMLDivElement>(null);
+
+  // Reset the nicknames box and the fields only when another card opens, not while typing in them.
+  useEffect(() => {
+    setAka(akaOf(doc.fields).join(', '));
+    setRows(rowsOf(doc));
+  }, [doc.id]);
 
   useEffect(() => {
     if (!portrait) return setPicture(null);
@@ -58,15 +75,29 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
     };
   }, [portrait, loadPicture]);
 
-  const setFields = (entries: [string, string][]) => {
-    const kept = Object.entries(doc.fields).filter(([key]) => !fields.some(([k]) => k === key));
-    onChange({ ...doc, fields: Object.fromEntries([...entries, ...kept]) });
+  /** Shows the fields as they are now and saves them, each under a name no other key has. */
+  const saveRows = (next: FieldRow[]) => {
+    setRows(next);
+    // A row with neither a name nor a value is still being made; it isn't saved yet.
+    const kept = next.filter((r) => r.name.trim() || r.value.trim());
+    const keys = cardFieldKeys(kept.map((r) => r.name));
+    onChange(withCardFields(doc, kept.map((r, i) => [keys[i]!, r.value])));
   };
-  const setField = (i: number, key: string, value: string) => setFields(fields.map((f, j) => (j === i ? [key, value] : f)));
+  const editRow = (id: number, change: Partial<FieldRow>) => saveRows(rows.map((r) => (r.id === id ? { ...r, ...change } : r)));
   const addField = () => {
-    let name = 'new field';
-    for (let n = 2; fields.some(([k]) => k === name); n++) name = `new field ${n}`;
-    setFields([...fields, [name, '']]);
+    let name = 'New field';
+    for (let n = 2; rows.some((r) => r.name.trim().toLowerCase() === name.toLowerCase()); n++) name = `New field ${n}`;
+    saveRows([...rows, { id: nextRowId++, name, value: '' }]);
+    // Ready to name straight away.
+    requestAnimationFrame(() => rowList.current?.querySelector<HTMLInputElement>('.pc-row:last-child .pc-key')?.select());
+  };
+  /** Enter in a field moves to the next one's value, like a form. */
+  const onFieldKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const inputs = [...(rowList.current?.querySelectorAll<HTMLInputElement>('.pc-value') ?? [])];
+    const at = e.currentTarget.classList.contains('pc-value') ? inputs.indexOf(e.currentTarget) + 1 : inputs.indexOf(e.currentTarget.parentElement!.querySelector('.pc-value')!);
+    inputs[at]?.focus();
   };
   const setOwn = (key: string, value: unknown) => {
     const { [key]: _old, ...rest } = doc.fields;
@@ -116,15 +147,17 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
             />
           </label>
         )}
-        {fields.map(([key, value], i) => (
-          <div className="pc-row" key={i}>
-            <input className="pc-key" aria-label="Field name" value={label(key)} onChange={(e) => setField(i, e.target.value.toLowerCase(), value)} />
-            <input className="pc-value" aria-label={label(key)} value={value} onChange={(e) => setField(i, key, e.target.value)} />
-            <button className="pc-x" aria-label={`Remove ${key}`} onClick={() => setFields(fields.filter((_, j) => j !== i))}>
-              ×
-            </button>
-          </div>
-        ))}
+        <div className="pc-fields" ref={rowList}>
+          {rows.map((r) => (
+            <div className="pc-row" key={r.id}>
+              <input className="pc-key" aria-label="Field name" placeholder="Name" value={r.name} onChange={(e) => editRow(r.id, { name: e.target.value })} onKeyDown={onFieldKey} />
+              <input className="pc-value" aria-label={r.name.trim() || 'Field'} value={r.value} onChange={(e) => editRow(r.id, { value: e.target.value })} onKeyDown={onFieldKey} />
+              <button className="pc-x" aria-label={`Remove ${r.name.trim() || 'field'}`} onClick={() => saveRows(rows.filter((x) => x.id !== r.id))}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
         <button className="ghost pc-add" onClick={addField}>
           + Field
         </button>

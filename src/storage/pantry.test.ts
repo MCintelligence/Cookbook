@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryAdapter } from './memory';
 import { createBook, readDocument, writeDocument } from './book';
-import { akaOf, cardFieldsOf, relationshipsOf, withCardFields } from './document';
+import { akaOf, cardFieldKeys, cardFieldsOf, parseDocument, relationshipsOf, serializeDocument, withCardFields } from './document';
 import { BookIndex, refreshIndex } from './index';
 import { savePicture, sectionOf } from './pantry';
 import { CARD_TEMPLATES, createFromTemplate } from './templates';
@@ -18,6 +18,30 @@ describe('Pantry cards', () => {
     ]);
     const doc = { id: '1', title: 'June', kind: 'character' as const, fields, body: '' };
     expect(withCardFields(doc, [['role', 'Baker']]).fields).toEqual({ role: 'Baker', notes: { n1: 'x' }, aka: ['Mama J'], portrait: 'pictures/June.jpg' });
+  });
+
+  it('saves every field under a name of its own, never one Cookbook uses', () => {
+    expect(cardFieldKeys(['Role', '', 'Age', '', ' Age ', 'status', 'Title', 'kind', 'Eye   Colour'])).toEqual([
+      'Role',
+      'Field',
+      'Age',
+      'Field 2',
+      'Age 2',
+      'status 2',
+      'Title',
+      'kind 2',
+      'Eye Colour',
+    ]);
+    // A field called "title" keeps the card's name, and one called "status" its status.
+    const doc = { id: '1', title: 'June', kind: 'character' as const, fields: { status: 'done' }, body: '' };
+    const keys = cardFieldKeys(['title', 'status']);
+    const back = parseDocument(serializeDocument(withCardFields(doc, [[keys[0]!, 'Chef'], [keys[1]!, 'Married']])));
+    expect(back.title).toBe('June');
+    expect(back.kind).toBe('character');
+    expect(cardFieldsOf(back.fields)).toEqual([
+      ['title 2', 'Chef'],
+      ['status 2', 'Married'],
+    ]);
   });
 
   it('reads nicknames as a list or a comma-separated line', () => {

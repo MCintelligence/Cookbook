@@ -18,17 +18,15 @@ permissions:
   contents: write
 
 jobs:
-  desktop:
-    name: Desktop (${{ matrix.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { name: macOS Apple silicon, os: macos-latest, args: --target aarch64-apple-darwin, rust-targets: aarch64-apple-darwin }
-          - { name: macOS Intel, os: macos-latest, args: --target x86_64-apple-darwin, rust-targets: x86_64-apple-darwin }
-          - { name: Windows, os: windows-latest, args: '', rust-targets: '' }
-          - { name: Linux, os: ubuntu-22.04, args: '', rust-targets: '' }
-    runs-on: ${{ matrix.os }}
+  # One job makes (or reuses) the draft release before the builds start, so
+  # the four builds upload to the same draft instead of racing to make one each.
+  draft:
+    name: Draft release
+    runs-on: ubuntu-latest
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+      tag: ${{ steps.tag.outputs.tag }}
+      notes: ${{ steps.notes.outputs.body }}
     steps:
       - uses: actions/checkout@v4
 
@@ -77,6 +75,40 @@ jobs:
             echo 'END_OF_NOTES'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Make the draft release, or reuse one for this tag
+        id: draft
+        uses: actions/github-script@v7
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          NOTES: ${{ steps.notes.outputs.body }}
+        with:
+          script: |
+            const { TAG: tag, NOTES: body } = process.env;
+            const name = `Cookbook ${tag}`;
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            const published = releases.find((r) => r.tag_name === tag && !r.draft);
+            if (published) return core.setFailed(`${tag} is already published. Set a new version first. See RELEASING.md.`);
+            const draft = releases.find((r) => r.tag_name === tag && r.draft);
+            const { data } = draft
+              ? await github.rest.repos.updateRelease({ ...context.repo, release_id: draft.id, name, body })
+              : await github.rest.repos.createRelease({ ...context.repo, tag_name: tag, target_commitish: context.sha, name, body, draft: true });
+            core.setOutput('id', data.id);
+
+  desktop:
+    name: Desktop (${{ matrix.name }})
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS Apple silicon, os: macos-latest, args: --target aarch64-apple-darwin, rust-targets: aarch64-apple-darwin }
+          - { name: macOS Intel, os: macos-latest, args: --target x86_64-apple-darwin, rust-targets: x86_64-apple-darwin }
+          - { name: Windows, os: windows-latest, args: '', rust-targets: '' }
+          - { name: Linux, os: ubuntu-22.04, args: '', rust-targets: '' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Install Linux build libraries
         if: runner.os == 'Linux'
         run: |
@@ -101,8 +133,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ steps.tag.outputs.tag }}
-          releaseName: Cookbook ${{ steps.tag.outputs.tag }}
-          releaseBody: ${{ steps.notes.outputs.body }}
-          releaseDraft: true
+          releaseId: ${{ needs.draft.outputs.id }}
+          tagName: ${{ needs.draft.outputs.tag }}
+          releaseBody: ${{ needs.draft.outputs.notes }}
           args: ${{ matrix.args }}

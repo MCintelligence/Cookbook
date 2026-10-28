@@ -1,6 +1,6 @@
 [package]
 name = "cookbook"
-version = "0.3.0"
+version = "0.3.1"
 description = "An offline writing app with an on-device proofreader"
 license = "Apache-2.0"
 edition = "2021"

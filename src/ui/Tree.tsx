@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 import { type TreeNode } from '../storage/book';
 import { LABELS, STATUSES, isCard } from '../storage/document';
 import { type CardSummary } from '../storage/index';
+import { allPaths, between } from './selection';
 import { StatusIcon } from './StatusIcon';
 import { placeAt } from './zoom';
 
@@ -37,6 +38,9 @@ interface Props {
   loadPicture?: (path: string) => Promise<string>;
   /** Opens or closes every folder, or every one inside `under`. A new `at` asks again. */
   folding?: { open: boolean; under?: string; at: number } | null;
+  /** Rows picked for the toolbar and right-click menu: Ctrl or ⌘-click adds one, Shift-click a run. */
+  marked?: Set<string>;
+  onMark?: (marked: Set<string>) => void;
 }
 
 export interface Recipe {
@@ -77,6 +81,8 @@ export function Tree(props: Props) {
   const [drop, setDrop] = useState<Drop | null>(null);
   const list = useRef<HTMLUListElement>(null);
   const justDragged = useRef(false);
+  // Where a Shift-click run starts: the row last clicked without Shift.
+  const anchor = useRef<string | null>(null);
 
   useEffect(() => setCollapsed(readCollapsed(collapseKey)), [collapseKey]);
 
@@ -221,10 +227,44 @@ export function Tree(props: Props) {
     window.addEventListener('touchmove', holdStill, { passive: false });
   };
 
-  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged };
+  /** A click with Ctrl, ⌘ or Shift only changes what is picked; a plain click picks the row and goes on to open it. */
+  const mark = (e: React.MouseEvent | ReactKeyboardEvent, path: string): boolean => {
+    const { marked, onMark } = props;
+    if (!onMark || !marked) return false;
+    if (e.shiftKey) {
+      const shown = Array.from(list.current?.querySelectorAll<HTMLElement>('[data-tree-path]') ?? []).map((el) => el.dataset.treePath!);
+      onMark(new Set(between(shown, anchor.current, path)));
+      return true;
+    }
+    anchor.current = path;
+    if (e.ctrlKey || e.metaKey) {
+      const next = new Set(marked);
+      if (!next.delete(path)) next.add(path);
+      onMark(next);
+      return true;
+    }
+    if (marked.size !== 1 || !marked.has(path)) onMark(new Set([path]));
+    return false;
+  };
+  /** Ctrl or ⌘+A picks every Group and Item; Escape lets go of them. */
+  const markKeys = (e: ReactKeyboardEvent) => {
+    const { marked, onMark } = props;
+    if (!onMark || !marked) return false;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a') {
+      onMark(new Set(allPaths(nodes)));
+      return true;
+    }
+    if (e.key === 'Escape' && marked.size > 0) {
+      onMark(new Set());
+      return true;
+    }
+    return false;
+  };
+
+  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged, mark, markKeys };
   return (
     <>
-      <ul className={`tree${drop?.row === null ? ' drop-end' : ''}`} role="tree" ref={list}>
+      <ul className={`tree${drop?.row === null ? ' drop-end' : ''}${(props.marked?.size ?? 0) > 1 ? ' has-many' : ''}`} role="tree" ref={list} aria-multiselectable={props.onMark ? true : undefined}>
         {nodes.map((n, i) => (
           <TreeItem key={n.path} node={n} parent={root} index={i} siblings={nodes.length} depth={0} {...shared} />
         ))}
@@ -246,10 +286,13 @@ interface Shared extends Props {
   dragging: string | null;
   begin: (e: ReactPointerEvent, node: TreeNode, label: string) => void;
   justDragged: { current: boolean };
+  mark: (e: React.MouseEvent | ReactKeyboardEvent, path: string) => boolean;
+  markKeys: (e: ReactKeyboardEvent) => boolean;
 }
 
 function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number; depth: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture } = shared;
+  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys } = shared;
+  const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
   const label = node.kind === 'file' ? (card?.title ?? node.name.replace(/\.md$/, '')) : (locked?.get(node.path) ?? node.name);
@@ -272,6 +315,12 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       if (!dragging) onMenu?.(node, e.clientX, e.clientY);
     },
     onKeyDown: (e: ReactKeyboardEvent) => {
+      if (markKeys(e)) return e.preventDefault();
+      // Space picks the row without opening it, as Ctrl or ⌘-click does.
+      if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        return void mark(e, node.path);
+      }
       const plain = !e.altKey && !e.ctrlKey && !e.metaKey;
       if (plain && (e.key === 'Delete' || e.key === 'Backspace') && !fixed && onTrash) {
         e.preventDefault();
@@ -305,8 +354,8 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         ) : (
         <button
           {...rowProps}
-          className={`tree-card${marker}${card?.skipExport ? ' no-export' : ''}`}
-          onClick={() => !justDragged.current && onSelect(node.path)}
+          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}`}
+          onClick={(e) => !justDragged.current && !mark(e, node.path) && onSelect(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span className="tree-card-top">
@@ -364,10 +413,10 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       ) : (
         <button
           {...rowProps}
-          className={`tree-folder${marker}`}
+          className={`tree-folder${marker}${picked}`}
           // The Group's word count lives on hover; the end of the row is kept for the board icon.
           title={total > 0 ? `${label}: ${fmt(total)} ${total === 1 ? 'word' : 'words'}` : undefined}
-          onClick={() => !justDragged.current && toggle(node.path)}
+          onClick={(e) => !justDragged.current && !mark(e, node.path) && toggle(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span className="tree-folder-name">

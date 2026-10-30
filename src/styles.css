@@ -994,3 +994,10 @@ button.seas-quote:hover { color: var(--accent); }
 /* Fields and keyboard focus. */
 .panel-search:focus-within, .set-search:focus-within, .set-num:focus, .set-sel:focus { border-color: var(--accent); outline: none; }
 :where(:focus-visible) { outline: var(--trim) solid var(--accent); outline-offset: 2px; }
+
+/* Brainstorming cards on character and place pages: a + beside an empty line, and the cards it adds. */
+.bs-plus { position: absolute; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--muted); opacity: 0.7; }
+.bs-plus:hover, .bs-plus:focus-visible { opacity: 1; color: var(--accent); border-color: var(--accent); }
+.cb-prose p.bs-heading { border-top: 1px solid var(--page-line); padding-top: 0.6em; }
+.cb-prose p.bs-hint { color: var(--page-text); opacity: 0.4; font-style: italic; cursor: text; user-select: none; }
+.cb-prose p.bs-blank::before { content: attr(data-placeholder); color: var(--page-text); opacity: 0.4; font-style: italic; pointer-events: none; float: left; height: 0; }

@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { type CookbookDocument, type Relationship, akaOf, cardFieldKeys, cardFieldsOf, portraitOf, relationshipsOf, withCardFields } from '../storage/document';
 import { type IncomingRelationship, type SceneMention } from '../storage/index';
+import { FIELD_PLACEHOLDERS, fieldPlaceholder, isBrainstormKind } from '../storage/brainstorm';
 
 export interface CardChoice {
   id: string;
@@ -84,12 +85,10 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
     onChange(withCardFields(doc, kept.map((r, i) => [keys[i]!, r.value])));
   };
   const editRow = (id: number, change: Partial<FieldRow>) => saveRows(rows.map((r) => (r.id === id ? { ...r, ...change } : r)));
+  // A new field starts with no name, so the writer types one from scratch; it is saved once it has a name or a value.
   const addField = () => {
-    let name = 'New field';
-    for (let n = 2; rows.some((r) => r.name.trim().toLowerCase() === name.toLowerCase()); n++) name = `New field ${n}`;
-    saveRows([...rows, { id: nextRowId++, name, value: '' }]);
-    // Ready to name straight away.
-    requestAnimationFrame(() => rowList.current?.querySelector<HTMLInputElement>('.pc-row:last-child .pc-key')?.select());
+    setRows([...rows, { id: nextRowId++, name: '', value: '' }]);
+    requestAnimationFrame(() => rowList.current?.querySelector<HTMLInputElement>('.pc-row:last-child .pc-key')?.focus());
   };
   /** Enter in a field moves to the next one's value, like a form. */
   const onFieldKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -140,7 +139,7 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
             <input
               className="pc-value"
               value={aka}
-              placeholder="Nicknames, separated by commas"
+              placeholder={isBrainstormKind(doc.kind) ? FIELD_PLACEHOLDERS[doc.kind].aka : 'Nicknames, separated by commas'}
               onChange={(e) => setAka(e.target.value)}
               onBlur={commitAka}
               onKeyDown={(e) => e.key === 'Enter' && commitAka()}
@@ -150,8 +149,8 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
         <div className="pc-fields" ref={rowList}>
           {rows.map((r) => (
             <div className="pc-row" key={r.id}>
-              <input className="pc-key" aria-label="Field name" placeholder="Name" value={r.name} onChange={(e) => editRow(r.id, { name: e.target.value })} onKeyDown={onFieldKey} />
-              <input className="pc-value" aria-label={r.name.trim() || 'Field'} value={r.value} onChange={(e) => editRow(r.id, { value: e.target.value })} onKeyDown={onFieldKey} />
+              <input className="pc-key" aria-label="Field name" placeholder="Field name" value={r.name} onChange={(e) => editRow(r.id, { name: e.target.value })} onKeyDown={onFieldKey} />
+              <input className="pc-value" aria-label={r.name.trim() || 'Field'} placeholder={fieldPlaceholder(doc.kind, r.name)} value={r.value} onChange={(e) => editRow(r.id, { value: e.target.value })} onKeyDown={onFieldKey} />
               <button className="pc-x" aria-label={`Remove ${r.name.trim() || 'field'}`} onClick={() => saveRows(rows.filter((x) => x.id !== r.id))}>
                 ×
               </button>

@@ -91,7 +91,7 @@ Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as
 
 The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Places and Research. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.
 
-A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants, fears, or any you add) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
+A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a place; or any you add, each with a hint of what goes in it) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
 
 ```yaml
 aka: [Mama J]
@@ -103,6 +103,8 @@ relationships:
 ```
 
 Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
+
+Character and place pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
 
 ### Linked names
 

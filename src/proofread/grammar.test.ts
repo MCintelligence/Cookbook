@@ -23,6 +23,12 @@ describe('grammar', () => {
     expect(found.every((i) => i.why && !i.message.includes('`'))).toBe(true);
   });
 
+  it('leaves "had had" and "that that" alone, and calls "more happier" a mistake', async () => {
+    expect(await check('He had had enough, and he knew that that was the end of it.')).toEqual([]);
+    const found = await check('He was more happier than before.');
+    expect(found.map((i) => [i.kind, i.suggestions[0]])).toEqual([['grammar', 'happier']]);
+  });
+
   it('leaves names alone rather than turning them into acronyms', async () => {
     expect(await check('I told Sam to go home.')).toEqual([]);
   });

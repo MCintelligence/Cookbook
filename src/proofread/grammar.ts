@@ -8,7 +8,13 @@ import { type Dialect, type Issue, type IssueKind } from './check';
 // Unclosed quotes are Pete's own check (style.ts), which can offer the closing quote.
 // OrthographicConsistency turns names such as Sam into acronyms (SAM).
 // Sentence length is left to Sally's spice meter.
-export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes', 'OrthographicConsistency', 'LongSentences'];
+// RedundantThat and ThatWhich flag "that that", which is good English ("he knew that that was the end").
+export const OFF_RULES = ['SpellCheck', 'Misspell', 'UnclosedQuotes', 'OrthographicConsistency', 'LongSentences', 'RedundantThat', 'ThatWhich'];
+
+/** Words that are often doubled on purpose: "had had enough", "what it is is". */
+const FINE_TWICE = new Set(['had', 'that', 'is']);
+/** Mistakes Harper files as style, which are Pete's: "more happier". */
+const GRAMMAR_NOT_STYLE = new Set(['AdjectiveDoubleDegree']);
 
 /** Harper's kinds of lint that read as style advice rather than mistakes. */
 const STYLE_KINDS = new Set<LintKind>(['Style', 'Readability', 'Enhancement', 'Redundancy']);
@@ -41,7 +47,8 @@ export function lintsToIssues(text: string, organized: Record<string, Lint[]>, w
       const { start: from, end: to } = lint.span();
       if (to <= from || to > text.length) continue;
       const problem = text.slice(from, to);
-      const issueKind: IssueKind = STYLE_KINDS.has(kind) ? 'style' : 'grammar';
+      if (rule === 'RepeatedWords' && FINE_TWICE.has(problem.split(/\s+/)[0]!.toLowerCase())) continue;
+      const issueKind: IssueKind = STYLE_KINDS.has(kind) && !GRAMMAR_NOT_STYLE.has(rule) ? 'style' : 'grammar';
       issues.push({
         from,
         to,

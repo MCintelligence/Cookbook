@@ -1,4 +1,5 @@
 import { type Issue } from './check';
+import { PETE_RULES } from './pete';
 import { STYLE_RULES } from './style';
 
 /**
@@ -20,7 +21,7 @@ export const isSeasoning = (id: unknown): id is SeasoningId => SEASONINGS.some((
 /** The proofreader's rule groups (see rules.ts) each character looks after. Daniel needs none. */
 export const RULES_OF: Record<SeasoningId, string[]> = {
   sam: ['spelling', 'name'],
-  pete: ['grammar', 'unclosed-quote', 'stray-capitals'],
+  pete: ['grammar', 'unclosed-quote', 'stray-capitals', ...PETE_RULES.map((r) => r.id)],
   daniel: [],
   sally: ['harper-style', ...STYLE_RULES.map((r) => r.id)],
 };
@@ -51,6 +52,28 @@ const SALLY: Record<string, string> = {
   redundancy: 'Double helping, hon.',
 };
 
+/** Pete names the trouble first, then says what to do; for the Harper rules writers meet most, in his own words. */
+const PETE: Record<string, (word: string, fix: string | undefined, message: string) => string | undefined> = {
+  agreement: (_w, _f, m) => `Agreement! ${m}`,
+  'word-mixup': (_w, _f, m) => `Mix-up! ${m}`,
+  'pronoun-case': (_w, _f, m) => `Wrong case! ${m}`,
+  'verb-form': (_w, _f, m) => `Verb form! ${m}`,
+  'reported-question': (_w, _f, m) => `Word order! ${m}`,
+  PronounVerbAgreement: (_w, f) => f && `Agreement! That verb doesn’t match its subject. Make it “${f}”.`,
+  PronounInflectionBe: (_w, f) => f && `Agreement! That verb doesn’t match its subject. Make it “${f}”.`,
+  AnA: () => 'Grammar! It’s “an” before a vowel sound and “a” before the rest.',
+  ItsContraction: () => 'Mix-up! “Its” owns things. Here you mean “it’s”, short for “it is”.',
+  ItsPossessive: () => 'Mix-up! “It’s” is short for “it is”. For belonging, it’s “its”.',
+  TheirToThere: (_w, f) => f && `Mix-up! You mean “${f}”.`,
+  ThenThan: (_w, f) => f && `Mix-up! You mean “${f}”.`,
+  ModalOf: (_w, f) => f && `Grammar! It’s “${f}”. “Of” only sounds like “’ve”.`,
+  RepeatedWords: (w) => `Twice! “${w}” says the same word two times.`,
+  SimplePastToPastParticiple: (_w, f) => f && `Verb form! After “has” or “had” it’s “${f}”.`,
+  SentenceCapitalization: () => 'Capitals! A sentence starts with a capital letter.',
+  CapitalizePersonalPronouns: () => 'Capitals! “I” is always a capital.',
+  AdjectiveDoubleDegree: (_w, f) => f && `Double helping! “${f}” already means more.`,
+};
+
 /** What the issue's character says about it. */
 export function remark(issue: Issue, word: string): string {
   const owner = ownerOf(issue);
@@ -62,7 +85,8 @@ export function remark(issue: Issue, word: string): string {
   if (owner === 'pete') {
     if (issue.rule === 'unclosed-quote') return 'Punctuation! You opened a quote and walked off. Close it.';
     if (issue.rule === 'stray-capitals') return `Capitals! “${word}” has its big letters in the wrong place.`;
-    return `Grammar! ${issue.message}`;
+    const own = PETE[issue.rule]?.(word, issue.suggestions[0], issue.message);
+    return own ?? `Grammar! ${issue.message}`;
   }
   if (issue.rule === 'passive') return 'Passive voice, how bland. Who’s doing the doing here?';
   if (issue.rule === 'crutch-word') return `Crutch word! Does the sentence really need “${word}”?`;

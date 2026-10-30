@@ -2,7 +2,19 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import { placeAt } from './zoom';
 
 export type MenuItem =
-  | { label: string; onPick: () => void; disabled?: boolean; danger?: boolean; hint?: string; checked?: boolean; icon?: ReactNode }
+  | {
+      label: string;
+      onPick: () => void;
+      disabled?: boolean;
+      danger?: boolean;
+      hint?: string;
+      checked?: boolean;
+      icon?: ReactNode;
+      /** The shortcut as a binding ("Mod-Shift-F"), for the Mac's own menu bar. */
+      binding?: string;
+      /** In the Mac's own menu bar, the system's item of this kind stands in for this one. */
+      native?: 'Undo' | 'Redo' | 'Cut' | 'Copy' | 'Paste' | 'SelectAll';
+    }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | { separator: true }
   | { heading: string };

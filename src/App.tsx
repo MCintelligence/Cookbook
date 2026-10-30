@@ -44,6 +44,7 @@ import { printHtml } from './export/print';
 import { KINDS, saveFile } from './ui/saveFile';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
+import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
@@ -105,7 +106,7 @@ import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
-import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
+import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type BackupInfo, type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
@@ -146,6 +147,11 @@ const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Se
 const DRAWER_WIDTH = 320;
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
+/** The desktop app on a Mac, whose menus go in the system's menu bar at the top of the screen. */
+const MAC_APP = isTauri() && IS_MAC;
+/** Closes the desktop app's window, which saves the last words typed before the app ends. */
+const quitApp = () => import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().close());
+
 const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
   strong: { key: 'Mod-B', style: 'strong' },
   emphasis: { key: 'Mod-I', style: 'emphasis' },
@@ -2400,7 +2406,7 @@ export function App() {
     {
       label: 'File',
       items: () => [
-        { label: 'New item', hint: keysFor('newScene'), disabled: !fs, onPick: () => void addScene() },
+        { label: 'New item', hint: keysFor('newScene'), binding: binding('newScene'), disabled: !fs, onPick: () => void addScene() },
         { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
         { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
         { separator: true },
@@ -2420,8 +2426,14 @@ export function App() {
         { label: 'Back up now', disabled: !fs, onPick: () => void backUpNow() },
         { label: 'Back up as a zip…', disabled: !fs, onPick: () => void backUp() },
         { label: 'Trash', disabled: !fs, onPick: openTrash },
-        { separator: true },
-        { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
+        // On a Mac, Settings and Quit are in the Cookbook menu.
+        ...(MAC_APP
+          ? []
+          : ([
+              { separator: true },
+              { label: 'Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
+              ...(isTauri() ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
+            ] as MenuItem[])),
       ],
     },
     {
@@ -2431,18 +2443,18 @@ export function App() {
         const none = !ed;
         const empty = !ed || ed.state.selection.empty;
         return [
-          { label: 'Undo', hint: keys('Mod-Z'), disabled: none || undoSteps === 0, onPick: () => void ed?.chain().focus().undo().run() },
-          { label: 'Redo', hint: keys(IS_MAC ? 'Mod-Shift-Z' : 'Mod-Y'), disabled: none || !ed.can().redo(), onPick: () => void ed?.chain().focus().redo().run() },
+          { label: 'Undo', native: 'Undo', hint: keys('Mod-Z'), disabled: none || undoSteps === 0, onPick: () => void ed?.chain().focus().undo().run() },
+          { label: 'Redo', native: 'Redo', hint: keys(IS_MAC ? 'Mod-Shift-Z' : 'Mod-Y'), disabled: none || !ed.can().redo(), onPick: () => void ed?.chain().focus().redo().run() },
           { separator: true },
-          { label: 'Cut', hint: keys('Mod-X'), disabled: empty, onPick: () => ed && clip(ed, 'cut') },
-          { label: 'Copy', hint: keys('Mod-C'), disabled: empty, onPick: () => ed && clip(ed, 'copy') },
-          { label: 'Paste', hint: keys('Mod-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, getSettings().pastePlain) },
+          { label: 'Cut', native: 'Cut', hint: keys('Mod-X'), disabled: empty, onPick: () => ed && clip(ed, 'cut') },
+          { label: 'Copy', native: 'Copy', hint: keys('Mod-C'), disabled: empty, onPick: () => ed && clip(ed, 'copy') },
+          { label: 'Paste', native: 'Paste', hint: keys('Mod-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, getSettings().pastePlain) },
           { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, true) },
-          { label: 'Select all', hint: keys('Mod-A'), disabled: none, onPick: () => void ed?.chain().focus().selectAll().run() },
+          { label: 'Select all', native: 'SelectAll', hint: keys('Mod-A'), disabled: none, onPick: () => void ed?.chain().focus().selectAll().run() },
           { separator: true },
-          { label: 'Search', hint: keysFor('find'), onPick: () => setFindRequest({ query: ed ? selectedWords(ed) : '', at: Date.now() }) },
-          { label: 'Go to an item or card…', hint: keysFor('switcher'), onPick: () => setPalette({ scenesOnly: true, at: Date.now() }) },
-          { label: 'Command palette…', hint: keysFor('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
+          { label: 'Search', hint: keysFor('find'), binding: binding('find'), onPick: () => setFindRequest({ query: ed ? selectedWords(ed) : '', at: Date.now() }) },
+          { label: 'Go to an item or card…', hint: keysFor('switcher'), binding: binding('switcher'), onPick: () => setPalette({ scenesOnly: true, at: Date.now() }) },
+          { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
         ];
       },
     },
@@ -2452,7 +2464,7 @@ export function App() {
         const page = pageOf(book?.page);
         return [
           { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
-          { label: 'Oven Mode (focus)', hint: keysFor('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
+          { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
           { separator: true },
           { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
@@ -2464,9 +2476,9 @@ export function App() {
           },
           { separator: true },
           { label: 'Pantry', checked: panel === 'pantry', onPick: () => togglePanel('pantry') },
-          { label: 'Seasonings', hint: keysFor('seasonings'), checked: seasoningsOpen, disabled: !doc, onPick: () => togglePanel('seasonings') },
+          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsOpen, disabled: !doc, onPick: () => togglePanel('seasonings') },
           { separator: true },
-          { label: manuscript ? 'Back to writing' : 'Read the recipe', hint: keysFor('bookread'), disabled: !fs, onPick: () => (manuscript ? setManuscript(null) : void readManuscript()) },
+          { label: manuscript ? 'Back to writing' : 'Read the recipe', hint: keysFor('bookread'), binding: binding('bookread'), disabled: !fs, onPick: () => (manuscript ? setManuscript(null) : void readManuscript()) },
         ];
       },
     },
@@ -2476,8 +2488,8 @@ export function App() {
         const ed = editor;
         const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => ed && void fn(ed.chain().focus()).run();
         return [
-          { label: 'Footnote', hint: keysFor('footnote'), disabled: !ed, onPick: () => ed && editFootnote(insertFootnote(ed)) },
-          { label: 'Name from the Pantry', hint: keysFor('shelf'), disabled: !ed, onPick: () => setShelf({ at: null }) },
+          { label: 'Footnote', hint: keysFor('footnote'), binding: binding('footnote'), disabled: !ed, onPick: () => ed && editFootnote(insertFootnote(ed)) },
+          { label: 'Name from the Pantry', hint: keysFor('shelf'), binding: binding('shelf'), disabled: !ed, onPick: () => setShelf({ at: null }) },
           { separator: true },
           { label: 'Table', disabled: !ed || ed.isActive('table'), onPick: run((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })) },
           { label: 'Numbered list', disabled: !ed, onPick: run((c) => c.toggleOrderedList()) },
@@ -2519,13 +2531,25 @@ export function App() {
       label: 'Help',
       items: () => [
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
-        { label: 'Command palette…', hint: keysFor('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
+        { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
         { separator: true },
         { label: 'Updates and privacy…', onPick: () => openSettings('updates') },
-        { label: `About Cookbook ${__APP_VERSION__}`, onPick: () => say(`Cookbook ${__APP_VERSION__}: an offline writing app. Everything stays on this device.`) },
+        ...(MAC_APP ? [] : [{ label: `About Cookbook ${__APP_VERSION__}`, onPick: () => say(`Cookbook ${__APP_VERSION__}: an offline writing app. Everything stays on this device.`) }]),
       ],
     },
   ];
+
+  // On a Mac the menus go in the system's own menu bar at the top of the screen, rebuilt when what they show changes.
+  const menusNow = useRef(topMenus);
+  menusNow.current = topMenus;
+  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, !!doc, !!editor, !!fs, !!book, !!manuscript, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
+  useEffect(() => {
+    if (!MAC_APP) return;
+    const t = window.setTimeout(() => {
+      void setMacMenu(menusNow.current, () => menusNow.current, { settings: () => openSettings(), quit: () => void quitApp() }).catch(() => {});
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [menuKey]);
 
   return (
     <div
@@ -2542,7 +2566,7 @@ export function App() {
           </button>
           <Logo />
           <span className="brand">cookbook</span>
-          <MenuBar menus={topMenus} />
+          {!MAC_APP && <MenuBar menus={topMenus} />}
           <span className="crumb">
             <button
               className="crumb-book"

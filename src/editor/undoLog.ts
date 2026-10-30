@@ -1,6 +1,6 @@
 import { type Editor } from '@tiptap/core';
 import { closeHistory, redo, undo, undoDepth } from '@tiptap/pm/history';
-import { EditorState, Selection, type Transaction } from '@tiptap/pm/state';
+import { EditorState, type Plugin, Selection, type Transaction } from '@tiptap/pm/state';
 import { Step } from '@tiptap/pm/transform';
 import { type StorageAdapter, joinPath } from '../storage/adapter';
 import { HIDDEN_FOLDER } from '../storage/book';
@@ -126,31 +126,38 @@ export class UndoRecorder {
     const target = normal(expected);
     this.replaying = true;
     try {
-      const schema = this.editor.schema;
-      this.reset(log.base);
+      const { schema, plugins } = this.editor.state;
+      // The log is replayed off screen, on a state that has only the undo history and the
+      // plugins that add changes of their own, then shown once. Going through the editor
+      // would draw the page, run every other plugin and re-render the app once per change.
+      let state = EditorState.create({ doc: schema.nodeFromJSON(log.base), plugins: plugins.filter(replayed) });
+      const apply = (tr: Transaction) => (state = state.apply(tr));
       const keepFrom = Math.max(0, log.entries.length - MAX_ENTRIES);
       let base = log.base;
       log.entries.forEach((entry, i) => {
-        if (i === keepFrom && i > 0) base = this.editor.state.doc.toJSON() as NodeJSON;
-        const { state, view } = this.editor;
-        if ('u' in entry) undo(state, (tr) => view.dispatch(tr));
-        else if ('r' in entry) redo(state, (tr) => view.dispatch(tr));
+        if (i === keepFrom && i > 0) base = state.doc.toJSON() as NodeJSON;
+        if ('u' in entry) undo(state, apply);
+        else if ('r' in entry) redo(state, apply);
         else {
-          view.dispatch(state.tr.setSelection(Selection.fromJSON(state.doc, entry.sel)));
-          const tr = this.editor.state.tr;
+          apply(state.tr.setSelection(Selection.fromJSON(state.doc, entry.sel)));
+          const tr = state.tr;
           for (const step of entry.s) {
             const result = tr.maybeStep(Step.fromJSON(schema, step));
             if (result.failed) throw new Error(result.failed);
           }
           tr.setTime(entry.t);
           if (entry.h === 0) tr.setMeta('addToHistory', false);
-          if (entry.a) tr.setMeta('appendedTransaction', this.editor.state.tr);
+          if (entry.a) tr.setMeta('appendedTransaction', state.tr);
           if (entry.x) closeHistory(tr);
           if (entry.c !== undefined) tr.setMeta('composition', entry.c);
-          view.dispatch(tr);
+          apply(tr);
         }
       });
-      if (normal(serializeMarkdown(this.editor.getJSON() as NodeJSON)) !== target) throw new Error('The log does not match the file.');
+      if (normal(serializeMarkdown(state.doc.toJSON() as NodeJSON)) !== target) throw new Error('The log does not match the file.');
+      // The other plugins start on the finished text, as they do when a scene opens without a log.
+      this.editor.view.updateState(state.reconfigure({ plugins }));
+      // An empty change, so everything that follows the editor (word count, footnotes) catches up.
+      this.editor.view.dispatch(this.editor.state.tr.setMeta('addToHistory', false));
       this.base = base;
       this.entries = log.entries.slice(keepFrom);
       // The cursor is left where the last change was made.
@@ -170,6 +177,12 @@ export class UndoRecorder {
     const { state, view } = this.editor;
     view.updateState(EditorState.create({ doc: state.schema.nodeFromJSON(doc), plugins: state.plugins }));
   }
+}
+
+/** The plugins a replay needs: the undo history, and any that add changes of their own, so the text comes out the same. */
+function replayed(plugin: Plugin): boolean {
+  const key = (plugin as unknown as { key: string }).key;
+  return key === HISTORY_META || !!plugin.spec.appendTransaction || !!plugin.spec.filterTransaction;
 }
 
 // ---------- where logs are kept ----------

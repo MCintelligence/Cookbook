@@ -47,7 +47,7 @@ const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
-import { parseMarkdown, plainText } from './editor/markdown';
+import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { GoalsPopup, type Goals } from './ui/GoalsPopup';
 import { Palette, type PaletteItem } from './ui/Palette';
@@ -229,6 +229,19 @@ export function App() {
   const seasoningsOpen = panel === 'seasonings';
   const togglePanel = (p: Panel) => setPanel((open) => (open === p ? null : p));
   const docRef = useRef<CookbookDocument | null>(null);
+  /**
+   * Set when the editor's text has changed since docRef.current.body was last brought up to
+   * date. Serialising a long Item takes milliseconds, so typing only sets this, and the body
+   * is worked out when something reads the Item through currentDoc().
+   */
+  const bodyFrom = useRef<Editor | null>(null);
+  /** The open Item as it is now, with its body brought up to date from the editor if needed. */
+  const currentDoc = useCallback((): CookbookDocument | null => {
+    const ed = bodyFrom.current;
+    bodyFrom.current = null;
+    if (ed && docRef.current) docRef.current = { ...docRef.current, body: serializeMarkdown(ed.getJSON() as NodeJSON) };
+    return docRef.current;
+  }, []);
   const saveTimer = useRef<number | undefined>(undefined);
   const pendingSave = useRef<(() => Promise<void>) | null>(null);
   const started = useRef(false);
@@ -400,6 +413,7 @@ export function App() {
     index.current = null;
     setEditor(null);
     docRef.current = null;
+    bodyFrom.current = null;
     setDoc(null);
     setPath(null);
     setBook(info);
@@ -539,7 +553,7 @@ export function App() {
   const movingWords = useRef(false);
   /** The open scene's file text as last read or written, and the newest text still waiting to be saved. */
   const savedText = useRef<string | null>(null);
-  const unsaved = useRef<{ path: string; text: string; base: string } | null>(null);
+  const unsaved = useRef<{ path: string; id: string; text: string; base: string } | null>(null);
   const locationRef = useRef<BookLocation | null>(null);
   locationRef.current = location;
   const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
@@ -590,7 +604,12 @@ export function App() {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
     const onHide = (e: Event) => {
       const pending = unsaved.current;
-      if (pending && locationRef.current) keepRescue(window.localStorage, { location: locationRef.current, ...pending });
+      if (pending && locationRef.current) {
+        // The newest words are only serialised now, rather than on every keystroke.
+        const scene = currentDoc();
+        const text = scene && scene.id === pending.id ? serializeDocument(scene) : pending.text;
+        keepRescue(window.localStorage, { location: locationRef.current, path: pending.path, text, base: pending.base });
+      }
       void flushSave().then(saveUndoNow);
       void saveIndexNow();
       // The browser can't wait for a zip as a tab closes, so the book is backed up whenever it's put away.
@@ -611,7 +630,7 @@ export function App() {
       window.removeEventListener('pageshow', onShow);
       document.removeEventListener('visibilitychange', onShow);
     };
-  }, [flushSave, saveIndexNow, saveUndoNow]);
+  }, [currentDoc, flushSave, saveIndexNow, saveUndoNow]);
 
   useEffect(() => {
     // The desktop app waits for the last save before the window closes.
@@ -662,15 +681,29 @@ export function App() {
     };
   }, []);
 
-  const scheduleSave = (next: CookbookDocument) => {
+  /**
+   * Saves the open Item a moment after the last change. `next` is the Item with a change
+   * made outside the editor; without it, the editor's text changed, and is only serialised
+   * when the save runs.
+   */
+  const scheduleSave = (next?: CookbookDocument) => {
     if (!fs || !path) return;
     const target = path;
-    docRef.current = next;
+    if (next) {
+      docRef.current = next;
+      bodyFrom.current = null;
+    }
+    const scene = docRef.current;
+    if (!scene) return;
     const current = index.current;
-    const text = serializeDocument(next);
-    unsaved.current = { path: target, text, base: savedText.current ?? text };
+    // Until the save runs, a closing tab rescues the last text that was serialised.
+    const known = next ? serializeDocument(next) : unsaved.current?.id === scene.id ? unsaved.current.text : (savedText.current ?? '');
+    unsaved.current = { path: target, id: scene.id, text: known, base: savedText.current ?? known };
     setDirty(true);
     pendingSave.current = async () => {
+      const latest = currentDoc();
+      const next = latest && latest.id === scene.id ? latest : scene;
+      const text = serializeDocument(next);
       await writeDocument(fs, target, next);
       savedText.current = text;
       // Count words written, unless the change only moved words between scenes.
@@ -710,6 +743,7 @@ export function App() {
     setManuscript(null);
     setSideOpen(false);
     docRef.current = opened;
+    bodyFrom.current = null;
     savedText.current = serializeDocument(opened);
     savedWords.current = sceneWords(opened);
     setUndoLog(await readUndoLog(fs, opened.id));
@@ -777,7 +811,7 @@ export function App() {
   const [snapshots, setSnapshots] = useState<{ path: string; title: string; list: Snapshot[] | null } | null>(null);
   /** A copy of the open scene's text as it is now, to go back to. */
   const takeSnapshot = async (reason: string) => {
-    const scene = docRef.current;
+    const scene = currentDoc();
     if (!fs || !scene) return;
     await flushSave();
     try {
@@ -793,14 +827,14 @@ export function App() {
   const showSnapshots = async (p: string) => {
     if (!fs) return;
     if (p !== path) await select(p);
-    const scene = docRef.current;
+    const scene = currentDoc();
     if (!scene) return;
     setSnapshots({ path: p, title: scene.title, list: null });
     setSnapshots({ path: p, title: scene.title, list: await listSnapshots(fs, scene.id) });
   };
   /** Puts a snapshot's text back, after keeping the text it replaces as a snapshot too. Undo still works. */
   const rollBack = async (snapshot: Snapshot) => {
-    const scene = docRef.current;
+    const scene = currentDoc();
     if (!fs || !scene || !editor) return;
     await storeSnapshot(fs, scene, 'Before rolling back');
     editor.chain().focus().setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
@@ -818,7 +852,7 @@ export function App() {
 
   /** Turns everything after a scene break into a new scene that comes right after this one. */
   const splitScene = async (pos: number) => {
-    const scene = docRef.current;
+    const scene = currentDoc();
     if (!fs || !path || !editor || !scene) return;
     await autoSnapshot('Before splitting');
     const moved = splitAtBreak(editor, pos);
@@ -840,7 +874,7 @@ export function App() {
 
   /** Adds the next scene in this folder to the end of this one, and puts its file in the trash. */
   const mergeNext = async () => {
-    const scene = docRef.current;
+    const scene = currentDoc();
     if (!fs || !path || !editor || !scene || !next) return;
     await autoSnapshot('Before merging');
     const incoming = await readDocument(fs, next.path);
@@ -873,6 +907,7 @@ export function App() {
   const closeScene = () => {
     setEditor(null);
     docRef.current = null;
+    bodyFrom.current = null;
     setDoc(null);
     setPath(null);
   };
@@ -1203,7 +1238,7 @@ export function App() {
           danger: true,
           onPick: () => {
             removeNoteAnchor(ed, id);
-            const { [id]: _gone, ...rest } = readNotes(docRef.current);
+            const { [id]: _gone, ...rest } = readNotes(currentDoc());
             setNotes(rest);
           },
         },
@@ -1445,7 +1480,7 @@ export function App() {
     if (!fs) return;
     await flushSave();
     try {
-      const target = page === path && docRef.current ? docRef.current : await readDocument(fs, page);
+      const target = page === path && currentDoc() ? currentDoc()! : await readDocument(fs, page);
       if (!(await fs.exists(RECIPES))) await fs.makeFolder(RECIPES);
       const p = await createDocument(fs, RECIPES, 'New note', 'recipe');
       await writeDocument(fs, p, withField(await readDocument(fs, p), 'page', target.id));
@@ -1512,7 +1547,7 @@ export function App() {
   /** Gives a page or card a new title, open or not. */
   const retitle = async (p: string, title: string) => {
     if (p === path) {
-      const base = docRef.current ?? doc;
+      const base = currentDoc() ?? doc;
       if (!base || base.title === title) return;
       const next = { ...base, title };
       setDoc(next);
@@ -1649,7 +1684,7 @@ export function App() {
   };
 
   const setCardField = (key: string, value: unknown) => {
-    const base = docRef.current ?? doc;
+    const base = currentDoc() ?? doc;
     if (!base) return;
     const updated = withField(base, key, value);
     setDoc(updated);
@@ -1660,6 +1695,12 @@ export function App() {
   const readManuscript = async (folder?: string) => {
     if (!fs) return;
     await flushSave();
+    await saveUndoNow();
+    // The page is put away while reading and comes back from these, so it must come back as it is now,
+    // not as it was opened, with the undo history it has now.
+    const scene = currentDoc();
+    if (scene) setDoc(scene);
+    if (recorder.current) setUndoLog(recorder.current.recorder.toJSON());
     const shelf = await readTree(fs, BOOKSHELF, order.current);
     const only = folder ? [...walkFolders(shelf)].find((n) => n.path === folder) : undefined;
     setManuscriptTitle(only ? only.name : 'The whole recipe');
@@ -1678,7 +1719,7 @@ export function App() {
   };
 
   const setNotes = (next: Notes) => {
-    const base = docRef.current ?? doc;
+    const base = currentDoc() ?? doc;
     if (!base) return;
     const { notes: _old, ...fields } = base.fields;
     const updated = { ...base, fields: Object.keys(next).length > 0 ? { ...fields, notes: next } : fields };
@@ -1726,7 +1767,7 @@ export function App() {
     setPictureLoader(fs ? loadPicture : null);
   }, [fs, loadPicture]);
   const pickPortrait = async (file: File) => {
-    const base = docRef.current ?? doc;
+    const base = currentDoc() ?? doc;
     if (!fs || !base) return;
     try {
       const { data, type } = await shrinkPicture(file);
@@ -1769,7 +1810,7 @@ export function App() {
         let spoken = 0;
         let all = 0;
         for (const f of files) {
-          const body = f === path && docRef.current ? docRef.current.body : await readDocument(fs, f).then((d) => d.body, () => '');
+          const body = f === path && currentDoc() ? currentDoc()!.body : await readDocument(fs, f).then((d) => d.body, () => '');
           for (const line of plainText(body).split('\n')) {
             all += countWords(line);
             for (const [a, b] of dialogueRanges(line)) spoken += countWords(line.slice(a, b));
@@ -2323,7 +2364,9 @@ export function App() {
               incoming={incoming}
               appearsIn={appearsIn}
               loadPicture={loadPicture}
-              onChange={(next) => {
+              onChange={(changed) => {
+                // The card builds on the Item as it was opened, so it keeps the text typed since.
+                const next = { ...changed, body: (currentDoc() ?? changed).body };
                 setDoc(next);
                 scheduleSave(next);
               }}
@@ -2340,7 +2383,10 @@ export function App() {
                 onRecorder={onRecorder}
                 nextStyle={nextStyle}
                 onReady={setEditor}
-                onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
+                onChange={(ed) => {
+                  bodyFrom.current = ed;
+                  scheduleSave();
+                }}
                 onSeasonings={showFootnote}
                 cardKind={doc.kind}
               />
@@ -2564,7 +2610,7 @@ export function App() {
           onGoals={(changes) => updateBook(changes)}
           scene={doc && doc.kind === 'scene' ? { title: doc.title, words: words ?? 0, goal: sceneGoal(doc) } : null}
           onSceneGoal={(goal) => {
-            const base = docRef.current ?? doc;
+            const base = currentDoc() ?? doc;
             if (!base) return;
             const { goal: _old, ...fields } = base.fields;
             const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
@@ -2649,15 +2695,16 @@ export function App() {
       {snapshots && (
         <SnapshotsDialog
           title={snapshots.title}
-          current={docRef.current?.body ?? ''}
+          current={currentDoc()?.body ?? ''}
           snapshots={snapshots.list}
           onTake={() => void takeSnapshot('By hand')}
           onRollBack={(snap) => void rollBack(snap)}
           onDelete={(snap) =>
             void (async () => {
-              if (!fs || !docRef.current) return;
+              const scene = currentDoc();
+              if (!fs || !scene) return;
               await deleteSnapshot(fs, snap);
-              setSnapshots({ ...snapshots, list: await listSnapshots(fs, docRef.current.id) });
+              setSnapshots({ ...snapshots, list: await listSnapshots(fs, scene.id) });
             })()
           }
           onClose={() => setSnapshots(null)}

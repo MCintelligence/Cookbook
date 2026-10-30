@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { cookbookExtensions, type NextStyle } from './extensions';
-import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
+import { parseMarkdown } from './markdown';
 import { type SeasoningsRequest } from './seasonings';
 import { UndoRecorder, type UndoLog } from './undoLog';
 
@@ -12,7 +12,8 @@ interface Props {
   undoLog: UndoLog | null;
   onRecorder: (recorder: UndoRecorder | null) => void;
   nextStyle: NextStyle;
-  onChange: (body: string) => void;
+  /** The text changed. The body isn't serialised here: that waits until it's saved or needed. */
+  onChange: (editor: Editor) => void;
   onReady: (editor: Editor | null) => void;
   /** A note or footnote was added or clicked in the text; Seasonings should show it. */
   onSeasonings: (request: SeasoningsRequest) => void;
@@ -41,7 +42,7 @@ export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChan
     editorProps: { attributes: { class: 'cb-prose', spellcheck: 'false', 'aria-label': 'Item text' } },
     onUpdate: ({ editor }) => {
       if (recorder.current?.isReplaying) return;
-      onChangeRef.current(serializeMarkdown(editor.getJSON() as NodeJSON));
+      onChangeRef.current(editor);
     },
   });
 

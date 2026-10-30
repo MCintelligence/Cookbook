@@ -446,10 +446,13 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
         <Row title="Undo history" help="Undo reaches back past closing the app, item by item. It is kept in the recipe’s hidden .cookbook folder." />
       </Group>
       <Group title="Automatic backups">
-        <Row title="Back up the recipe when I close it" help="A zip of the whole recipe’s folder, made when you close Cookbook or open another recipe.">
-          <Switch label="Back up on close" on={s.backupOnClose} onChange={(backupOnClose) => setSettings({ backupOnClose })} />
+        <Row
+          title="Back up the recipe automatically"
+          help="A zip of the whole recipe’s folder, snapshots and trash included: every half hour while you write, when you close Cookbook or open another recipe, and after Cookbook stops without closing."
+        >
+          <Switch label="Back up automatically" on={s.backupOnClose} onChange={(backupOnClose) => setSettings({ backupOnClose })} />
         </Row>
-        <Row title="Keep" help="Older automatic backups are removed.">
+        <Row title="Keep" help="Besides these, one backup a day is kept for a week and one a week for a month. Older automatic backups are removed.">
           <Select
             label="Backups kept"
             value={s.keepBackups}

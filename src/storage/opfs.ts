@@ -101,7 +101,8 @@ export class OpfsAdapter implements StorageAdapter {
     if (!entry) throw new Error(`No such file or folder: ${from}`);
     // OPFS has no portable rename for folders, so copy then delete.
     if (entry.kind === 'file') {
-      await this.writeText(to, await this.readText(from));
+      // As bytes, so pictures and zips are copied exactly; text would mangle them.
+      await this.writeBytes(to, await this.readBytes(from));
     } else {
       await this.makeFolder(to);
       for (const child of await this.list(from)) {

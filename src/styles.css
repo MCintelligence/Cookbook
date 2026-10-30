@@ -261,6 +261,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 
 /* Dragging */
 .tree li.is-dragging > button { opacity: 0.4; }
+/* A row cut with Ctrl/⌘+X, waiting to be pasted somewhere else. */
+.tree :is(.tree-card, .tree-folder).is-cut { opacity: 0.55; outline: 1px dashed var(--accent); outline-offset: -1px; }
 .tree .drop-before::before, .tree .drop-after::after { content: ''; position: absolute; left: 6px; right: 6px; height: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 .tree .drop-before::before { top: -3px; }
 .tree .drop-after::after { bottom: -3px; }
@@ -368,6 +370,8 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .ms-bar { width: 816px; max-width: 100%; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
 .ms-bar strong { color: var(--text); }
 .manuscript { min-height: 0; }
+/* The book itself takes the keyboard for reading; its items show the focus ring as Tab reaches them. */
+.manuscript:focus { outline: none; }
 .ms-folder { margin: 48px 0 24px; text-align: center; font-family: 'Literata', Georgia, serif; font-weight: 600; color: var(--page-text); }
 .ms-folder:first-child { margin-top: 0; }
 .ms-depth-0 { font-size: 26px; }

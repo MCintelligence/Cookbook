@@ -296,6 +296,24 @@ export function issuesOf(state: EditorState): FoundIssue[] {
   return ps ? ps.set.find(undefined, undefined, isIssue).map(found).sort((a, b) => a.from - b.from) : [];
 }
 
+/**
+ * The issue F7 (or Shift+F7) goes to: the next one after the cursor, or the one before it,
+ * going round to the other end. Sentence tints are listed in Seasonings rather than stepped
+ * to, and the word being typed isn't counted. Worked out only when the key is pressed.
+ */
+export function stepIssue(state: EditorState, dir: 1 | -1): FoundIssue | null {
+  const list = drawnSet(state)
+    .find(undefined, undefined, (spec) => isIssue(spec) && !isSentenceRule((spec as { issue: Issue }).issue.rule))
+    .map(found)
+    .sort((a, b) => a.from - b.from || a.to - b.to);
+  if (list.length === 0) return null;
+  const { from, empty } = state.selection;
+  if (dir > 0) return list.find((i) => i.from > from || (empty && i.from === from)) ?? list[0]!;
+  // A plain loop rather than findLast, which older Linux web views don't have.
+  for (let i = list.length - 1; i >= 0; i--) if (list[i]!.from < from) return list[i]!;
+  return list[list.length - 1]!;
+}
+
 /** The issue under a document position, for the card that opens when an underline is clicked. */
 export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const ps = proofreadKey.getState(state);

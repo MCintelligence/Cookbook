@@ -55,6 +55,9 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
 
   const showPicker = picking;
   const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
+    // The card is drawn again in its new place; the keyboard stays on the same button or card.
+    const held = document.activeElement;
+    if (held instanceof HTMLElement && list.current?.contains(held)) requestAnimationFrame(() => held.isConnected && held.focus({ preventScroll: true }));
     const rest = chosen.filter((c) => c !== id);
     const at = chosen.indexOf(id);
     const index = to === 'top' ? 0 : to === 'bottom' ? rest.length : to === 'up' ? Math.max(0, at - 1) : Math.min(rest.length, at + 1);
@@ -179,7 +182,20 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
             const count = id === 'daniel' ? tracked.length : issues.length;
             const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before'].filter(Boolean).join(' ');
             return (
-              <section className={cls} aria-label={who.name} key={id}>
+              <section
+                className={cls}
+                aria-label={who.name}
+                key={id}
+                // Alt+↑ and Alt+↓ move a seasoning up or down the list (Alt+Home and Alt+End to the ends), as on the Shelf.
+                onKeyDown={(e) => {
+                  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+                  const to = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'Home' ? 'top' : e.key === 'End' ? 'bottom' : null;
+                  if (!to) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  move(id, to);
+                }}
+              >
                 <div className="sc-head" title="Drag to reorder" onPointerDown={(e) => begin(e, id)}>
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>

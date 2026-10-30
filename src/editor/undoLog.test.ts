@@ -150,6 +150,22 @@ describe('undo that survives closing', () => {
     expect(serializeMarkdown(log.base)).toBe('xxxxx\n');
   });
 
+  it('replays off screen and shows the result once', () => {
+    const { editor, recorder } = make('The kitchen.');
+    type(editor, ' It smelled of cornbread.');
+    pause();
+    type(editor, ' Lou hummed.');
+    const text = md(editor);
+    const log = parseUndoLog(JSON.stringify(recorder.toJSON()))!;
+    const again = make(serializeMarkdown(log.base));
+    let updates = 0;
+    again.editor.on('transaction', () => updates++);
+    expect(again.recorder.restore(log, text)).toBe(true);
+    expect(updates).toBe(1);
+    expect(md(again.editor)).toBe(text);
+    expect(again.recorder.depth()).toBe(2);
+  });
+
   it('ignores a damaged log file', () => {
     expect(parseUndoLog('{not json')).toBeNull();
     expect(parseUndoLog('{"version":2}')).toBeNull();

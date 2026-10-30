@@ -106,6 +106,26 @@ export function cardFieldsOf(fields: Record<string, unknown>): [string, string][
     .map(([key, value]) => [key, value === null ? '' : String(value)]);
 }
 
+/** Keys the file itself is built from, which a field must never replace. */
+const FILE_KEYS = new Set(['id', 'title', 'kind']);
+
+/**
+ * The keys a card's fields are saved under: the names the writer typed, made
+ * safe. A blank name becomes "Field", and a name that Cookbook keeps for itself
+ * or that an earlier field already has gets a number ("Age 2"), so one field
+ * can never replace another, nor the card's own name, kind or status.
+ */
+export function cardFieldKeys(names: string[]): string[] {
+  const taken = new Set([...RESERVED, ...FILE_KEYS]);
+  return names.map((typed) => {
+    const name = typed.trim().replace(/\s+/g, ' ') || 'Field';
+    let key = name;
+    for (let n = 2; taken.has(key); n++) key = `${name} ${n}`;
+    taken.add(key);
+    return key;
+  });
+}
+
 /** Replaces the writer's fields, keeping Cookbook's own keys where they were. */
 export function withCardFields(doc: CookbookDocument, entries: [string, string][]): CookbookDocument {
   const kept = Object.entries(doc.fields).filter(([key, value]) => RESERVED.has(key) || !(typeof value === 'string' || typeof value === 'number' || value === null));

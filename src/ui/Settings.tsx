@@ -376,12 +376,12 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             </Row>
           </Group>
           <Group title="While writing">
-            <Row title="Study" help={`Hides the panels and fades everything but where you are. ${keys(binding('focus'))} turns it on and off.`}>
-              <Switch label="Study" on={s.focus} onChange={(focus) => set({ focus })} />
+            <Row title="Oven Mode" help={`Focus mode: hides the panels and fades everything but where you are. Stove Mode is the normal view. ${keys(binding('focus'))} turns it on and off.`}>
+              <Switch label="Oven Mode" on={s.focus} onChange={(focus) => set({ focus })} />
             </Row>
-            <Row title="Study keeps bright" help="The rest of the page fades.">
+            <Row title="Oven Mode keeps bright" help="The rest of the page fades.">
               <Select
-                label="Study keeps bright"
+                label="Oven Mode keeps bright"
                 value={s.fade}
                 options={[
                   ['paragraph', 'The paragraph'],

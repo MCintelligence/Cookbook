@@ -365,6 +365,8 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         <button
           {...rowProps}
           className={`tree-folder${marker}`}
+          // The Group's word count lives on hover; the end of the row is kept for the board icon.
+          title={total > 0 ? `${label}: ${fmt(total)} ${total === 1 ? 'word' : 'words'}` : undefined}
           onClick={() => !justDragged.current && toggle(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
@@ -374,7 +376,6 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
             </span>
             <span className="tree-card-title">{label}</span>
           </span>
-          {total > 0 && <span className="tree-words">{fmt(total)}</span>}
         </button>
       )}
       {open && children.length > 0 && (

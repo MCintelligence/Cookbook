@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
@@ -36,6 +36,7 @@ interface Props {
 
 /** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
 const MIN_GRADE_WORDS = 50;
+const LONG_PRESS_MS = 400;
 
 export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
@@ -43,6 +44,9 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   useEffect(() => {
     if (chosen.length === 0) setPicking(true);
   }, [chosen.length]);
+  // The seasoning being dragged by its head, and where it would land among the others.
+  const [drag, setDrag] = useState<{ id: SeasoningId; index: number | null } | null>(null);
+  const list = useRef<HTMLDivElement>(null);
   const page = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: textGrade(paragraphs(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
@@ -56,6 +60,79 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
     const index = to === 'top' ? 0 : to === 'bottom' ? rest.length : to === 'up' ? Math.max(0, at - 1) : Math.min(rest.length, at + 1);
     onChosen([...rest.slice(0, index), id, ...rest.slice(index)]);
   };
+  const remove = (id: SeasoningId) => onChosen(chosen.filter((c) => c !== id));
+  /** Where a drop at (x, y) would put a card, as an index into the list. */
+  const target = (x: number, y: number): number | null => {
+    const cards = Array.from(list.current?.querySelectorAll<HTMLElement>('.sc') ?? []);
+    if (cards.length === 0) return null;
+    const box = list.current!.getBoundingClientRect();
+    if (x < box.left - 24 || x > box.right + 24) return null;
+    const at = cards.findIndex((c) => {
+      const r = c.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    });
+    return at === -1 ? cards.length : at;
+  };
+  const begin = (e: ReactPointerEvent, id: SeasoningId) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+    const touch = e.pointerType !== 'mouse';
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let active = false;
+    // Whatever scrolls the panel, so a long list scrolls while a card is held near its edge.
+    let scroller = list.current?.parentElement ?? null;
+    while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const start = () => {
+      active = true;
+      setDrag({ id, index: null });
+      navigator.vibrate?.(10);
+    };
+    // On a touch screen a long press picks the card up, so a plain swipe still scrolls.
+    const timer = touch ? window.setTimeout(start, LONG_PRESS_MS) : undefined;
+    const move = (ev: PointerEvent) => {
+      if (!active) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < (touch ? 8 : 4)) return;
+        if (touch) return finish();
+        start();
+      }
+      setDrag({ id, index: target(ev.clientX, ev.clientY) });
+      if (scroller) {
+        const box = scroller.getBoundingClientRect();
+        if (ev.clientY < box.top + 40) scroller.scrollBy(0, -12);
+        else if (ev.clientY > box.bottom - 40) scroller.scrollBy(0, 12);
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      const index = active ? target(ev.clientX, ev.clientY) : null;
+      finish();
+      if (index === null) return;
+      const from = chosen.indexOf(id);
+      // Dropping just above or below itself leaves it where it is.
+      if (index === from || index === from + 1) return;
+      const rest = chosen.filter((c) => c !== id);
+      const to = index > from ? index - 1 : index;
+      onChosen([...rest.slice(0, to), id, ...rest.slice(to)]);
+    };
+    const key = (ev: KeyboardEvent) => ev.key === 'Escape' && finish();
+    const holdStill = (ev: TouchEvent) => active && ev.preventDefault();
+    const finish = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', finish);
+      window.removeEventListener('keydown', key);
+      window.removeEventListener('touchmove', holdStill);
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', finish);
+    window.addEventListener('keydown', key);
+    window.addEventListener('touchmove', holdStill, { passive: false });
+  };
+  // No line where a drop would leave the card where it is.
+  const from = drag ? chosen.indexOf(drag.id) : -1;
+  const dropAt = drag?.index != null && drag.index !== from && drag.index !== from + 1 ? drag.index : null;
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
   const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
 
@@ -95,14 +172,15 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
           </button>
         </>
       ) : (
-        <div className="panel-list">
+        <div className={`panel-list${drag ? ' is-sorting' : ''}${dropAt === chosen.length ? ' drop-end' : ''}`} ref={list}>
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
             const issues = mine(id);
             const count = id === 'daniel' ? tracked.length : issues.length;
+            const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before'].filter(Boolean).join(' ');
             return (
-              <section className="sc" aria-label={who.name} key={id}>
-                <div className="sc-head">
+              <section className={cls} aria-label={who.name} key={id}>
+                <div className="sc-head" title="Drag to reorder" onPointerDown={(e) => begin(e, id)}>
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>
                   {count > 0 && <span className="count">{count}</span>}
@@ -111,6 +189,7 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
                     <Handle label="Move up" disabled={at === 0} onClick={() => move(id, 'up')} d="M12 19V6M6 11l6-6 6 6" />
                     <Handle label="Move down" disabled={at === chosen.length - 1} onClick={() => move(id, 'down')} d="M12 5v13M6 13l6 6 6-6" />
                     <Handle label="Move to bottom" disabled={at === chosen.length - 1} onClick={() => move(id, 'bottom')} d="M5 20h14M12 4v11M7 11l5 5 5-5" />
+                    <Handle label={`Remove ${who.name}`} className="handle-remove" onClick={() => remove(id)} d="M6 6l12 12M18 6 6 18" />
                   </span>
                 </div>
 
@@ -187,9 +266,9 @@ function SpiceMeter({ grade }: { grade: number }) {
   );
 }
 
-function Handle({ label, d, disabled, onClick }: { label: string; d: string; disabled: boolean; onClick: () => void }) {
+function Handle({ label, d, disabled = false, className, onClick }: { label: string; d: string; disabled?: boolean; className?: string; onClick: () => void }) {
   return (
-    <button className="handle" aria-label={label} title={label} disabled={disabled} onClick={onClick}>
+    <button className={className ? `handle ${className}` : 'handle'} aria-label={label} title={label} disabled={disabled} onClick={onClick}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d={d} />
       </svg>

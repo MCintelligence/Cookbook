@@ -14,7 +14,7 @@ Each recipe is an ordinary folder you can open in any text editor, back up, or k
 
 ```
 My Recipe/
-  book.json        title, format version and daily word goal
+  book.json        title, id, format version and daily word goal
   order.json       the order of items and groups
   writing-history.csv  words written and deleted each day
   bookshelf/       the Shelf: items, in nested groups
@@ -23,7 +23,7 @@ My Recipe/
     settings/
     research/
   pictures/        portraits for Pantry cards
-  .cookbook/       hidden: search index, undo history and trash (see below)
+  .cookbook/       hidden: search index, undo history, snapshots and trash (see below)
 ```
 
 Every item and card is a Markdown file with a small YAML header:
@@ -135,6 +135,14 @@ Undo reaches back past closing an item or the app. Each item's changes are logge
 Click a section break (`* * *`) to split the item there, so everything after it becomes a new item right after this one, or to merge the next item into this one. A merged item's file goes to `.cookbook/trash/` rather than being deleted. Its footnotes come along.
 
 Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and you only lose undo history and the trash.
+
+## Backups
+
+Your text is saved as you type. On top of that, Cookbook zips the whole recipe into a backups folder outside it: every half hour while you write, when you close Cookbook or open another recipe, and when a recipe opens after Cookbook stopped without closing it (a crash or a power cut). Back up now, on the recipe menu or in Settings › Saving and backups, makes one straight away.
+
+A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
+
+The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
 
 ## Seasonings
 

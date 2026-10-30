@@ -45,7 +45,7 @@ export interface BookInfo {
   dialect?: 'en-US' | 'en-GB';
   /** Proofreader checks the writer switched off. */
   proofreadOff?: string[];
-  /** Made the first time the book is exported as an e-book, so readers know a new copy is the same book. */
+  /** The book's own id: files its backups, and tells readers a new e-book is the same book. Given to every book when it opens. */
   id?: string;
   /** Page size, margins, view and zoom; see page.ts. */
   page?: Partial<PageSettings>;
@@ -81,7 +81,7 @@ export interface TreeNode {
 
 export async function createBook(fs: StorageAdapter, title: string, now = new Date()): Promise<BookInfo> {
   if (await fs.exists(BOOK_FILE)) throw new Error('There is already a recipe in this folder.');
-  const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString() };
+  const info: BookInfo = { format: FORMAT_VERSION, title, created: now.toISOString(), id: newId() };
   await fs.makeFolder(BOOKSHELF);
   for (const section of PANTRY_SECTIONS) await fs.makeFolder(joinPath(PANTRY, section));
   await fs.makeFolder(HIDDEN_FOLDER);

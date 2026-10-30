@@ -30,7 +30,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -106,7 +106,7 @@ import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type BackupInfo, type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
-import { type Backup, listBackups, makeBackup, restoreBackup } from './storage/autoBackup';
+import { BACKUP_EVERY_MS, type Backup, listBackups, makeBackup, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
@@ -193,6 +193,9 @@ function* walkFolders(nodes: TreeNode[]): Generator<TreeNode> {
     yield* walkFolders(n.children ?? []);
   }
 }
+
+/** Whose backups these are. Every book has an id once it has been opened (see openAt). */
+const ownerOf = (info: BookInfo) => ({ title: info.title, id: info.id ?? info.title });
 
 function lastSceneKey(location: BookLocation | null): string {
   return `cookbook.lastScene:${JSON.stringify(location)}`;
@@ -305,25 +308,41 @@ export function App() {
     return backupStore.current;
   };
   const refreshBackups = async () => {
-    const title = bookRef.current?.title;
-    if (!title) return;
+    const info = bookRef.current;
+    if (!info) return;
     try {
       const store = await openBackupStore();
-      const list = await listBackups(store.fs, title);
+      const list = await listBackups(store.fs, ownerOf(info));
       setBackups({ folder: store.where, canChoose: canPickFolder(), last: list[0]?.date ?? null, count: list.length });
     } catch (e) {
       setBackups((b) => ({ ...b, folder: `Can’t reach the backup folder. ${friendlyError(e)}` }));
     }
   };
+  /** The backup being made, so a timed one and one on close don't zip the book twice at once. */
+  const backingUp = useRef<Promise<void> | null>(null);
   /** Zips the open book into the backups folder; automatic ones only when something changed. */
-  const autoBackup = async (always = false) => {
+  const autoBackup = async (always = false): Promise<void> => {
+    // Waits its turn; several waiting at once each check again once the one before is done.
+    while (backingUp.current) await backingUp.current.catch(() => {});
     const bookFs = fsRef.current;
     const info = bookRef.current;
     if (!bookFs || !info || (!always && !changedSinceBackup.current)) return;
     changedSinceBackup.current = false;
     lastBackupAt.current = Date.now();
-    const store = await openBackupStore();
-    await makeBackup(bookFs, store.fs, info.title, getSettings().keepBackups);
+    const run = (async () => {
+      const store = await openBackupStore();
+      await makeBackup(bookFs, store.fs, ownerOf(info), getSettings().keepBackups);
+    })();
+    backingUp.current = run;
+    try {
+      await run;
+    } catch (e) {
+      // Nothing was backed up, so the changes still need one.
+      changedSinceBackup.current = true;
+      throw e;
+    } finally {
+      if (backingUp.current === run) backingUp.current = null;
+    }
   };
 
   const saveIndexNow = useCallback(async () => {
@@ -362,9 +381,19 @@ export function App() {
         else throw e;
       }
     }
+    // Backups are filed by the book's id, so every book gets one; older books are given theirs now.
+    if (!info.id) {
+      info = { ...info, id: newId() };
+      await saveBookInfo(nextFs, info).catch(() => {});
+    }
     // Words a closing browser tab didn't finish saving go back into their scene.
     const rescue = takeRescue(window.localStorage, target);
     if (rescue) await applyRescue(nextFs, rescue).catch(() => {});
+    // The book that was open is closed properly now. If this one was never closed, Cookbook stopped
+    // with it open last time, so it is backed up before anything else changes.
+    const previous = locationRef.current;
+    if (previous) markClosed(window.localStorage, previous);
+    const crashed = markOpen(window.localStorage, target);
     index.current?.index.close();
     index.current = null;
     setEditor(null);
@@ -381,7 +410,12 @@ export function App() {
     rememberBook({ location: target, title: info.title });
     bookRef.current = info;
     fsRef.current = nextFs;
-    void refreshBackups();
+    if (crashed && getSettings().backupOnClose) {
+      autoBackup(true).then(
+        () => say('Cookbook didn’t close properly last time, so it made a backup of this recipe.'),
+        () => {},
+      ).finally(() => void refreshBackups());
+    } else void refreshBackups();
 
     // The index catches up in the background; search works on whatever it has so far.
     const opened = { fs: nextFs, index: await loadIndex(nextFs) };
@@ -552,19 +586,28 @@ export function App() {
 
   useEffect(() => {
     // Save straight away when the window is hidden or closed, rather than losing the last few words.
-    const onHide = () => {
+    const onHide = (e: Event) => {
       const pending = unsaved.current;
       if (pending && locationRef.current) keepRescue(window.localStorage, { location: locationRef.current, ...pending });
       void flushSave().then(saveUndoNow);
       void saveIndexNow();
       // The browser can't wait for a zip as a tab closes, so the book is backed up whenever it's put away.
       if (!isTauri() && document.visibilityState === 'hidden' && getSettings().backupOnClose && Date.now() - lastBackupAt.current > 10 * 60_000) void autoBackup().catch(() => {});
+      // Put away with its words saved, so a phone or browser ending Cookbook in the background isn't taken for a crash.
+      if (locationRef.current && (document.visibilityState === 'hidden' || e.type === 'pagehide')) markClosed(window.localStorage, locationRef.current);
+    };
+    const onShow = () => {
+      if (locationRef.current && document.visibilityState === 'visible') markOpen(window.localStorage, locationRef.current);
     };
     window.addEventListener('pagehide', onHide);
     document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pageshow', onShow);
+    document.addEventListener('visibilitychange', onShow);
     return () => {
       window.removeEventListener('pagehide', onHide);
       document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pageshow', onShow);
+      document.removeEventListener('visibilitychange', onShow);
     };
   }, [flushSave, saveIndexNow, saveUndoNow]);
 
@@ -580,6 +623,7 @@ export function App() {
           await saveUndoNow();
           await saveIndexNow();
           if (getSettings().backupOnClose) await autoBackup().catch(() => {});
+          if (locationRef.current) markClosed(window.localStorage, locationRef.current);
         })
         .then((unlisten) => (gone ? unlisten() : (stop = unlisten))),
     );
@@ -588,6 +632,19 @@ export function App() {
       stop?.();
     };
   }, [flushSave, saveIndexNow, saveUndoNow]);
+
+  useEffect(() => {
+    // A backup every half hour while the writer works, so a long session is never only backed up when it ends.
+    const timer = window.setInterval(() => {
+      if (!getSettings().backupOnClose || !changedSinceBackup.current) return;
+      void (async () => {
+        await flushSave();
+        await autoBackup();
+        await refreshBackups();
+      })().catch(() => {});
+    }, BACKUP_EVERY_MS);
+    return () => window.clearInterval(timer);
+  }, [flushSave]);
 
   useEffect(() => {
     // The app menu's Settings… (Cookbook › Settings… on a Mac, Edit › Settings… elsewhere).
@@ -981,11 +1038,13 @@ export function App() {
     const current = bookRef.current;
     if (!current) return;
     const store = await openBackupStore();
-    const list = await listBackups(store.fs, current.title);
+    const list = await listBackups(store.fs, ownerOf(current));
     const when = (d: Date) => d.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' });
+    // Backups from before they were filed by recipe may be of another recipe with the same title.
+    const label = (b: Backup) => (b.older ? `${when(b.date)} (older, by title)` : when(b.date));
     showMenu('Restore', x, y, [
       { heading: 'Open a copy of the recipe as it was' },
-      ...list.slice(0, 25).map((b) => ({ label: when(b.date), onPick: () => void restoreCopy(b) })),
+      ...list.slice(0, 25).map((b) => ({ label: label(b), onPick: () => void restoreCopy(b) })),
       ...(list.length === 0 ? [{ label: 'No backups yet', disabled: true, onPick: () => {} }] : []),
     ]);
   };
@@ -1000,7 +1059,8 @@ export function App() {
       const { fs: into } = await openLocation(target);
       if (!(await into.exists('book.json'))) {
         await restoreBackup(store.fs, b, into);
-        await saveBookInfo(into, { ...(await openBook(into)), title });
+        // A new id, so the copy's backups are kept apart from the recipe's own.
+        await saveBookInfo(into, { ...(await openBook(into)), title, id: newId() });
       }
       setSettingsAt(null);
       await openAt(target);

@@ -58,7 +58,7 @@ describe('book folder', () => {
   it('creates and reopens a book', async () => {
     const fs = new MemoryAdapter();
     await createBook(fs, 'The Summer Kitchen', new Date('2026-10-21T00:00:00Z'));
-    expect(await openBook(fs)).toEqual({ format: 1, title: 'The Summer Kitchen', created: '2026-10-21T00:00:00.000Z' });
+    expect(await openBook(fs)).toEqual({ format: 1, title: 'The Summer Kitchen', created: '2026-10-21T00:00:00.000Z', id: expect.any(String) });
     expect(await fs.exists('pantry/characters')).toBe(true);
     await expect(createBook(fs, 'Again')).rejects.toThrow(/already a recipe/);
   });

@@ -717,9 +717,9 @@ button.seas-quote:hover { color: var(--accent); }
 .app.focus .sidebar, .app.focus .shelf-resize, .app.focus .toolbar, .app.focus .drawer, .app.focus .card-details, .app.focus .pantry-card { display: none; }
 .app.focus { grid-template-columns: 0 1fr !important; }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
-.study-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }
-.study-exit:hover { background: var(--accent); color: var(--on-accent, #fff); }
-.app.focus .footer:has(.study-exit) { opacity: 1; }
+.oven-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }
+.oven-exit:hover { background: var(--accent); color: var(--on-accent, #fff); }
+.app.focus .footer:has(.oven-exit) { opacity: 1; }
 .app.focus .topbar:hover, .app.focus .footer:hover, .app.focus .topbar:focus-within, .app.focus .footer:focus-within { opacity: 1; }
 .cb-prose .cb-faded, .cb-prose .cb-faded * { color: var(--page-muted) !important; transition: color 0.2s; }
 .cb-prose .cb-faded .cb-lit, .cb-prose .cb-faded .cb-lit * { color: var(--page-text) !important; }

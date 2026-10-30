@@ -1206,7 +1206,7 @@ export function App() {
       { separator: true },
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
-      { label: 'Study', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
+      { label: 'Oven Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
       { label: 'Read the recipe', hint: keysFor('bookread'), onPick: () => void readManuscript() },
     ];
     if (words) {
@@ -1858,16 +1858,17 @@ export function App() {
   const toggleFocus = () => {
     const focus = !getSettings().focus;
     setSettings({ focus });
-    say(focus ? `Study. ${keysFor('focus')} or Escape brings everything back.` : 'Study off.');
+    say(focus ? `Oven Mode. ${keysFor('focus')} or Escape goes back to Stove Mode.` : 'Stove Mode.');
   };
   useEffect(() => {
-    // Escape leaves Study, unless something else (a menu, Search) wanted it first.
+    // Escape leaves Oven Mode (focus mode) for Stove Mode, unless something else (a menu, Search) wanted it first.
     if (!settings.focus) return;
     const onKey = (e: KeyboardEvent) => {
       // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
       const handled = e.defaultPrevented && !(e.target instanceof Element && e.target.closest('.ProseMirror'));
       if (e.key !== 'Escape' || handled || document.querySelector('.menu, .shelf, .settings, .palette, .goals-pop, .issue-card')) return;
       setSettings({ focus: false });
+      say('Stove Mode.');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -2049,7 +2050,7 @@ export function App() {
       cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places research'),
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
-      cmd('focus', settings.focus ? 'Study off' : 'Study', toggleFocus, 'View', keysFor('focus'), 'focus distraction'),
+      cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -2512,8 +2513,8 @@ export function App() {
         />
         <span className="footer-end">
           {settings.focus && (
-            <button className="study-exit" title={`Leave Study (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
-              Study
+            <button className="oven-exit" title={`Back to Stove Mode (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
+              Oven Mode
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>

@@ -20,7 +20,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'find', label: 'Search', key: 'Mod-F' },
   { id: 'shelf', label: 'Name from the Pantry', key: 'Mod-J' },
   { id: 'seasonings', label: 'Seasonings', key: 'Mod-Shift-S' },
-  { id: 'focus', label: 'Study', key: 'Mod-Shift-F' },
+  { id: 'focus', label: 'Oven Mode (focus)', key: 'Mod-Shift-F' },
   { id: 'footnote', label: 'Footnote', key: 'Mod-Alt-F' },
   { id: 'strong', label: 'Strong', key: 'Mod-B' },
   { id: 'emphasis', label: 'Emphasis', key: 'Mod-I' },

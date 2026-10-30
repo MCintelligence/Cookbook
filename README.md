@@ -79,7 +79,7 @@ Pressing Backspace straight after a shortcut turns it back into exactly what you
 
 ## The Shelf
 
-Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth, show the total words inside, and open or close with a click. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import and Read the recipe; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
+Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with a click; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import and Read the recipe; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
@@ -123,6 +123,10 @@ Pinned cards stay in the right-hand drawer, above the Pantry or Seasonings, unti
 A new recipe can start as a novel (a group of items, plus a main character and place in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
 
 The footer also has the zoom (click the percentage for a slider), whether the item is saved, and Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
+
+## Oven Mode and Stove Mode
+
+Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
 
 ## Undo, splitting and merging
 

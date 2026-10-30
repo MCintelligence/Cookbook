@@ -19,6 +19,7 @@ import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
+import { Brainstorm } from './brainstorm';
 import { DialogueFocus, Footnote, Note, type SeasoningsRequest, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
@@ -462,9 +463,11 @@ const NO_TYPOGRAPHY = {
   superscriptThree: false,
 } as const;
 
-export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
+/** `cardKind` is the kind of page open: character and place pages get brainstorming cards. */
+export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}, cardKind: string | null = null) {
   return [
     Document,
+    Brainstorm.configure({ kind: cardKind }),
     Text,
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,

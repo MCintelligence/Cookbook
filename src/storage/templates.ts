@@ -53,7 +53,8 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     folder: 'characters',
     title: 'New character',
     fields: { role: '', age: '', wants: '', fears: '' },
-    body: 'How they look, how they talk, and what they would never say out loud.\n',
+    // Nearly empty: the writer adds brainstorming cards with the + on an empty line.
+    body: '',
   },
   {
     id: 'setting',
@@ -61,8 +62,8 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     kind: 'setting',
     folder: 'settings',
     title: 'New place',
-    fields: { when: '' },
-    body: 'What it smells like, what it sounds like, and who belongs here.\n',
+    fields: { role: '', when: '', offers: '', threatens: '' },
+    body: '',
   },
   { id: 'research', name: 'Research note', kind: 'research', folder: 'research', title: 'New note', body: '' },
 ];

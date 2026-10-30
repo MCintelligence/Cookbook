@@ -94,6 +94,8 @@ import { undoDepth } from '@tiptap/pm/history';
 import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/scenes';
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
+import { BrainstormPlus } from './ui/BrainstormPlus';
+import { isBrainstormKind } from './storage/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
@@ -2279,7 +2281,9 @@ export function App() {
                 onReady={setEditor}
                 onChange={(body) => scheduleSave({ ...(docRef.current ?? doc), body })}
                 onSeasonings={showFootnote}
+                cardKind={doc.kind}
               />
+              {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
               <PageFootnotes editor={editor} />
               <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
             </article>

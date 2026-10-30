@@ -16,9 +16,11 @@ interface Props {
   onReady: (editor: Editor | null) => void;
   /** A note or footnote was added or clicked in the text; Seasonings should show it. */
   onSeasonings: (request: SeasoningsRequest) => void;
+  /** The kind of page, read once when it opens: character and place pages get brainstorming cards. */
+  cardKind?: string | null;
 }
 
-export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChange, onReady, onSeasonings }: Props) {
+export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChange, onReady, onSeasonings, cardKind = null }: Props) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const nextStyleRef = useRef(nextStyle);
@@ -33,6 +35,7 @@ export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChan
     extensions: cookbookExtensions(
       (style) => nextStyleRef.current(style),
       (request) => onSeasoningsRef.current(request),
+      cardKind,
     ),
     content: undoLog ? undoLog.base : parseMarkdown(initialBody),
     editorProps: { attributes: { class: 'cb-prose', spellcheck: 'false', 'aria-label': 'Item text' } },

@@ -1633,6 +1633,12 @@ export function App() {
   const readManuscript = async (folder?: string) => {
     if (!fs) return;
     await flushSave();
+    await saveUndoNow();
+    // The page is put away while reading and comes back from these, so it must come back as it is now,
+    // not as it was opened, with the undo history it has now.
+    const scene = currentDoc();
+    if (scene) setDoc(scene);
+    if (recorder.current) setUndoLog(recorder.current.recorder.toJSON());
     const shelf = await readTree(fs, BOOKSHELF, order.current);
     const only = folder ? [...walkFolders(shelf)].find((n) => n.path === folder) : undefined;
     setManuscriptTitle(only ? only.name : 'The whole recipe');

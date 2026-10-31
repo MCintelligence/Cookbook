@@ -1168,3 +1168,26 @@ button.seas-quote:hover { color: var(--accent); }
   .recipes-nav, .tpl-nav { width: auto; max-height: 140px; border: none; border-top: 1px solid var(--line); }
   .new-row { flex-wrap: wrap; }
 }
+
+/* Mise en Place: a Group's Items joined as one page. The Group shown is marked on the Shelf like the open Item. */
+.tree li[aria-selected='true'] > .tree-folder { background: var(--paper); box-shadow: 0 0 0 1px var(--line-strong); }
+.tree li[aria-selected='true'] > .tree-folder .tree-card-title { color: var(--accent); }
+/* The arrow is its own target, since a click on the name opens the Group's page. */
+.sidebar .tree-folder .chevron { width: 16px; height: 22px; margin-left: -4px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; cursor: pointer; }
+.sidebar .tree-folder .chevron:hover { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--muted); }
+.mise .cb-prose { min-height: 0; }
+.mise .ms-folder:first-child { margin-top: 0; }
+.mise-item { position: relative; outline: none; border-radius: 2px; cursor: text; }
+.mise-item + .mise-item { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--page-line); }
+.mise-item:focus-visible { box-shadow: 0 0 0 2px var(--focus); }
+.mise-item[aria-busy='true'] { background: repeating-linear-gradient(transparent 0 20px, color-mix(in srgb, var(--page-line) 45%, transparent) 20px 21px, transparent 21px 28px); }
+.mise-item-name { margin: 0 0 10px; font-family: 'Nunito', sans-serif; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--page-muted); user-select: none; -webkit-user-select: none; }
+.mise-item.is-active .mise-item-name { color: var(--accent); }
+.mise-item.is-active .cb-prose { min-height: 3em; }
+.mise .mise-item:not(.is-active) .cb-note { background: transparent; border-bottom: none; }
+.mise-blank { min-height: 12em !important; cursor: text; }
+.mise-blank:empty::before { content: attr(data-placeholder); color: var(--page-text); opacity: 0.4; font-style: italic; pointer-events: none; }
+.mise-count { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40ch; }
+h3.mise-item-name { font-weight: 400; line-height: 1.4; }
+/* Read out by screen readers, not drawn. */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }

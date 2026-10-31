@@ -11,11 +11,13 @@ const roots: Root[] = [];
 afterEach(() => {
   act(() => roots.splice(0).forEach((r) => r.unmount()));
   document.body.innerHTML = '';
+  // Groups closed in one test would start closed in the next.
+  localStorage.clear();
 });
 
 const card = (title: string, words: number) => ({ id: title, title, kind: 'scene', words }) as CardSummary;
 
-function shelf() {
+function shelf(extra: { onOpenGroup?: (p: string) => void; onSelect?: (p: string) => void } = {}) {
   const host = document.body.appendChild(document.createElement('div'));
   const root = createRoot(host);
   roots.push(root);
@@ -44,10 +46,11 @@ function shelf() {
         live={null}
         collapseKey="test.collapsed"
         renaming={null}
-        onSelect={() => {}}
+        onSelect={extra.onSelect ?? (() => {})}
         onMove={() => {}}
         onStartRename={() => {}}
         onRename={() => {}}
+        onOpenGroup={extra.onOpenGroup}
       />,
     ),
   );
@@ -65,5 +68,38 @@ describe('the Shelf', () => {
   it('keeps each Item’s own count on its row', () => {
     const host = shelf();
     expect([...host.querySelectorAll('.tree-card .tree-words')].map((e) => e.textContent)).toEqual(['1,200', '34']);
+  });
+
+  it('opens a Group as Mise en Place from a click on its name, and only opens or closes it from the arrow', () => {
+    const opened: string[] = [];
+    const host = shelf({ onOpenGroup: (p) => opened.push(p) });
+    const group = host.querySelector<HTMLElement>('.tree-folder')!;
+    act(() => group.querySelector<HTMLElement>('.tree-card-title')!.click());
+    expect(opened).toEqual(['bookshelf/Part One']);
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(2);
+    act(() => group.querySelector<HTMLElement>('.chevron')!.click());
+    expect(opened).toEqual(['bookshelf/Part One']);
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(0);
+  });
+
+  it('still opens and closes a Group on a click where Groups have no page, as in the Pantry', () => {
+    const host = shelf();
+    act(() => host.querySelector<HTMLElement>('.tree-folder .tree-card-title')!.click());
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(0);
+  });
+
+  it('opens a Group as Mise en Place from Enter, while the arrow keys only open and close it', () => {
+    const opened: string[] = [];
+    const host = shelf({ onOpenGroup: (p) => opened.push(p) });
+    const group = host.querySelector<HTMLElement>('.tree-folder')!;
+    const press = (key: string) => act(() => group.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })));
+    press('ArrowLeft');
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(0);
+    press('ArrowRight');
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(2);
+    expect(opened).toEqual([]);
+    // A button's Enter is a click on the button itself, not on its arrow.
+    act(() => group.click());
+    expect(opened).toEqual(['bookshelf/Part One']);
   });
 });

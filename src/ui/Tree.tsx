@@ -46,6 +46,13 @@ interface Props {
   /** Rows picked for the toolbar and right-click menu: Ctrl or ⌘-click adds one, Shift-click a run. */
   marked?: Set<string>;
   onMark?: (marked: Set<string>) => void;
+  /**
+   * Opens a Group as Mise en Place: a click on its name, Enter or Space. Without it, a click opens
+   * or closes the Group, as in the Pantry. The arrow always opens and closes it.
+   */
+  onOpenGroup?: (path: string) => void;
+  /** The Group shown as Mise en Place, highlighted like the open Item. */
+  shownGroup?: string | null;
 }
 
 export interface Recipe {
@@ -492,14 +499,15 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
     );
   }
 
+  const shown = shared.shownGroup === node.path;
   return (
-    <li role="treeitem" aria-expanded={open} className={dragging === node.path ? 'is-dragging' : undefined}>
+    <li role="treeitem" aria-expanded={open} aria-selected={shared.onOpenGroup ? shown : undefined} className={dragging === node.path ? 'is-dragging' : undefined}>
       {renaming === node.path ? (
         <FolderName name={node.name} onDone={(title) => onRename(node.path, title)} />
       ) : (
         <button
           {...rowProps}
-          className={`tree-folder${marker}${picked}${cut === node.path ? ' is-cut' : ''}`}
+          className={`tree-folder${marker}${picked}${cut === node.path ? ' is-cut' : ''}${shown ? ' is-shown' : ''}`}
           // The Group's word count lives on hover; the end of the row is kept for the board icon.
           title={wordsTitle(label, total)}
           // The open Item's words as typed are added in as the pointer arrives, so typing never redraws the Shelf.
@@ -509,11 +517,19 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
             if (now) e.currentTarget.title = now;
             else e.currentTarget.removeAttribute('title');
           }}
-          onClick={(e) => !justDragged.current && !mark(e, node.path) && toggle(node.path)}
-          onDoubleClick={() => !fixed && onStartRename(node.path)}
+          onClick={(e) => {
+            if (justDragged.current) return;
+            // The arrow only opens and closes the Group, so it never takes the page away.
+            if ((e.target as Element).closest('.chevron') || !shared.onOpenGroup) {
+              if (!mark(e, node.path)) toggle(node.path);
+              return;
+            }
+            if (!mark(e, node.path)) shared.onOpenGroup(node.path);
+          }}
+          onDoubleClick={(e) => !fixed && !(e.target as Element).closest('.chevron') && onStartRename(node.path)}
         >
           <span className="tree-folder-name">
-            <span aria-hidden="true" className="chevron">
+            <span aria-hidden="true" className="chevron" title={open ? 'Close the group' : 'Open the group'}>
               {open ? '▾' : '▸'}
             </span>
             <span className="tree-card-title">{label}</span>

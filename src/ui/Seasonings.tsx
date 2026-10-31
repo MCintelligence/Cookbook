@@ -54,6 +54,16 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   // The seasoning being dragged by its head, and where it would land among the others.
   const [drag, setDrag] = useState<{ id: SeasoningId; index: number | null } | null>(null);
   const list = useRef<HTMLDivElement>(null);
+  // Moving a card takes it out of the page and back, which drops the keyboard; it's put back once the list is redrawn.
+  const refocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const held = refocus.current;
+    refocus.current = null;
+    if (!held?.isConnected || document.activeElement === held) return;
+    // "Move down" turns off at the bottom of the list, so the keyboard goes to the card's first button that still works.
+    const to = held instanceof HTMLButtonElement && held.disabled ? held.closest('.sc')?.querySelector<HTMLElement>('.handles button:not(:disabled)') : held;
+    to?.focus({ preventScroll: true });
+  }, [chosen]);
   const justDragged = useRef(false);
   // Seasonings picked for the toolbar and menu, by clicking their heads.
   const [marked, setMarked] = useState<SeasoningId[]>([]);
@@ -66,6 +76,9 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
 
   const showPicker = picking;
   const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
+    // The card is drawn again in its new place; the keyboard stays on the same button or card.
+    const held = document.activeElement;
+    if (held instanceof HTMLElement && list.current?.contains(held)) refocus.current = held;
     const rest = chosen.filter((c) => c !== id);
     const at = chosen.indexOf(id);
     const index = to === 'top' ? 0 : to === 'bottom' ? rest.length : to === 'up' ? Math.max(0, at - 1) : Math.min(rest.length, at + 1);
@@ -241,7 +254,21 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
             const count = id === 'daniel' ? tracked.length : issues.length;
             const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before', picked.includes(id) && 'is-marked'].filter(Boolean).join(' ');
             return (
-              <section className={cls} aria-label={who.name} key={id} onContextMenu={(e) => cardMenu(e, id, at)}>
+              <section
+                className={cls}
+                aria-label={who.name}
+                key={id}
+                onContextMenu={(e) => cardMenu(e, id, at)}
+                // Alt+↑ and Alt+↓ move a seasoning up or down the list (Alt+Home and Alt+End to the ends), as on the Shelf.
+                onKeyDown={(e) => {
+                  if (!e.altKey || e.ctrlKey || e.metaKey) return;
+                  const to = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down' : e.key === 'Home' ? 'top' : e.key === 'End' ? 'bottom' : null;
+                  if (!to) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  move(id, to);
+                }}
+              >
                 <div className="sc-head" title="Click to pick, drag to reorder" onPointerDown={(e) => begin(e, id)} onClick={(e) => pick(e, id)}>
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>

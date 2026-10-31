@@ -29,6 +29,22 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'newScene', label: 'New item', key: isTauri() ? 'Mod-N' : 'Mod-Alt-N' },
   { id: 'bookread', label: 'Read the recipe', key: 'Mod-Shift-R' },
   { id: 'settings', label: 'Settings', key: 'Mod-,' },
+  // Cookbook saves as you type; this saves anything still waiting straight away and says so.
+  { id: 'save', label: 'Save now', key: 'Mod-S' },
+  // Moving around the window: F6 goes round the toolbar, Shelf, page and panels; Mod+1 to 5 jump to one.
+  { id: 'nextArea', label: 'Next part of the window', key: 'F6' },
+  { id: 'prevArea', label: 'Previous part of the window', key: 'Shift-F6' },
+  { id: 'goPage', label: 'Go to the page', key: 'Mod-1' },
+  { id: 'goShelf', label: 'Go to the Shelf', key: 'Mod-2' },
+  { id: 'goPantry', label: 'Go to the Pantry', key: 'Mod-3' },
+  { id: 'goSeasonings', label: 'Go to Seasonings', key: 'Mod-4' },
+  { id: 'goToolbar', label: 'Go to the toolbar', key: 'Mod-5' },
+  // Proofreading: the next or previous underlined issue, with its card open.
+  { id: 'nextIssue', label: 'Next issue', key: 'F7' },
+  { id: 'prevIssue', label: 'Previous issue', key: 'Shift-F7' },
+  // A web browser keeps Ctrl+Page Up and Ctrl+Page Down for its own tabs, so these are the desktop app's.
+  { id: 'prevItem', label: 'Previous item', key: isTauri() ? 'Mod-PageUp' : '' },
+  { id: 'nextItem', label: 'Next item', key: isTauri() ? 'Mod-PageDown' : '' },
 ];
 
 /** The binding in use for a command: the writer's own, or the default. */
@@ -42,8 +58,15 @@ export function setBinding(id: string, key: string | null): void {
   setSettings({ shortcuts: key && key !== fallback ? { ...rest, [id]: key } : rest });
 }
 
-/** The key itself, as a binding names it: letters upper case, and ⌥ on a Mac doesn't turn M into µ. */
+/**
+ * The key itself, as a binding names it. A letter is the one printed on the key, so on a French,
+ * German or Dvorak keyboard Ctrl+K is the key marked K, as menus and Settings show it (the page's
+ * own Mod-B and Mod-I already work this way). Where the key types no plain letter (a Russian or
+ * Greek layout, or ⌥ on a Mac turning M into µ) the key's place on a US keyboard is used instead.
+ * Digits always go by place, since French keyboards need Shift to type them.
+ */
 function keyName(e: KeyboardEvent): string {
+  if (/^[a-z]$/i.test(e.key)) return e.key.toUpperCase();
   if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
   if (/^Digit\d$/.test(e.code)) return e.code.slice(5);
   if (e.key === ' ') return 'Space';
@@ -52,7 +75,9 @@ function keyName(e: KeyboardEvent): string {
 
 /** The binding a key press makes, or null while only modifiers are held. */
 export function bindingOf(e: KeyboardEvent): string | null {
-  if (['Control', 'Meta', 'Alt', 'Shift'].includes(e.key)) return null;
+  if (['Control', 'Meta', 'Alt', 'Shift', 'AltGraph'].includes(e.key)) return null;
+  // AltGr types letters like ń, € and @ on Windows and Linux, and reports itself as Ctrl+Alt; it's never a shortcut.
+  if (!IS_MAC && e.getModifierState?.('AltGraph')) return null;
   const parts: string[] = [];
   if (IS_MAC ? e.metaKey : e.ctrlKey) parts.push('Mod');
   if (IS_MAC && e.ctrlKey) parts.push('Ctrl');

@@ -1,7 +1,8 @@
 import { unzipSync } from 'fflate';
 import { type StorageAdapter, joinPath } from './adapter';
-import { backupZip } from './backup';
+import { backupEntries } from './backup';
 import { fileNameFor } from './book';
+import { zipInBackground, zipProblemInBackground } from './zip';
 
 /**
  * Automatic backups: a zip of the whole book, kept in a backups folder outside
@@ -116,7 +117,14 @@ export function backupsToKeep(dates: Date[], keep: number, now: Date = new Date(
   return kept;
 }
 
-/** Zips the book into its backups folder, then removes older ones the writer doesn't keep (`keep` 0 keeps all). */
+/** A backup was written but didn't read back whole, so it was removed rather than kept. */
+export class BackupCheckError extends Error {
+  constructor(readonly problem: string) {
+    super(`Cookbook made a backup but couldn’t open it again complete, so it wasn’t kept: ${problem}. The recipe itself is fine.`);
+  }
+}
+
+/** Zips the book into its backups folder, checks it opens again, then removes older ones the writer doesn't keep (`keep` 0 keeps all). */
 export async function makeBackup(book: StorageAdapter, backups: StorageAdapter, owner: BackupOwner, keep: number, now = new Date()): Promise<Backup> {
   const wanted = backupFolderName(owner);
   let folder = await ownFolder(backups, owner);
@@ -132,7 +140,27 @@ export async function makeBackup(book: StorageAdapter, backups: StorageAdapter, 
   folder ??= wanted;
   await backups.makeFolder(folder);
   const path = joinPath(folder, backupName(now));
-  await backups.writeBytes(path, await backupZip(book, fileNameFor(owner.title)));
+  const entries = await backupEntries(book, fileNameFor(owner.title));
+  const zip = await zipInBackground(entries);
+  try {
+    await backups.writeBytes(path, zip);
+  } catch (e) {
+    // A write that fails part way may leave a start of a zip, which would be listed and kept as a backup.
+    await backups.remove(path).catch(() => {});
+    throw e;
+  }
+  // Read back and opened, so a backup that a full or failing disk spoiled is never counted on,
+  // and never pushes out an older one that works.
+  let problem: string | null;
+  try {
+    problem = await zipProblemInBackground(await backups.readBytes(path), entries);
+  } catch (e) {
+    problem = `it can’t be read back (${e instanceof Error ? e.message : String(e)})`;
+  }
+  if (problem) {
+    await backups.remove(path).catch(() => {});
+    throw new BackupCheckError(problem);
+  }
   if (keep > 0) {
     const own = (await backupsIn(backups, folder, false)).sort(newestFirst);
     const kept = backupsToKeep(

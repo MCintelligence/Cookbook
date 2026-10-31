@@ -8,11 +8,19 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
     await tick();
     disk.set(p, text);
   },
-  rename: async (from: string, to: string) => {
+}));
+// The app's own swap: flushes the temporary file to disk, then renames it over the file.
+const committed: string[] = [];
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: async (command: string, args: { tmp: string }) => {
+    if (command !== 'commit_write') throw new Error(`unknown command ${command}`);
     await tick();
-    if (!disk.has(from)) throw new Error(`failed to rename ${from}: No such file or directory`);
-    disk.set(to, disk.get(from)!);
-    disk.delete(from);
+    const { tmp } = args;
+    if (!disk.has(tmp)) throw new Error(`failed to rename ${tmp}: No such file or directory`);
+    const to = tmp.slice(0, -'.cookbook-tmp'.length);
+    disk.set(to, disk.get(tmp)!);
+    disk.delete(tmp);
+    committed.push(to);
   },
 }));
 
@@ -24,5 +32,7 @@ describe('TauriAdapter', () => {
     await Promise.all([fs.writeText('styles.json', 'one'), fs.writeText('styles.json', 'two'), fs.writeText('styles.json', 'three')]);
     expect(disk.get('/book/styles.json')).toBe('three');
     expect([...disk.keys()].filter((k) => k.endsWith('.cookbook-tmp'))).toEqual([]);
+    // Every save went through the flushing swap, not a plain rename.
+    expect(committed).toEqual(['/book/styles.json', '/book/styles.json', '/book/styles.json']);
   });
 });

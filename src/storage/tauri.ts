@@ -1,9 +1,10 @@
+import { invoke } from '@tauri-apps/api/core';
 import { exists, mkdir, readDir, readFile, readTextFile, remove, rename, stat, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { type Entry, type StorageAdapter, joinPath } from './adapter';
 
 /** A book folder anywhere on the writer's disk, for the desktop and mobile apps. */
 export class TauriAdapter implements StorageAdapter {
-  constructor(private root: string) {}
+  constructor(readonly root: string) {}
 
   /** The last write to each file, so writes to one file land in order and never share a temporary file. */
   private writing = new Map<string, Promise<void>>();
@@ -31,6 +32,8 @@ export class TauriAdapter implements StorageAdapter {
 
   /**
    * Writes beside the real file, then swaps it in, so a crash never leaves half a page.
+   * The swap (commit_write in src-tauri) first forces the new file onto the disk, so a
+   * power cut straight after a save can't leave it empty either.
    * Two quick saves of one file wait their turn: if they shared the temporary file, the
    * second rename would find it already gone.
    */
@@ -39,7 +42,7 @@ export class TauriAdapter implements StorageAdapter {
     const run = async () => {
       const tmp = `${abs}.cookbook-tmp`;
       await write(tmp);
-      await rename(tmp, abs);
+      await invoke('commit_write', { tmp });
     };
     const next = (this.writing.get(abs) ?? Promise.resolve()).then(run, run);
     this.writing.set(abs, next);

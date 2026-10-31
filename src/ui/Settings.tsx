@@ -34,6 +34,10 @@ export interface BackupInfo {
   canChoose: boolean;
   last: Date | null;
   count: number;
+  /** The backup folder is on the same disk as the recipe, so one broken or lost disk would take both. */
+  sameDisk: boolean;
+  /** Why the last automatic backup failed, until one works again. */
+  problem: string | null;
 }
 
 interface Props {
@@ -493,14 +497,36 @@ function Saving({ backups, onBackUpNow, onRestore, onChooseBackupFolder }: Props
             onChange={(keepBackups) => setSettings({ keepBackups })}
           />
         </Row>
-        <Row title="Backup folder" help={backups.folder}>
+        <Row
+          title="Backup folder"
+          help={
+            backups.sameDisk ? (
+              <>
+                {backups.folder}
+                <span className="set-row-warn">On the same disk as this recipe, so a broken or lost computer would take both. A folder on another drive, or one a cloud service syncs, keeps them apart.</span>
+              </>
+            ) : (
+              backups.folder
+            )
+          }
+          words={`${backups.folder} disk drive`}
+        >
           {backups.canChoose && (
             <button className="set-btn" onClick={onChooseBackupFolder}>
               Choose folder…
             </button>
           )}
         </Row>
-        <Row title="Last backup" help={`${last} · ${backups.count} ${backups.count === 1 ? 'backup' : 'backups'} of this recipe`}>
+        <Row
+          title="Last backup"
+          help={
+            <>
+              {`${last} · ${backups.count} ${backups.count === 1 ? 'backup' : 'backups'} of this recipe. Each one is opened again after it is made, to check it is complete.`}
+              {backups.problem && <span className="set-row-warn">{backups.problem.replace(/ \([^]*\)$/, '')}</span>}
+            </>
+          }
+          words="last backup check failed"
+        >
           <div className="set-actions">
             <button className="set-btn" disabled={backups.count === 0} onClick={onRestore}>
               Restore…

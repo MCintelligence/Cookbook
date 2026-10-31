@@ -55,6 +55,7 @@ import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, type SaveState, SavedStatus } from './ui/LiveCounts';
 import { createStore } from './ui/store';
 import { useStable } from './ui/useStable';
+import { docWords } from './editor/docStats';
 import { useTracked } from './ui/useTracked';
 import { useBookIndex } from './storage/useBookIndex';
 import { ownerOf, useBackups } from './storage/useBackups';
@@ -79,7 +80,10 @@ import {
   recentBooks,
   rememberBook,
   sameLocation,
+  updateRecent,
 } from './storage/platform';
+import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
+import type { NewRecipeChoice } from './ui/NewRecipe';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -100,14 +104,16 @@ import { undoDepth } from '@tiptap/pm/history';
 import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/scenes';
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
+import { AREA_SHORTCUTS, type Area, areaOf, areaRoot, areaShown, landingIn, nextArea } from './ui/areas';
 import { BrainstormPlus } from './ui/BrainstormPlus';
-import { isBrainstormKind } from './storage/brainstorm';
+import { BRAINSTORM_GROUPS, type BrainstormCard, isBrainstormKind } from './storage/brainstorm';
+import { emptyLineAt, insertBrainstorm } from './editor/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
 import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
-import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from './proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt, stepIssue } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
@@ -180,13 +186,24 @@ function readNotes(doc: CookbookDocument | null): Notes {
   return Object.fromEntries(Object.entries(raw).map(([id, text]) => [id, typeof text === 'string' ? text : String(text ?? '')]));
 }
 
-async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel'): Promise<BookInfo> {
+async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel', setup: Partial<BookInfo> = {}): Promise<BookInfo> {
   return makeBookOrUndo(fs, async () => {
-    const info = await createBook(fs, title);
+    const info = { ...(await createBook(fs, title)), ...setup };
     await applyBookTemplate(fs, template);
+    if (Object.keys(setup).length > 0) await saveBookInfo(fs, info);
     return info;
   });
 }
+
+/** A new recipe that starts as a copy of another: one of the writer's templates, or a recipe being duplicated. */
+async function copyBook(from: BookLocation, fs: StorageAdapter, title: string, setup: Partial<BookInfo> = {}): Promise<BookInfo> {
+  const { fs: source } = await openLocation(from);
+  return makeBookOrUndo(fs, async () => {
+    await copyRecipe(source, fs);
+    return renameCopy(fs, { title, ...setup });
+  });
+}
+
 
 /** Words in a scene, not counting markup. */
 function sceneWords(doc: CookbookDocument): number {
@@ -258,6 +275,8 @@ export function App() {
   const started = useRef(false);
   const [location, setLocation] = useState<BookLocation | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Your Recipes opens straight onto New Recipe. */
+  const [libraryNew, setLibraryNew] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<BookLocation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -341,14 +360,18 @@ export function App() {
    * Opens the book at a location. `create` starts a new book there; `adopt`
    * turns a folder that is not a book yet into one.
    */
-  const openAt = async (target: BookLocation, mode: { create?: string; template?: BookTemplateId; adopt?: boolean } = {}) => {
+  const openAt = async (
+    target: BookLocation,
+    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean } = {},
+  ) => {
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
     if (getSettings().backupOnClose) await autoBackup().catch(() => {});
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
-    if (mode.create) info = await startBook(nextFs, mode.create, mode.template);
+    if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
+    else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
     else {
       try {
         info = await openBook(nextFs);
@@ -372,6 +395,9 @@ export function App() {
     // with it open last time, so it is backed up before anything else changes.
     const previous = locationRef.current;
     if (previous) markClosed(window.localStorage, previous);
+    noteRecipe.current();
+    // A new recipe counts as edited now, so it sorts to the top of Your Recipes.
+    lastEdited.current = mode.create ? Date.now() : undefined;
     const crashed = markOpen(window.localStorage, target);
     index.current?.index.close();
     index.current = null;
@@ -387,7 +413,9 @@ export function App() {
     setFs(nextFs);
     setWhere(nextWhere);
     setLocation(target);
-    rememberBook({ location: target, title: info.title });
+    // A template being edited stays off the list of recipes.
+    if (!mode.editingTemplate) rememberBook({ location: target, title: info.title });
+    editingTemplate.current = !!mode.editingTemplate;
     bookRef.current = info;
     fsRef.current = nextFs;
     if (crashed && getSettings().backupOnClose) {
@@ -415,6 +443,7 @@ export function App() {
     try {
       if ((await action()) === 'done') {
         setLibraryOpen(false);
+        setLibraryNew(false);
         setAdopting(null);
       }
     } catch (e) {
@@ -440,19 +469,73 @@ export function App() {
 
   const closeLibrary = useCallback(() => {
     setLibraryOpen(false);
+    setLibraryNew(false);
     setLibraryError(null);
     setAdopting(null);
   }, []);
 
-  const createNewBook = (title: string, template: BookTemplateId, inFolder: boolean) =>
+  /** A folder for a new recipe that no other recipe uses yet. */
+  const freshLocation = async (title: string, parent: BookLocation | null) => {
+    const taken = new Set<string>();
+    for (const b of recentBooks()) taken.add(b.location.kind === 'folder' ? baseName(b.location.path.replace(/\\/g, '/')) : b.location.name);
+    const name = freeName(fileNameFor(title), (n) => taken.has(n));
+    return parent ? childLocation(parent, name) : newBookLocation(name, getSettings().newBooksFolder);
+  };
+
+  const createNewBook = ({ title, builtIn, template, setup, inFolder }: NewRecipeChoice) =>
     fromLibrary(async () => {
-      let target: BookLocation;
+      let parent: BookLocation | null = null;
       if (inFolder) {
-        const parent = await pickFolder(`Choose where to keep “${title}”`);
+        parent = await pickFolder(`Choose where to keep “${title}”`);
         if (!parent) return 'cancelled';
-        target = await childLocation(parent, fileNameFor(title));
-      } else target = await newBookLocation(fileNameFor(title), getSettings().newBooksFolder);
-      await openAt(target, { create: title, template });
+      }
+      const target = await freshLocation(title, parent);
+      await openAt(target, { create: title, template: builtIn, from: template?.location, setup });
+      return 'done';
+    });
+
+  /** Copies a recipe beside the others and opens the copy. */
+  const duplicateRecipe = (from: BookLocation, title: string) =>
+    fromLibrary(async () => {
+      const copyTitle = `${title} copy`;
+      await openAt(await freshLocation(copyTitle, null), { create: copyTitle, from });
+      say(`Made a copy of “${title}”.`);
+      return 'done';
+    });
+
+  /** Renames a recipe in its book.json, whether it is open or not. */
+  const renameRecipe = async (target: BookLocation, title: string) => {
+    if (location && sameLocation(target, location)) {
+      updateBook({ title });
+    } else {
+      const { fs: other } = await openLocation(target);
+      await saveBookInfo(other, { ...(await openBook(other)), title });
+    }
+    updateRecent(target, { title });
+  };
+
+  /** Opens one of the writer's templates to change it, like any recipe, but kept off the list of recipes. */
+  const editTemplate = (template: UserTemplate) =>
+    fromLibrary(async () => {
+      await openAt(template.location, { editingTemplate: true });
+      say(`You’re editing the template “${template.name}”. Changes save into the template; recipes already made from it stay as they are.`);
+      return 'done';
+    });
+
+  const saveAsTemplate = async (from: BookLocation, name: string, group: string, keepText: boolean) => {
+    if (location && sameLocation(from, location)) await flushSave();
+    return saveTemplate(from, name, group, keepText);
+  };
+
+  /** Points a recipe whose folder moved at where it is now. */
+  const locateRecipe = (lost: BookLocation) =>
+    fromLibrary(async () => {
+      const picked = await pickFolder('Find the recipe’s folder');
+      if (!picked) return 'cancelled';
+      const { fs: there } = await openLocation(picked);
+      if (!(await there.exists('book.json'))) throw new Error('That folder has no Cookbook recipe in it. Pick the folder that holds book.json.');
+      updateRecent(lost, { location: picked });
+      await openAt(picked);
       return 'done';
     });
 
@@ -520,6 +603,10 @@ export function App() {
   const unsaved = useRef<{ path: string; id: string; text: string; base: string } | null>(null);
   const locationRef = useRef<BookLocation | null>(null);
   locationRef.current = location;
+  /** The open recipe is one of the writer's templates, opened to edit it. */
+  const editingTemplate = useRef(false);
+  /** When the open recipe was last saved. Noted in Your Recipes only when the window opens or the recipe closes, never per save. */
+  const lastEdited = useRef<number | undefined>(undefined);
   const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
 
   const onRecorder = useCallback(
@@ -547,6 +634,7 @@ export function App() {
     try {
       await save();
       setSaveFailed(false);
+      lastEdited.current = Date.now();
       if (!pendingSave.current) {
         setDirty(false);
         unsaved.current = null;
@@ -1113,7 +1201,7 @@ export function App() {
       x: r.left,
       y: r.bottom + 4,
       items: [
-        { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+        { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
         { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
@@ -1774,6 +1862,8 @@ export function App() {
       const moved = await moveItem(fs, order.current, treeOf(topOf(from)), topOf(from), from, folder, at);
       order.current = moved.order;
       followMove(from, moved.path);
+      await refreshTree();
+      return moved.path;
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -2002,11 +2092,106 @@ export function App() {
     // indexVersion changes whenever the index does, like searchBook below.
     [indexVersion],
   );
+  /**
+   * Puts the keyboard in a part of the window, opening it first if it's closed (or hidden by
+   * Oven Mode). The page keeps its cursor where it was; a list lands on its current row.
+   */
+  const goToArea = (area: Area) => {
+    if (area === 'page') {
+      if (!editor) return;
+      setSideOpen(false);
+      editor.commands.focus();
+      return;
+    }
+    if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
+    const oven = getSettings().focus;
+    if (oven) setSettings({ focus: false });
+    if (area === 'pantry' && panel !== 'pantry') setPanel('pantry');
+    if (area === 'seasonings' && panel !== 'seasonings') setPanel('seasonings');
+    // On a narrow window the Shelf slides in. (In Oven Mode it's hidden for that reason alone.)
+    if (area === 'shelf' && !oven && !areaShown('shelf')) setSideOpen(true);
+    // After React has drawn what was just opened.
+    requestAnimationFrame(() => {
+      const root = areaRoot(area);
+      const target = root && landingIn(root);
+      target?.focus();
+    });
+  };
+  /** F7 and Shift+F7: the next or previous issue in the page, with its card open. */
+  const [issueRequest, setIssueRequest] = useState<{ issue: FoundIssue; at: number } | null>(null);
+  const goToIssue = (dir: 1 | -1) => {
+    if (!editor || !doc || manuscript) return;
+    const found = stepIssue(editor.state, dir);
+    if (found) setIssueRequest({ issue: found, at: Date.now() });
+    // Grammar and style are only checked while Seasonings is open, so this may be spelling alone.
+    else say('Nothing underlined in this item.');
+  };
+  /** Mod+Page Up and Mod+Page Down: the item before or after this one, in Shelf (or Pantry) order. */
+  const stepItem = (dir: 1 | -1) => {
+    if (!path || manuscript) return;
+    const files: string[] = [];
+    const walk = (list: TreeNode[]) => list.forEach((n) => (n.kind === 'file' ? files.push(n.path) : walk(n.children ?? [])));
+    walk(treeOf(topOf(path)));
+    const to = files[files.indexOf(path) + dir];
+    if (!to) return;
+    // The next page's editor takes the keyboard as soon as it's ready, so writing can carry on.
+    focusNextPage.current = 'start';
+    void select(to);
+  };
+  /** Where the next editor to appear takes the keyboard: at the top of a new item, or where its cursor already is. */
+  const focusNextPage = useRef<false | 'start' | 'here'>(false);
+  useEffect(() => {
+    if (!editor || !focusNextPage.current) return;
+    const at = focusNextPage.current;
+    focusNextPage.current = false;
+    // Unless something else (a menu, a box) has taken the keyboard meanwhile.
+    if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
+    editor.commands.focus(at === 'start' ? 'start' : undefined);
+  }, [editor]);
+  // Read the recipe takes the page away; coming back from it (or opening an item from it) hands the keyboard back.
+  const wasReading = useRef(false);
+  useEffect(() => {
+    if (manuscript) wasReading.current = true;
+    else if (wasReading.current) {
+      wasReading.current = false;
+      if (!focusNextPage.current) focusNextPage.current = 'here';
+    }
+  }, [manuscript]);
+  /** F6 and Shift+F6: round the parts of the window that are on screen. */
+  const cycleArea = (dir: 1 | -1) => {
+    const go = () => {
+      const from = areaOf(document.activeElement);
+      const to = nextArea(from, dir, (a) => (a === 'page' ? !!editor && !!doc && !manuscript : areaShown(a)));
+      if (to) goToArea(to);
+    };
+    // Oven Mode hides everything but the page, so F6 brings the panels back first.
+    if (getSettings().focus) {
+      setSettings({ focus: false });
+      requestAnimationFrame(go);
+    } else go();
+  };
   /** The app's own shortcuts (Settings › Keyboard shortcuts); the page's are in the editor. */
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onAppKey.current = (e: KeyboardEvent) => {
     if (e.defaultPrevented) return;
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings']);
+    if (e.key === 'Escape' && !settingsAt) {
+      // Escape in the Shelf or a panel goes back to the page, unless a box or menu there wanted it.
+      const at = document.activeElement;
+      const area = areaOf(at);
+      if (area && area !== 'page' && area !== 'toolbar' && !(at instanceof Element && at.closest('input, textarea, select, .menu, [role="dialog"]'))) {
+        e.preventDefault();
+        goToArea('page');
+      }
+      return;
+    }
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem']);
+    if (id === 'save') {
+      // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
+      // which are whole-file writes), and it never opens the browser's Save page dialog.
+      e.preventDefault();
+      void flushSave().then(() => !pendingSave.current && say('Saved.'));
+      return;
+    }
     if (settingsAt) {
       // Only the Settings shortcut itself works over Settings: it closes it again.
       if (id === 'settings') {
@@ -2034,6 +2219,10 @@ export function App() {
     else if (id === 'newScene') void addScene();
     else if (id === 'bookread') manuscript ? setManuscript(null) : void readManuscript();
     else if (id === 'settings') openSettings();
+    else if (id === 'nextArea' || id === 'prevArea') cycleArea(id === 'nextArea' ? 1 : -1);
+    else if (AREA_SHORTCUTS[id]) goToArea(AREA_SHORTCUTS[id]!);
+    else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
+    else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -2182,6 +2371,7 @@ export function App() {
     if (typed && /^[^\n]{1,40}$/.test(typed) && state.doc.textBetween(at, at + 1) === '@') editor.chain().focus().insertContentAt(at + 1, typed).run();
     else editor.commands.focus();
   };
+  const cardKind = doc?.kind ?? null;
   const insertItems = useMemo<PaletteItem[]>(() => {
     if (!editor) return [];
     const item = (id: string, label: string, group: string, words: string, run: () => void, hint?: string): PaletteItem => ({ id, label, group, words, run, hint });
@@ -2207,8 +2397,23 @@ export function App() {
       item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
       item('name', 'Name from the Pantry', 'Insert', 'pantry character place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
+      // On a character or place page, the brainstorming cards the + offers, so they can be added without the mouse.
+      ...(isBrainstormKind(cardKind)
+        ? BRAINSTORM_GROUPS.flatMap((g) => {
+            const add = (cards: BrainstormCard[]) => () => {
+              const line = emptyLineAt(editor, cardKind);
+              if (line === null) say('Brainstorming cards go on an empty line of their own.');
+              else insertBrainstorm(editor, line, cards);
+            };
+            const list = g.cards[cardKind];
+            return [
+              ...(g.addsAll ? [item(`bs-${g.id}`, `All of ${g.title}`, 'Brainstorm', `brainstorm card ${g.title}`, add(list), `${list.length} cards`)] : []),
+              ...list.map((c) => item(`bs-${g.id}-${c.id}`, c.title, 'Brainstorm', `brainstorm card ${g.title}`, add([c]), g.title)),
+            ];
+          })
+        : []),
     ];
-  }, [editor, sheet, settings.shortcuts, settings.shortcutStyle]);
+  }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
   const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
   const saveEverything = useCallback(async () => {
     await flushSave();
@@ -2272,9 +2477,15 @@ export function App() {
       cmd('import', 'Import files…', () => chooseImport(null), 'Recipe', '.docx .md .txt'),
       cmd('zip', 'Back up as a zip…', () => void backUp(), 'Recipe'),
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
-      cmd('books', 'Your recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
+      cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
       cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
+      // Also here because a web browser keeps Ctrl+1 to Ctrl+8 for its own tabs.
+      cmd('goShelf', 'Go to the Shelf', () => goToArea('shelf'), 'Go to', keysFor('goShelf'), 'keyboard focus panel'),
+      cmd('goPantry', 'Go to the Pantry', () => goToArea('pantry'), 'Go to', keysFor('goPantry'), 'keyboard focus panel'),
+      cmd('goSeasonings', 'Go to Seasonings', () => goToArea('seasonings'), 'Go to', keysFor('goSeasonings'), 'keyboard focus panel proofread'),
+      cmd('goToolbar', 'Go to the toolbar', () => goToArea('toolbar'), 'Go to', keysFor('goToolbar'), 'keyboard focus formatting'),
+      cmd('nextIssue', 'Next issue', () => goToIssue(1), 'Go to', keysFor('nextIssue'), 'proofread spelling grammar mistake'),
       ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
       ...places,
     ];
@@ -2293,6 +2504,46 @@ export function App() {
     for (const [p, c] of cards) if (p.startsWith(BOOKSHELF + '/') && c.kind === 'scene' && p !== path) total += c.words;
     return total;
   }, [cards, path]);
+  /** Words on the Shelf now, with the open Item counted from the editor. Read when needed, not while typing. */
+  const bookWordsNow = () => {
+    if (!path || !path.startsWith(BOOKSHELF + '/') || doc?.kind !== 'scene') return otherWords;
+    return otherWords + (editor ? docWords(editor.state.doc) : (cards.get(path)?.words ?? 0));
+  };
+  /**
+   * Notes the open recipe's title, words, goal and series in Your Recipes, so the list shows them without
+   * opening it. Run when Your Recipes opens and when the recipe closes, never while typing.
+   */
+  const noteRecipe = useRef<(extra?: { firstLines?: string }) => void>(() => {});
+  noteRecipe.current = (extra = {}) => {
+    const at = locationRef.current;
+    const info = bookRef.current;
+    if (!at || !info || editingTemplate.current) return;
+    updateRecent(at, { title: info.title, words: bookWordsNow(), goal: info.bookTarget, series: info.series, seriesNumber: info.seriesNumber, ...(lastEdited.current && { edited: lastEdited.current }), ...extra });
+  };
+  useEffect(() => {
+    const onHide = () => noteRecipe.current();
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, []);
+  // Its first lines are read once, when Your Recipes opens.
+  const [libraryVersion, setLibraryVersion] = useState(0);
+  useEffect(() => {
+    if (!libraryOpen || !fs || editingTemplate.current) return;
+    let live = true;
+    noteRecipe.current();
+    setLibraryVersion((v) => v + 1);
+    void flushSave()
+      .then(() => firstLines(fs, tree, plainText))
+      .then((text) => {
+        if (!live) return;
+        noteRecipe.current({ firstLines: text || undefined });
+        setLibraryVersion((v) => v + 1);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [libraryOpen]);
   const exportHistoryCsv = () =>
     void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
   // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
@@ -2330,7 +2581,8 @@ export function App() {
         { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
         { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
         { separator: true },
-        { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+        { label: 'New Recipe…', onPick: () => (setLibraryNew(true), setLibraryOpen(true)) },
+        { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
         {
           label: 'Export',
@@ -2474,7 +2726,7 @@ export function App() {
   // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
   // their identity; anything else that re-renders the app then leaves them be.
   const onSelect = useStable(select);
-  const onTreeMove = useStable((from: string, folder: string, at: number) => void moveInTree(from, folder, at));
+  const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
   const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
@@ -2513,7 +2765,7 @@ export function App() {
                   { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
                   { separator: true },
                   { label: 'Back up now', onPick: () => void backUpNow() },
-                  { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+                  { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
                 ]);
               }}
             >
@@ -2740,7 +2992,7 @@ export function App() {
         </div>
       )}
 
-      <IssueCard editor={editor} proof={proof} />
+      <IssueCard editor={editor} proof={proof} request={issueRequest} />
       {slash !== null && editor && <InsertMenu editor={editor} at={slash} items={insertItems} onClose={() => setSlash(null)} />}
 
       {shelf && (
@@ -2771,6 +3023,9 @@ export function App() {
           adopting={adopting}
           error={libraryError}
           busy={busy}
+          version={libraryVersion}
+          startNew={libraryNew}
+          defaultWhere={isTauri() ? settings.newBooksFolder || 'Cookbook’s own folder' : 'In this browser’s storage'}
           onOpen={(target) =>
             void fromLibrary(async () => {
               await openAt(target);
@@ -2778,7 +3033,7 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
-          onCreate={(title, template, inFolder) => void createNewBook(title, template, inFolder)}
+          onCreate={(choice) => void createNewBook(choice)}
           onAdopt={(target) =>
             void fromLibrary(async () => {
               await openAt(target, { adopt: true });
@@ -2787,6 +3042,12 @@ export function App() {
           }
           onCancelAdopt={() => setAdopting(null)}
           onClose={closeLibrary}
+          onRename={renameRecipe}
+          onDuplicate={(from, title) => void duplicateRecipe(from, title)}
+          onLocate={(lost) => void locateRecipe(lost)}
+          onDeleteForGood={deleteForGood}
+          onSaveTemplate={saveAsTemplate}
+          onEditTemplate={(t) => void editTemplate(t)}
           openBookItems={[
             { label: 'Back up as a zip…', onPick: () => void backUp() },
             {
@@ -2798,7 +3059,6 @@ export function App() {
                 { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
               ],
             },
-            { label: 'Trash', onPick: openTrash },
           ]}
         /></Suspense>
       )}

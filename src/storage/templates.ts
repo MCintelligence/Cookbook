@@ -8,9 +8,10 @@ import { type DocumentKind } from './document';
  * scenes and cards, so nothing about a book depends on its template.
  */
 
-export type BookTemplateId = 'novel' | 'short-story' | 'nonfiction';
+export type BookTemplateId = 'empty' | 'novel' | 'short-story' | 'nonfiction';
 
 export const BOOK_TEMPLATES: { id: BookTemplateId; name: string; description: string }[] = [
+  { id: 'empty', name: 'Empty', description: 'One blank item and an empty Pantry. Start from nothing.' },
   { id: 'novel', name: 'Novel', description: 'A group of items, with a main character and a place in the Pantry.' },
   { id: 'short-story', name: 'Short story', description: 'A single item and a main character.' },
   { id: 'nonfiction', name: 'Nonfiction', description: 'A group of items, with a note for your sources.' },
@@ -89,6 +90,8 @@ export async function applyBookTemplate(fs: StorageAdapter, template: BookTempla
     await createFromTemplate(fs, joinPath(BOOKSHELF, 'Group 1'), blank, 'Item 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');
     await createFromTemplate(fs, '', card('setting'), 'Main setting');
+  } else if (template === 'empty') {
+    await createFromTemplate(fs, BOOKSHELF, blank, 'Item 1');
   } else if (template === 'short-story') {
     await createFromTemplate(fs, BOOKSHELF, blank, 'Item 1');
     await createFromTemplate(fs, '', card('character'), 'Main character');

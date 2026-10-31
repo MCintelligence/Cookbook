@@ -25,6 +25,7 @@ const BOOK_SECTIONS: [SettingsSection, string][] = [
   ['proofreader', 'Proofreader'],
   ['goals', 'Goals'],
 ];
+const ALL_SECTIONS = [...APP_SECTIONS, ...BOOK_SECTIONS];
 export const SECTION_TITLES = Object.fromEntries([...APP_SECTIONS, ...BOOK_SECTIONS]) as Record<SettingsSection, string>;
 
 export interface BackupInfo {
@@ -169,10 +170,32 @@ export function Settings(props: Props) {
   const box = useRef<HTMLDivElement>(null);
   const searching = query.trim() !== '';
 
-  useEffect(() => {
+  // Settings is one long page: the list on the left jumps to a section and follows the scroll.
+  const [spied, setSpied] = useState(section);
+  const jump = (id: SettingsSection, smooth = false) => {
+    const el = box.current?.querySelector<HTMLElement>(`#set-${id}`);
+    el?.scrollIntoView({ block: 'start', behavior: smooth && !document.documentElement.hasAttribute('data-reduce-motion') ? 'smooth' : 'auto' });
     // The section's heading gets the keyboard, so the first Tab lands in it.
-    box.current?.querySelector<HTMLElement>('.set-main h2')?.focus();
-  }, [section]);
+    el?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
+    setSpied(id);
+  };
+  useEffect(() => jump(section), [section]);
+  useEffect(() => {
+    const root = box.current;
+    if (!root || searching) return;
+    // Watched by the browser, not on every scroll event: the topmost section in view is the one marked.
+    const seen = new Map<string, boolean>();
+    const watch = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+        const top = ALL_SECTIONS.find(([id]) => seen.get(`set-${id}`));
+        if (top) setSpied(top[0]);
+      },
+      { root, rootMargin: '-64px 0px -55% 0px' },
+    );
+    root.querySelectorAll('.set-section').forEach((el) => watch.observe(el));
+    return () => watch.disconnect();
+  }, [searching]);
 
   // Escape is heard from anywhere, not only from inside the dialog: a click on
   // the background leaves the keyboard on the page itself, and Escape still
@@ -193,7 +216,13 @@ export function Settings(props: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const sections = searching ? [...APP_SECTIONS, ...BOOK_SECTIONS].map(([id]) => id) : [section];
+  const sections = ALL_SECTIONS.map(([id]) => id);
+  const pick = (id: SettingsSection) => {
+    setQuery('');
+    // The page is laid out again without the search first, then scrolled.
+    window.requestAnimationFrame(() => jump(id, true));
+    onSection(id);
+  };
   return (
     <div
       className="settings"
@@ -226,18 +255,18 @@ export function Settings(props: Props) {
         <nav className="set-nav" aria-label="Settings sections">
           <div className="set-scope">App Settings</div>
           {APP_SECTIONS.map(([id, label]) => (
-            <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
+            <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
           <div className="set-scope">Recipe Settings</div>
           {BOOK_SECTIONS.map(([id, label]) => (
-            <NavItem key={id} id={id} label={label} current={!searching && id === section} onPick={(s) => (setQuery(''), onSection(s))} />
+            <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
           <p className="set-note">Recipe settings are saved in the recipe’s folder, so they travel with it. App settings stay on this device.</p>
         </nav>
         <main className="set-main">
           <Query.Provider value={query}>
             {sections.map((s) => (
-              <section key={s} className="set-section" aria-label={SECTION_TITLES[s]}>
+              <section key={s} id={`set-${s}`} className="set-section" aria-label={SECTION_TITLES[s]}>
                 <h2 className="set-h2" tabIndex={-1}>
                   {SECTION_TITLES[s]}
                 </h2>

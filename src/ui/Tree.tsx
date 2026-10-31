@@ -7,7 +7,9 @@ import { allPaths, between } from './selection';
 import { StatusIcon } from './StatusIcon';
 import { LiveWords } from './LiveCounts';
 import { docWords } from '../editor/docStats';
+import { altMove, pasteMove, placesOf, shownPaths } from './treeKeys';
 import { placeAt } from './zoom';
+import { IS_MAC } from '../shortcuts';
 
 interface Props {
   nodes: TreeNode[];
@@ -24,8 +26,8 @@ interface Props {
   /** The folder whose name is being edited. */
   renaming: string | null;
   onSelect: (path: string) => void;
-  /** Moves `from` to `index` among what `folder` holds now. */
-  onMove: (from: string, folder: string, index: number) => void;
+  /** Moves `from` to `index` among what `folder` holds now; may settle with where it landed. */
+  onMove: (from: string, folder: string, index: number) => void | Promise<string | undefined>;
   onStartRename: (path: string) => void;
   /** null when the writer cancels. */
   onRename: (path: string, title: string | null) => void;
@@ -76,7 +78,12 @@ function readCollapsed(key: string): Set<string> {
 /**
  * The Shelf (or a Pantry group) as a compact list of pages in books. Drag a
  * page or book to reorder it or move it into another book; on a touch
- * screen, press and hold first. Alt+↑ and Alt+↓ move the focused one.
+ * screen, press and hold first.
+ *
+ * From the keyboard it is one Tab stop: ↑ and ↓ go between rows, Home and End
+ * to the first and last, → opens a Group (then goes into it) and ← closes it
+ * (or goes up to it). Alt+↑ and Alt+↓ move the row, past the edge of its Group
+ * into the next; Mod+X then Mod+V on another row moves it there.
  */
 export const Tree = memo(function Tree(props: Props) {
   const { nodes, root, cards, collapseKey, onMove } = props;
@@ -85,6 +92,12 @@ export const Tree = memo(function Tree(props: Props) {
   const [drop, setDrop] = useState<Drop | null>(null);
   const list = useRef<HTMLUListElement>(null);
   const justDragged = useRef(false);
+  /** The row the keyboard was last on, which is the tree's one Tab stop. */
+  const [cursor, setCursor] = useState<string | null>(null);
+  /** A row cut with Mod+X, waiting for Mod+V. */
+  const [cut, setCut] = useState<string | null>(null);
+  // Worked out when the tree or its open Groups change, not on every keystroke in the page.
+  const places = useMemo(() => placesOf(nodes, root), [nodes, root]);
   // Where a Shift-click run starts: the row last clicked without Shift.
   const anchor = useRef<string | null>(null);
 
@@ -123,6 +136,72 @@ export const Tree = memo(function Tree(props: Props) {
     }
     remember(next);
   }, [props.folding?.at]);
+
+  const tabStop = useMemo(() => {
+    const shown = shownPaths(nodes, collapsed);
+    if (cursor && shown.includes(cursor)) return cursor;
+    if (props.selected && shown.includes(props.selected)) return props.selected;
+    return shown[0] ?? null;
+  }, [nodes, collapsed, cursor, props.selected]);
+
+  useEffect(() => {
+    if (cut && !places.has(cut)) setCut(null);
+  }, [places]);
+
+  const rowEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-tree-path="${CSS.escape(p)}"]`) ?? null;
+  const rows = () => [...(list.current?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path]') ?? [])];
+  const moveTo = (node: TreeNode, to: { folder: string; index: number }) => {
+    // Where the row should land; the move itself says for certain, since a name taken in the new Group gets a number.
+    const guess = to.folder === places.get(node.path)?.parent ? node.path : `${to.folder}/${node.name}`;
+    // A closed Group opens, so the row can still be seen where it went.
+    if (collapsed.has(to.folder)) {
+      const next = new Set(collapsed);
+      next.delete(to.folder);
+      remember(next);
+    }
+    // Once the tree is drawn again with the row in its new place, the keyboard follows it there.
+    void Promise.resolve(onMove(node.path, to.folder, to.index)).then((landed) => requestAnimationFrame(() => rowEl(landed ?? guess)?.focus()));
+  };
+
+  /** The tree's own keys on a row; true when one was used. */
+  const navigate = (e: ReactKeyboardEvent, node: TreeNode, open: boolean, fixed: boolean): boolean => {
+    const mod = IS_MAC ? e.metaKey : e.ctrlKey;
+    const plain = !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+    // The letter printed on the key, or its US place on a layout without Latin letters, as shortcuts.ts does.
+    const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : '';
+    const all = rows();
+    const here = all.indexOf(e.currentTarget as HTMLElement);
+    const go = (el: HTMLElement | undefined | null) => {
+      el?.focus();
+      el?.scrollIntoView({ block: 'nearest' });
+    };
+    if (plain && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) go(all[here + (e.key === 'ArrowDown' ? 1 : -1)]);
+    else if (plain && e.key === 'Home') go(all[0]);
+    else if (plain && e.key === 'End') go(all[all.length - 1]);
+    else if (plain && e.key === 'ArrowRight' && node.kind === 'folder') {
+      if (!open) toggle(node.path);
+      else if (node.children?.length) go(rowEl(node.children[0]!.path));
+    } else if (plain && e.key === 'ArrowLeft') {
+      if (node.kind === 'folder' && open) toggle(node.path);
+      else {
+        const parent = places.get(node.path)?.parent;
+        if (parent && parent !== root) go(rowEl(parent));
+      }
+    } else if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      if (fixed) return true;
+      const to = altMove(node, places, root, e.key === 'ArrowUp' ? -1 : 1);
+      if (to) moveTo(node, to);
+    } else if (mod && !e.altKey && !e.shiftKey && letter === 'x' && !fixed) setCut(node.path);
+    else if (mod && !e.altKey && !e.shiftKey && letter === 'v' && cut) {
+      const moving = places.get(cut);
+      const to = pasteMove(cut, node, places);
+      const from = moving && moving.siblings[moving.index];
+      setCut(null);
+      if (to && from) moveTo(from, to);
+    } else if (e.key === 'Escape' && cut) setCut(null);
+    else return false;
+    return true;
+  };
 
   // Words per Item and Group as last saved. Pantry cards aren't counted. The open Item's row
   // counts its own words as they are typed, and a Group adds them in when its count is shown.
@@ -265,12 +344,12 @@ export const Tree = memo(function Tree(props: Props) {
     return false;
   };
 
-  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged, mark, markKeys };
+  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged, mark, markKeys, tabStop, cut, setCursor, navigate };
   return (
     <>
       <ul className={`tree${drop?.row === null ? ' drop-end' : ''}${(props.marked?.size ?? 0) > 1 ? ' has-many' : ''}`} role="tree" ref={list} aria-multiselectable={props.onMark ? true : undefined}>
         {nodes.map((n, i) => (
-          <TreeItem key={n.path} node={n} parent={root} index={i} siblings={nodes.length} depth={0} {...shared} />
+          <TreeItem key={n.path} node={n} parent={root} index={i} depth={0} {...shared} />
         ))}
       </ul>
       {drag && (
@@ -292,10 +371,14 @@ interface Shared extends Props {
   justDragged: { current: boolean };
   mark: (e: React.MouseEvent | ReactKeyboardEvent, path: string) => boolean;
   markKeys: (e: ReactKeyboardEvent) => boolean;
+  tabStop: string | null;
+  cut: string | null;
+  setCursor: (path: string) => void;
+  navigate: (e: ReactKeyboardEvent, node: TreeNode, open: boolean, fixed: boolean) => boolean;
 }
 
-function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; siblings: number; depth: number }) {
-  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onMove, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys } = shared;
+function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; depth: number }) {
+  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate } = shared;
   const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
@@ -312,6 +395,8 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
     'data-tree-kind': node.kind,
     'data-tree-count': children.length,
     'data-tree-open': String(open),
+    tabIndex: tabStop === node.path ? 0 : -1,
+    onFocus: () => setCursor(node.path),
     onPointerDown: (e: ReactPointerEvent) => begin(e, node, label),
     onContextMenu: (e: React.MouseEvent) => {
       if (!dragging && !onMenu) return;
@@ -325,6 +410,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         e.preventDefault();
         return void mark(e, node.path);
       }
+      if (navigate(e, node, open, fixed)) return e.preventDefault();
       const plain = !e.altKey && !e.ctrlKey && !e.metaKey;
       if (plain && (e.key === 'Delete' || e.key === 'Backspace') && !fixed && onTrash) {
         e.preventDefault();
@@ -339,11 +425,6 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         const r = e.currentTarget.getBoundingClientRect();
         return onMenu(node, r.left + 24, r.bottom - 4);
       }
-      if (!e.altKey || fixed) return;
-      if (e.key === 'ArrowUp' && index > 0) onMove(node.path, parent, index - 1);
-      else if (e.key === 'ArrowDown' && index < siblings - 1) onMove(node.path, parent, index + 2);
-      else return;
-      e.preventDefault();
     },
   };
 
@@ -358,7 +439,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
         ) : (
         <button
           {...rowProps}
-          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}`}
+          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}${cut === node.path ? ' is-cut' : ''}`}
           onClick={(e) => !justDragged.current && !mark(e, node.path) && onSelect(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
@@ -381,6 +462,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
                 ) : (
                   <button
                     className="tree-recipe"
+                    tabIndex={-1}
                     data-recipe-path={r.path}
                     onClick={() => onSelect(r.path)}
                     onDoubleClick={() => onStartRename(r.path)}
@@ -417,7 +499,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       ) : (
         <button
           {...rowProps}
-          className={`tree-folder${marker}${picked}`}
+          className={`tree-folder${marker}${picked}${cut === node.path ? ' is-cut' : ''}`}
           // The Group's word count lives on hover; the end of the row is kept for the board icon.
           title={wordsTitle(label, total)}
           // The open Item's words as typed are added in as the pointer arrives, so typing never redraws the Shelf.
@@ -441,7 +523,7 @@ function TreeItem({ node, parent, index, siblings, depth, ...shared }: Shared & 
       {open && children.length > 0 && (
         <ul className="tree" role="group">
           {children.map((c, i) => (
-            <TreeItem key={c.path} node={c} parent={node.path} index={i} siblings={children.length} depth={depth + 1} {...shared} />
+            <TreeItem key={c.path} node={c} parent={node.path} index={i} depth={depth + 1} {...shared} />
           ))}
         </ul>
       )}

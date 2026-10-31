@@ -73,10 +73,16 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
   }, [fs, tree]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Escape in an item's menu closes only the menu.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.activeElement?.closest('.menu') && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  // The keyboard goes to the book once it's gathered, so Page Up, Page Down and the arrows read through it straight away.
+  const page = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (items) page.current?.focus({ preventScroll: true });
+  }, [!!items]);
 
   if (!items) return <p className="empty">Gathering every item…</p>;
   const scenes = items.filter((i) => i.type === 'scene');
@@ -93,7 +99,7 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
           Back to writing
         </button>
       </div>
-      <article className="cb-page manuscript" aria-label={title}>
+      <article className="cb-page manuscript" aria-label={title} tabIndex={-1} ref={page}>
         {scenes.length === 0 && <p className="empty">The Shelf has no items yet.</p>}
         {items.map((item) =>
           item.type === 'folder' ? (
@@ -105,6 +111,19 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
               key={item.path}
               className="ms-scene"
               aria-label={item.title}
+              // A Tab stop per item: Enter opens it to write in, and the menu key shows its menu.
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onOpen(item.path);
+                } else if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onMenu) {
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  onMenu(item.path, r.left + 24, Math.max(r.top, 0) + 24);
+                }
+              }}
               onDoubleClick={() => onOpen(item.path)}
               onContextMenu={(e) => {
                 if (!onMenu) return;

@@ -43,6 +43,8 @@ import { bookMarkdown } from './export/markdownExport';
 import { printHtml } from './export/print';
 import { KINDS, saveFile } from './ui/saveFile';
 import { Menu, type MenuItem } from './ui/Menu';
+import { type BarMenu, MenuBar } from './ui/MenuBar';
+import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
@@ -104,7 +106,7 @@ import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
-import { IS_MAC, commandFor, keys, keysFor } from './shortcuts';
+import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type BackupInfo, type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
@@ -125,6 +127,8 @@ import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
+import { BAR_ICONS, PanelBar } from './ui/PanelBar';
+import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
@@ -143,6 +147,11 @@ const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Se
 const DRAWER_WIDTH = 320;
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
+/** The desktop app on a Mac, whose menus go in the system's menu bar at the top of the screen. */
+const MAC_APP = isTauri() && IS_MAC;
+/** Closes the desktop app's window, which saves the last words typed before the app ends. */
+const quitApp = () => import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().close());
+
 const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
   strong: { key: 'Mod-B', style: 'strong' },
   emphasis: { key: 'Mod-I', style: 'emphasis' },
@@ -256,6 +265,14 @@ export function App() {
   const order = useRef<Order>({});
   const [renaming, setRenaming] = useState<string | null>(null);
   const [pantryGroup, setPantryGroup] = useState<PantrySection>('characters');
+  /** Groups and Items picked on the Shelf and in the Pantry, for their toolbars and menus. */
+  const [shelfPicked, setShelfMarked] = useState<Set<string>>(() => new Set());
+  const [pantryPicked, setPantryMarked] = useState<Set<string>>(() => new Set());
+  // What the Pantry shows: the cards and Groups of the section picked.
+  const pantryNodes = useMemo(() => childrenOf(pantryTree, PANTRY, joinPath(PANTRY, pantryGroup)), [pantryTree, pantryGroup]);
+  // Anything moved away, renamed or deleted is no longer picked.
+  const shelfMarked = useMemo(() => stillThere(shelfPicked, tree), [shelfPicked, tree]);
+  const pantryMarked = useMemo(() => stillThere(pantryPicked, pantryNodes), [pantryPicked, pantryNodes]);
   const [pantryQuery, setPantryQuery] = useState('');
   /** The Pantry shelf, and where the @ that opened it is. */
   const [shelf, setShelf] = useState<{ at: number | null } | null>(null);
@@ -913,39 +930,53 @@ export function App() {
   };
 
   /** Moves a scene, card or folder to the trash, with an Undo. */
-  const trashPath = async (p: string) => {
-    if (!fs || PANTRY_FOLDERS.has(p)) return;
+  const trashPath = (p: string) => trashPaths([p]);
+  /** Moves several to the trash at once, with one Undo that puts them all back. */
+  const trashPaths = async (paths: string[]) => {
+    const list = topmost(paths).filter((p) => !PANTRY_FOLDERS.has(p));
+    if (!fs || list.length === 0) return;
     await flushSave();
     await saveUndoNow();
-    const label = cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '');
-    try {
-      const gone = await moveToTrash(fs, p, new Date(), order.current, await namesIn(parentOf(p)));
-      order.current = gone.order;
-      const under = (q: string) => q === p || q.startsWith(p + '/');
-      if (path && under(path)) closeScene();
-      if (pins.some(under)) setPins(pins.filter((q) => !under(q)));
-      await reindex();
-      await refreshTree();
-      say(`Moved “${label}” to the trash.`, () => void putBack(gone.name));
-    } catch (e) {
-      setError(`Couldn’t move “${label}” to the trash. ${friendlyError(e)}`);
+    const labelOf = (p: string) => cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '');
+    const names: string[] = [];
+    let failed: unknown = null;
+    for (const p of list) {
+      try {
+        const gone = await moveToTrash(fs, p, new Date(), order.current, await namesIn(parentOf(p)));
+        order.current = gone.order;
+        names.push(gone.name);
+      } catch (e) {
+        failed = failed ?? e;
+      }
     }
+    const under = (q: string) => list.some((p) => q === p || q.startsWith(p + '/'));
+    if (path && under(path)) closeScene();
+    if (pins.some(under)) setPins(pins.filter((q) => !under(q)));
+    await reindex();
+    await refreshTree();
+    if (failed) setError(`Couldn’t move ${list.length === 1 ? `“${labelOf(list[0]!)}”` : 'everything'} to the trash. ${friendlyError(failed)}`);
+    if (names.length > 0) say(names.length === 1 ? `Moved “${labelOf(list[0]!)}” to the trash.` : `Moved ${names.length} to the trash.`, () => void putBackAll(names));
   };
 
   /** Puts something from the trash back where it was. */
-  const putBack = async (name: string): Promise<string | null> => {
-    if (!fs) return null;
+  const putBack = async (name: string): Promise<string | null> => (await putBackAll([name]))[0] ?? null;
+  const putBackAll = async (names: string[]): Promise<string[]> => {
+    if (!fs) return [];
+    const back: string[] = [];
     try {
-      const back = await restoreFromTrash(fs, name, order.current, namesIn);
-      order.current = back.order;
-      await reindex();
-      await refreshTree();
-      setNotice(null);
-      return back.path;
+      // Last in, first out, so each goes back to the place it left.
+      for (const name of [...names].reverse()) {
+        const put = await restoreFromTrash(fs, name, order.current, namesIn);
+        order.current = put.order;
+        back.push(put.path);
+      }
     } catch (e) {
       setError(`Couldn’t put that back. ${friendlyError(e)}`);
-      return null;
     }
+    await reindex();
+    await refreshTree();
+    setNotice(null);
+    return back;
   };
 
   const openTrash = () => {
@@ -1165,6 +1196,50 @@ export function App() {
     ];
   };
 
+  // Words pasted from a menu count as pasted, as Ctrl+V's do.
+  const pasteFromMenu = (ed: Editor, plain: boolean) =>
+    void pasteInto(ed, plain).then((result) => {
+      if (result === 'unreadable') say(`To paste, press ${keys('Mod-V')}.`);
+      else if (result === 'empty') say('There are no words on the clipboard to paste.');
+      else pastedWords.current += countWords(result.pasted);
+    });
+
+  /** Paragraph and character styles and Clear formatting, for the page's menu and Format. */
+  const formatItems = (ed: Editor): MenuItem[] => {
+    const styleId = (ed.state.selection.$from.parent.attrs.style as string | undefined) ?? 'body';
+    const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => void fn(ed.chain().focus()).run();
+    return [
+      {
+        label: 'Paragraph style',
+        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id, align: null, lineSpacing: null })) })),
+      },
+      {
+        // Strong, Emphasis and Underline are what ⌘B, ⌘I and ⌘U apply, so they carry those keys here.
+        label: 'Character style',
+        items: sheet.character.map((st) => {
+          const basic = BASIC_KEYS[st.id];
+          return {
+            label: st.name,
+            hint: basic && keys(basic.key),
+            checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
+            onPick: () => {
+              ed.commands.focus();
+              if (basic) toggleFormat(ed, basic.style);
+              else toggleCharStyle(ed, st.id);
+            },
+          };
+        }),
+      },
+      {
+        label: 'Clear formatting',
+        onPick: () => {
+          ed.commands.focus();
+          clearFormatting(ed);
+        },
+      },
+    ];
+  };
+
   /** Right-click on the page: what it offers depends on what is under the pointer. */
   const pageMenu = (e: React.MouseEvent) => {
     const ed = editor;
@@ -1246,48 +1321,14 @@ export function App() {
     }
 
     const words = selectedWords(ed);
-    const styleId = (ed.state.selection.$from.parent.attrs.style as string | undefined) ?? 'body';
-    // Words pasted from the menu count as pasted, as Ctrl+V's do.
-    const menuPaste = (plain: boolean) =>
-      void pasteInto(ed, plain).then((result) => {
-        if (result === 'unreadable') say(`To paste, press ${keys('Mod-V')}.`);
-        else if (result === 'empty') say('There are no words on the clipboard to paste.');
-        else pastedWords.current += countWords(result.pasted);
-      });
+    const menuPaste = (plain: boolean) => pasteFromMenu(ed, plain);
     const items: MenuItem[] = [
       { label: 'Cut', hint: keys('Mod-X'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'cut') },
       { label: 'Copy', hint: keys('Mod-C'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'copy') },
       { label: 'Paste', hint: keys('Mod-V'), onPick: () => menuPaste(getSettings().pastePlain) },
       { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), onPick: () => menuPaste(true) },
       { separator: true },
-      {
-        label: 'Paragraph style',
-        items: sheet.paragraph.map((st) => ({ label: st.name, checked: st.id === styleId, onPick: run((c) => c.updateAttributes('paragraph', { style: st.id, align: null, lineSpacing: null })) })),
-      },
-      {
-        // Strong, Emphasis and Underline are what ⌘B, ⌘I and ⌘U apply, so they carry those keys here.
-        label: 'Character style',
-        items: sheet.character.map((st) => {
-          const basic = BASIC_KEYS[st.id];
-          return {
-            label: st.name,
-            hint: basic && keys(basic.key),
-            checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
-            onPick: () => {
-              ed.commands.focus();
-              if (basic) toggleFormat(ed, basic.style);
-              else toggleCharStyle(ed, st.id);
-            },
-          };
-        }),
-      },
-      {
-        label: 'Clear formatting',
-        onPick: () => {
-          ed.commands.focus();
-          clearFormatting(ed);
-        },
-      },
+      ...formatItems(ed),
       { separator: true },
       { label: 'Add footnote', hint: keys('Mod-Alt-F'), onPick: () => editFootnote(insertFootnote(ed)) },
       {
@@ -1355,6 +1396,9 @@ export function App() {
       { separator: true },
       { label: 'Expand all', onPick: () => setFolding({ open: true, at: Date.now() }) },
       { label: 'Collapse all', onPick: () => setFolding({ open: false, at: Date.now() }) },
+      { separator: true },
+      { label: 'Select all', hint: keys('Mod-A'), disabled: tree.length === 0, onPick: () => setShelfMarked(new Set(allPaths(tree))) },
+      { label: 'Deselect all', disabled: shelfMarked.size === 0, onPick: () => setShelfMarked(new Set()) },
     ]);
   };
 
@@ -1379,6 +1423,12 @@ export function App() {
   const rowMenu = (node: TreeNode, x: number, y: number) => {
     const p = node.path;
     const top = topOf(p);
+    if (top === BOOKSHELF || top === PANTRY) {
+      const [marks, setMarks] = top === PANTRY ? [pantryMarked, setPantryMarked] : [shelfMarked, setShelfMarked];
+      // A right-click on one of several picked rows is about all of them; on any other row it picks that row.
+      if (marks.has(p) && marks.size > 1) return pickedMenu([...marks], top, x, y);
+      if (!marks.has(p)) setMarks(new Set([p]));
+    }
     const onShelf = top === BOOKSHELF;
     const fixed = PANTRY_FOLDERS.has(p);
     const card = cards.get(p);
@@ -1472,6 +1522,135 @@ export function App() {
       { label: 'Copy as Markdown', onPick: () => void copyMarkdown(p) },
       { label: 'Export item', items: exportItems(p) },
       ...trash,
+    ]);
+  };
+
+  /** Moves several Groups and Items to the end of `folder`, in the order they are shown. */
+  const moveMany = async (paths: string[], folder: string) => {
+    if (!fs) return;
+    await flushSave();
+    await saveUndoNow();
+    const top = topOf(folder);
+    try {
+      for (const p of topmost(paths)) {
+        const fresh = await readTree(fs, top, ORDERED(order.current));
+        const moved = await moveItem(fs, order.current, fresh, top, p, folder, childrenOf(fresh, top, folder).length);
+        order.current = moved.order;
+        followMove(p, moved.path);
+      }
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+    await refreshTree();
+  };
+
+  /** The right-click menu for several picked rows at once. */
+  const pickedMenu = (paths: string[], top: string, x: number, y: number) => {
+    const list = topmost(paths);
+    const files = paths.filter((p) => p.endsWith('.md'));
+    const items = files.filter((p) => cards.get(p)?.kind === 'scene');
+    const setMarks = top === PANTRY ? setPantryMarked : setShelfMarked;
+    const inside = (f: string) => list.some((p) => f === p || f.startsWith(p + '/'));
+    const targets: MenuItem[] = [];
+    if (top === BOOKSHELF) targets.push({ label: 'Top of the Shelf', onPick: () => void moveMany(list, top) });
+    const walk = (nodes: TreeNode[], depth: number) => {
+      for (const n of nodes) {
+        if (n.kind !== 'folder' || inside(n.path)) continue;
+        targets.push({ label: `${' '.repeat(depth)}${PANTRY_FOLDERS.get(n.path) ?? n.name}`, onPick: () => void moveMany(list, n.path) });
+        walk(n.children ?? [], depth + 1);
+      }
+    };
+    walk(top === PANTRY ? pantryNodes : tree, 0);
+    const each = (key: string, value: unknown) => () => void Promise.all(files.map((p) => setFieldOf(p, key, value)));
+    showMenu('Picked', x, y, [
+      { heading: `${paths.length} picked` },
+      { label: 'Move to', items: targets.length > 0 ? targets : [{ label: 'No other groups', onPick: () => {}, disabled: true }] },
+      {
+        label: 'Label',
+        disabled: files.length === 0,
+        items: [{ label: 'None', onPick: each('label', undefined) }, ...LABELS.map((l) => ({ label: l.name, onPick: each('label', l.id) }))],
+      },
+      ...(top === BOOKSHELF
+        ? [
+            {
+              label: 'Status',
+              disabled: items.length === 0,
+              items: STATUSES.map((st) => ({ label: st.label, icon: <StatusIcon status={st.id} decorative />, onPick: () => void Promise.all(items.map((p) => setFieldOf(p, 'status', st.id === 'not-started' ? undefined : st.id))) })),
+            },
+          ]
+        : []),
+      { separator: true },
+      { label: 'Select all', hint: keys('Mod-A'), onPick: () => setMarks(new Set(allPaths(top === PANTRY ? pantryNodes : tree))) },
+      { label: 'Deselect all', hint: 'Esc', onPick: () => setMarks(new Set()) },
+      { separator: true },
+      { label: `Move ${list.length} to trash`, hint: 'Delete', danger: true, onPick: () => void trashPaths(list) },
+    ]);
+  };
+
+  /** Delete on a picked row takes every picked row with it. */
+  const trashFromTree = (p: string) => {
+    const marks = topOf(p) === PANTRY ? pantryMarked : shelfMarked;
+    return void (marks.has(p) && marks.size > 1 ? trashPaths([...marks]) : trashPath(p));
+  };
+
+  /** A new Item or card goes in the picked Group, if one Group is picked, or where it would anyway. */
+  const pickedGroup = (marks: Set<string>, nodes: TreeNode[]): string | null => {
+    if (marks.size !== 1) return null;
+    const only = [...marks][0]!;
+    return allPaths(nodes).includes(only) && !only.endsWith('.md') ? only : null;
+  };
+  const shelfBar = () => {
+    const all = allPaths(tree);
+    const everything = all.length > 0 && shelfMarked.size === all.length;
+    const group = pickedGroup(shelfMarked, tree);
+    return (
+      <PanelBar
+        label="Shelf tools"
+        status={shelfMarked.size > 1 ? `${shelfMarked.size} picked` : undefined}
+        buttons={[
+          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => setShelfMarked(everything ? new Set() : new Set(all)) },
+          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
+          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group) : addScene()) },
+          { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
+        ]}
+      />
+    );
+  };
+  const pantryBar = () => {
+    const all = allPaths(pantryNodes);
+    const everything = all.length > 0 && pantryMarked.size === all.length;
+    const group = pickedGroup(pantryMarked, pantryNodes);
+    const template = CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!;
+    return (
+      <PanelBar
+        label="Pantry tools"
+        status={pantryMarked.size > 1 ? `${pantryMarked.size} picked` : undefined}
+        buttons={[
+          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => setPantryMarked(everything ? new Set() : new Set(all)) },
+          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void addFolderIn(group ?? joinPath(PANTRY, pantryGroup)) },
+          { label: `New ${template.name.toLowerCase()}`, icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(template, group) : addCard()) },
+          { label: pantryMarked.size > 1 ? `Delete ${pantryMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: pantryMarked.size === 0, onClick: () => void trashPaths([...pantryMarked]) },
+        ]}
+      />
+    );
+  };
+
+  /** Right-click on the empty part of the Pantry. */
+  const pantryMenu = (x: number, y: number) => {
+    const template = CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!;
+    const here = joinPath(PANTRY, pantryGroup);
+    showMenu('Pantry', x, y, [
+      { label: `New ${template.name.toLowerCase()}`, onPick: () => void addFrom(template, here) },
+      { label: 'New group', onPick: () => void addFolderIn(here) },
+      { separator: true },
+      { label: 'Select all', hint: keys('Mod-A'), disabled: pantryNodes.length === 0, onPick: () => setPantryMarked(new Set(allPaths(pantryNodes))) },
+      { label: 'Deselect all', disabled: pantryMarked.size === 0, onPick: () => setPantryMarked(new Set()) },
+      { separator: true },
+      { label: 'Expand all', onPick: () => setFolding({ open: true, under: here, at: Date.now() }) },
+      { label: 'Collapse all', onPick: () => setFolding({ open: false, under: here, at: Date.now() }) },
+      { separator: true },
+      { heading: 'Show' },
+      ...PANTRY_SECTIONS.map((sct) => ({ label: SECTION_LABEL[sct], checked: sct === pantryGroup, onPick: () => setPantryGroup(sct) })),
     ]);
   };
 
@@ -1791,7 +1970,9 @@ export function App() {
   // Through updateBook, so a change made a moment before isn't written back over with the old settings.
   const onDialect = useCallback((dialect: 'en-US' | 'en-GB') => updateBook({ dialect }), [fs, book]);
   const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
-  const resting = useMemo(() => rulesOff(chosen), [chosen]);
+  // Switched off, every seasoning rests and nothing is marked on the page.
+  const paused = !!seas?.paused;
+  const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
   const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: indexVersion, onError: setError });
 
@@ -2220,6 +2401,156 @@ export function App() {
   // The cards above the page are as wide as the page itself, at any size and zoom.
   const cardStyle = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
+  /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
+  const topMenus: BarMenu[] = [
+    {
+      label: 'File',
+      items: () => [
+        { label: 'New item', hint: keysFor('newScene'), binding: binding('newScene'), disabled: !fs, onPick: () => void addScene() },
+        { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
+        { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
+        { separator: true },
+        { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+        { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
+        {
+          label: 'Export',
+          disabled: !fs,
+          items: [
+            { label: 'Word…', hint: '.docx', onPick: () => void exportBook('docx') },
+            { label: 'EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
+            { label: 'Markdown…', hint: '.md', onPick: () => void exportBook('md') },
+          ],
+        },
+        { label: 'Print or save as PDF…', disabled: !fs, onPick: () => void exportBook('print') },
+        { separator: true },
+        { label: 'Back up now', disabled: !fs, onPick: () => void backUpNow() },
+        { label: 'Back up as a zip…', disabled: !fs, onPick: () => void backUp() },
+        { label: 'Trash', disabled: !fs, onPick: openTrash },
+        // On a Mac, Settings and Quit are in the Cookbook menu.
+        ...(MAC_APP
+          ? []
+          : ([
+              { separator: true },
+              { label: 'Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
+              ...(isTauri() ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
+            ] as MenuItem[])),
+      ],
+    },
+    {
+      label: 'Edit',
+      items: () => {
+        const ed = editor;
+        const none = !ed;
+        const empty = !ed || ed.state.selection.empty;
+        return [
+          { label: 'Undo', native: 'Undo', hint: keys('Mod-Z'), disabled: none || undoSteps === 0, onPick: () => void ed?.chain().focus().undo().run() },
+          { label: 'Redo', native: 'Redo', hint: keys(IS_MAC ? 'Mod-Shift-Z' : 'Mod-Y'), disabled: none || !ed.can().redo(), onPick: () => void ed?.chain().focus().redo().run() },
+          { separator: true },
+          { label: 'Cut', native: 'Cut', hint: keys('Mod-X'), disabled: empty, onPick: () => ed && clip(ed, 'cut') },
+          { label: 'Copy', native: 'Copy', hint: keys('Mod-C'), disabled: empty, onPick: () => ed && clip(ed, 'copy') },
+          { label: 'Paste', native: 'Paste', hint: keys('Mod-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, getSettings().pastePlain) },
+          { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, true) },
+          { label: 'Select all', native: 'SelectAll', hint: keys('Mod-A'), disabled: none, onPick: () => void ed?.chain().focus().selectAll().run() },
+          { separator: true },
+          { label: 'Search', hint: keysFor('find'), binding: binding('find'), onPick: () => setFindRequest({ query: ed ? selectedWords(ed) : '', at: Date.now() }) },
+          { label: 'Go to an item or card…', hint: keysFor('switcher'), binding: binding('switcher'), onPick: () => setPalette({ scenesOnly: true, at: Date.now() }) },
+          { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
+        ];
+      },
+    },
+    {
+      label: 'View',
+      items: () => {
+        const page = pageOf(book?.page);
+        return [
+          { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
+          { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
+          { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
+          { separator: true },
+          { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
+          { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
+          { label: 'Zoom', disabled: !book, items: ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })) },
+          {
+            label: 'Theme',
+            items: (['system', 'light', 'dark', 'sepia'] as const).map((t) => ({ label: `${t[0]!.toUpperCase()}${t.slice(1)}`, checked: settings.theme === t, onPick: () => setSettings({ theme: t }) })),
+          },
+          { separator: true },
+          { label: 'Pantry', checked: panel === 'pantry', onPick: () => togglePanel('pantry') },
+          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsOpen, disabled: !doc, onPick: () => togglePanel('seasonings') },
+          { separator: true },
+          { label: manuscript ? 'Back to writing' : 'Read the recipe', hint: keysFor('bookread'), binding: binding('bookread'), disabled: !fs, onPick: () => (manuscript ? setManuscript(null) : void readManuscript()) },
+        ];
+      },
+    },
+    {
+      label: 'Insert',
+      items: () => {
+        const ed = editor;
+        const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => ed && void fn(ed.chain().focus()).run();
+        return [
+          { label: 'Footnote', hint: keysFor('footnote'), binding: binding('footnote'), disabled: !ed, onPick: () => ed && editFootnote(insertFootnote(ed)) },
+          { label: 'Name from the Pantry', hint: keysFor('shelf'), binding: binding('shelf'), disabled: !ed, onPick: () => setShelf({ at: null }) },
+          { separator: true },
+          { label: 'Table', disabled: !ed || ed.isActive('table'), onPick: run((c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true })) },
+          { label: 'Numbered list', disabled: !ed, onPick: run((c) => c.toggleOrderedList()) },
+          { label: 'Bulleted list', disabled: !ed, onPick: run((c) => c.toggleBulletList()) },
+          { label: 'Checklist', disabled: !ed, onPick: run((c) => c.toggleTaskList()) },
+          { label: 'Section break', disabled: !ed || ed.state.selection.$from.depth !== 1, onPick: run((c) => c.insertContent({ type: 'sceneBreak' })) },
+        ];
+      },
+    },
+    {
+      label: 'Format',
+      items: () => [
+        ...(editor ? formatItems(editor) : [{ label: 'Open an item to format it', disabled: true, onPick: () => {} }]),
+        { separator: true },
+        { label: 'Edit styles…', disabled: !book, onPick: () => openSettings('styles') },
+      ],
+    },
+    {
+      label: 'Recipe',
+      items: () => [
+        { label: 'Configure this recipe…', disabled: !book, onPick: () => openSettings('page') },
+        { label: 'Goals…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
+        { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
+        { separator: true },
+        {
+          label: 'Snapshots of this item',
+          disabled: !doc || !path,
+          items: [
+            { label: 'Take a snapshot', onPick: () => void takeSnapshot('By hand') },
+            { label: 'Compare and roll back…', onPick: () => path && void showSnapshots(path) },
+          ],
+        },
+        { separator: true },
+        { label: 'Expand the Shelf', onPick: () => setFolding({ open: true, at: Date.now() }) },
+        { label: 'Collapse the Shelf', onPick: () => setFolding({ open: false, at: Date.now() }) },
+      ],
+    },
+    {
+      label: 'Help',
+      items: () => [
+        { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
+        { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
+        { separator: true },
+        { label: 'Updates and privacy…', onPick: () => openSettings('updates') },
+        ...(MAC_APP ? [] : [{ label: `About Cookbook ${__APP_VERSION__}`, onPick: () => say(`Cookbook ${__APP_VERSION__}: an offline writing app. Everything stays on this device.`) }]),
+      ],
+    },
+  ];
+
+  // On a Mac the menus go in the system's own menu bar at the top of the screen, rebuilt when what they show changes.
+  const menusNow = useRef(topMenus);
+  menusNow.current = topMenus;
+  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, !!doc, !!editor, !!fs, !!book, !!manuscript, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
+  useEffect(() => {
+    if (!MAC_APP) return;
+    const t = window.setTimeout(() => {
+      void setMacMenu(menusNow.current, () => menusNow.current, { settings: () => openSettings(), quit: () => void quitApp() }).catch(() => {});
+    }, 150);
+    return () => window.clearTimeout(t);
+  }, [menuKey]);
+
   return (
     <div
       className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
@@ -2235,6 +2566,7 @@ export function App() {
           </button>
           <Logo />
           <span className="brand">cookbook</span>
+          {!MAC_APP && <MenuBar menus={topMenus} />}
           <span className="crumb">
             <button
               className="crumb-book"
@@ -2323,11 +2655,14 @@ export function App() {
           onStartRename={setRenaming}
           onRename={(p, title) => void renameInTree(p, title)}
           onMenu={rowMenu}
-          onTrash={(p) => void trashPath(p)}
+          onTrash={trashFromTree}
           dropTarget={fileDrop}
           folding={folding}
           recipes={recipes}
+          marked={shelfMarked}
+          onMark={setShelfMarked}
         />
+        {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
       {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
@@ -2426,11 +2761,13 @@ export function App() {
               hits={pantryHits}
               selected={path}
               onOpen={(p) => void select(p)}
-              onNew={() => void addCard()}
               onClose={() => setPanel(null)}
+              onMenu={pantryMenu}
+              onHitMenu={(p, x, y) => rowMenu({ name: baseName(p), path: p, kind: 'file' }, x, y)}
+              bar={pantryBar()}
             >
               <Tree
-                nodes={childrenOf(pantryTree, PANTRY, joinPath(PANTRY, pantryGroup))}
+                nodes={pantryNodes}
                 root={joinPath(PANTRY, pantryGroup)}
                 selected={path}
                 cards={cards}
@@ -2442,9 +2779,11 @@ export function App() {
                 onStartRename={setRenaming}
                 onRename={(p, title) => void renameInTree(p, title)}
                 onMenu={rowMenu}
-                onTrash={(p) => void trashPath(p)}
+                onTrash={trashFromTree}
                 folding={folding}
                 loadPicture={loadPicture}
+                marked={pantryMarked}
+                onMark={setPantryMarked}
               />
             </PantryPanel>
           )}
@@ -2461,6 +2800,9 @@ export function App() {
               onGone={(key) => setSeasonings({ gone: [...new Set([...(seas?.gone ?? []), key])] })}
               onClose={() => setPanel(null)}
               onIssueMenu={(i, x, y) => void issueItems(i).then((items) => showMenu('Suggestion', x, y, items))}
+              paused={paused}
+              onPaused={(on) => setSeasonings({ paused: on || undefined })}
+              onMenu={showMenu}
             />
           )}
         </div>

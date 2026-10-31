@@ -75,7 +75,10 @@ import {
   recentBooks,
   rememberBook,
   sameLocation,
+  updateRecent,
 } from './storage/platform';
+import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
+import type { NewRecipeChoice } from './ui/NewRecipe';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -179,13 +182,24 @@ function readNotes(doc: CookbookDocument | null): Notes {
   return Object.fromEntries(Object.entries(raw).map(([id, text]) => [id, typeof text === 'string' ? text : String(text ?? '')]));
 }
 
-async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel'): Promise<BookInfo> {
+async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel', setup: Partial<BookInfo> = {}): Promise<BookInfo> {
   return makeBookOrUndo(fs, async () => {
-    const info = await createBook(fs, title);
+    const info = { ...(await createBook(fs, title)), ...setup };
     await applyBookTemplate(fs, template);
+    if (Object.keys(setup).length > 0) await saveBookInfo(fs, info);
     return info;
   });
 }
+
+/** A new recipe that starts as a copy of another: one of the writer's templates, or a recipe being duplicated. */
+async function copyBook(from: BookLocation, fs: StorageAdapter, title: string, setup: Partial<BookInfo> = {}): Promise<BookInfo> {
+  const { fs: source } = await openLocation(from);
+  return makeBookOrUndo(fs, async () => {
+    await copyRecipe(source, fs);
+    return renameCopy(fs, { title, ...setup });
+  });
+}
+
 
 /** Words in a scene, not counting markup. */
 function sceneWords(doc: CookbookDocument): number {
@@ -256,6 +270,8 @@ export function App() {
   const started = useRef(false);
   const [location, setLocation] = useState<BookLocation | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Your Recipes opens straight onto New Recipe. */
+  const [libraryNew, setLibraryNew] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<BookLocation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -394,14 +410,18 @@ export function App() {
    * Opens the book at a location. `create` starts a new book there; `adopt`
    * turns a folder that is not a book yet into one.
    */
-  const openAt = async (target: BookLocation, mode: { create?: string; template?: BookTemplateId; adopt?: boolean } = {}) => {
+  const openAt = async (
+    target: BookLocation,
+    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean } = {},
+  ) => {
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
     if (getSettings().backupOnClose) await autoBackup().catch(() => {});
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
-    if (mode.create) info = await startBook(nextFs, mode.create, mode.template);
+    if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
+    else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
     else {
       try {
         info = await openBook(nextFs);
@@ -425,6 +445,9 @@ export function App() {
     // with it open last time, so it is backed up before anything else changes.
     const previous = locationRef.current;
     if (previous) markClosed(window.localStorage, previous);
+    noteRecipe.current();
+    // A new recipe counts as edited now, so it sorts to the top of Your Recipes.
+    lastEdited.current = mode.create ? Date.now() : undefined;
     const crashed = markOpen(window.localStorage, target);
     index.current?.index.close();
     index.current = null;
@@ -440,7 +463,9 @@ export function App() {
     setFs(nextFs);
     setWhere(nextWhere);
     setLocation(target);
-    rememberBook({ location: target, title: info.title });
+    // A template being edited stays off the list of recipes.
+    if (!mode.editingTemplate) rememberBook({ location: target, title: info.title });
+    editingTemplate.current = !!mode.editingTemplate;
     bookRef.current = info;
     fsRef.current = nextFs;
     if (crashed && getSettings().backupOnClose) {
@@ -468,6 +493,7 @@ export function App() {
     try {
       if ((await action()) === 'done') {
         setLibraryOpen(false);
+        setLibraryNew(false);
         setAdopting(null);
       }
     } catch (e) {
@@ -493,19 +519,73 @@ export function App() {
 
   const closeLibrary = useCallback(() => {
     setLibraryOpen(false);
+    setLibraryNew(false);
     setLibraryError(null);
     setAdopting(null);
   }, []);
 
-  const createNewBook = (title: string, template: BookTemplateId, inFolder: boolean) =>
+  /** A folder for a new recipe that no other recipe uses yet. */
+  const freshLocation = async (title: string, parent: BookLocation | null) => {
+    const taken = new Set<string>();
+    for (const b of recentBooks()) taken.add(b.location.kind === 'folder' ? baseName(b.location.path.replace(/\\/g, '/')) : b.location.name);
+    const name = freeName(fileNameFor(title), (n) => taken.has(n));
+    return parent ? childLocation(parent, name) : newBookLocation(name, getSettings().newBooksFolder);
+  };
+
+  const createNewBook = ({ title, builtIn, template, setup, inFolder }: NewRecipeChoice) =>
     fromLibrary(async () => {
-      let target: BookLocation;
+      let parent: BookLocation | null = null;
       if (inFolder) {
-        const parent = await pickFolder(`Choose where to keep “${title}”`);
+        parent = await pickFolder(`Choose where to keep “${title}”`);
         if (!parent) return 'cancelled';
-        target = await childLocation(parent, fileNameFor(title));
-      } else target = await newBookLocation(fileNameFor(title), getSettings().newBooksFolder);
-      await openAt(target, { create: title, template });
+      }
+      const target = await freshLocation(title, parent);
+      await openAt(target, { create: title, template: builtIn, from: template?.location, setup });
+      return 'done';
+    });
+
+  /** Copies a recipe beside the others and opens the copy. */
+  const duplicateRecipe = (from: BookLocation, title: string) =>
+    fromLibrary(async () => {
+      const copyTitle = `${title} copy`;
+      await openAt(await freshLocation(copyTitle, null), { create: copyTitle, from });
+      say(`Made a copy of “${title}”.`);
+      return 'done';
+    });
+
+  /** Renames a recipe in its book.json, whether it is open or not. */
+  const renameRecipe = async (target: BookLocation, title: string) => {
+    if (location && sameLocation(target, location)) {
+      updateBook({ title });
+    } else {
+      const { fs: other } = await openLocation(target);
+      await saveBookInfo(other, { ...(await openBook(other)), title });
+    }
+    updateRecent(target, { title });
+  };
+
+  /** Opens one of the writer's templates to change it, like any recipe, but kept off the list of recipes. */
+  const editTemplate = (template: UserTemplate) =>
+    fromLibrary(async () => {
+      await openAt(template.location, { editingTemplate: true });
+      say(`You’re editing the template “${template.name}”. Changes save into the template; recipes already made from it stay as they are.`);
+      return 'done';
+    });
+
+  const saveAsTemplate = async (from: BookLocation, name: string, group: string, keepText: boolean) => {
+    if (location && sameLocation(from, location)) await flushSave();
+    return saveTemplate(from, name, group, keepText);
+  };
+
+  /** Points a recipe whose folder moved at where it is now. */
+  const locateRecipe = (lost: BookLocation) =>
+    fromLibrary(async () => {
+      const picked = await pickFolder('Find the recipe’s folder');
+      if (!picked) return 'cancelled';
+      const { fs: there } = await openLocation(picked);
+      if (!(await there.exists('book.json'))) throw new Error('That folder has no Cookbook recipe in it. Pick the folder that holds book.json.');
+      updateRecent(lost, { location: picked });
+      await openAt(picked);
       return 'done';
     });
 
@@ -573,6 +653,10 @@ export function App() {
   const unsaved = useRef<{ path: string; id: string; text: string; base: string } | null>(null);
   const locationRef = useRef<BookLocation | null>(null);
   locationRef.current = location;
+  /** The open recipe is one of the writer's templates, opened to edit it. */
+  const editingTemplate = useRef(false);
+  /** When the open recipe was last saved. Noted in Your Recipes only when the window opens or the recipe closes, never per save. */
+  const lastEdited = useRef<number | undefined>(undefined);
   const recorder = useRef<{ recorder: UndoRecorder; fs: StorageAdapter; id: string; saved: number; at: number } | null>(null);
 
   const onRecorder = useCallback(
@@ -600,6 +684,7 @@ export function App() {
     try {
       await save();
       setSaveFailed(false);
+      lastEdited.current = Date.now();
       if (!pendingSave.current) {
         setDirty(false);
         unsaved.current = null;
@@ -1159,7 +1244,7 @@ export function App() {
       x: r.left,
       y: r.bottom + 4,
       items: [
-        { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+        { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
         { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
@@ -2348,7 +2433,7 @@ export function App() {
       cmd('import', 'Import files…', () => chooseImport(null), 'Recipe', '.docx .md .txt'),
       cmd('zip', 'Back up as a zip…', () => void backUp(), 'Recipe'),
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
-      cmd('books', 'Your recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
+      cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
       cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
       ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
@@ -2373,6 +2458,41 @@ export function App() {
     for (const [p, c] of cards) if (p.startsWith(BOOKSHELF + '/') && c.kind === 'scene') total += p === path ? (words ?? c.words) : c.words;
     return total;
   }, [cards, path, words]);
+  /**
+   * Notes the open recipe's title, words, goal and series in Your Recipes, so the list shows them without
+   * opening it. Run when Your Recipes opens and when the recipe closes, never while typing.
+   */
+  const noteRecipe = useRef<(extra?: { firstLines?: string }) => void>(() => {});
+  noteRecipe.current = (extra = {}) => {
+    const at = locationRef.current;
+    const info = bookRef.current;
+    if (!at || !info || editingTemplate.current) return;
+    updateRecent(at, { title: info.title, words: bookWords, goal: info.bookTarget, series: info.series, seriesNumber: info.seriesNumber, ...(lastEdited.current && { edited: lastEdited.current }), ...extra });
+  };
+  useEffect(() => {
+    const onHide = () => noteRecipe.current();
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, []);
+  // Its first lines are read once, when Your Recipes opens.
+  const [libraryVersion, setLibraryVersion] = useState(0);
+  useEffect(() => {
+    if (!libraryOpen || !fs || editingTemplate.current) return;
+    let live = true;
+    noteRecipe.current();
+    setLibraryVersion((v) => v + 1);
+    void flushSave()
+      .then(() => firstLines(fs, tree, plainText))
+      .then((text) => {
+        if (!live) return;
+        noteRecipe.current({ firstLines: text || undefined });
+        setLibraryVersion((v) => v + 1);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [libraryOpen]);
   const exportHistoryCsv = () =>
     void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
   // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
@@ -2410,7 +2530,8 @@ export function App() {
         { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
         { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
         { separator: true },
-        { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+        { label: 'New Recipe…', onPick: () => (setLibraryNew(true), setLibraryOpen(true)) },
+        { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
         {
           label: 'Export',
@@ -2581,7 +2702,7 @@ export function App() {
                   { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
                   { separator: true },
                   { label: 'Back up now', onPick: () => void backUpNow() },
-                  { label: 'Your recipes…', onPick: () => setLibraryOpen(true) },
+                  { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
                 ]);
               }}
             >
@@ -2839,6 +2960,9 @@ export function App() {
           adopting={adopting}
           error={libraryError}
           busy={busy}
+          version={libraryVersion}
+          startNew={libraryNew}
+          defaultWhere={isTauri() ? settings.newBooksFolder || 'Cookbook’s own folder' : 'In this browser’s storage'}
           onOpen={(target) =>
             void fromLibrary(async () => {
               await openAt(target);
@@ -2846,7 +2970,7 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
-          onCreate={(title, template, inFolder) => void createNewBook(title, template, inFolder)}
+          onCreate={(choice) => void createNewBook(choice)}
           onAdopt={(target) =>
             void fromLibrary(async () => {
               await openAt(target, { adopt: true });
@@ -2855,6 +2979,12 @@ export function App() {
           }
           onCancelAdopt={() => setAdopting(null)}
           onClose={closeLibrary}
+          onRename={renameRecipe}
+          onDuplicate={(from, title) => void duplicateRecipe(from, title)}
+          onLocate={(lost) => void locateRecipe(lost)}
+          onDeleteForGood={deleteForGood}
+          onSaveTemplate={saveAsTemplate}
+          onEditTemplate={(t) => void editTemplate(t)}
           openBookItems={[
             { label: 'Back up as a zip…', onPick: () => void backUp() },
             {
@@ -2866,7 +2996,6 @@ export function App() {
                 { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
               ],
             },
-            { label: 'Trash', onPick: openTrash },
           ]}
         /></Suspense>
       )}

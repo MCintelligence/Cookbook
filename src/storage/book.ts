@@ -56,6 +56,9 @@ export interface BookInfo {
   countPasted?: boolean;
   /** Saturdays and Sundays without writing don't end a streak. */
   weekendsOff?: boolean;
+  /** The series the book belongs to, and its place in it, shown in Your Recipes. */
+  series?: string;
+  seriesNumber?: number;
   /** Seasonings: the characters picked, in the order shown, what Daniel tracks, and remarks removed for good. */
   seasonings?: SeasoningsInfo;
 }
@@ -129,6 +132,8 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(info.page && typeof info.page === 'object' && { page: pageOf(info.page) }),
     ...(typeof info.bookTarget === 'number' && info.bookTarget > 0 && { bookTarget: info.bookTarget }),
     ...(typeof info.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(info.deadline) && { deadline: info.deadline }),
+    ...(typeof info.series === 'string' && info.series.trim() !== '' && { series: info.series }),
+    ...(typeof info.seriesNumber === 'number' && info.seriesNumber > 0 && { seriesNumber: info.seriesNumber }),
     ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
     ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
     ...(info.seasonings && typeof info.seasonings === 'object' && {

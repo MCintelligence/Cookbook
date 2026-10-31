@@ -7,7 +7,7 @@ import { relationshipsOf } from './document';
 import { parseMarkdown, plainText, type NodeJSON } from '../editor/markdown';
 import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook, shelfOf } from './learnToCook';
 
-const mac = (id: string) => ({ palette: '⌘K', switcher: '⌘O', find: '⌘F', focus: '⇧⌘F' })[id] ?? '';
+const mac = (id: string) => ({ palette: '⌘K', switcher: '⌘O', find: '⌘F', focus: '⇧⌘F', mise: '⇧⌘G' })[id] ?? '';
 
 async function made() {
   const fs = new MemoryAdapter();
@@ -52,6 +52,18 @@ describe('Learn to Cook', () => {
     await makeLearnToCook(bare, () => '');
     const plain = (await readDocument(bare, 'bookshelf/Finding your way/Search and shortcuts.md')).body;
     expect(plain).toContain('open it from Help › Command palette');
+  });
+
+  it('explains Mise en Place on the Shelf’s own pages, so clicking The Shelf shows it at work', async () => {
+    const { fs } = await made();
+    expect(shelfOf(mac).find((g) => g.title === 'The Shelf')!.items.map((i) => i.title)).toContain('Mise en Place');
+    const mise = (await readDocument(fs, 'bookshelf/The Shelf/Mise en Place.md')).body;
+    expect(mise).toContain('**⇧⌘G** switches');
+    expect(mise).toContain('find a Group by name: press ⌘O');
+    const bare = new MemoryAdapter();
+    await makeLearnToCook(bare, () => '');
+    expect((await readDocument(bare, 'bookshelf/The Shelf/Mise en Place.md')).body).toContain('View › **Mise en Place** switches');
+    expect((await readDocument(fs, 'bookshelf/Start here/Welcome.md')).body).toContain('Click the name of the next Group, **The Shelf**');
   });
 
   it('fills the Pantry with linked characters, a place and a research note', async () => {

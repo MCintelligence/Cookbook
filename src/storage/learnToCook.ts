@@ -86,7 +86,7 @@ A *Recipe* is one piece of writing: a novel, a story, a thesis. On the left is i
 
 Try these as you go:
 
-- [ ] Open the next Group, **The Shelf**, and click its first Item.
+- [ ] Click the name of the next Group, **The Shelf**, to read all of it as one page.
 - [ ] Open the **Pantry** from the View menu and find Mama Lou.
 - [ ] Open **Seasonings** and let Salty Sam find a spelling mistake.
 - [ ] Turn on **Oven Mode** to write without distractions.
@@ -108,6 +108,8 @@ When you’re finished, delete this recipe like any other. Open a recipe of your
           body: `# Groups and Items
 
 Your writing is kept in **Items**, gathered into **Groups**. A Group can hold Items and other Groups, as deep as you like: Part One › Chapter 3 › the scene in the kitchen.
+
+Click an Item on the Shelf to open it on its own page. Click a Group’s **name** to see every Item in it as one page (more on that two pages down), and click the **arrow** beside the name to open or close the Group.
 
 To add one, use the buttons at the bottom of the Shelf, or File › **New item** and **New group**. A new Item goes beside the one you’re in.
 
@@ -134,6 +136,22 @@ A draft rarely falls into Items the first time. Below is a section break, the th
 Right-click the break and choose **Split into a new item here**. Everything after it moves into a new Item, just below this one on the Shelf.
 
 To join them again, open the first and right-click it on the Shelf: **Merge with next**. Cookbook takes a snapshot before splitting or merging, so you can always go back (Settings › Saving and backups can turn this off).
+`,
+        },
+        {
+          title: 'Mise en Place',
+          synopsis: 'A whole Group as one page.',
+          body: `# Mise en Place
+
+**Mise en Place** sets out a whole Group on one page. Click a Group’s name on the Shelf (or select it and press Enter) and every Item inside it appears in Shelf order, one after another, with the names of any Groups inside it as dividers. If you clicked **The Shelf** to get here, you are in it now: scroll up and the pages before this one are right there.
+
+Write anywhere. Click into an Item’s text and the cursor lands where you clicked; the arrow keys at the start or end of an Item carry on into the one before or after. Each Item is still its own page on the Shelf, saved, proofread and undone on its own. The bar at the bottom shows the Group’s Items and words.
+
+- ${k('mise') ? `**${k('mise')}** switches` : 'View › **Mise en Place** switches'} between the Item you’re in on its own page and its whole Group, with the cursor where it was.
+- Right-click a Group and choose **Show as one page**, or find a Group by name: ${press(k, 'switcher', 'Edit › Go to an item or card')}.
+- An empty Group opens as an empty page. Start typing and a new Item is made in it; Undo takes it away again.
+
+To go back to one Item, click it on the Shelf.
 `,
         },
       ],
@@ -297,7 +315,7 @@ You can also give an Item a goal of its own; the bottom bar then shows how close
 Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so it opens in any text editor and nothing is locked inside Cookbook.
 
 - **Snapshots** keep earlier versions of one Item. Take one from Recipe › Snapshots of this item, then compare and roll back whenever you like.
-- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. File › **Back up now** makes one at once. Settings › Saving and backups says where they go.
+- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
 - **Trash** keeps whatever you delete until you empty it: File › Trash.
 - **Undo** reaches back past closing the app.
 `,
@@ -326,7 +344,7 @@ To bring writing in, File › **Import files** takes Word, Markdown and plain te
 
 The fastest way to anything is the **command palette**: ${press(k, 'palette', 'open it from Help › Command palette')} and type what you want, such as “oven” or “export”.
 
-- **Go to an Item or card**: ${press(k, 'switcher', 'Edit › Go to an item or card')} and type part of its name.
+- **Go to an Item, a Group or a card**: ${press(k, 'switcher', 'Edit › Go to an item or card')} and type part of its name. A Group opens as one page.
 - **Search** the whole recipe: ${press(k, 'find', 'Edit › Search')}. Replace is there too.
 - **Move between parts of the window** with F6 and Shift+F6.
 
@@ -424,8 +442,8 @@ export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel): Promise<
     await writeDocument(fs, joinPath(PANTRY, card.section, `${fileNameFor(card.title)}.md`), { id: byId.get(card.title)!, title: card.title, kind: card.kind, fields, body: card.body });
   }
   await saveOrder(fs, order);
-  // Key names in the shortcuts aren't spelling mistakes; the writer's own recipes start without them.
-  await saveDictionary(fs, ['Ctrl', 'Alt']);
+  // Key names in the shortcuts, and Mise en Place, aren't spelling mistakes; the writer's own recipes start without them.
+  await saveDictionary(fs, ['Ctrl', 'Alt', 'Mise']);
   await saveBookInfo(fs, info);
   return info;
 }

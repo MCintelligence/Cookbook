@@ -130,6 +130,10 @@ Press ⌘J (Name from the Pantry) or type @ while writing for a quick search ove
 
 Pinned cards stay in the right-hand drawer, above the Pantry or Seasonings, until you unpin them. They're remembered for each recipe on this device. A name's peek can pin its card too.
 
+## Learn to Cook
+
+The first time Cookbook starts, it opens **Learn to Cook**, a recipe made for trying things out: one group for each part of Cookbook (the Shelf, writing, the Pantry, Seasonings, Stove and Oven, goals, keeping it safe, finding your way), an example Pantry, and pages full of things to try. Its shortcuts are your own, so it says ⌘O on a Mac and Ctrl+O elsewhere, or the menu way if you've taken a shortcut off. It is an ordinary recipe: change it, or delete it from Your Recipes when you're done. Help › Learn to Cook opens it again, or makes a fresh copy if it was deleted.
+
 ## Starting points and goals
 
 A new recipe can start as a novel (a group of items, plus a main character and place in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
@@ -155,6 +159,8 @@ Your text is saved as you type. On top of that, Cookbook zips the whole recipe i
 A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
 
 The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
+
+Each backup is opened again as soon as it is written and checked file by file against the recipe. One that doesn't open whole is removed, never counted among the backups kept, and Cookbook says so. If automatic backups stop working, Cookbook tells you once and Settings shows why until one works again. In the desktop app, saves and backups are forced onto the disk before they replace the old file, Settings marks a backup folder that is on the same disk as the recipe, and Cookbook suggests choosing another drive or a cloud-synced folder the first time it finds them together.
 
 ## Seasonings
 

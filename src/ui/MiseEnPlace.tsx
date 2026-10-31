@@ -44,7 +44,7 @@ interface Loaded {
 }
 
 /** Where the cursor goes once an Item's editor is on screen. */
-type Landing = { path: string; dx: number; dy: number } | { path: string; at: 'start' | 'end'; text?: string };
+type Landing = { path: string; dx: number; dy: number } | { path: string; at: 'start' | 'end'; fresh?: boolean };
 
 /**
  * Mise en Place: every Item in a Group as one page, under the names of the Groups inside it.
@@ -74,6 +74,16 @@ export function MiseEnPlace(props: Props) {
   const fresh = useRef<string | null>(null);
 
   const keep = (path: string, loaded: Loaded) => setTexts((m) => new Map(m).set(path, loaded));
+
+  // An Item moved away, renamed or put in the trash is forgotten, so a new one made with its
+  // name later is read afresh rather than shown with the old one's words.
+  useEffect(() => {
+    const here = new Set(items);
+    setTexts((m) => {
+      if ([...m.keys()].every((p) => here.has(p))) return m;
+      return new Map([...m].filter(([p]) => here.has(p)));
+    });
+  }, [items]);
 
   /** Reads an Item's text the first time it comes near the screen. */
   const want = (path: string) => {
@@ -133,10 +143,20 @@ export function MiseEnPlace(props: Props) {
       editor.commands.focus(at ? at.pos : 'end', { scrollIntoView: false });
     } else {
       editor.commands.focus(want.at, { scrollIntoView: true });
-      // The words typed into the empty Group, as one step Undo can take back.
-      if (want.text) editor.commands.insertContent({ type: 'text', text: want.text });
+      if (want.fresh) {
+        // The words typed into the empty Group, read only now so none typed while the Item was
+        // being made are lost, and put in as one step Undo can take back.
+        const text = (blank.current?.textContent ?? '').replace(/\s+/g, ' ').trimStart();
+        if (text) editor.commands.insertContent({ type: 'text', text });
+        setStarting(null);
+      }
     }
   }, [editor, active]);
+
+  // Undo only takes away a new Item while it is still the one being written in.
+  useEffect(() => {
+    if (fresh.current && fresh.current !== active && starting === null) fresh.current = null;
+  }, [active]);
 
   // An Item picked on the Shelf, or from Search, is scrolled to; the first one leaves the Group's name in view.
   useLayoutEffect(() => {
@@ -166,7 +186,7 @@ export function MiseEnPlace(props: Props) {
   const crossing = (e: ReactKeyboardEvent) => {
     if (!editor || !active) return;
     const mod = IS_MAC ? e.metaKey : e.ctrlKey;
-    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z' && fresh.current === active && undoDepth(editor.state) === 0) {
+    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z' && fresh.current === active && undoDepth(editor.state) === 0 && editor.isEmpty) {
       e.preventDefault();
       e.stopPropagation();
       fresh.current = null;
@@ -196,24 +216,30 @@ export function MiseEnPlace(props: Props) {
 
   // The empty Group: typing here starts its first Item.
   const blank = useRef<HTMLDivElement>(null);
-  const starting = useRef(false);
+  const making = useRef(false);
+  /**
+   * The Item being made from the words typed into the empty Group. The empty page stays, still
+   * taking letters, until that Item's editor is ready to take them over.
+   */
+  const [starting, setStarting] = useState<string | null>(null);
   useEffect(() => {
     if (items.length === 0) blank.current?.focus({ preventScroll: true });
   }, [items.length === 0, group.path]);
   const start = async () => {
     const el = blank.current;
-    if (starting.current || !el || !(el.textContent ?? '').trim()) return;
-    starting.current = true;
-    await props
+    if (making.current || starting || !el || !(el.textContent ?? '').trim()) return;
+    making.current = true;
+    const made = await props
       .onStartWriting((path) => {
-        // Read as late as possible, so letters typed while the Item was being made come too.
-        const text = (blank.current?.textContent ?? el.textContent ?? '').replace(/\s+/g, ' ').trimStart();
         fresh.current = path;
-        landing.current = { path, at: 'end', text };
+        landing.current = { path, at: 'end', fresh: true };
         opened.current = path;
+        setStarting(path);
       })
       .catch(() => null);
-    starting.current = false;
+    making.current = false;
+    // It couldn't be made, or its editor never came: the words stay on the empty page.
+    if (!made) setStarting(null);
   };
 
   // What the other Items do when used, kept current so their memoised elements never go stale.
@@ -259,7 +285,7 @@ export function MiseEnPlace(props: Props) {
             </h2>
           );
         }
-        if (entry.path === active) return null;
+        if (entry.path === active || entry.path === starting) return null;
         const card = cards.get(entry.path);
         return (
           <ItemText
@@ -274,7 +300,7 @@ export function MiseEnPlace(props: Props) {
           />
         );
       }),
-    [entries, active, texts, cards, schema, observe],
+    [entries, active, starting, texts, cards, schema, observe],
   );
   const activeAt = useMemo(() => (active ? entries.findIndex((e) => e.path === active) : -1), [entries, active]);
   const activeTitle = active ? (cards.get(active)?.title ?? (activeAt >= 0 ? entries[activeAt]!.name : '')) : '';
@@ -291,7 +317,7 @@ export function MiseEnPlace(props: Props) {
             </section>,
             ...rows.slice(activeAt + 1),
           ]}
-      {items.length === 0 && (
+      {(items.length === 0 || starting !== null) && (
         <div
           ref={blank}
           className="cb-prose mise-blank"

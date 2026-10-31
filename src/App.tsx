@@ -52,7 +52,7 @@ import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES,
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
-import { LiveGoals, type SaveState, SavedStatus } from './ui/LiveCounts';
+import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
 import { createStore } from './ui/store';
 import { useStable } from './ui/useStable';
 import { docWords } from './editor/docStats';
@@ -796,13 +796,19 @@ export function App() {
     const section = sectionOf(p);
     if (section) setPantryGroup(section);
     const opened = await readDocument(fs, p);
+    const log = await readUndoLog(fs, opened.id);
+    // Words typed while the next Item was being read still belong to the one being left.
+    if (pendingSave.current) {
+      await flushSave();
+      await saveUndoNow();
+    }
     setManuscript(null);
     setSideOpen(false);
     docRef.current = opened;
     bodyFrom.current = null;
     savedText.current = serializeDocument(opened);
     savedWords.current = sceneWords(opened);
-    setUndoLog(await readUndoLog(fs, opened.id));
+    setUndoLog(log);
     setPath(p);
     setDoc(opened);
     try {
@@ -811,6 +817,20 @@ export function App() {
       // The book just opens without a scene next time.
     }
   };
+
+  /**
+   * The open Item's editor made again in another place on the page, into or out of Mise en Place:
+   * it starts from the text and undo history as they are now, not as the Item was opened.
+   * Read once as the editor is made, while the one it replaces is still there.
+   */
+  const editorTakeOver = useCallback(() => {
+    const r = recorder.current;
+    const now = currentDoc();
+    if (!r || !now || r.id !== now.id) return null;
+    // The steps the old editor hadn't written yet are written now, so they survive closing too.
+    void saveUndoNow();
+    return { initialBody: now.body, undoLog: r.recorder.toJSON() };
+  }, [currentDoc, saveUndoNow]);
 
   // Leaving an Item whose saves only changed words: the Shelf catches up with its word count now.
   useEffect(() => {
@@ -858,18 +878,17 @@ export function App() {
   const openGroup = async (g: string) => {
     const node = findGroup(tree, g);
     if (!fs || !node) return;
+    // Saved before the page changes, since the editor of an Item outside the Group goes as it does.
+    await flushSave();
+    await saveUndoNow();
     setManuscript(null);
     setSideOpen(false);
     setMise(g);
     if (path && isInside(path, g)) return;
     const first = miseItems(miseEntries(node))[0];
     if (first) await select(first);
-    else {
-      // An empty Group opens as an empty page; the Item open before is put away.
-      await flushSave();
-      await saveUndoNow();
-      closeScene();
-    }
+    // An empty Group opens as an empty page; the Item open before is put away.
+    else closeScene();
   };
 
   /** The first words typed into an empty Group make its first Item. */
@@ -2629,16 +2648,21 @@ export function App() {
   const cardStyle = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
   /** The open Item's editor and what goes with it: on its own page, or in its place in Mise en Place. */
-  const pageBody = () =>
-    doc && path ? (
+  const pageBody = () => {
+    if (!doc || !path) return null;
+    const forId = doc.id;
+    return (
       <>
         <PageEditor
           initialBody={doc.body}
           undoLog={undoLog}
+          takeOver={editorTakeOver}
           onRecorder={onRecorder}
           nextStyle={nextStyle}
           onReady={setEditor}
           onChange={(ed) => {
+            // An editor on its way out, typed in after its Item's words were saved, mustn't write into the next one.
+            if (docRef.current?.id !== forId) return;
             bodyFrom.current = ed;
             scheduleSave();
           }}
@@ -2649,12 +2673,13 @@ export function App() {
         <PageFootnotes editor={editor} />
         <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
       </>
-    ) : null;
-  // Words in the Group shown as Mise en Place, with the open Item counted as it is now.
+    );
+  };
+  // Words in the Group shown as Mise en Place. The others are added up when the Shelf or the index
+  // changes, not on every keystroke; the footer adds the open Item's words as they are typed.
   const miseList = useMemo(() => (miseGroup ? miseItems(miseEntries(miseGroup)) : []), [miseGroup]);
-  // The others are added up when the Shelf or the index changes, not on every keystroke.
-  const miseOthers = useMemo(() => miseWords(miseList, (p) => cards.get(p)?.words ?? 0, path, 0), [miseList, cards, path]);
-  const miseTotal = miseOthers + (miseGroup && path && isInside(path, miseGroup.path) ? (words ?? 0) : 0);
+  const miseActive = miseGroup && path && isInside(path, miseGroup.path) ? path : null;
+  const miseOthers = useMemo(() => miseWords(miseList, (p) => cards.get(p)?.words ?? 0, miseActive, 0), [miseList, cards, miseActive]);
 
   /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
   const topMenus: BarMenu[] = [
@@ -2814,6 +2839,7 @@ export function App() {
     setMise(null);
     void select(p);
   });
+  const onOpenGroup = useStable((g: string) => void openGroup(g));
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
   const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
@@ -2933,7 +2959,7 @@ export function App() {
           recipes={recipes}
           marked={shelfMarked}
           onMark={setShelfMarked}
-          onOpenGroup={(g) => void openGroup(g)}
+          onOpenGroup={onOpenGroup}
           shownGroup={miseGroup ? miseGroup.path : null}
         />
         {shelfBar()}
@@ -3253,9 +3279,13 @@ export function App() {
         />
         <span className="footer-end">
           {miseGroup && (
-            <span className="mise-count" title={`Mise en Place: everything in “${miseGroup.name}”`}>
-              {miseGroup.name} · {miseList.length.toLocaleString('en')} {miseList.length === 1 ? 'item' : 'items'} · {miseTotal.toLocaleString('en')} {miseTotal === 1 ? 'word' : 'words'}
-            </span>
+            <MiseCount
+              name={miseGroup.name}
+              items={miseList.length}
+              otherWords={miseOthers}
+              editor={miseActive ? editor : null}
+              savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
+            />
           )}
           {settings.focus && (
             <button className="oven-exit" title={`Back to Stove Mode (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>

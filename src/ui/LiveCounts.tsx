@@ -39,6 +39,25 @@ export function LiveGoals({ editor, item, savedItemWords, otherWords, ...rest }:
   return <GoalsPopup {...rest} scene={item ? { title: item.title, words, goal: item.goal } : null} bookWords={otherWords + (item?.onShelf ? words : 0)} />;
 }
 
+/** Mise en Place's Items and words in the footer, with the open Item's words counted as they are now. */
+export function MiseCount({ name, items, otherWords, editor, savedItemWords }: {
+  name: string;
+  items: number;
+  /** Words in every Item of the Group but the open one, as last saved. */
+  otherWords: number;
+  /** The open Item's editor, when it is in the Group. */
+  editor: Editor | null;
+  savedItemWords: number;
+}) {
+  const live = useLiveWords(editor);
+  const words = otherWords + (editor ? (live ?? savedItemWords) : savedItemWords);
+  return (
+    <span className="mise-count" title={`Mise en Place: everything in “${name}”`}>
+      {name} · {fmt(items)} {items === 1 ? 'item' : 'items'} · {fmt(words)} {words === 1 ? 'word' : 'words'}
+    </span>
+  );
+}
+
 export interface SaveState {
   /** Changes are waiting to be saved. */
   dirty: boolean;

@@ -83,7 +83,7 @@ Items sit on the Shelf with a status dot (not started, simmering or done) and th
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
-The open item's status and synopsis are on the card above the page, so they never end up in the manuscript.
+The open item's status sits in the footer and on the Shelf, never on the page, so it never ends up in the manuscript.
 
 Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as one document, under its group headings, with the total words and an estimated reading time. Double-click a section to go back to writing in it.
 

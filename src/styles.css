@@ -313,6 +313,10 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* The brackets are full-width glyphs inked on one half; the other half is pulled in so they hug the words. */
 .cb-bracket-open { margin-left: -0.5em; }
 .cb-bracket-close { margin-right: -0.5em; }
+/* A seasoning whose Check is off marks nothing on the page; its issues are still counted on its meter. */
+.cb-off-spelling .cb-issue-spelling, .cb-off-grammar .cb-issue-grammar { text-decoration: none; background: none; cursor: text; }
+.cb-off-style .cb-issue-style { background: none; cursor: text; }
+.cb-off-style .cb-bracket { display: none; }
 .issue-card { --issue: var(--spelling); position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); }
 .card-details { flex-wrap: wrap; }
 .card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
@@ -861,21 +865,70 @@ button.seas-quote:hover { color: var(--accent); }
 .chip button { border: none; background: transparent; padding: 0; color: var(--faint); font-size: 11px; }
 .chip button:hover { color: var(--text); }
 .chip.chip-add { background: transparent; border: 1px dashed var(--line-strong); color: var(--accent); }
-.track-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.track-title { font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.track-share { flex: none; font-size: 12px; color: var(--muted); }
-.spice { display: grid; gap: 4px; margin: 4px 0 8px; }
-.spice-row { display: flex; justify-content: space-between; align-items: baseline; }
-.spice-level { font-weight: 700; font-size: 14px; color: var(--text); }
-.spice-grade { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.spice-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
-.spice-step { height: 8px; border-radius: 4px; background: var(--line); }
-.spice-step.is-on.spice-0 { background: #8bbf5a; }
-.spice-step.is-on.spice-1 { background: #e3b23c; }
-.spice-step.is-on.spice-2 { background: #e8792f; }
-.spice-step.is-on.spice-3 { background: #d6452b; }
-.spice-step.is-on.spice-4 { background: #9e1f1f; }
-.spice-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+.gauge { display: grid; gap: 4px; margin: 2px 0 8px; }
+.gauge-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gauge-level { font-weight: 700; font-size: 14px; color: var(--text); }
+.gauge-detail { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; min-width: 0; }
+.gauge-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.gauge-step { height: 8px; border-radius: 4px; background: var(--line); }
+.gauge-step.is-on.gauge-0 { background: #8bbf5a; }
+.gauge-step.is-on.gauge-1 { background: #e3b23c; }
+.gauge-step.is-on.gauge-2 { background: #e8792f; }
+.gauge-step.is-on.gauge-3 { background: #d6452b; }
+.gauge-step.is-on.gauge-4 { background: #9e1f1f; }
+.gauge-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+/* A seasoning card: the remark, the meter, then its Check and Report. */
+.sc-remark { margin: 2px 0 8px; background: var(--bg); border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.42; font-style: italic; }
+.sc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sc-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.sc-report { height: 24px; font-size: 12px; }
+.sc-report:disabled { color: var(--faint); cursor: default; }
+/* A seasoning's report, in a window over the page. */
+.lib.report { width: min(720px, 100%); gap: 14px; padding: 14px 20px 18px; }
+.report-head { display: flex; align-items: center; gap: 12px; }
+.report-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.report-title h2 { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 600; }
+.report-title span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-verdict { background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 15px; line-height: 1.45; font-style: italic; }
+.report .gauge { margin: 0; }
+.report-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0; }
+.report-stats div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--card); min-width: 0; }
+.report-stats dt { font-size: 11px; color: var(--muted); }
+.report-stats dd { margin: 2px 0 0; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.report-section { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.report-section h3 { margin: 0; font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+.report-note, .report-empty { margin: 0; font-size: 12px; color: var(--muted); }
+.report-empty { font-style: italic; }
+.report-actions { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.45; }
+.report-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.report-row { display: flex; align-items: center; gap: 6px; }
+.report-row-main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; text-align: left; border: 1px solid transparent; background: transparent; padding: 4px 8px; border-radius: 6px; font-size: 13px; color: var(--text); }
+.report-row-main:hover:not(:disabled) { background: var(--bg); border-color: var(--line); }
+.report-label { font-weight: 700; }
+.report-ctx { flex: 1; min-width: 0; color: var(--muted); overflow-wrap: anywhere; }
+.report-ctx mark { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); border-radius: 2px; padding: 0 1px; }
+.report-detail { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; }
+.report-row-main .count { margin-left: auto; flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.report-spots { flex: none; display: flex; gap: 2px; align-items: center; }
+.report-spot { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--card); font-size: 11px; color: var(--muted); }
+.report-spot:hover { color: var(--accent); border-color: var(--accent); }
+.report-more { font-size: 11px; color: var(--faint); padding-left: 2px; }
+.report-all { align-self: flex-start; }
+.report-bars { display: flex; flex-direction: column; gap: 4px; }
+.report-bar { display: grid; grid-template-columns: minmax(80px, 30%) 1fr 36px; align-items: center; gap: 8px; font-size: 12px; }
+.report-bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-bar-track { height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.report-bar-track span { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+.report-bar-value { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.report-strip { display: flex; align-items: flex-end; gap: 2px; height: 64px; padding: 4px; border-radius: 8px; background: var(--bg); overflow-x: auto; }
+.report-strip-cell { flex: 1 0 4px; max-width: 18px; height: 100%; padding: 0; border: none; background: transparent; display: flex; align-items: flex-end; cursor: pointer; }
+.report-strip-cell span { display: block; width: 100%; border-radius: 2px 2px 0 0; background: var(--line-strong); }
+.report-strip-cell span.is-spoken { background: var(--accent); }
+.report-strip-cell:hover span { filter: brightness(0.9); outline: 1px solid var(--accent); }
+.report-saved { margin: 0; font-size: 12px; color: var(--faint); }
+@media (max-width: 560px) {
+  .report-stats { grid-template-columns: repeat(2, 1fr); }
+}
 .meter { height: 4px; margin: 5px 0 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .meter span { display: block; height: 100%; background: var(--accent); }
 

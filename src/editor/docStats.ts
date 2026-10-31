@@ -1,6 +1,8 @@
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { countWords } from '../storage/index';
 import { sentences } from '../proofread/style';
+import { dialogueRanges } from './dialogue';
+import { textMap } from './textmap';
 
 /**
  * Counts over the open Item that only redo the blocks that changed.
@@ -88,5 +90,36 @@ export function docReading(doc: PMNode): Reading {
     return false;
   });
   readingByDoc.set(doc, sum);
+  return sum;
+}
+
+interface Talk {
+  /** Every word in the document's text blocks. */
+  words: number;
+  /** The words inside quotation marks. */
+  spoken: number;
+}
+const talkByBlock = new WeakMap<PMNode, Talk>();
+const talkByDoc = new WeakMap<PMNode, Talk>();
+
+/** Words, and words spoken inside quotes, for Drunk Daniel's meter; the same as dialogueStats, a block at a time. */
+export function docTalk(doc: PMNode): Talk {
+  let total = talkByDoc.get(doc);
+  if (total) return total;
+  const sum: Talk = { words: 0, spoken: 0 };
+  doc.descendants((node) => {
+    if (!node.isTextblock) return true;
+    let own = talkByBlock.get(node);
+    if (!own) {
+      const { text } = textMap(node, -1);
+      own = { words: countWords(text), spoken: 0 };
+      for (const [a, b] of dialogueRanges(text)) own.spoken += countWords(text.slice(a, b));
+      talkByBlock.set(node, own);
+    }
+    sum.words += own.words;
+    sum.spoken += own.spoken;
+    return false;
+  });
+  talkByDoc.set(doc, sum);
   return sum;
 }

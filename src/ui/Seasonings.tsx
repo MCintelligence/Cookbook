@@ -3,9 +3,11 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { checkedOff, isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
 import { type FoundIssue, issuesOf } from '../proofread/plugin';
 import { KIND_OF, METERS, SEASONINGS, type SeasoningId, meterRemark, ownerOf, perThousand, spiceOf, tasteOf } from '../proofread/remarks';
+import { REPORTS } from '../proofread/reports';
 import { readingGrade } from '../proofread/style';
 import { docReading, docTalk, docWords } from '../editor/docStats';
 import { Face } from './Faces';
+import { Gauge } from './Gauge';
 import { type MenuItem } from './Menu';
 import { BAR_ICONS, PanelBar } from './PanelBar';
 
@@ -22,13 +24,15 @@ interface Props {
   onPaused: (paused: boolean) => void;
   /** Shows a right-click menu. */
   onMenu: (label: string, x: number, y: number, items: MenuItem[]) => void;
+  /** Opens a seasoning's report on the open Item. */
+  onReport: (id: SeasoningId) => void;
 }
 
 /** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
 const MIN_GRADE_WORDS = 50;
 const LONG_PRESS_MS = 400;
 
-export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onClose, paused, onPaused, onMenu }: Props) {
+export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onClose, paused, onPaused, onMenu, onReport }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -314,8 +318,12 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                     <input type="checkbox" role="switch" className="switch" checked={checking(id)} onChange={(e) => setChecking(id, e.target.checked)} />
                     <span>{meter.check}</span>
                   </label>
-                  {/* Each report is designed for its seasoning and comes in a later step. */}
-                  <button className="btn sc-report" disabled title="Coming soon">
+                  <button
+                    className="btn sc-report"
+                    disabled={!REPORTS[id]}
+                    title={REPORTS[id] ? `${who.name}’s full report on this Item, saved to Research` : 'Coming soon'}
+                    onClick={() => onReport(id)}
+                  >
                     {meter.report}
                   </button>
                 </div>
@@ -351,37 +359,6 @@ function slipsOf(issues: FoundIssue[]): Record<SeasoningId, number> {
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-
-/** A seasoning's meter: its level and what it read, five steps from one end to the other. */
-function Gauge({ id, reading }: { id: SeasoningId; reading: { at: number; detail: string } | null }) {
-  const { measure, steps, ends } = METERS[id];
-  const at = reading?.at ?? -1;
-  return (
-    <div
-      className="gauge"
-      role="meter"
-      aria-label={measure}
-      aria-valuemin={0}
-      aria-valuemax={steps.length - 1}
-      aria-valuenow={Math.max(at, 0)}
-      aria-valuetext={reading ? `${steps[at]!.level}, ${reading.detail}` : 'Not enough to read yet'}
-    >
-      <div className="gauge-row">
-        <span className="gauge-level">{reading ? steps[at]!.level : '—'}</span>
-        {reading && <span className="gauge-detail">{reading.detail}</span>}
-      </div>
-      <div className="gauge-bar" aria-hidden="true">
-        {steps.map((s, i) => (
-          <span key={s.level} className={`gauge-step gauge-${i}${i <= at ? ' is-on' : ''}`} />
-        ))}
-      </div>
-      <div className="gauge-ends" aria-hidden="true">
-        <span>{ends[0]}</span>
-        <span>{ends[1]}</span>
-      </div>
-    </div>
-  );
-}
 
 function Handle({ label, d, disabled = false, className, onClick }: { label: string; d: string; disabled?: boolean; className?: string; onClick: () => void }) {
   return (

@@ -22,12 +22,12 @@ export const STYLE_RULES: { id: string; label: string; why: string }[] = [
 const WHY = Object.fromEntries(STYLE_RULES.map((r) => [r.id, r.why]));
 
 /** Short words that hold a sentence together but carry little meaning. */
-const GLUE = new Set(
+export const GLUE = new Set(
   'a an the of to in on at by for from with into onto upon and or but nor so as if than that this these those it its is are was were be been being am do does did have has had i me my we us our you your he him his she her they them their there here what which who whom whose when where why how not no all any some can could would should will shall may might must just very then also too up out about over off'.split(' '),
 );
 
 /** Words ending in -ly that aren't adverbs, or that no writer would want flagged. */
-const NOT_ADVERBS = new Set(
+export const NOT_ADVERBS = new Set(
   'only family early daily holy reply supply apply belly jelly ugly lonely friendly lovely likely unlikely silly curly hilly chilly bully rally ally fly july italy lily oily smelly wily jolly folly holly homely costly deadly elderly orderly lively lowly sly rely comply imply multiply anomaly assembly butterfly monopoly melancholy worldly cowardly scholarly ghastly ghostly heavenly beastly bubbly burly cuddly frilly gangly gnarly grisly measly prickly sickly surly wobbly wrinkly unruly unsightly leisurely motherly fatherly brotherly sisterly neighbourly neighborly manly womanly timely untimely weekly monthly yearly hourly nightly quarterly kindly lily-white reply'.split(' '),
 );
 

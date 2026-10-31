@@ -62,7 +62,7 @@ import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
 import { TextSelection } from '@tiptap/pm/state';
 import { type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, shownOf, toIndexed } from './storage/index';
-import { type NamedCard, castIn, countNames, nameMatcher, setNameMatcher } from './editor/names';
+import { type NamedCard, castIn, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
@@ -111,8 +111,10 @@ import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
-import { KIND_OF, fixText, isSeasoning, rulesOff } from './proofread/remarks';
-import { type FoundIssue, applySuggestion, aroundIssue, issueAt, stepIssue } from './proofread/plugin';
+import { KIND_OF, type SeasoningId, fixText, isSeasoning, rulesOff } from './proofread/remarks';
+import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
+import { ReportWindow } from './ui/ReportWindow';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, stepIssue } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
@@ -169,6 +171,8 @@ const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
 const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order });
+/** The Group in the Pantry's Research where Seasonings reports are kept. */
+const REPORT_GROUP = 'Seasoning Reports';
 
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
@@ -2026,6 +2030,48 @@ export function App() {
   useEffect(() => {
     if (editor && !editor.isDestroyed) setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);
   }, [editor, uncheckedKinds, doc?.id]);
+
+  // A seasoning's report on the open Item. It is worked out once, when asked for, and kept in the
+  // Pantry's Research under Seasoning Reports, named after the seasoning and the time.
+  const [report, setReport] = useState<{ report: Report; item: string; saved: string | null } | null>(null);
+  useEffect(() => setReport(null), [doc?.id]);
+  const saveReport = async (built: Report, item: string, when: Date): Promise<string> => {
+    if (!fs) throw new Error('No recipe is open.');
+    const folder = joinPath(joinPath(PANTRY, 'research'), REPORT_GROUP);
+    const fresh = !(await fs.exists(folder));
+    if (fresh) await fs.makeFolder(folder);
+    // A second report from the same seasoning in the same minute is numbered, so the two can be told apart.
+    let title = reportName(built.id, when);
+    for (let n = 2; await fs.exists(joinPath(folder, `${fileNameFor(title)}.md`)); n++) title = `${reportName(built.id, when)} (${n})`;
+    const p = await createDocument(fs, folder, title, SECTION_KIND.research);
+    const saved: CookbookDocument = { ...(await readDocument(fs, p)), body: reportMarkdown(built, item, when) };
+    await writeDocument(fs, p, saved);
+    // The Group goes at the end of Research, and each report at the end of the Group, so they read oldest first.
+    const pantry = await readTree(fs, PANTRY, ORDERED(order.current));
+    if (fresh) order.current = await placeNew(fs, order.current, pantry, PANTRY, folder, null);
+    order.current = await placeNew(fs, order.current, pantry, PANTRY, p, null);
+    // Only the new card is indexed, rather than checking every file in the Recipe again.
+    const current = index.current;
+    if (current && current.fs === fs) {
+      current.index.upsert(toIndexed(p, saved, await fs.stamp(p)));
+      indexChanged();
+    }
+    setPantryTree(await readTree(fs, PANTRY, ORDERED(order.current)));
+    return baseName(p).replace(/\.md$/, '');
+  };
+  const openReport = (id: SeasoningId) => {
+    if (!editor || !doc) return;
+    const when = new Date();
+    const build = REPORTS[id];
+    if (!build) return;
+    const built = build({ doc: editor.state.doc, issues: issuesOf(editor.state), names: nameMatcherOf(editor.state) });
+    const item = doc.title;
+    setReport({ report: built, item, saved: null });
+    saveReport(built, item, when).then(
+      (name) => setReport((r) => (r?.report === built ? { ...r, saved: name } : r)),
+      (e: unknown) => setError(`Couldn’t save the ${built.title}: ${friendlyError(e)}`),
+    );
+  };
   const castIds = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? castIn(editor.state).map((c) => c.id).join('\n') : ''),
@@ -2972,12 +3018,14 @@ export function App() {
               paused={paused}
               onPaused={(on) => setSeasonings({ paused: on || undefined })}
               onMenu={showMenu}
+              onReport={openReport}
             />
           )}
         </div>
       )}
 
       <IssueCard editor={editor} proof={proof} request={issueRequest} />
+      {report && editor && <ReportWindow editor={editor} report={report.report} item={report.item} saved={report.saved} onClose={() => setReport(null)} />}
       {slash !== null && editor && <InsertMenu editor={editor} at={slash} items={insertItems} onClose={() => setSlash(null)} />}
 
       {shelf && (

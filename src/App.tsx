@@ -120,7 +120,7 @@ import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
-import { type Backup, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
+import { type Backup, BackupCheckError, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
@@ -318,8 +318,9 @@ export function App() {
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
   /** A short message at the bottom of the window, sometimes with an Undo. */
-  const [notice, setNotice] = useState<{ text: string; undo?: () => void; at: number } | null>(null);
-  const say = (text: string, undo?: () => void) => setNotice({ text, undo, at: Date.now() });
+  /** A passing message; `undo` adds a button, labelled `action` or else Undo. */
+  const [notice, setNotice] = useState<{ text: string; undo?: () => void; action?: string; at: number } | null>(null);
+  const say = (text: string, undo?: () => void, action?: string) => setNotice({ text, undo, action, at: Date.now() });
   const importInput = useRef<HTMLInputElement>(null);
   /** The folder the next "Import files…" goes into, or null for the usual place. */
   const importInto = useRef<string | null>(null);
@@ -343,7 +344,19 @@ export function App() {
   /** Words pasted since the last save, which don't count towards the goal unless the book says so. */
   const pastedWords = useRef(0);
   // Saved before a timed backup, so it has the newest words.
-  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current());
+  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current(), {
+    failed: (text) => setError(text),
+    mended: (text) => {
+      setError((shown) => (shown === text ? null : shown));
+      say('Backups are working again.');
+    },
+    sameDisk: () =>
+      say(
+        'Your backups are on the same disk as your recipes, so a broken or lost computer would take both. A folder on another drive, or one a cloud service syncs, keeps them apart.',
+        () => openSettings('saving'),
+        'Choose folder…',
+      ),
+  });
 
   /** Changes the open book's settings in book.json. */
   const updateBook = (changes: Partial<BookInfo>) => {
@@ -1140,7 +1153,7 @@ export function App() {
       await refreshBackups();
       say(`Backed up “${bookRef.current?.title ?? 'the recipe'}”.`);
     } catch (e) {
-      setError(`Couldn’t back up the recipe. ${friendlyError(e)}`);
+      setError(e instanceof BackupCheckError ? e.message : `Couldn’t back up the recipe. ${friendlyError(e)}`);
     }
   };
   /** Shows the book's backups; picking one opens a copy of the book as it was, beside this one. */
@@ -3101,7 +3114,7 @@ export function App() {
                 undo();
               }}
             >
-              Undo
+              {notice.action ?? 'Undo'}
             </button>
           )}
           <button className="notice-close" aria-label="Dismiss" onClick={() => setNotice(null)}>

@@ -46,6 +46,8 @@ export interface AppSettings {
   checkUpdates: boolean;
   /** A folder the writer chose for automatic backups, or null for Cookbook's own. */
   backupFolder: BookLocation | null;
+  /** The writer was told once that backups sit on the same disk as their recipes. */
+  backupDiskNudged: boolean;
   /** In the desktop app, where new books go; empty for Cookbook's own folder. */
   newBooksFolder: string;
   /** Shortcuts the writer changed, by command id. */
@@ -75,6 +77,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoSnapshot: true,
   checkUpdates: true,
   backupFolder: null,
+  backupDiskNudged: false,
   newBooksFolder: '',
   shortcuts: {},
 };

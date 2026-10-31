@@ -314,3 +314,28 @@ declare global {
     requestPermission?: (options: { mode: 'read' | 'readwrite' }) => Promise<PermissionState>;
   }
 }
+
+// ---------- keeping backups on another disk ----------
+
+/** The start of a Windows path that names its drive: C:\ or \\server\share. */
+export const windowsDrive = (path: string) => /^(?:[a-z]:|[\\/]{2}[^\\/]+[\\/][^\\/]+)/i.exec(path)?.[0].toLowerCase().replace(/\//g, '\\') ?? null;
+
+/**
+ * Whether two folders of the desktop app are on the same disk, so one broken
+ * or lost disk would take both. Null when it can't be told, such as in the browser.
+ */
+export async function onSameDisk(a: StorageAdapter, b: StorageAdapter): Promise<boolean | null> {
+  if (!isTauri()) return null;
+  const { TauriAdapter } = await import('./tauri');
+  if (!(a instanceof TauriAdapter && b instanceof TauriAdapter)) return null;
+  try {
+    const { stat } = await import('@tauri-apps/plugin-fs');
+    const [one, two] = await Promise.all([stat(a.root), stat(b.root)]);
+    if (one.dev !== null && two.dev !== null) return one.dev === two.dev;
+  } catch {
+    return null;
+  }
+  // Windows gives no disk number, but each drive has its own letter.
+  const [one, two] = [windowsDrive(a.root), windowsDrive(b.root)];
+  return one && two ? one === two : null;
+}

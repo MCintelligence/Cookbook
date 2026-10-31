@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { strFromU8, unzipSync } from 'fflate';
 import { MemoryAdapter } from './memory';
-import { backupFolderName, backupName, backupsToKeep, dateOfBackup, listBackups, makeBackup, markClosed, markOpen, restoreBackup } from './autoBackup';
+import { BackupCheckError, backupFolderName, backupName, backupsToKeep, dateOfBackup, listBackups, makeBackup, markClosed, markOpen, restoreBackup } from './autoBackup';
 import { backupZip } from './backup';
 import { createBook, openBook } from './book';
 import { takeSnapshot } from './snapshots';
@@ -155,5 +155,57 @@ describe('a backup made while the writer works', () => {
       throw new Error('Permission denied');
     };
     await expect(backupZip(book, 'Supper')).rejects.toThrow('Permission denied');
+  });
+
+  it('keeps a backup only once it opens again whole, so a spoiled one never pushes out a good one', async () => {
+    const book = new MemoryAdapter();
+    await createBook(book, 'Supper');
+    await book.writeText('bookshelf/One.md', 'Pie.');
+    const backups = new MemoryAdapter();
+    await makeBackup(book, backups, SUPPER, 1, new Date(2026, 9, 22, 10, 0));
+    // A disk that fills up part way: only half of each zip lands.
+    const writeBytes = backups.writeBytes.bind(backups);
+    backups.writeBytes = (path, data) => writeBytes(path, data.slice(0, data.length >> 1));
+    const failed = makeBackup(book, backups, SUPPER, 1, new Date(2026, 9, 22, 11, 0));
+    await expect(failed).rejects.toBeInstanceOf(BackupCheckError);
+    await expect(failed).rejects.toThrow('won’t open');
+    expect((await listBackups(backups, SUPPER)).map((b) => b.path)).toEqual(['Supper 1a2b3c4d/2026-10-22 10.00.00.zip']);
+  });
+
+  it('notices a backup that reads back different from what was written', async () => {
+    const book = new MemoryAdapter();
+    await createBook(book, 'Supper');
+    await book.writeText('bookshelf/One.md', 'Pie.');
+    const backups = new MemoryAdapter();
+    // A disk that hands back an older or another file's bytes.
+    const stale = await backupZip(book, 'Supper');
+    await book.writeText('bookshelf/One.md', 'Pie and custard.');
+    backups.readBytes = async () => stale;
+    await expect(makeBackup(book, backups, SUPPER, 0, new Date(2026, 9, 22, 11, 0))).rejects.toThrow('“Supper/bookshelf/One.md” in it doesn’t match');
+    expect(await listBackups(backups, SUPPER)).toEqual([]);
+  });
+
+  it('fails plainly when the backup folder is read-only or gone', async () => {
+    const book = new MemoryAdapter();
+    await createBook(book, 'Supper');
+    const readOnly = new MemoryAdapter();
+    readOnly.writeBytes = async () => {
+      throw new Error('EROFS: read-only file system');
+    };
+    await expect(makeBackup(book, readOnly, SUPPER, 1)).rejects.toThrow('read-only');
+    // A write that fails part way leaves nothing that could be taken for a backup.
+    const full = new MemoryAdapter();
+    const writeBytes = full.writeBytes.bind(full);
+    full.writeBytes = async (path, data) => {
+      await writeBytes(path, data.slice(0, 10));
+      throw new Error('ENOSPC: no space left on device');
+    };
+    await expect(makeBackup(book, full, SUPPER, 1)).rejects.toThrow('no space');
+    expect(await listBackups(full, SUPPER)).toEqual([]);
+    const unplugged = new MemoryAdapter();
+    unplugged.makeFolder = async () => {
+      throw new Error('No such file or directory (os error 2)');
+    };
+    await expect(makeBackup(book, unplugged, SUPPER, 1)).rejects.toThrow('No such file');
   });
 });

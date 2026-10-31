@@ -1,4 +1,4 @@
-import { parse, stringify } from 'yaml';
+import { isScalar, isMap, parseDocument as parseYaml, stringify } from 'yaml';
 
 /**
  * Every scene and Pantry card is one Markdown file with YAML front matter:
@@ -26,6 +26,12 @@ export interface CookbookDocument {
   kind: DocumentKind;
   /** Anything else in the front matter: card fields, status, labels. */
   fields: Record<string, unknown>;
+  /**
+   * The order the fields were written in. A plain object always lists names
+   * that are whole numbers ("3") first, so the order is kept here as well;
+   * keys not listed keep their place in `fields`, after the listed ones.
+   */
+  order?: string[];
   body: string;
 }
 
@@ -35,12 +41,15 @@ const KINDS: readonly DocumentKind[] = ['scene', 'character', 'setting', 'resear
 export function parseDocument(text: string, fallbackTitle = 'Untitled'): CookbookDocument {
   const normalized = text.replace(/\r\n/g, '\n');
   let front: Record<string, unknown> = {};
+  let order: string[] = [];
   let body = normalized;
   if (normalized.startsWith(FENCE + '\n')) {
     const end = normalized.indexOf('\n' + FENCE, FENCE.length);
     if (end !== -1) {
-      const parsed: unknown = parse(normalized.slice(FENCE.length + 1, end));
+      const yaml = parseYaml(normalized.slice(FENCE.length + 1, end));
+      const parsed: unknown = yaml.toJS();
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) front = parsed as Record<string, unknown>;
+      if (isMap(yaml.contents)) order = yaml.contents.items.map((item) => String(isScalar(item.key) ? item.key.value : item.key));
       body = normalized.slice(end + FENCE.length + 1).replace(/^\n/, '');
     }
   }
@@ -50,12 +59,22 @@ export function parseDocument(text: string, fallbackTitle = 'Untitled'): Cookboo
     title: typeof title === 'string' && title ? title : fallbackTitle,
     kind: KINDS.includes(kind as DocumentKind) ? (kind as DocumentKind) : 'scene',
     fields,
+    order: order.filter((key) => !FILE_KEYS.has(key)),
     body,
   };
 }
 
+/** A document's fields as [name, value] pairs, in the order the writer put them. */
+export function fieldEntries(doc: Pick<CookbookDocument, 'fields' | 'order'>): [string, unknown][] {
+  const entries = Object.entries(doc.fields);
+  if (!doc.order?.length) return entries;
+  const rank = new Map(doc.order.map((key, i) => [key, i]));
+  const at = (key: string) => rank.get(key) ?? Infinity;
+  return entries.map((e, i) => [e, i] as const).sort(([a, i], [b, j]) => at(a[0]) - at(b[0]) || i - j).map(([e]) => e);
+}
+
 export function serializeDocument(doc: CookbookDocument): string {
-  const front = stringify({ id: doc.id, title: doc.title, kind: doc.kind, ...doc.fields }).trimEnd();
+  const front = stringify(new Map<string, unknown>([['id', doc.id], ['title', doc.title], ['kind', doc.kind], ...fieldEntries(doc)])).trimEnd();
   const body = doc.body.endsWith('\n') || doc.body === '' ? doc.body : doc.body + '\n';
   return `${FENCE}\n${front}\n${FENCE}\n${body}`;
 }
@@ -100,8 +119,8 @@ export interface Relationship {
 const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export']);
 
 /** The writer's own fields on a card, like role, age and wants, in order. */
-export function cardFieldsOf(fields: Record<string, unknown>): [string, string][] {
-  return Object.entries(fields)
+export function cardFieldsOf(doc: Pick<CookbookDocument, 'fields' | 'order'>): [string, string][] {
+  return fieldEntries(doc)
     .filter(([key, value]) => !RESERVED.has(key) && (typeof value === 'string' || typeof value === 'number' || value === null))
     .map(([key, value]) => [key, value === null ? '' : String(value)]);
 }
@@ -128,8 +147,9 @@ export function cardFieldKeys(names: string[]): string[] {
 
 /** Replaces the writer's fields, keeping Cookbook's own keys where they were. */
 export function withCardFields(doc: CookbookDocument, entries: [string, string][]): CookbookDocument {
-  const kept = Object.entries(doc.fields).filter(([key, value]) => RESERVED.has(key) || !(typeof value === 'string' || typeof value === 'number' || value === null));
-  return { ...doc, fields: Object.fromEntries([...entries, ...kept]) };
+  const kept = fieldEntries(doc).filter(([key, value]) => RESERVED.has(key) || !(typeof value === 'string' || typeof value === 'number' || value === null));
+  const all = [...entries, ...kept];
+  return { ...doc, fields: Object.fromEntries(all), order: all.map(([key]) => key) };
 }
 
 /** Other names the card goes by. Written as a YAML list, but a comma-separated line is read too. */

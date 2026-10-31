@@ -35,7 +35,7 @@ interface FieldRow {
 }
 
 let nextRowId = 1;
-const rowsOf = (doc: CookbookDocument): FieldRow[] => cardFieldsOf(doc.fields).map(([key, value]) => ({ id: nextRowId++, name: label(key), value }));
+const rowsOf = (doc: CookbookDocument): FieldRow[] => cardFieldsOf(doc).map(([key, value]) => ({ id: nextRowId++, name: label(key), value }));
 
 /**
  * The top of a character, setting or research card: portrait, other names,

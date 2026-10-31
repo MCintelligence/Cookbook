@@ -96,14 +96,16 @@ import { undoDepth } from '@tiptap/pm/history';
 import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/scenes';
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
+import { AREA_SHORTCUTS, type Area, areaOf, areaRoot, areaShown, landingIn, nextArea } from './ui/areas';
 import { BrainstormPlus } from './ui/BrainstormPlus';
-import { isBrainstormKind } from './storage/brainstorm';
+import { BRAINSTORM_GROUPS, type BrainstormCard, isBrainstormKind } from './storage/brainstorm';
+import { emptyLineAt, insertBrainstorm } from './editor/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
 import { fixText, isSeasoning, rulesOff } from './proofread/remarks';
-import { type FoundIssue, applySuggestion, aroundIssue, issueAt } from './proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt, stepIssue } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
@@ -1820,6 +1822,8 @@ export function App() {
       const moved = await moveItem(fs, order.current, treeOf(topOf(from)), topOf(from), from, folder, at);
       order.current = moved.order;
       followMove(from, moved.path);
+      await refreshTree();
+      return moved.path;
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -2078,11 +2082,106 @@ export function App() {
     // indexVersion changes whenever the index does, like searchBook below.
     [indexVersion],
   );
+  /**
+   * Puts the keyboard in a part of the window, opening it first if it's closed (or hidden by
+   * Oven Mode). The page keeps its cursor where it was; a list lands on its current row.
+   */
+  const goToArea = (area: Area) => {
+    if (area === 'page') {
+      if (!editor) return;
+      setSideOpen(false);
+      editor.commands.focus();
+      return;
+    }
+    if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
+    const oven = getSettings().focus;
+    if (oven) setSettings({ focus: false });
+    if (area === 'pantry' && panel !== 'pantry') setPanel('pantry');
+    if (area === 'seasonings' && panel !== 'seasonings') setPanel('seasonings');
+    // On a narrow window the Shelf slides in. (In Oven Mode it's hidden for that reason alone.)
+    if (area === 'shelf' && !oven && !areaShown('shelf')) setSideOpen(true);
+    // After React has drawn what was just opened.
+    requestAnimationFrame(() => {
+      const root = areaRoot(area);
+      const target = root && landingIn(root);
+      target?.focus();
+    });
+  };
+  /** F7 and Shift+F7: the next or previous issue in the page, with its card open. */
+  const [issueRequest, setIssueRequest] = useState<{ issue: FoundIssue; at: number } | null>(null);
+  const goToIssue = (dir: 1 | -1) => {
+    if (!editor || !doc || manuscript) return;
+    const found = stepIssue(editor.state, dir);
+    if (found) setIssueRequest({ issue: found, at: Date.now() });
+    // Grammar and style are only checked while Seasonings is open, so this may be spelling alone.
+    else say('Nothing underlined in this item.');
+  };
+  /** Mod+Page Up and Mod+Page Down: the item before or after this one, in Shelf (or Pantry) order. */
+  const stepItem = (dir: 1 | -1) => {
+    if (!path || manuscript) return;
+    const files: string[] = [];
+    const walk = (list: TreeNode[]) => list.forEach((n) => (n.kind === 'file' ? files.push(n.path) : walk(n.children ?? [])));
+    walk(treeOf(topOf(path)));
+    const to = files[files.indexOf(path) + dir];
+    if (!to) return;
+    // The next page's editor takes the keyboard as soon as it's ready, so writing can carry on.
+    focusNextPage.current = 'start';
+    void select(to);
+  };
+  /** Where the next editor to appear takes the keyboard: at the top of a new item, or where its cursor already is. */
+  const focusNextPage = useRef<false | 'start' | 'here'>(false);
+  useEffect(() => {
+    if (!editor || !focusNextPage.current) return;
+    const at = focusNextPage.current;
+    focusNextPage.current = false;
+    // Unless something else (a menu, a box) has taken the keyboard meanwhile.
+    if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
+    editor.commands.focus(at === 'start' ? 'start' : undefined);
+  }, [editor]);
+  // Read the recipe takes the page away; coming back from it (or opening an item from it) hands the keyboard back.
+  const wasReading = useRef(false);
+  useEffect(() => {
+    if (manuscript) wasReading.current = true;
+    else if (wasReading.current) {
+      wasReading.current = false;
+      if (!focusNextPage.current) focusNextPage.current = 'here';
+    }
+  }, [manuscript]);
+  /** F6 and Shift+F6: round the parts of the window that are on screen. */
+  const cycleArea = (dir: 1 | -1) => {
+    const go = () => {
+      const from = areaOf(document.activeElement);
+      const to = nextArea(from, dir, (a) => (a === 'page' ? !!editor && !!doc && !manuscript : areaShown(a)));
+      if (to) goToArea(to);
+    };
+    // Oven Mode hides everything but the page, so F6 brings the panels back first.
+    if (getSettings().focus) {
+      setSettings({ focus: false });
+      requestAnimationFrame(go);
+    } else go();
+  };
   /** The app's own shortcuts (Settings › Keyboard shortcuts); the page's are in the editor. */
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onAppKey.current = (e: KeyboardEvent) => {
     if (e.defaultPrevented) return;
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings']);
+    if (e.key === 'Escape' && !settingsAt) {
+      // Escape in the Shelf or a panel goes back to the page, unless a box or menu there wanted it.
+      const at = document.activeElement;
+      const area = areaOf(at);
+      if (area && area !== 'page' && area !== 'toolbar' && !(at instanceof Element && at.closest('input, textarea, select, .menu, [role="dialog"]'))) {
+        e.preventDefault();
+        goToArea('page');
+      }
+      return;
+    }
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem']);
+    if (id === 'save') {
+      // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
+      // which are whole-file writes), and it never opens the browser's Save page dialog.
+      e.preventDefault();
+      void flushSave().then(() => !pendingSave.current && say('Saved.'));
+      return;
+    }
     if (settingsAt) {
       // Only the Settings shortcut itself works over Settings: it closes it again.
       if (id === 'settings') {
@@ -2110,6 +2209,10 @@ export function App() {
     else if (id === 'newScene') void addScene();
     else if (id === 'bookread') manuscript ? setManuscript(null) : void readManuscript();
     else if (id === 'settings') openSettings();
+    else if (id === 'nextArea' || id === 'prevArea') cycleArea(id === 'nextArea' ? 1 : -1);
+    else if (AREA_SHORTCUTS[id]) goToArea(AREA_SHORTCUTS[id]!);
+    else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
+    else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -2258,6 +2361,7 @@ export function App() {
     if (typed && /^[^\n]{1,40}$/.test(typed) && state.doc.textBetween(at, at + 1) === '@') editor.chain().focus().insertContentAt(at + 1, typed).run();
     else editor.commands.focus();
   };
+  const cardKind = doc?.kind ?? null;
   const insertItems = useMemo<PaletteItem[]>(() => {
     if (!editor) return [];
     const item = (id: string, label: string, group: string, words: string, run: () => void, hint?: string): PaletteItem => ({ id, label, group, words, run, hint });
@@ -2283,8 +2387,23 @@ export function App() {
       item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
       item('name', 'Name from the Pantry', 'Insert', 'pantry character place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
+      // On a character or place page, the brainstorming cards the + offers, so they can be added without the mouse.
+      ...(isBrainstormKind(cardKind)
+        ? BRAINSTORM_GROUPS.flatMap((g) => {
+            const add = (cards: BrainstormCard[]) => () => {
+              const line = emptyLineAt(editor, cardKind);
+              if (line === null) say('Brainstorming cards go on an empty line of their own.');
+              else insertBrainstorm(editor, line, cards);
+            };
+            const list = g.cards[cardKind];
+            return [
+              ...(g.addsAll ? [item(`bs-${g.id}`, `All of ${g.title}`, 'Brainstorm', `brainstorm card ${g.title}`, add(list), `${list.length} cards`)] : []),
+              ...list.map((c) => item(`bs-${g.id}-${c.id}`, c.title, 'Brainstorm', `brainstorm card ${g.title}`, add([c]), g.title)),
+            ];
+          })
+        : []),
     ];
-  }, [editor, sheet, settings.shortcuts, settings.shortcutStyle]);
+  }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
   const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
   const saveEverything = useCallback(async () => {
     await flushSave();
@@ -2351,6 +2470,12 @@ export function App() {
       cmd('books', 'Your recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
       cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
+      // Also here because a web browser keeps Ctrl+1 to Ctrl+8 for its own tabs.
+      cmd('goShelf', 'Go to the Shelf', () => goToArea('shelf'), 'Go to', keysFor('goShelf'), 'keyboard focus panel'),
+      cmd('goPantry', 'Go to the Pantry', () => goToArea('pantry'), 'Go to', keysFor('goPantry'), 'keyboard focus panel'),
+      cmd('goSeasonings', 'Go to Seasonings', () => goToArea('seasonings'), 'Go to', keysFor('goSeasonings'), 'keyboard focus panel proofread'),
+      cmd('goToolbar', 'Go to the toolbar', () => goToArea('toolbar'), 'Go to', keysFor('goToolbar'), 'keyboard focus formatting'),
+      cmd('nextIssue', 'Next issue', () => goToIssue(1), 'Go to', keysFor('nextIssue'), 'proofread spelling grammar mistake'),
       ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
       ...places,
     ];
@@ -2651,7 +2776,7 @@ export function App() {
           collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
           renaming={renaming}
           onSelect={select}
-          onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+          onMove={(from, folder, at) => moveInTree(from, folder, at)}
           onStartRename={setRenaming}
           onRename={(p, title) => void renameInTree(p, title)}
           onMenu={rowMenu}
@@ -2775,7 +2900,7 @@ export function App() {
                 collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${PANTRY}`}
                 renaming={renaming}
                 onSelect={select}
-                onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+                onMove={(from, folder, at) => moveInTree(from, folder, at)}
                 onStartRename={setRenaming}
                 onRename={(p, title) => void renameInTree(p, title)}
                 onMenu={rowMenu}
@@ -2808,7 +2933,7 @@ export function App() {
         </div>
       )}
 
-      <IssueCard editor={editor} proof={proof} />
+      <IssueCard editor={editor} proof={proof} request={issueRequest} />
       {slash !== null && editor && <InsertMenu editor={editor} at={slash} items={insertItems} onClose={() => setSlash(null)} />}
 
       {shelf && (

@@ -3,7 +3,7 @@ import { type NameMatcher } from '../editor/names';
 import { type TextMap, textMap } from '../editor/textmap';
 import { countWords } from '../storage/index';
 import { type FoundIssue } from './plugin';
-import { METERS, type SeasoningId, SEASONINGS, perThousand, tasteOf } from './remarks';
+import { METERS, type SeasoningId, SEASONINGS, perThousand, remark, tasteOf } from './remarks';
 
 /**
  * The Seasonings reports: a fuller look at the open Item than the meters
@@ -95,7 +95,14 @@ function contextOf(doc: PMNode, spot: Spot): Row['context'] {
   return { before, hit: doc.textBetween(spot.from, spot.to, ' ', ' '), after };
 }
 
+/** The opening words of a paragraph or sentence, for naming it. */
+const opening = (text: string, n = 6) => {
+  const ws = text.trim().split(/\s+/);
+  return ws.length > n ? `${ws.slice(0, n).join(' ')}…` : text.trim();
+};
+
 const plural = (n: number, word: string, many = `${word}s`) => `${n.toLocaleString('en')} ${n === 1 ? word : many}`;
+const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
 /** Groups items by a key, keeping first-seen order, most frequent first. */
 function grouped<T>(items: T[], key: (t: T) => string): [string, T[]][] {
@@ -175,8 +182,72 @@ export function saltReport({ doc, issues }: ReportInput): Report {
   };
 }
 
+// ---------- Peppery Pete: grammar ----------
+
+/** Pete's name for a slip: the word before the "!" in what he says about it. */
+function troubleOf(i: FoundIssue): { kind: string; says: string } {
+  const said = remark(i.issue, i.word);
+  const m = /^([^!]{2,24})! (.*)$/s.exec(said);
+  return m ? { kind: m[1]!, says: m[2]! } : { kind: 'Grammar', says: said };
+}
+
+export function pepperReport({ doc, issues }: ReportInput): Report {
+  const paras = parasOf(doc);
+  const total = paras.reduce((n, p) => n + p.words, 0);
+  const slips = issues.filter((i) => i.issue.kind === 'grammar');
+  const per = perThousand(slips.length, total);
+  const reading = total > 0 ? { at: tasteOf(METERS.pete.steps, per), detail: `${plural(slips.length, 'grammar slip')} · ${per} per 1,000 words` } : null;
+  const byKind = grouped(slips, (i) => troubleOf(i).kind);
+
+  // Which paragraphs have slips, and the worst of them.
+  const ends: number[] = paras.map((p) => (p.map.positions.length > 0 ? p.map.positions[p.map.positions.length - 1]! + 1 : 0));
+  const paraOf = (pos: number) => ends.findIndex((end) => pos < end);
+  const perPara = new Map<number, number>();
+  for (const s of slips) {
+    const at = paraOf(s.from);
+    perPara.set(at, (perPara.get(at) ?? 0) + 1);
+  }
+  const written = paras.filter((p) => p.words > 0).length;
+  const clean = written - [...perPara.keys()].filter((k) => k >= 0 && paras[k]!.words > 0).length;
+  const worst = [...perPara].sort((a, b) => b[1] - a[1])[0];
+
+  const actions: string[] = [];
+  if (byKind[0]) actions.push(`Start with the ${byKind[0][0].toLowerCase()} slips. There ${byKind[0][1].length === 1 ? 'is one' : `are ${byKind[0][1].length}`}, more than anything else.`);
+  if (worst && worst[1] >= 3 && paras[worst[0]]) actions.push(`The paragraph starting “${opening(paras[worst[0]]!.text)}” has ${worst[1]} slips. Give it a once-over.`);
+  if (slips.length > 0) actions.push('Click any underline on the page for my fix. F7 takes you to the next one.');
+  if (slips.length === 0 && total > 0) actions.push('Clean grammar. Nothing to grind. Off you go.');
+
+  return {
+    id: 'pete',
+    title: METERS.pete.report,
+    reading,
+    verdict: verdictOf('pete', reading),
+    stats: [
+      { label: 'Grammar slips', value: slips.length.toLocaleString('en') },
+      { label: 'Per 1,000 words', value: String(per) },
+      { label: 'Kinds of slip', value: String(byKind.length) },
+      { label: 'Clean paragraphs', value: `${pct(clean, written)}%` },
+    ],
+    actions: actions.slice(0, 3),
+    sections: [
+      {
+        kind: 'bars',
+        title: 'Slips by kind',
+        bars: byKind.map(([kind, list]) => ({ label: kind, value: list.length })),
+        empty: 'Not a single slip to sort.',
+      },
+      ...byKind.map(([kind, list]): Section => ({
+        kind: 'rows',
+        title: kind,
+        rows: list.map((i, n) => ({ label: i.word, detail: troubleOf(i).says, context: n < QUOTED_ROWS ? contextOf(doc, spotOf(i)) : undefined, spots: [spotOf(i)] })),
+        empty: '',
+      })),
+    ],
+  };
+}
+
 /** The reports there are, by seasoning. */
-export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport };
+export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport };
 
 // ---------- saving ----------
 

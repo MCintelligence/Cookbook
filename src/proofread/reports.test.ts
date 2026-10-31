@@ -7,7 +7,7 @@ import { parseMarkdown } from '../editor/markdown';
 import { fileNameFor } from '../storage/book';
 import { type IssueKind } from './check';
 import { type FoundIssue } from './plugin';
-import { reportMarkdown, reportName, saltReport } from './reports';
+import { pepperReport, reportMarkdown, reportName, saltReport } from './reports';
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -61,6 +61,25 @@ describe('Seasonings reports', () => {
     expect(report.stats.find((s) => s.label === 'Name slips')!.value).toBe('1');
     expect(report.actions[0]).toMatch(/“Teh” first/);
     expect(report.actions[1]).toMatch(/you mean Mara/);
+  });
+
+  it('Pete sorts slips by kind, in his own words', () => {
+    const doc = open('They was late. The dogs runs fast. Its a shame.');
+    const report = pepperReport({
+      doc,
+      issues: [
+        issueAt(doc, 'was', 'grammar', 'agreement', 'With “they”, it’s “were”.'),
+        issueAt(doc, 'runs', 'grammar', 'agreement', 'With “dogs”, it’s “run”.'),
+        issueAt(doc, 'Its', 'grammar', 'ItsContraction'),
+      ],
+    });
+    const kinds = report.sections[0]!;
+    expect(kinds.kind === 'bars' && kinds.bars).toEqual([
+      { label: 'Agreement', value: 2 },
+      { label: 'Mix-up', value: 1 },
+    ]);
+    expect(report.actions[0]).toMatch(/agreement slips/);
+    expect(report.stats.find((s) => s.label === 'Clean paragraphs')!.value).toBe('0%');
   });
 
   it('saves as Markdown that reads back as a page', () => {

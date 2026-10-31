@@ -20,6 +20,17 @@ export type BookLocation =
 export interface RecentBook {
   location: BookLocation;
   title: string;
+  /** What Your Recipes shows without opening the recipe, noted while it was last open. */
+  edited?: number;
+  words?: number;
+  goal?: number;
+  series?: string;
+  seriesNumber?: number;
+  firstLines?: string;
+  favourite?: boolean;
+  archived?: boolean;
+  /** When it went to Trash; the files stay until the writer deletes it for good. */
+  trashed?: number;
 }
 
 export interface OpenedStorage {
@@ -29,7 +40,8 @@ export interface OpenedStorage {
 
 export const DEFAULT_BOOK = 'My Book';
 const RECENT_KEY = 'cookbook.recentBooks';
-const MAX_RECENT = 12;
+/** Every recipe the writer has opened is kept, so All recipes can list them. */
+const MAX_RECENT = 500;
 
 export function sameLocation(a: BookLocation, b: BookLocation): boolean {
   if (a.kind === 'browser' && b.kind === 'browser') return a.name === b.name;
@@ -54,21 +66,75 @@ export function recentBooks(): RecentBook[] {
   }
 }
 
-export function rememberBook(book: RecentBook): void {
-  const rest = recentBooks().filter((b) => !sameLocation(b.location, book.location));
+function saveRecent(books: RecentBook[]): void {
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify([book, ...rest].slice(0, MAX_RECENT)));
+    localStorage.setItem(RECENT_KEY, JSON.stringify(books.slice(0, MAX_RECENT)));
   } catch {
     // Private windows may refuse; the book still opens.
   }
 }
 
+/** Moves the book to the top of the list, keeping what was noted about it before. Opening a book takes it out of Trash. */
+export function rememberBook(book: RecentBook): void {
+  const books = recentBooks();
+  const old = books.find((b) => sameLocation(b.location, book.location));
+  const { trashed: _gone, ...kept } = { ...old, ...book };
+  saveRecent([kept, ...books.filter((b) => b !== old)]);
+}
+
+/** Notes something about a book without moving it in the list. */
+export function updateRecent(location: BookLocation, changes: Partial<Omit<RecentBook, 'location'>> & { location?: BookLocation }): void {
+  const books = recentBooks();
+  const i = books.findIndex((b) => sameLocation(b.location, location));
+  if (i === -1) return;
+  const next = { ...books[i]!, ...changes };
+  // An undefined change clears the note, so JSON does not keep it.
+  for (const key of Object.keys(next) as (keyof RecentBook)[]) if (next[key] === undefined) delete next[key];
+  books[i] = next;
+  saveRecent(books);
+}
+
 export function forgetBook(location: BookLocation): void {
+  saveRecent(recentBooks().filter((b) => !sameLocation(b.location, location)));
+}
+
+/** Puts a book taken off the list back, at the end, with everything noted about it. */
+export function putBackBook(book: RecentBook): void {
+  saveRecent([...recentBooks().filter((b) => !sameLocation(b.location, book.location)), book]);
+}
+
+/** Whether the book's folder can still be found. A folder the browser remembers counts as found: checking it would need a click. */
+export async function bookExists(location: BookLocation): Promise<boolean> {
   try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentBooks().filter((b) => !sameLocation(b.location, location))));
+    if (location.kind === 'folder') {
+      const { exists } = await import('@tauri-apps/plugin-fs');
+      return await exists(`${location.path.replace(/[\\/]+$/, '')}/book.json`);
+    }
+    if (location.kind === 'picked') return (await loadHandle(location.id)) !== undefined;
+    if (!hasBrowserStorage()) return true;
+    return (await browserBooks()).includes(location.name);
   } catch {
-    // Nothing to do.
+    return false;
   }
+}
+
+/** Deletes a book kept in the browser's own storage, which has no other copy. Folders on disk are never deleted. */
+export async function deleteBrowserBook(name: string): Promise<void> {
+  const root = await navigator.storage.getDirectory();
+  const books = await root.getDirectoryHandle('books');
+  let dir = books;
+  const parts = name.split('/');
+  for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+  await dir.removeEntry(parts[parts.length - 1]!, { recursive: true });
+}
+
+/** Where Cookbook keeps the writer's own templates: in its own data folder, or in a hidden folder beside the browser's books. */
+export async function templateLocation(name: string): Promise<BookLocation> {
+  if (isTauri()) {
+    const { appDataDir, join } = await import('@tauri-apps/api/path');
+    return { kind: 'folder', path: await join(await appDataDir(), 'templates', name) };
+  }
+  return { kind: 'browser', name: `.templates/${name}` };
 }
 
 /** The book to open when nothing else is remembered. */
@@ -141,7 +207,8 @@ export async function browserBooks(): Promise<string[]> {
     return [];
   }
   const names: string[] = [];
-  for await (const [name, handle] of books.entries()) if (handle.kind === 'directory') names.push(name);
+  // Hidden folders, such as the writer's templates, are not books.
+  for await (const [name, handle] of books.entries()) if (handle.kind === 'directory' && !name.startsWith('.')) names.push(name);
   return names.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 }
 

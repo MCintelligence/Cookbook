@@ -7,15 +7,25 @@ import { cookbookExtensions } from '../editor/extensions';
 import { type NodeJSON, parseMarkdown } from '../editor/markdown';
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode, readDocument } from '../storage/book';
+import { type Seen, firstSeen, keepStill } from './scrollAnchor';
 import { type CardSummary } from '../storage/index';
 import { IS_MAC } from '../shortcuts';
 import { SceneText, footnotesOf } from './SceneText';
-import { estimatedHeight, itemBeside, miseEntries, miseItems } from './mise';
+import { estimatedHeight, isInside, itemBeside, miseEntriesOf, miseItems } from './mise';
 
 interface Props {
   fs: StorageAdapter;
-  /** The Group being shown. */
-  group: TreeNode;
+  /** The Groups (and Items picked on their own) shown, in Shelf order, none inside another. */
+  roots: TreeNode[];
+  /**
+   * The Group the page opens at, with the Groups before it above and those after it below.
+   * Mise en Place is drawn afresh when it changes, so adding Groups around it keeps the page still.
+   */
+  anchor: string;
+  /** Where typing into an all-empty page makes the first Item, and its name. */
+  target: { path: string; name: string };
+  /** What the page is called: the Group's name, or how many Groups. */
+  title: string;
   /** The Item being written in, which has the live editor; the others are drawn as text until clicked. */
   active: string | null;
   editor: Editor | null;
@@ -63,9 +73,9 @@ type Landing = { path: string; dx: number; dy: number } | { path: string; at: 's
  * into another Item says which one it is.
  */
 export function MiseEnPlace(props: Props) {
-  const { fs, group, active, editor, cards, onActivate } = props;
+  const { fs, roots, anchor, active, editor, cards, onActivate } = props;
   const schema = useMemo(() => getSchema(cookbookExtensions((s) => s)), []);
-  const entries = useMemo(() => miseEntries(group), [group]);
+  const entries = useMemo(() => miseEntriesOf(roots), [roots]);
   const items = useMemo(() => miseItems(entries), [entries]);
   const [texts, setTexts] = useState<Map<string, Loaded>>(() => new Map());
   const loading = useRef(new Set<string>());
@@ -177,6 +187,33 @@ export function MiseEnPlace(props: Props) {
     setSaid(`${name}, item ${at + 1} of ${items.length}`);
   }, [active]);
 
+  // Items above the screen load (or Groups are added above) without moving what is being read:
+  // the first thing on screen stays where it was. Browsers that do this themselves are told not
+  // to (overflow-anchor), so it works the same in every desktop app. This runs before the page's
+  // own scrolling below, which then has the last word; the place is noted again after it.
+  const still = useRef<Seen | null>(null);
+  useLayoutEffect(() => {
+    const desk = page.current?.closest<HTMLElement>('.desk');
+    if (desk) keepStill(desk, still.current);
+  });
+
+  // The page opens at the anchor Group: at the open Item if it is in that Group (and not its first),
+  // or else at the Group's name, with the Groups before it above. Once, as it opens.
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    if (placed.current) return;
+    placed.current = true;
+    const desk = page.current?.closest<HTMLElement>('.desk');
+    if (!desk) return;
+    const firstInAnchor = items.find((p) => isInside(p, anchor));
+    const atItem = active && isInside(active, anchor) && active !== firstInAnchor && activeBox.current;
+    const heading = page.current?.querySelector<HTMLElement>(`[data-group="${CSS.escape(anchor)}"]`);
+    const to = atItem ? activeBox.current : heading;
+    if (!to || entries[0]?.path === anchor && !atItem) desk.scrollTo({ top: 0 });
+    else to.scrollIntoView({ block: 'start' });
+    if (active) opened.current = active;
+  }, []);
+
   // An Item picked on the Shelf, or from Search, is scrolled to; the first one leaves the Group's name in view.
   useLayoutEffect(() => {
     if (!active) return;
@@ -185,9 +222,29 @@ export function MiseEnPlace(props: Props) {
       return;
     }
     const desk = page.current?.closest('.desk');
+    // The first Item of a Group shows the Group's name above it too.
+    const heading = page.current?.querySelector<HTMLElement>(`[data-group="${CSS.escape(anchor)}"]`);
     if (active === items[0]) desk?.scrollTo({ top: 0 });
+    else if (heading && active === items.find((p) => isInside(p, anchor))) heading.scrollIntoView({ block: 'start' });
     else activeBox.current?.scrollIntoView({ block: 'start' });
   }, [active]);
+
+  // Noted after every change and every scroll (one binary search), never while typing.
+  useLayoutEffect(() => {
+    const desk = page.current?.closest<HTMLElement>('.desk');
+    if (desk && page.current) still.current = firstSeen(desk, page.current);
+  });
+  useEffect(() => {
+    const desk = page.current?.closest<HTMLElement>('.desk');
+    if (!desk) return;
+    const onScroll = () => {
+      if (page.current) still.current = firstSeen(desk, page.current);
+    };
+    desk.addEventListener('scroll', onScroll, { passive: true });
+    return () => desk.removeEventListener('scroll', onScroll);
+  }, []);
+
+
 
   const open = (path: string, land: Landing) => {
     landing.current = land;
@@ -248,7 +305,7 @@ export function MiseEnPlace(props: Props) {
     if (items.length !== 0) return;
     const at = document.activeElement;
     if (!at || at === document.body || page.current?.contains(at)) blank.current?.focus({ preventScroll: true });
-  }, [items.length === 0, group.path]);
+  }, [items.length === 0, props.target.path]);
   const start = async () => {
     const el = blank.current;
     if (making.current || starting || !el || !(el.textContent ?? '').trim()) return;
@@ -304,7 +361,7 @@ export function MiseEnPlace(props: Props) {
       entries.map((entry) => {
         if (entry.type === 'group') {
           return (
-            <h2 key={entry.path} className={`ms-folder ms-depth-${Math.min(entry.depth, 2)}`}>
+            <h2 key={entry.path} data-group={entry.path} className={`ms-folder ms-depth-${Math.min(entry.depth, 2)}`}>
               {entry.name}
             </h2>
           );
@@ -330,7 +387,7 @@ export function MiseEnPlace(props: Props) {
   const activeTitle = active ? (cards.get(active)?.title ?? (activeAt >= 0 ? entries[activeAt]!.name : '')) : '';
 
   return (
-    <article className={`${props.className} mise`} style={props.style} aria-label={`Mise en Place: ${group.name}`} ref={page}>
+    <article className={`${props.className} mise`} style={props.style} aria-label={`Mise en Place: ${props.title}`} ref={page}>
       {activeAt < 0
         ? rows
         : [
@@ -349,7 +406,7 @@ export function MiseEnPlace(props: Props) {
           suppressContentEditableWarning
           role="textbox"
           aria-multiline="true"
-          aria-label={`Write the first item in ${group.name}`}
+          aria-label={`Write the first item in ${props.target.name}`}
           data-placeholder="Start writing, and a new item begins here."
           spellCheck={false}
           onInput={(e) => !(e.nativeEvent as InputEvent).isComposing && void start()}

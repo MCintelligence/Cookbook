@@ -273,8 +273,6 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 
 /* The open scene's card, above the page */
 .card-details { width: 816px; max-width: 100%; flex: none; display: flex; align-items: flex-start; gap: 14px; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
-.card-synopsis { flex: 1; min-width: 0; resize: none; overflow: hidden; border: none; outline: none; background: transparent; color: var(--text); font-family: 'Literata', Georgia, serif; font-size: 14px; font-style: italic; line-height: 1.5; padding: 4px 0; }
-.card-synopsis::placeholder { color: var(--muted); opacity: 0.8; }
 
 /* Pantry */
 .pantry-results mark { background: var(--find); color: inherit; border-radius: 2px; }
@@ -315,7 +313,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .cb-bracket-close { margin-right: -0.5em; }
 .issue-card { --issue: var(--spelling); position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); }
 .card-details { flex-wrap: wrap; }
-.card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
 .cast-chip { min-height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; }
 .cast-chip::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .cast-chip.cast-setting::before { border-radius: 2px; background: var(--green); }

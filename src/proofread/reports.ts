@@ -1,9 +1,12 @@
 import { type Node as PMNode } from '@tiptap/pm/model';
-import { type NameMatcher } from '../editor/names';
-import { type TextMap, textMap } from '../editor/textmap';
+import { dialogueRanges } from '../editor/dialogue';
+import { type NameMatcher, findNames } from '../editor/names';
+import { type TextMap, textMap, toRange } from '../editor/textmap';
 import { countWords } from '../storage/index';
+import { words } from './check';
 import { type FoundIssue } from './plugin';
 import { METERS, type SeasoningId, SEASONINGS, perThousand, remark, tasteOf } from './remarks';
+import { NOT_ADVERBS } from './style';
 
 /**
  * The Seasonings reports: a fuller look at the open Item than the meters
@@ -73,6 +76,9 @@ function parasOf(doc: PMNode): Para[] {
   });
   return out;
 }
+
+/** A spot from character offsets in a paragraph. */
+const spotIn = (p: Para, from: number, to: number): Spot => (to > from ? toRange(p.map, from, to) : { from: p.map.positions[from] ?? 0, to: p.map.positions[from] ?? 0 });
 
 const AROUND = 40;
 /**
@@ -246,8 +252,151 @@ export function pepperReport({ doc, issues }: ReportInput): Report {
   };
 }
 
+// ---------- Drunk Daniel: dialogue ----------
+
+const TAGS = new Set(
+  'said says say asked asks ask told tells replied replies answered answers whispered whispers shouted shouts yelled yells muttered mutters murmured murmurs exclaimed cried cries called calls snapped hissed growled retorted snarled barked sighed laughed chuckled giggled sneered gasped breathed purred demanded insisted added continued admitted agreed protested pleaded begged whimpered stammered stuttered roared bellowed screamed grumbled groaned moaned quipped declared announced remarked observed interjected mumbled drawled chirped spat croaked rasped teased offered warned suggested'.split(' '),
+);
+/** The tags that disappear on the page; the rest draw attention to themselves. */
+const PLAIN_TAGS = new Set('said says say asked asks ask told tells'.split(' '));
+/** How far either side of a speech a tag can sit. */
+const TAG_REACH = 48;
+
+interface Tag {
+  verb: string;
+  adverb: string | null;
+  spot: Spot;
+  speaker: string | null;
+}
+
+/** The dialogue tags in a paragraph: a speech verb just after or just before a quote, with any -ly word beside it. */
+function tagsIn(p: Para, speech: [number, number][], names: NameMatcher | null | undefined): Tag[] {
+  const out: Tag[] = [];
+  const taken = new Set<number>();
+  const inSpeech = (at: number) => speech.some(([a, b]) => at >= a && at < b);
+  for (const [a, b] of speech) {
+    for (const [from, to] of [
+      [b, Math.min(p.text.length, b + TAG_REACH)],
+      [Math.max(0, a - TAG_REACH), a],
+    ] as const) {
+      if (to <= from) continue;
+      const ws = words(p.text.slice(from, to)).map((w) => ({ ...w, from: w.from + from, to: w.to + from }));
+      const at = ws.findIndex((w) => TAGS.has(w.word.toLowerCase()) && !inSpeech(w.from));
+      if (at === -1) continue;
+      const w = ws[at]!;
+      if (taken.has(w.from)) continue;
+      taken.add(w.from);
+      const near = [ws[at + 1], ws[at - 1], ws[at + 2]].find((n) => n && /ly$/i.test(n.word) && n.word.length > 4 && !NOT_ADVERBS.has(n.word.toLowerCase()) && !inSpeech(n.from));
+      const window = p.text.slice(Math.max(from, w.from - 24), Math.min(to, w.to + 24));
+      const speaker = findNames(window, names ?? null)[0]?.card.title ?? null;
+      out.push({ verb: w.word.toLowerCase(), adverb: near ? near.word : null, spot: spotIn(p, w.from, (near && near.from > w.from ? near.to : w.to)), speaker });
+      break;
+    }
+  }
+  return out;
+}
+
+export function drunkReport({ doc, names }: ReportInput): Report {
+  const paras = parasOf(doc);
+  let all = 0;
+  let spoken = 0;
+  let speeches = 0;
+  let longest: { words: number; spot: Spot; text: string } | null = null;
+  const cells: { share: number | null; words: number; spot: Spot }[] = [];
+  const tags: Tag[] = [];
+  let dry: { words: number; from: number; to: number } | null = null;
+  let run: { words: number; from: number; to: number } | null = null;
+  paras.forEach((p, i) => {
+    const speech = dialogueRanges(p.text);
+    let mine = 0;
+    for (const [a, b] of speech) {
+      const n = countWords(p.text.slice(a, b));
+      mine += n;
+      speeches++;
+      if (!longest || n > longest.words) longest = { words: n, spot: spotIn(p, a, b), text: p.text.slice(a, b) };
+    }
+    all += p.words;
+    spoken += mine;
+    const whole = p.text.length > 0 ? spotIn(p, 0, p.text.length) : spotIn(p, 0, 0);
+    if (p.words > 0) cells.push({ share: mine / p.words, words: p.words, spot: whole });
+    tags.push(...tagsIn(p, speech, names));
+    // The longest run of paragraphs where nobody says a word.
+    if (p.words > 0 && speech.length === 0) {
+      run = run ? { ...run, words: run.words + p.words, to: i } : { words: p.words, from: i, to: i };
+      if (!dry || run.words > dry.words) dry = { ...run };
+    } else if (p.words > 0) run = null;
+  });
+  const share = pct(spoken, all);
+  const reading = all > 0 ? { at: tasteOf(METERS.daniel.steps, share), detail: `${share}% dialogue · ${100 - share}% narration` } : null;
+  const fancy = tags.filter((t) => !PLAIN_TAGS.has(t.verb));
+  const adverbs = tags.filter((t) => t.adverb);
+  const bySpeaker = grouped(tags.filter((t) => t.speaker), (t) => t.speaker!);
+  const dryRun = dry as { words: number; from: number; to: number } | null;
+  const longestSpeech = longest as { words: number; spot: Spot; text: string } | null;
+
+  const actions: string[] = [];
+  if (dryRun && dryRun.words >= 300) actions.push(`Nobody says a word for ${dryRun.words.toLocaleString('en')} words from “${opening(paras[dryRun.from]!.text)}”. Let someone pipe up. Hic.`);
+  if (fancy.length >= 3 && fancy.length * 3 > tags.length) actions.push(`Easy on the fancy tags: ${fancy.length} of your ${tags.length} aren’t “said” or “asked”. “Said” goes down smooth.`);
+  if (adverbs[0]) actions.push(`“${adverbs[0].verb} ${adverbs[0].adverb}”: let the line itself do the work and drop the -ly.`);
+  if (all > 300 && share < 10) actions.push('Quiet as a library in here. A line or two out loud would liven it up.');
+  if (share > 70) actions.push('All talk, my favourite! Give the reader a look at the room between the lines.');
+  if (actions.length === 0 && all > 0) actions.push('Talk and walk in good measure. Pour yourself one. Cheers!');
+
+  return {
+    id: 'daniel',
+    title: METERS.daniel.report,
+    reading,
+    verdict: verdictOf('daniel', reading),
+    stats: [
+      { label: 'Spoken', value: `${share}%` },
+      { label: 'Speeches', value: speeches.toLocaleString('en') },
+      { label: 'Dialogue tags', value: tags.length.toLocaleString('en') },
+      { label: 'Fancy tags', value: fancy.length.toLocaleString('en') },
+    ],
+    actions: actions.slice(0, 3),
+    sections: [
+      {
+        kind: 'strip',
+        title: 'Talk and walk',
+        note: 'One bar per paragraph, in order: the taller it is, the more of it is spoken. Click one to go there.',
+        cells,
+        empty: 'Nothing written yet.',
+      },
+      {
+        kind: 'bars',
+        title: 'Who talks',
+        note: 'Speeches tagged with a name from your Pantry.',
+        bars: bySpeaker.map(([who, list]) => ({ label: who, value: list.length })),
+        empty: 'No tagged speeches name anyone on a Pantry card yet.',
+      },
+      {
+        kind: 'rows',
+        title: 'Fancy tags',
+        note: '“Said” and “asked” vanish on the page. These don’t.',
+        rows: grouped(fancy, (t) => t.verb).map(([verb, list]) => ({ label: verb, count: list.length, spots: list.map((t) => t.spot) })),
+        empty: 'Every tag is a plain “said” or “asked”. Lovely.',
+      },
+      {
+        kind: 'rows',
+        title: 'Adverbs on tags',
+        rows: adverbs.map((t, n) => ({ label: `${t.verb} ${t.adverb}`, context: n < QUOTED_ROWS ? contextOf(doc, t.spot) : undefined, spots: [t.spot] })),
+        empty: 'No -ly words leaning on your tags.',
+      },
+      {
+        kind: 'rows',
+        title: 'Longest stretches',
+        rows: [
+          ...(dryRun ? [{ label: 'Longest quiet stretch', detail: `${plural(dryRun.words, 'word')} with no dialogue, from “${opening(paras[dryRun.from]!.text)}”`, spots: [{ from: spotIn(paras[dryRun.from]!, 0, 0).from, to: spotIn(paras[dryRun.to]!, 0, paras[dryRun.to]!.text.length).to }] }] : []),
+          ...(longestSpeech && longestSpeech.words > 0 ? [{ label: 'Longest speech', detail: `${plural(longestSpeech.words, 'word')}: ${opening(longestSpeech.text, 8)}`, spots: [longestSpeech.spot] }] : []),
+        ],
+        empty: 'Nothing to measure yet.',
+      },
+    ],
+  };
+}
+
 /** The reports there are, by seasoning. */
-export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport };
+export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport, daniel: drunkReport };
 
 // ---------- saving ----------
 

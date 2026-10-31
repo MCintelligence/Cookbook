@@ -4,10 +4,11 @@ import { Editor } from '@tiptap/core';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { cookbookExtensions } from '../editor/extensions';
 import { parseMarkdown } from '../editor/markdown';
+import { nameMatcher } from '../editor/names';
 import { fileNameFor } from '../storage/book';
 import { type IssueKind } from './check';
 import { type FoundIssue } from './plugin';
-import { pepperReport, reportMarkdown, reportName, saltReport } from './reports';
+import { drunkReport, pepperReport, reportMarkdown, reportName, saltReport } from './reports';
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -82,15 +83,41 @@ describe('Seasonings reports', () => {
     expect(report.stats.find((s) => s.label === 'Clean paragraphs')!.value).toBe('0%');
   });
 
+  it('Daniel counts the talk, the tags and who is talking', () => {
+    const doc = open(SCENE);
+    const names = nameMatcher([{ id: 'm', path: 'pantry/characters/Mara.md', title: 'Mara', kind: 'character', aka: [] }]);
+    const report = drunkReport({ doc, issues: [], names });
+    const strip = report.sections.find((s) => s.kind === 'strip')!;
+    expect(strip.kind === 'strip' && strip.cells.length).toBe(3);
+    expect(strip.kind === 'strip' && strip.cells[1]!.share).toBe(0);
+    expect(report.stats.find((s) => s.label === 'Dialogue tags')!.value).toBe('3');
+    expect(report.stats.find((s) => s.label === 'Fancy tags')!.value).toBe('2');
+    const who = report.sections.find((s) => s.title === 'Who talks')!;
+    expect(who.kind === 'bars' && who.bars).toEqual([{ label: 'Mara', value: 2 }]);
+    const adverbs = report.sections.find((s) => s.title === 'Adverbs on tags')!;
+    expect(adverbs.kind === 'rows' && adverbs.rows.map((r) => r.label)).toEqual(['whispered softly']);
+    const longest = report.sections.find((s) => s.title === 'Longest stretches')!;
+    expect(longest.kind === 'rows' && longest.rows[0]!.detail).toMatch(/^77 words with no dialogue/);
+  });
+
+  it('jumps land on the words they name', () => {
+    const doc = open(SCENE);
+    const report = drunkReport({ doc, issues: [], names: null });
+    const adverbs = report.sections.find((s) => s.title === 'Adverbs on tags')!;
+    const spot = adverbs.kind === 'rows' ? adverbs.rows[0]!.spots[0]! : null;
+    expect(spot && doc.textBetween(spot.from, spot.to)).toBe('whispered softly');
+  });
+
   it('saves as Markdown that reads back as a page', () => {
     const doc = open(SCENE);
     const when = new Date(2026, 9, 31, 15, 11);
-    for (const report of [saltReport({ doc, issues: [] })]) {
+    for (const report of [saltReport({ doc, issues: [] }), drunkReport({ doc, issues: [] })]) {
       const md = reportMarkdown(report, 'Item 1', when);
       expect(md).toMatch(/## Try this first/);
       expect(md).toContain('On “Item 1”');
       const back = parseMarkdown(md);
       expect(JSON.stringify(back)).toContain('Try this first');
     }
+    expect(reportMarkdown(drunkReport({ doc, issues: [] }), 'Item 1', when)).toMatch(/`[ ▁▂▃▄▅▆▇█]{3}`/);
   });
 });

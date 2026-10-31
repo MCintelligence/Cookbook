@@ -73,7 +73,8 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
   }, [fs, tree]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Escape in an item's menu closes only the menu.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.activeElement?.closest('.menu') && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);

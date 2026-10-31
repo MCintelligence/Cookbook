@@ -47,6 +47,16 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   // The seasoning being dragged by its head, and where it would land among the others.
   const [drag, setDrag] = useState<{ id: SeasoningId; index: number | null } | null>(null);
   const list = useRef<HTMLDivElement>(null);
+  // Moving a card takes it out of the page and back, which drops the keyboard; it's put back once the list is redrawn.
+  const refocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const held = refocus.current;
+    refocus.current = null;
+    if (!held?.isConnected || document.activeElement === held) return;
+    // "Move down" turns off at the bottom of the list, so the keyboard goes to the card's first button that still works.
+    const to = held instanceof HTMLButtonElement && held.disabled ? held.closest('.sc')?.querySelector<HTMLElement>('.handles button:not(:disabled)') : held;
+    to?.focus({ preventScroll: true });
+  }, [chosen]);
   const page = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: textGrade(paragraphs(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
@@ -57,7 +67,7 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
     // The card is drawn again in its new place; the keyboard stays on the same button or card.
     const held = document.activeElement;
-    if (held instanceof HTMLElement && list.current?.contains(held)) requestAnimationFrame(() => held.isConnected && held.focus({ preventScroll: true }));
+    if (held instanceof HTMLElement && list.current?.contains(held)) refocus.current = held;
     const rest = chosen.filter((c) => c !== id);
     const at = chosen.indexOf(id);
     const index = to === 'top' ? 0 : to === 'bottom' ? rest.length : to === 'up' ? Math.max(0, at - 1) : Math.min(rest.length, at + 1);

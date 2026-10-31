@@ -22,8 +22,8 @@ interface Props {
   /** The folder whose name is being edited. */
   renaming: string | null;
   onSelect: (path: string) => void;
-  /** Moves `from` to `index` among what `folder` holds now. */
-  onMove: (from: string, folder: string, index: number) => void;
+  /** Moves `from` to `index` among what `folder` holds now; may settle with where it landed. */
+  onMove: (from: string, folder: string, index: number) => void | Promise<string | undefined>;
   onStartRename: (path: string) => void;
   /** null when the writer cancels. */
   onRename: (path: string, title: string | null) => void;
@@ -88,8 +88,6 @@ export function Tree(props: Props) {
   const [cursor, setCursor] = useState<string | null>(null);
   /** A row cut with Mod+X, waiting for Mod+V. */
   const [cut, setCut] = useState<string | null>(null);
-  /** The row to put the keyboard back on once a move has redrawn the tree. */
-  const refocus = useRef<string | null>(null);
   // Worked out when the tree or its open Groups change, not on every keystroke in the page.
   const places = useMemo(() => placesOf(nodes, root), [nodes, root]);
 
@@ -136,13 +134,6 @@ export function Tree(props: Props) {
     return shown[0] ?? null;
   }, [nodes, collapsed, cursor, props.selected]);
 
-  // After a move the row is drawn again in its new place; the keyboard follows it there.
-  useEffect(() => {
-    const want = refocus.current;
-    if (!want) return;
-    refocus.current = null;
-    rowEl(want)?.focus({ preventScroll: false });
-  }, [nodes]);
   useEffect(() => {
     if (cut && !places.has(cut)) setCut(null);
   }, [places]);
@@ -150,15 +141,16 @@ export function Tree(props: Props) {
   const rowEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-tree-path="${CSS.escape(p)}"]`) ?? null;
   const rows = () => [...(list.current?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path]') ?? [])];
   const moveTo = (node: TreeNode, to: { folder: string; index: number }) => {
-    // The row keeps its name in its new Group (unless that name is taken there).
-    refocus.current = to.folder === places.get(node.path)?.parent ? node.path : `${to.folder}/${node.name}`;
+    // Where the row should land; the move itself says for certain, since a name taken in the new Group gets a number.
+    const guess = to.folder === places.get(node.path)?.parent ? node.path : `${to.folder}/${node.name}`;
     // A closed Group opens, so the row can still be seen where it went.
     if (collapsed.has(to.folder)) {
       const next = new Set(collapsed);
       next.delete(to.folder);
       remember(next);
     }
-    onMove(node.path, to.folder, to.index);
+    // Once the tree is drawn again with the row in its new place, the keyboard follows it there.
+    void Promise.resolve(onMove(node.path, to.folder, to.index)).then((landed) => requestAnimationFrame(() => rowEl(landed ?? guess)?.focus()));
   };
 
   /** The tree's own keys on a row; true when one was used. */

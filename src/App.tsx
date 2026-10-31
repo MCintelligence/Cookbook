@@ -1643,6 +1643,8 @@ export function App() {
       const moved = await moveItem(fs, order.current, treeOf(topOf(from)), topOf(from), from, folder, at);
       order.current = moved.order;
       followMove(from, moved.path);
+      await refreshTree();
+      return moved.path;
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -1942,15 +1944,28 @@ export function App() {
     const to = files[files.indexOf(path) + dir];
     if (!to) return;
     // The next page's editor takes the keyboard as soon as it's ready, so writing can carry on.
-    focusNextPage.current = true;
+    focusNextPage.current = 'start';
     void select(to);
   };
-  const focusNextPage = useRef(false);
+  /** Where the next editor to appear takes the keyboard: at the top of a new item, or where its cursor already is. */
+  const focusNextPage = useRef<false | 'start' | 'here'>(false);
   useEffect(() => {
     if (!editor || !focusNextPage.current) return;
+    const at = focusNextPage.current;
     focusNextPage.current = false;
-    editor.commands.focus('start');
+    // Unless something else (a menu, a box) has taken the keyboard meanwhile.
+    if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
+    editor.commands.focus(at === 'start' ? 'start' : undefined);
   }, [editor]);
+  // Read the recipe takes the page away; coming back from it (or opening an item from it) hands the keyboard back.
+  const wasReading = useRef(false);
+  useEffect(() => {
+    if (manuscript) wasReading.current = true;
+    else if (wasReading.current) {
+      wasReading.current = false;
+      if (!focusNextPage.current) focusNextPage.current = 'here';
+    }
+  }, [manuscript]);
   /** F6 and Shift+F6: round the parts of the window that are on screen. */
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
@@ -2195,7 +2210,7 @@ export function App() {
       ...(isBrainstormKind(cardKind)
         ? BRAINSTORM_GROUPS.flatMap((g) => {
             const add = (cards: BrainstormCard[]) => () => {
-              const line = emptyLineAt(editor);
+              const line = emptyLineAt(editor, cardKind);
               if (line === null) say('Brainstorming cards go on an empty line of their own.');
               else insertBrainstorm(editor, line, cards);
             };
@@ -2429,7 +2444,7 @@ export function App() {
           collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
           renaming={renaming}
           onSelect={select}
-          onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+          onMove={(from, folder, at) => moveInTree(from, folder, at)}
           onStartRename={setRenaming}
           onRename={(p, title) => void renameInTree(p, title)}
           onMenu={rowMenu}
@@ -2548,7 +2563,7 @@ export function App() {
                 collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${PANTRY}`}
                 renaming={renaming}
                 onSelect={select}
-                onMove={(from, folder, at) => void moveInTree(from, folder, at)}
+                onMove={(from, folder, at) => moveInTree(from, folder, at)}
                 onStartRename={setRenaming}
                 onRename={(p, title) => void renameInTree(p, title)}
                 onMenu={rowMenu}

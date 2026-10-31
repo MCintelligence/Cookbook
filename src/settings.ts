@@ -22,10 +22,10 @@ export interface AppSettings {
   reduceMotion: boolean;
   curlyQuotes: boolean;
   emDash: boolean;
-  /** **bold**, _italic_, # headings and the like as you type. */
+  /** Markdown as a whole: when off, no rule below works, whatever its own switch says. */
   markdown: boolean;
-  /** - for bullets, -1 for numbers, -TD for a checklist, * * * for a scene break. */
-  lineStarters: boolean;
+  /** Each Markdown rule on its own (see MARKDOWN_RULES). */
+  markdownRules: Record<MarkdownRule, boolean>;
   /** Typing @ (not after a letter) opens the Pantry shelf. */
   atShelf: boolean;
   /** Typing / at the start of a line (or after a space) opens the insert menu. */
@@ -54,6 +54,37 @@ export interface AppSettings {
   shortcuts: Record<string, string>;
 }
 
+/**
+ * The Markdown rules a writer can turn on and off one by one, in the order
+ * Settings lists them. Each is a typing shortcut except drop caps, which is
+ * how !Word is shown.
+ */
+export const MARKDOWN_RULES = [
+  { id: 'bold', label: 'Bold', example: '**bold**' },
+  { id: 'italic', label: 'Italic', example: '*italic*' },
+  { id: 'underline', label: 'Underline', example: '_underline_' },
+  { id: 'strike', label: 'Strikethrough', example: '~~struck~~' },
+  { id: 'code', label: 'Code', example: '`code`' },
+  { id: 'dropCap', label: 'Drop cap', example: '!Word' },
+  { id: 'heading', label: 'Headings', example: '# , ## or ### at the start of a line' },
+  { id: 'quote', label: 'Quote', example: '> at the start of a line' },
+  { id: 'codeBlock', label: 'Code block', example: '``` at the start of a line' },
+  { id: 'bullets', label: 'Bullets', example: '- at the start of a line' },
+  { id: 'numbers', label: 'Numbered list', example: '-1 or 1. at the start of a line' },
+  { id: 'checklist', label: 'Checklist', example: '-TD at the start of a line' },
+  { id: 'sceneBreak', label: 'Section break', example: '* * * then Enter' },
+] as const;
+export type MarkdownRule = (typeof MARKDOWN_RULES)[number]['id'];
+
+function allRules(on: boolean): Record<MarkdownRule, boolean> {
+  return Object.fromEntries(MARKDOWN_RULES.map((r) => [r.id, on])) as Record<MarkdownRule, boolean>;
+}
+
+/** Whether a Markdown rule works now: Markdown is on, and so is the rule. */
+export function markdownOn(rule: MarkdownRule, s: AppSettings = current): boolean {
+  return s.markdown && s.markdownRules[rule];
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   reopenLast: true,
   shortcutStyle: 'auto',
@@ -64,7 +95,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   curlyQuotes: true,
   emDash: true,
   markdown: true,
-  lineStarters: true,
+  markdownRules: allRules(true),
   atShelf: true,
   slashMenu: true,
   fade: 'paragraph',
@@ -83,6 +114,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const KEY = 'cookbook.settings';
+const LINE_STARTERS: MarkdownRule[] = ['bullets', 'numbers', 'checklist', 'sceneBreak'];
+const TYPED_MARKS: MarkdownRule[] = ['bold', 'italic', 'underline', 'strike', 'code', 'heading', 'quote', 'codeBlock'];
 const CHOICES: { [K in keyof AppSettings]?: readonly unknown[] } = {
   shortcutStyle: ['auto', 'mac', 'pc'],
   theme: ['system', 'light', 'dark', 'sepia'],
@@ -107,6 +140,19 @@ export function parseSettings(raw: string | null): AppSettings {
     const value = saved[key];
     const choices = CHOICES[key as keyof AppSettings];
     if (choices ? choices.includes(value) : typeof value === typeof fallback && !Array.isArray(value) && value !== null) out[key] = value;
+  }
+  // Each rule a boolean, and any this version doesn't save yet on.
+  const rules = saved.markdownRules && typeof saved.markdownRules === 'object' ? (saved.markdownRules as Record<string, unknown>) : {};
+  out.markdownRules = Object.fromEntries(MARKDOWN_RULES.map((r) => [r.id, typeof rules[r.id] === 'boolean' ? rules[r.id] : true]));
+  // Before the rules had their own switches, one switch turned the typed list starters and section break off together.
+  // and the Markdown switch only the rest, so a writer who had one off keeps the other working.
+  if (!saved.markdownRules) {
+    const migrated = out.markdownRules as Record<MarkdownRule, boolean>;
+    if (saved.lineStarters === false) for (const id of LINE_STARTERS) migrated[id] = false;
+    if (saved.markdown === false) {
+      out.markdown = true;
+      for (const id of TYPED_MARKS) migrated[id] = false;
+    }
   }
   out.shortcuts = Object.fromEntries(Object.entries(out.shortcuts as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
   return out as unknown as AppSettings;

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { type getSchema } from '@tiptap/core';
 import { DOMSerializer, Node as PMNode } from '@tiptap/pm/model';
+import { applyDropCaps } from '../editor/dropCaps';
 import { type NodeJSON } from '../editor/markdown';
 
 /** The footnotes in an Item's text, in order. */
@@ -18,6 +19,7 @@ export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchem
     try {
       const doc = PMNode.fromJSON(schema, body);
       el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
+      applyDropCaps(el);
     } catch {
       el.textContent = 'This item could not be shown.';
     }

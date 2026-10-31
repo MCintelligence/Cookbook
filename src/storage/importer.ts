@@ -207,11 +207,23 @@ export function importDocx(name: string, data: Uint8Array): Imported {
     top.node.content!.push(item);
   };
 
+  // Word keeps a drop cap in a little paragraph of its own; it comes back as !Word on the paragraph after it.
+  let dropCap: string | null = null;
   const paragraph = (p: Element) => {
     const pPr = childrenNamed(p, 'pPr')[0] ?? null;
     const styleId = attr(pPr ? childrenNamed(pPr, 'pStyle')[0] : null, 'val') ?? '';
     const nodes = inline(p);
     const plain = nodes.map((n) => (n.type === 'text' ? n.text : n.type === 'hardBreak' ? '\n' : '')).join('');
+    const frame = pPr ? childrenNamed(pPr, 'framePr')[0] : undefined;
+    if (frame && /^(drop|margin)$/.test(attr(frame, 'dropCap') ?? '') && /^\p{L}+$/u.test(plain.trim())) {
+      dropCap = plain.trim();
+      return;
+    }
+    if (dropCap) {
+      if (nodes[0]?.type === 'text') nodes[0].text = `!${dropCap}${nodes[0].text}`;
+      else nodes.unshift(text(`!${dropCap}`));
+      dropCap = null;
+    }
     if (styleId === 'cbCode') {
       endLists();
       code ??= [];

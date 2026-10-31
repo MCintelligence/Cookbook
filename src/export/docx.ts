@@ -4,6 +4,7 @@ import { type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 import { type TextFormat, paragraphFormatOf, textFormatOf } from '../editor/format';
 import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
+import { withDropCaps } from '../editor/dropCaps';
 
 /**
  * A Word document (.docx) written by hand: the book's paragraph and character
@@ -60,6 +61,10 @@ function textRun(text: string, rPr = ''): string {
   return `<w:r>${rPr}<w:t xml:space="preserve">${xml(text)}</w:t></w:r>`;
 }
 
+/** How much larger than its paragraph's text a raised initial is, and a dropped capital two lines deep. */
+const RAISED = 1.6;
+const DROPPED = 2.4;
+
 const PLAIN = new Set(['bold', 'italic', 'underline', 'strike', 'code']);
 
 class DocxBody {
@@ -77,8 +82,9 @@ class DocxBody {
     return `<w:p><w:pPr><w:pStyle w:val="${style}"/>${extra}</w:pPr>${inner}</w:p>`;
   }
 
-  inline(nodes: NodeJSON[]): string {
-    return nodes
+  /** `size` is the paragraph's font size in points, which a raised initial is drawn larger than. */
+  inline(nodes: NodeJSON[], size = 12): string {
+    return withDropCaps(nodes)
       .map((n) => {
         if (n.type === 'footnote') {
           this.notes.push(String(n.attrs?.text ?? ''));
@@ -90,7 +96,8 @@ class DocxBody {
         if (n.type !== 'text') return '';
         const link = n.marks?.find((m) => m.type === 'link');
         const plain = new Set((n.marks ?? []).map((m) => m.type).filter((t) => PLAIN.has(t)));
-        const format = textFormatOf(n.marks?.find((m) => m.type === 'textStyle')?.attrs);
+        let format = textFormatOf(n.marks?.find((m) => m.type === 'textStyle')?.attrs);
+        if (n.dropCap) format = { ...format, size: Math.round((format.size ?? size) * RAISED) };
         const run = textRun(n.text ?? '', runProps(this.sheet, { styles: charStyles(n), plain, link: !!link, format }));
         if (!link || link.type !== 'link') return run;
         this.links.push(link.attrs.href);
@@ -104,7 +111,18 @@ class DocxBody {
       // Alignment and spacing set by hand, in the order Word wants them.
       const { align, lineSpacing } = paragraphFormatOf(n.attrs);
       const extra = (lineSpacing ? `<w:spacing w:line="${Math.round(lineSpacing * 240)}" w:lineRule="auto"/>` : '') + (align ? `<w:jc w:val="${ALIGN[align]}"/>` : '');
-      return this.paragraph(styleId(String(n.attrs?.style ?? BODY_STYLE)), this.inline(n.content ?? []), extra);
+      const style = String(n.attrs?.style ?? BODY_STYLE);
+      const size = resolveParagraphStyle(this.sheet, style).size;
+      // A drop cap at the start is a real Word drop cap: the letter in a frame of its own, two lines deep.
+      const content = withDropCaps(n.content ?? []);
+      const first = content[0];
+      if (first?.dropCap === 'start') {
+        const letter = Math.round(size * DROPPED);
+        const rPr = runProps(this.sheet, { styles: charStyles(first), plain: new Set(), link: false, format: { ...textFormatOf(first.marks?.find((m) => m.type === 'textStyle')?.attrs), size: letter } });
+        const frame = `<w:p><w:pPr><w:pStyle w:val="${styleId(style)}"/><w:keepNext/><w:framePr w:dropCap="drop" w:lines="2" w:wrap="around" w:vAnchor="text" w:hAnchor="text"/><w:spacing w:before="0" w:after="0" w:line="${letter * 20}" w:lineRule="exact"/><w:ind w:left="0" w:firstLine="0"/><w:jc w:val="left"/><w:textAlignment w:val="baseline"/></w:pPr>${textRun(first.text ?? '', rPr)}</w:p>`;
+        return frame + this.paragraph(styleId(style), this.inline(content.slice(1), size), extra);
+      }
+      return this.paragraph(styleId(style), this.inline(content, size), extra);
     }
     if (n.type === 'sceneBreak') return this.paragraph('cbSceneBreak', textRun('* * *'));
     if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') return this.list(n, 0);

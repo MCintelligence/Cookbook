@@ -9,11 +9,12 @@ import { type Mark as PMMark, type NodeType } from '@tiptap/pm/model';
 import { liftListItem } from '@tiptap/pm/schema-list';
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
-import { type AppSettings, getSettings } from '../settings';
+import { type AppSettings, type MarkdownRule, getSettings, markdownOn } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, darkPageColor, fontStack } from '../styles/styles';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
+import { DropCaps } from './dropCaps';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { LinkedNames } from './names';
@@ -28,17 +29,18 @@ export type NextStyle = (style: string) => string;
 /** Headings pasted from other apps come in as Chapter title and the heading styles. */
 const TAG_STYLE: Record<string, string> = { H1: HEADING_STYLES[0], H2: HEADING_STYLES[1], H3: HEADING_STYLES[2], H4: HEADING_STYLES[2], H5: HEADING_STYLES[2], H6: HEADING_STYLES[2] };
 
-type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash' | 'markdown' | 'lineStarters'>;
+type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash'>;
 
-/** An extension whose typing shortcuts only work while a setting is on; the setting is read on each key. */
-function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting): T {
+/** An extension whose typing shortcuts only work while a setting (or a Markdown rule) is on; it is read on each key. */
+function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | MarkdownRule): T {
+  const on = setting === 'curlyQuotes' || setting === 'emDash' ? () => getSettings()[setting] : () => markdownOn(setting);
   return extension.extend({
     addInputRules() {
       return (this.parent?.() ?? []).map(
         (rule: InputRule) =>
           new InputRule({
             find: rule.find,
-            handler: (props) => (getSettings()[setting] ? rule.handler(props) : null),
+            handler: (props) => (on() ? rule.handler(props) : null),
             undoable: rule.undoable,
           }),
       );
@@ -92,7 +94,7 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const { $from, empty } = editor.state.selection;
         // Only top-level paragraphs; lists keep their own Enter behaviour.
         if (!empty || $from.depth !== 1 || $from.parent.type.name !== this.name) return false;
-        if (getSettings().lineStarters && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
+        if (markdownOn('sceneBreak') && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
           return editor.commands.command(({ tr, state }) => {
             const start = $from.before();
             tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
@@ -485,11 +487,12 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Strike,
     Code,
     Link,
-    whenOn(PlainMarkRules, 'markdown'),
+    PlainMarkRules,
     HardBreak,
-    whenOn(CodeBlock, 'markdown'),
+    whenOn(CodeBlock, 'codeBlock'),
     Image,
-    whenOn(BlockShortcuts, 'markdown'),
+    BlockShortcuts,
+    DropCaps,
     PasteCleanup,
     whenOn(
       BulletList.extend({
@@ -497,7 +500,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
           return [wrappingInputRule({ find: /^\s*-\s$/, type: this.type })];
         },
       }),
-      'lineStarters',
+      'bullets',
     ),
     // -1 starts a numbered list, as - starts bullets and -TD a checklist; so does 1. on its own.
     whenOn(
@@ -506,7 +509,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
           return [wrappingInputRule({ find: /^\s*(?:-1|1\.)\s$/, type: this.type })];
         },
       }),
-      'lineStarters',
+      'numbers',
     ),
     ListItem.extend({ content: 'paragraph list*' }),
     whenOn(
@@ -515,7 +518,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
           return [wrappingInputRule({ find: /^\s*-TD\s$/i, type: this.type })];
         },
       }),
-      'lineStarters',
+      'checklist',
     ),
     TaskItem.extend({ content: 'paragraph list*' }).configure({ nested: true }),
     Table.extend({

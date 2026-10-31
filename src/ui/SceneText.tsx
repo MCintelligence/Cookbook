@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { type getSchema } from '@tiptap/core';
 import { DOMSerializer, Node as PMNode } from '@tiptap/pm/model';
 import { type NodeJSON } from '../editor/markdown';
@@ -12,7 +12,9 @@ export function footnotesOf(node: NodeJSON): string[] {
 /** An Item's text drawn with the same schema and styles as the editor, but not editable. */
 export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchema>; body: NodeJSON }) {
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // Drawn before the page is laid out, so whatever measures it then (Mise en Place keeping the
+  // page still as Items load) sees its real height.
+  useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
     try {

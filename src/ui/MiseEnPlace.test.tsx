@@ -62,7 +62,10 @@ function mount(fs: MemoryAdapter, start: { group: TreeNode; active: string | nul
     return (
       <MiseEnPlace
         fs={fs}
-        group={state.group}
+        roots={[state.group]}
+        anchor={state.group.path}
+        target={{ path: state.group.path, name: state.group.name }}
+        title={state.group.name}
         active={body === null ? null : state.active}
         editor={ed}
         cards={new Map()}
@@ -224,6 +227,44 @@ describe('Mise en Place from the keyboard', () => {
     await settle();
     expect(m.editor()?.getText()).toBe('The second.');
     expect(m.host.querySelector('.sr-only')?.textContent).toBe('Two, item 2 of 2');
+  });
+});
+
+describe('several Groups as one page', () => {
+  it('shows each Group under its own name in Shelf order, and an all-empty page writes into the target Group', async () => {
+    const fs = await shelfFs();
+    const host = document.body.appendChild(document.createElement('div'));
+    host.className = 'desk';
+    const root = createRoot(host);
+    roots.push(root);
+    const a: TreeNode = { name: 'Act One', path: 'bookshelf/Act One', kind: 'folder', children: [] };
+    const b: TreeNode = { name: 'Act Two', path: 'bookshelf/Act Two', kind: 'folder', children: [] };
+    act(() =>
+      root.render(
+        <MiseEnPlace
+          fs={fs}
+          roots={[a, b]}
+          anchor={b.path}
+          target={{ path: a.path, name: a.name }}
+          title="2 groups"
+          active={null}
+          editor={null}
+          cards={new Map()}
+          className="cb-page"
+          style={{}}
+          renderActive={() => null}
+          onActivate={() => {}}
+          onStartWriting={async () => null}
+          onDiscard={() => {}}
+          onPageMenu={() => {}}
+          onItemMenu={() => {}}
+        />,
+      ),
+    );
+    await settle();
+    expect([...host.querySelectorAll('h2')].map((h) => h.textContent)).toEqual(['Act One', 'Act Two']);
+    expect(host.querySelector('.mise')?.getAttribute('aria-label')).toBe('Mise en Place: 2 groups');
+    expect(host.querySelector('.mise-blank')?.getAttribute('aria-label')).toBe('Write the first item in Act One');
   });
 });
 

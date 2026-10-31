@@ -93,6 +93,8 @@ Click a group's name (or press Enter on it) to see every item inside it as one p
 
 An empty group opens as an empty page. Start typing and a new item is made in it; Undo takes it away again. Clicking an item on the Shelf opens it on its own page.
 
+Groups picked together show together. Ctrl-click (⌘-click on a Mac) or Shift-click groups on the Shelf, or press ⌘A (Ctrl+A) there or use Select all, and every group picked is shown as one page in Shelf order, each under its own name. The page stays at the group you were on (the one you clicked, or the open item's group): picking Select all from the middle of the story shows everything, with the earlier groups above and the later ones below, and the page stays still as they load. If every group picked is empty, typing makes the first item in the group picked first, or the top one after Select all. In the page itself, ⌘A selects text as usual.
+
 ⌘⇧G (Ctrl+Shift+G) switches between the open item on its own page and its whole group as one page, with the cursor where it was; it is also in the View menu and the command palette. Right-click a group for Show as one page, or find a group by name with ⌘O.
 
 From the keyboard, Enter on a group shows it and leaves the keyboard on the Shelf, as opening an item does; ⌘1, F6 or Escape go to the page. Tab reaches each item and Enter writes in it. Each item has a heading a screen reader can jump between, and moving into another item says which one it is and where it is in the group.

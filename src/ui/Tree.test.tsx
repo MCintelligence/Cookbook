@@ -17,7 +17,7 @@ afterEach(() => {
 
 const card = (title: string, words: number) => ({ id: title, title, kind: 'scene', words }) as CardSummary;
 
-function shelf(extra: { onOpenGroup?: (p: string) => void; onSelect?: (p: string) => void } = {}) {
+function shelf(extra: { onOpenGroup?: (p: string) => void; onSelect?: (p: string) => void; onMark?: (m: Set<string>, picking?: boolean) => void } = {}) {
   const host = document.body.appendChild(document.createElement('div'));
   const root = createRoot(host);
   roots.push(root);
@@ -51,6 +51,8 @@ function shelf(extra: { onOpenGroup?: (p: string) => void; onSelect?: (p: string
         onStartRename={() => {}}
         onRename={() => {}}
         onOpenGroup={extra.onOpenGroup}
+        marked={extra.onMark ? new Set() : undefined}
+        onMark={extra.onMark}
       />,
     ),
   );
@@ -101,5 +103,17 @@ describe('the Shelf', () => {
     // A button's Enter is a click on the button itself, not on its arrow.
     act(() => group.click());
     expect(opened).toEqual(['bookshelf/Part One']);
+  });
+
+  it('tells picking with Ctrl or ⌘, Shift or Select all apart from a plain click', () => {
+    const marks: [string[], boolean][] = [];
+    const host = shelf({ onMark: (m, picking) => marks.push([[...m], !!picking]), onOpenGroup: () => {} });
+    const group = host.querySelector<HTMLElement>('.tree-folder')!;
+    const name = group.querySelector<HTMLElement>('.tree-card-title')!;
+    act(() => name.click());
+    act(() => name.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true })));
+    act(() => group.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true })));
+    expect(marks.map(([, picking]) => picking)).toEqual([false, true, true]);
+    expect(marks[2]![0]).toEqual(['bookshelf/Part One', 'bookshelf/Part One/One.md', 'bookshelf/Part One/Two.md']);
   });
 });

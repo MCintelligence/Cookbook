@@ -150,6 +150,14 @@ import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePictu
 type Notes = Record<string, string>;
 /** The panel open on the right of the page, if any. */
 type Panel = 'pantry' | 'seasonings';
+/** Where the cursor was in an Item whose editor is being made again elsewhere on the page. */
+interface KeptCaret {
+  id: string;
+  from: number;
+  to: number;
+  /** Whether the editor had the keyboard, so the new one takes it back. */
+  focus: boolean;
+}
 
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
@@ -1573,6 +1581,7 @@ export function App() {
     if (node.kind === 'folder') {
       const kids = childrenOf(treeOf(top), top, p);
       showMenu('Group', x, y, [
+        ...(onShelf ? [{ label: 'Show as one page', onPick: () => void openGroup(p) }, { separator: true as const }] : []),
         {
           label: onShelf ? 'New item here' : 'New card here',
           onPick: () => void addFrom(onShelf ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))!, p),
@@ -2173,9 +2182,12 @@ export function App() {
    */
   const goToArea = (area: Area) => {
     if (area === 'page') {
-      if (!editor) return;
+      // An empty Group in Mise en Place has a blank page to type on instead of an editor.
+      const blank = editor ? null : document.querySelector<HTMLElement>('.mise-blank');
+      if (!editor && !blank) return;
       setSideOpen(false);
-      editor.commands.focus();
+      if (editor) editor.commands.focus();
+      else blank!.focus();
       return;
     }
     if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
@@ -2213,12 +2225,50 @@ export function App() {
     focusNextPage.current = 'start';
     void select(to);
   };
+  /**
+   * Mod+Shift+G: between the open Item on its own page and its whole Group as one page (Mise en
+   * Place), with the cursor kept where it is. The same editor is made again in its new place.
+   */
+  const toggleMise = () => {
+    if (manuscript) return;
+    const keep = () => {
+      if (!editor || !doc) return;
+      const { from, to } = editor.state.selection;
+      focusNextPage.current = { id: doc.id, from, to, focus: editor.isFocused };
+    };
+    if (miseGroup) {
+      if (!path || !isInside(path, miseGroup.path)) return;
+      keep();
+      return setMise(null);
+    }
+    if (!path || topOf(path) !== BOOKSHELF) return say('Mise en Place shows a group from the Shelf.');
+    const g = parentOf(path);
+    if (g === BOOKSHELF) return say('This item isn’t in a group, so there is nothing to show with it.');
+    keep();
+    void openGroup(g);
+  };
+  /** Whether the open Item could be shown with its whole Group, or is being. */
+  const canMise = !!miseGroup || (!!path && topOf(path) === BOOKSHELF && parentOf(path) !== BOOKSHELF);
   /** Where the next editor to appear takes the keyboard: at the top of a new item, or where its cursor already is. */
-  const focusNextPage = useRef<false | 'start' | 'here'>(false);
+  const focusNextPage = useRef<false | 'start' | 'here' | KeptCaret>(false);
   useEffect(() => {
     if (!editor || !focusNextPage.current) return;
     const at = focusNextPage.current;
     focusNextPage.current = false;
+    if (typeof at === 'object') {
+      // The same Item's editor made again elsewhere on the page: the cursor goes back where it was.
+      if (docRef.current?.id !== at.id) return;
+      const size = editor.state.doc.content.size;
+      const clamp = (n: number) => Math.max(0, Math.min(n, size));
+      try {
+        editor.commands.setTextSelection({ from: clamp(at.from), to: clamp(at.to) });
+      } catch {
+        // A place that no longer exists: the cursor stays at the start.
+      }
+      if (at.focus) editor.commands.focus(undefined, { scrollIntoView: true });
+      else editor.commands.scrollIntoView();
+      return;
+    }
     // Unless something else (a menu, a box) has taken the keyboard meanwhile.
     if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
     editor.commands.focus(at === 'start' ? 'start' : undefined);
@@ -2236,7 +2286,7 @@ export function App() {
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
       const from = areaOf(document.activeElement);
-      const to = nextArea(from, dir, (a) => (a === 'page' ? !!editor && !!doc && !manuscript : areaShown(a)));
+      const to = nextArea(from, dir, (a) => (a === 'page' ? !manuscript && ((!!editor && !!doc) || !!document.querySelector('.mise-blank')) : areaShown(a)));
       if (to) goToArea(to);
     };
     // Oven Mode hides everything but the page, so F6 brings the panels back first.
@@ -2259,7 +2309,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2298,6 +2348,7 @@ export function App() {
     else if (AREA_SHORTCUTS[id]) goToArea(AREA_SHORTCUTS[id]!);
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
+    else if (id === 'mise') toggleMise();
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -2513,6 +2564,17 @@ export function App() {
         return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
       })
       .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
+    // The Shelf's Groups too, each opening as one page. Walked only as the palette opens.
+    const groups: PaletteItem[] = [];
+    const walk = (list: TreeNode[]) =>
+      list.forEach((n) => {
+        if (n.kind !== 'folder') return;
+        const above = parentOf(n.path) === BOOKSHELF ? '' : ` · ${baseName(parentOf(n.path))}`;
+        groups.push({ id: `group:${n.path}`, label: n.name, hint: `Group, as one page${above}`, group: scenesOnly ? 'Go to' : 'Shelf', words: 'group mise en place', run: () => void openGroup(n.path) });
+        walk(n.children ?? []);
+      });
+    walk(tree);
+    places.push(...groups);
     if (scenesOnly) return places;
     const cmd = (id: string, label: string, run: () => void, group = 'Actions', hint?: string, words?: string): PaletteItem => ({ id, label, run, group, hint, words });
     const sections: [SettingsSection, string, string][] = [
@@ -2539,6 +2601,7 @@ export function App() {
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
+      ...(canMise ? [cmd('mise', miseGroup ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -2747,6 +2810,7 @@ export function App() {
           { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
           { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
+          { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseGroup, disabled: !canMise || !!manuscript, onPick: toggleMise },
           { separator: true },
           { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
           { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },

@@ -191,6 +191,42 @@ describe('Mise en Place', () => {
   });
 });
 
+describe('Mise en Place from the keyboard', () => {
+  it('leaves the keyboard on the Shelf when an empty Group is opened from it', async () => {
+    const fs = await shelfFs();
+    const shelfRow = document.body.appendChild(document.createElement('button'));
+    shelfRow.focus();
+    const m = mount(fs, { group: group([]), active: null });
+    await settle();
+    expect(document.activeElement).toBe(shelfRow);
+    expect(m.host.querySelector('.mise-blank')).not.toBeNull();
+  });
+
+  it('gives the empty page the keyboard when nothing else has it, as after Undo takes a new Item away', async () => {
+    const fs = await shelfFs();
+    (document.activeElement as HTMLElement | null)?.blur();
+    const m = mount(fs, { group: group([]), active: null });
+    await settle();
+    expect(document.activeElement).toBe(m.host.querySelector('.mise-blank'));
+  });
+
+  it('gives each Item a heading, opens one with Enter and says which Item the editor moved into', async () => {
+    const fs = await shelfFs();
+    await item(fs, 'bookshelf/Part One/One.md', 'The first.');
+    await item(fs, 'bookshelf/Part One/Two.md', 'The second.');
+    const m = mount(fs, { group: group(['bookshelf/Part One/One.md', 'bookshelf/Part One/Two.md']), active: 'bookshelf/Part One/One.md' });
+    await settle();
+    expect([...m.host.querySelectorAll('h3.mise-item-name')].map((h) => h.textContent)).toEqual(['One', 'Two']);
+    const two = m.host.querySelector<HTMLElement>('[data-path="bookshelf/Part One/Two.md"]')!;
+    expect(two.tabIndex).toBe(0);
+    expect(two.getAttribute('aria-describedby')).toBe('mise-item-hint');
+    act(() => two.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })));
+    await settle();
+    expect(m.editor()?.getText()).toBe('The second.');
+    expect(m.host.querySelector('.sr-only')?.textContent).toBe('Two, item 2 of 2');
+  });
+});
+
 describe('the page editor made again for the same Item', () => {
   it('starts from the text as it is now, not as the Item was opened', async () => {
     const host = document.body.appendChild(document.createElement('div'));

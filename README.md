@@ -93,6 +93,10 @@ Click a group's name (or press Enter on it) to see every item inside it as one p
 
 An empty group opens as an empty page. Start typing and a new item is made in it; Undo takes it away again. Clicking an item on the Shelf opens it on its own page.
 
+⌘⇧G (Ctrl+Shift+G) switches between the open item on its own page and its whole group as one page, with the cursor where it was; it is also in the View menu and the command palette. Right-click a group for Show as one page, or find a group by name with ⌘O.
+
+From the keyboard, Enter on a group shows it and leaves the keyboard on the Shelf, as opening an item does; ⌘1, F6 or Escape go to the page. Tab reaches each item and Enter writes in it. Each item has a heading a screen reader can jump between, and moving into another item says which one it is and where it is in the group.
+
 ## The Pantry
 
 The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Places and Research. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.

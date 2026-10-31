@@ -54,9 +54,13 @@ type Landing = { path: string; dx: number; dy: number } | { path: string; at: 's
  * near the screen, so a long Group opens quickly. Clicking one moves the editor there, with the
  * cursor where the click was; the arrow keys at the edge of an Item go on into the next.
  *
- * Typing re-renders the app, so nothing here grows with the Group per keystroke: the other
- * Items are memoised elements, rebuilt only when one loads or the Shelf changes; one shared
- * observer watches for Items coming near; and no text is read, parsed or serialised while typing.
+ * Nothing here grows with the Group per keystroke: the other Items are memoised elements,
+ * rebuilt only when one loads or the Shelf changes; one shared observer watches for Items coming
+ * near; and no text is read, parsed or serialised while typing.
+ *
+ * From the keyboard: Tab reaches each Item, Enter writes in it, and the arrow keys at an Item's
+ * edge go on into the next. Each Item is a heading a screen reader can jump between, and moving
+ * into another Item says which one it is.
  */
 export function MiseEnPlace(props: Props) {
   const { fs, group, active, editor, cards, onActivate } = props;
@@ -158,6 +162,21 @@ export function MiseEnPlace(props: Props) {
     if (fresh.current && fresh.current !== active && starting === null) fresh.current = null;
   }, [active]);
 
+  // Says which Item the editor has moved into, for a screen reader: once per move, never while typing.
+  const [said, setSaid] = useState('');
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (!active) return;
+    const at = items.indexOf(active);
+    if (at < 0) return;
+    const name = cards.get(active)?.title ?? active.split('/').pop()!.replace(/\.md$/, '');
+    setSaid(`${name}, item ${at + 1} of ${items.length}`);
+  }, [active]);
+
   // An Item picked on the Shelf, or from Search, is scrolled to; the first one leaves the Group's name in view.
   useLayoutEffect(() => {
     if (!active) return;
@@ -222,8 +241,13 @@ export function MiseEnPlace(props: Props) {
    * taking letters, until that Item's editor is ready to take them over.
    */
   const [starting, setStarting] = useState<string | null>(null);
+  // The empty page takes the keyboard only when it was already on the page, or nowhere, as when
+  // Undo takes a new Item away. Opening the Group from the Shelf leaves the keyboard there, as
+  // opening an Item does; Mod+1, F6 or Escape bring it to the page.
   useEffect(() => {
-    if (items.length === 0) blank.current?.focus({ preventScroll: true });
+    if (items.length !== 0) return;
+    const at = document.activeElement;
+    if (!at || at === document.body || page.current?.contains(at)) blank.current?.focus({ preventScroll: true });
   }, [items.length === 0, group.path]);
   const start = async () => {
     const el = blank.current;
@@ -311,10 +335,10 @@ export function MiseEnPlace(props: Props) {
         ? rows
         : [
             ...rows.slice(0, activeAt),
-            <section key={active!} className="mise-item is-active" aria-label={activeTitle} ref={activeBox} onKeyDownCapture={crossing} onContextMenu={props.onPageMenu}>
-              <div className="mise-item-name">{activeTitle}</div>
+            <article key={active!} className="mise-item is-active" aria-label={activeTitle} ref={activeBox} onKeyDownCapture={crossing} onContextMenu={props.onPageMenu}>
+              <h3 className="mise-item-name">{activeTitle}</h3>
               {props.renderActive()}
-            </section>,
+            </article>,
             ...rows.slice(activeAt + 1),
           ]}
       {(items.length === 0 || starting !== null) && (
@@ -332,9 +356,18 @@ export function MiseEnPlace(props: Props) {
           onCompositionEnd={() => void start()}
         />
       )}
+      <p id={HINT_ID} hidden>
+        Press Enter to write in this item.
+      </p>
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {said}
+      </div>
     </article>
   );
 }
+
+/** Read out with each Item that isn't being written in. */
+const HINT_ID = 'mise-item-hint';
 
 interface Hands {
   want: (path: string) => void;
@@ -371,11 +404,12 @@ const ItemText = memo(function ItemText({
   }, [!!loaded, observe]);
 
   return (
-    <section
+    <article
       ref={box}
       data-path={path}
       className="mise-item"
       aria-label={title}
+      aria-describedby={HINT_ID}
       tabIndex={0}
       aria-busy={loaded ? undefined : true}
       style={loaded ? undefined : { minHeight: height }}
@@ -401,7 +435,7 @@ const ItemText = memo(function ItemText({
         hands.current.menu(path, e.clientX, e.clientY);
       }}
     >
-      <div className="mise-item-name">{title}</div>
+      <h3 className="mise-item-name">{title}</h3>
       {loaded && <SceneText schema={schema} body={loaded.body} />}
       {loaded && loaded.notes.length > 0 && (
         <ol className="cb-page-notes">
@@ -410,6 +444,6 @@ const ItemText = memo(function ItemText({
           ))}
         </ol>
       )}
-    </section>
+    </article>
   );
 });

@@ -2064,7 +2064,8 @@ export function App() {
     const when = new Date();
     const build = REPORTS[id];
     if (!build) return;
-    const built = build({ doc: editor.state.doc, issues: issuesOf(editor.state), names: nameMatcherOf(editor.state) });
+    // A new seed each time, so the same page reported twice still gets fresh words.
+    const built = build({ doc: editor.state.doc, issues: issuesOf(editor.state), names: nameMatcherOf(editor.state), seed: Math.floor(Math.random() * 2 ** 31) });
     const item = doc.title;
     setReport({ report: built, item, saved: null });
     saveReport(built, item, when).then(

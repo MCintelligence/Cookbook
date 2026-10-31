@@ -5,7 +5,7 @@ import { type TextMap, textMap, toRange } from '../editor/textmap';
 import { countWords } from '../storage/index';
 import { words } from './check';
 import { type FoundIssue } from './plugin';
-import { METERS, type SeasoningId, SEASONINGS, perThousand, remark, spiceOf, tasteOf } from './remarks';
+import { METERS, type SeasoningId, SEASONINGS, meterRemark, mix, oneOf, perThousand, remark, spiceOf, tasteOf, waitingRemark } from './remarks';
 import { GLUE, NOT_ADVERBS, STYLE_RULES, readingGrade, sentences } from './style';
 
 /**
@@ -57,6 +57,8 @@ export interface ReportInput {
   issues: FoundIssue[];
   /** Linked story names, for who is talking. */
   names?: NameMatcher | null;
+  /** Picks among the many ways each seasoning can say a thing, so no two reports read alike. */
+  seed?: number;
 }
 
 interface Para {
@@ -124,16 +126,17 @@ function grouped<T>(items: T[], key: (t: T) => string): [string, T[]][] {
 
 const spotOf = (i: FoundIssue): Spot => ({ from: i.from, to: i.to });
 
-function verdictOf(id: SeasoningId, reading: Report['reading']): string {
-  const meter = METERS[id];
-  if (!reading) return meter.waiting;
-  const step = meter.steps[reading.at]!;
-  return `${step.level}! ${step.says}`;
+function verdictOf(id: SeasoningId, reading: Report['reading'], seed: number): string {
+  return reading ? meterRemark(id, reading.at, seed) : waitingRemark(id, seed);
 }
+
+/** One of several ways of saying the same thing, picked by the report's seed and which thing it is. */
+const sayer = (seed: number) => (which: number, lines: readonly string[]) => oneOf(mix(seed, which), lines);
 
 // ---------- Salty Sam: spelling ----------
 
-export function saltReport({ doc, issues }: ReportInput): Report {
+export function saltReport({ doc, issues, seed = 0 }: ReportInput): Report {
+  const say = sayer(seed);
   const paras = parasOf(doc);
   const total = paras.reduce((n, p) => n + p.words, 0);
   const slips = issues.filter((i) => i.issue.kind === 'spelling');
@@ -146,16 +149,47 @@ export function saltReport({ doc, issues }: ReportInput): Report {
   const byName = grouped(names, (i) => i.word);
 
   const actions: string[] = [];
-  if (repeats[0]) actions.push(`Fix “${repeats[0][1][0]!.word}” first. It turns up ${plural(repeats[0][1].length, 'time')}, so one fix does the lot.`);
-  if (byName[0]) actions.push(`“${byName[0][0]}”? Pretty sure you mean ${byName[0][1][0]!.issue.suggestions[0] ?? 'one of your characters'}. Check their Pantry card.`);
-  if (plain.length > 0) actions.push('A word I don’t know but you do, like a place or a made-up word? Right-click it and add it to the dictionary, and I’ll stop nagging.');
-  if (slips.length === 0 && total > 0) actions.push('Not a grain out of place. Go and salt the next Item.');
+  if (repeats[0]) {
+    const w = repeats[0][1][0]!.word;
+    const n = plural(repeats[0][1].length, 'time');
+    actions.push(
+      say(1, [
+        `Fix “${w}” first. It turns up ${n}, so one fix does the lot.`,
+        `“${w}” is fouling the anchor ${n} over. Cut it loose first.`,
+        `Same leak ${n}: “${w}”. Plug it once and she’ll float.`,
+        `Start with “${w}”, sailor. ${n} wrong, and every one of ’em the same.`,
+      ]),
+    );
+  }
+  if (byName[0]) {
+    const w = byName[0][0];
+    const right = byName[0][1][0]!.issue.suggestions[0] ?? 'one of your crew';
+    actions.push(
+      say(2, [
+        `“${w}”? Pretty sure you mean ${right}. Check their Pantry card.`,
+        `You’ve gone and called ${right} “${w}”. They’ll have words with you.`,
+        `“${w}” isn’t on my crew list. ${right} is. Fix it before there’s a mutiny.`,
+      ]),
+    );
+  }
+  if (plain.length > 0)
+    actions.push(
+      say(3, [
+        'A word I don’t know but you do, like a place or a made-up word? Right-click it and add it to the dictionary, and I’ll stop nagging.',
+        'Foreign port names and made-up words go in the dictionary. Right-click ’em and I’ll stop squawking.',
+        'If I’ve flagged a word you invented, right-click it and add it to the dictionary. I don’t do fiction, sailor.',
+      ]),
+    );
+  if (slips.length === 0 && total > 0)
+    actions.push(
+      say(4, ['Not a grain out of place. Go and salt the next Item.', 'Nothing to swab. Hoist the sails and write on.', 'Clean deck. I’m off to find someone worse at spelling. Won’t take long.']),
+    );
 
   return {
     id: 'sam',
     title: METERS.sam.report,
     reading,
-    verdict: verdictOf('sam', reading),
+    verdict: verdictOf('sam', reading, seed),
     stats: [
       { label: 'Spelling slips', value: slips.length.toLocaleString('en') },
       { label: 'Per 1,000 words', value: String(per) },
@@ -190,6 +224,17 @@ export function saltReport({ doc, issues }: ReportInput): Report {
 
 // ---------- Peppery Pete: grammar ----------
 
+/** How Pete's heading for a kind of slip reads inside a sentence: "the doubled-word slips", not "the twice slips". */
+const SLIP_NAME: Record<string, string> = {
+  Twice: 'doubled-word',
+  Capitals: 'capital-letter',
+  'Verb form': 'verb-form',
+  'Wrong case': 'pronoun',
+  'Word order': 'word-order',
+  'Double helping': 'double-helping',
+  'Mix-up': 'mix-up',
+};
+
 /** Pete's name for a slip: the word before the "!" in what he says about it. */
 function troubleOf(i: FoundIssue): { kind: string; says: string } {
   const said = remark(i.issue, i.word);
@@ -197,7 +242,8 @@ function troubleOf(i: FoundIssue): { kind: string; says: string } {
   return m ? { kind: m[1]!, says: m[2]! } : { kind: 'Grammar', says: said };
 }
 
-export function pepperReport({ doc, issues }: ReportInput): Report {
+export function pepperReport({ doc, issues, seed = 0 }: ReportInput): Report {
+  const say = sayer(seed);
   const paras = parasOf(doc);
   const total = paras.reduce((n, p) => n + p.words, 0);
   const slips = issues.filter((i) => i.issue.kind === 'grammar');
@@ -218,16 +264,47 @@ export function pepperReport({ doc, issues }: ReportInput): Report {
   const worst = [...perPara].sort((a, b) => b[1] - a[1])[0];
 
   const actions: string[] = [];
-  if (byKind[0]) actions.push(`Start with the ${byKind[0][0].toLowerCase()} slips. There ${byKind[0][1].length === 1 ? 'is one' : `are ${byKind[0][1].length}`}, more than anything else.`);
-  if (worst && worst[1] >= 3 && paras[worst[0]]) actions.push(`The paragraph starting “${opening(paras[worst[0]]!.text)}” has ${worst[1]} slips. Give it a once-over.`);
-  if (slips.length > 0) actions.push('Click any underline on the page for my fix. F7 takes you to the next one.');
-  if (slips.length === 0 && total > 0) actions.push('Clean grammar. Nothing to grind. Off you go.');
+  if (byKind[0]) {
+    const kind = SLIP_NAME[byKind[0][0]] ?? byKind[0][0].toLowerCase();
+    const n = byKind[0][1].length;
+    const count = n === 1 ? 'one' : String(n);
+    actions.push(
+      say(1, [
+        `Start with the ${kind} slips. There ${n === 1 ? 'is one' : `are ${n}`}, more than anything else.`,
+        `Maybe look at the ${kind} slips first? Only ${count} of them. Only.`,
+        `Not to nag, but the ${kind} slips are winning. ${count} of them, at last count.`,
+        `If you do one thing today, and I’m not saying you will, fix the ${count} ${kind} slips.`,
+      ]),
+    );
+  }
+  if (worst && worst[1] >= 3 && paras[worst[0]]) {
+    const where = opening(paras[worst[0]]!.text);
+    actions.push(
+      say(2, [
+        `The paragraph starting “${where}” has ${worst[1]} slips. Give it a once-over.`,
+        `“${where}” has ${worst[1]} slips in one paragraph. Impressive, in its way.`,
+        `I’ve circled the paragraph starting “${where}”. ${worst[1]} times. Lovingly.`,
+      ]),
+    );
+  }
+  if (slips.length > 0)
+    actions.push(
+      say(3, [
+        'Click any underline on the page for my fix. F7 takes you to the next one.',
+        'My fixes are one click away on each underline. You’re welcome, in advance.',
+        'F7 walks you from slip to slip. I made it easy. You’re welcome.',
+      ]),
+    );
+  if (slips.length === 0 && total > 0)
+    actions.push(
+      say(4, ['Clean grammar. Nothing to grind. Off you go.', 'No notes. Which is a note, really. A good one. Fine.', 'Nothing for me here. I’ll just… go and check someone else’s.']),
+    );
 
   return {
     id: 'pete',
     title: METERS.pete.report,
     reading,
-    verdict: verdictOf('pete', reading),
+    verdict: verdictOf('pete', reading, seed),
     stats: [
       { label: 'Grammar slips', value: slips.length.toLocaleString('en') },
       { label: 'Per 1,000 words', value: String(per) },
@@ -296,7 +373,8 @@ function tagsIn(p: Para, speech: [number, number][], names: NameMatcher | null |
   return out;
 }
 
-export function drunkReport({ doc, names }: ReportInput): Report {
+export function drunkReport({ doc, names, seed = 0 }: ReportInput): Report {
+  const say = sayer(seed);
   const paras = parasOf(doc);
   let all = 0;
   let spoken = 0;
@@ -335,18 +413,42 @@ export function drunkReport({ doc, names }: ReportInput): Report {
   const longestSpeech = longest as { words: number; spot: Spot; text: string } | null;
 
   const actions: string[] = [];
-  if (dryRun && dryRun.words >= 300) actions.push(`Nobody says a word for ${dryRun.words.toLocaleString('en')} words from “${opening(paras[dryRun.from]!.text)}”. Let someone pipe up. Hic.`);
-  if (fancy.length >= 3 && fancy.length * 3 > tags.length) actions.push(`Easy on the fancy tags: ${fancy.length} of your ${tags.length} aren’t “said” or “asked”. “Said” goes down smooth.`);
-  if (adverbs[0]) actions.push(`“${adverbs[0].verb} ${adverbs[0].adverb}”: let the line itself do the work and drop the -ly.`);
-  if (all > 300 && share < 10) actions.push('Quiet as a library in here. A line or two out loud would liven it up.');
-  if (share > 70) actions.push('All talk, my favourite! Give the reader a look at the room between the lines.');
-  if (actions.length === 0 && all > 0) actions.push('Talk and walk in good measure. Pour yourself one. Cheers!');
+  if (dryRun && dryRun.words >= 300) {
+    const n = dryRun.words.toLocaleString('en');
+    const where = opening(paras[dryRun.from]!.text);
+    actions.push(
+      say(1, [
+        `Nobody says a word for ${n} words from “${where}”. Let someone pipe up. Hic.`,
+        `${n} words of silence from “${where}”. I nearly sobered up. Somebody talk!`,
+        `From “${where}”, ${n} words and not a peep. Who died? Hic. Sorry.`,
+      ]),
+    );
+  }
+  if (fancy.length >= 3 && fancy.length * 3 > tags.length)
+    actions.push(
+      say(2, [
+        `Easy on the fancy tags: ${fancy.length} of your ${tags.length} aren’t “said” or “asked”. “Said” goes down smooth.`,
+        `${fancy.length} fancy tags! Everyone’s hissing and growling. Just say “said”, mate. Hic.`,
+        `So much snapping and muttering. Have a “said”. It’s like water. Not that I’d know.`,
+      ]),
+    );
+  if (adverbs[0]) {
+    const tag = `${adverbs[0].verb} ${adverbs[0].adverb}`;
+    actions.push(
+      say(3, [`“${tag}”: let the line itself do the work and drop the -ly.`, `“${tag}”? The line should say how it’s said. Lose the -ly. Hic.`, `“${tag}”. One -ly too many, like my last drink.`]),
+    );
+  }
+  if (all > 300 && share < 10)
+    actions.push(say(4, ['Quiet as a library in here. A line or two out loud would liven it up.', 'Not a word spoken. I’ve been to livelier funerals. Hic.', 'Let somebody talk! I’m begging. My glass is empty.']));
+  if (share > 70)
+    actions.push(say(5, ['All talk, my favourite! Give the reader a look at the room between the lines.', 'Love the chatter, but where are we? A pub? Please say a pub.', 'Everyone’s talking, nobody’s moving. Let ’em pour a drink or something. Hic.']));
+  if (actions.length === 0 && all > 0) actions.push(say(6, ['Talk and walk in good measure. Pour yourself one. Cheers!', 'Nothing to fix. Lovely. Lovely page. I’m a bit emotional. Hic.', 'Perfectly balanced, like me. Mostly. Cheers!']));
 
   return {
     id: 'daniel',
     title: METERS.daniel.report,
     reading,
-    verdict: verdictOf('daniel', reading),
+    verdict: verdictOf('daniel', reading, seed),
     stats: [
       { label: 'Spoken', value: `${share}%` },
       { label: 'Speeches', value: speeches.toLocaleString('en') },
@@ -408,19 +510,20 @@ const LENGTHS: { label: string; upTo: number }[] = [
 /** A sentence this long is worth a look whatever the grade. */
 const LONG_SENTENCE = 30;
 const STYLE_LABEL: Record<string, string> = Object.fromEntries(STYLE_RULES.map((r) => [r.id, r.label]));
-/** Sally's line on each kind of note, for the actions. */
-const SALLY_ON: Record<string, (n: number) => string> = {
-  adverb: (n) => `${plural(n, 'adverb')}. Swap a few for stronger verbs and feel the heat.`,
-  'crutch-word': (n) => `${plural(n, 'crutch word')}. Pull them out and see if the sentence still stands.`,
-  passive: (n) => `${plural(n, 'passive sentence')}. Tell me who’s doing the doing.`,
-  'sticky-sentence': (n) => `${plural(n, 'sticky sentence')}. Too much glue, hon. Trim the little words.`,
-  echo: (n) => `${plural(n, 'echo', 'echoes')}. Same spice twice. Swap one of each pair.`,
-  cliche: (n) => `${plural(n, 'cliché')}. Stale seasoning. Say it your own way.`,
-  'simpler-word': (n) => `${plural(n, 'fancy word')}. Cool it down with something plainer.`,
-  redundancy: (n) => `${plural(n, 'double helping')}. Say it once.`,
+/** Sally's lines on each kind of note, for the actions. */
+const SALLY_ON: Record<string, ((n: number) => string)[]> = {
+  adverb: [(n) => `${plural(n, 'adverb')}. Swap a few for stronger verbs and feel the heat.`, (n) => `${plural(n, 'adverb')}, darling. A strong verb is so much more attractive.`, (n) => `${plural(n, '-ly word')} hanging about. Send some of them home.`],
+  'crutch-word': [(n) => `${plural(n, 'crutch word')}. Pull them out and see if the sentence still stands.`, (n) => `${plural(n, 'crutch word')}. Stand up straight, sugar. You look better without them.`, (n) => `${plural(n, 'crutch word')}. Really, hon? Just cut them.`],
+  passive: [(n) => `${plural(n, 'passive sentence')}. Tell me who’s doing the doing.`, (n) => `${plural(n, 'passive sentence')}. I like a sentence that takes charge.`, (n) => `${plural(n, 'passive sentence')}. Things “were done”, darling? By whom? Don’t tease.`],
+  'sticky-sentence': [(n) => `${plural(n, 'sticky sentence')}. Too much glue, hon. Trim the little words.`, (n) => `${plural(n, 'sticky sentence')}. Clingy isn’t a good look on anyone.`, (n) => `${plural(n, 'sticky sentence')}. Peel a few words off and let them breathe.`],
+  echo: [(n) => `${plural(n, 'echo', 'echoes')}. Same spice twice. Swap one of each pair.`, (n) => `${plural(n, 'echo', 'echoes')}, darling. Variety keeps things exciting.`, (n) => `${plural(n, 'echo', 'echoes')}. Charming once, hon. Less so twice.`],
+  cliche: [(n) => `${plural(n, 'cliché')}. Stale seasoning. Say it your own way.`, (n) => `${plural(n, 'cliché')}. I’ve heard those lines before, sugar. Surprise me.`, (n) => `${plural(n, 'cliché')}. Be original, darling. It’s far more seductive.`],
+  'simpler-word': [(n) => `${plural(n, 'fancy word')}. Cool it down with something plainer.`, (n) => `${plural(n, 'big word')}. You don’t need to impress me, darling. You already do.`, (n) => `${plural(n, 'word')} in a three-piece suit. Loosen the tie.`],
+  redundancy: [(n) => `${plural(n, 'double helping')}. Say it once.`, (n) => `${plural(n, 'double helping')}, hon. Once is plenty when it’s good.`, (n) => `${plural(n, 'phrase')} saying it twice. I heard you the first time, darling.`],
 };
 
-export function spiceReport({ doc, issues, names }: ReportInput): Report {
+export function spiceReport({ doc, issues, names, seed = 0 }: ReportInput): Report {
+  const say = sayer(seed);
   const paras = parasOf(doc);
   const all: { words: number; p: number; from: number; to: number }[] = [];
   let letters = 0;
@@ -461,17 +564,43 @@ export function spiceReport({ doc, issues, names }: ReportInput): Report {
   const overused = [...counts.values()].filter((c) => c.n >= 3 && perThousand(c.n, wordTotal) >= 5).sort((a, b) => b.n - a.n).slice(0, 10);
 
   const actions: string[] = [];
-  if (long[0]) actions.push(`Chop the sentence starting “${opening(long[0].text)}” in two. ${long[0].words} words is a mouthful, hon.`);
-  if (all.length >= 8 && commonest / all.length >= 0.6) actions.push('Your sentences all taste the same length. Mix a short one in with the long ones.');
-  if (byRule[0]) actions.push(SALLY_ON[byRule[0][0]]?.(byRule[0][1].length) ?? `${plural(byRule[0][1].length, 'note')} on word choice. Have a look.`);
-  if (overused[0] && actions.length < 3) actions.push(`“${overused[0].shown}” turns up ${overused[0].n} times. Find it a friend.`);
-  if (actions.length === 0 && grade.words > 0) actions.push('Just the right kick. Nothing burning. Serve it up.');
+  if (long[0]) {
+    const where = opening(long[0].text);
+    const n = long[0].words;
+    actions.push(
+      say(1, [
+        `Chop the sentence starting “${where}” in two. ${n} words is a mouthful, hon.`,
+        `“${where}” goes on for ${n} words. Darling, leave them wanting more.`,
+        `${n} words in one breath, starting “${where}”. Even I need a pause.`,
+        `Break up “${where}”. ${n} words without a full stop? Tease.`,
+      ]),
+    );
+  }
+  if (all.length >= 8 && commonest / all.length >= 0.6)
+    actions.push(
+      say(2, [
+        'Your sentences all taste the same length. Mix a short one in with the long ones.',
+        'Every sentence the same length, darling? Keep me guessing.',
+        'Same rhythm, over and over. Surprise me with a short one. Like this.',
+      ]),
+    );
+  if (byRule[0]) {
+    const n = byRule[0][1].length;
+    const lines = SALLY_ON[byRule[0][0]];
+    actions.push(lines ? oneOf(mix(seed, 3), lines)(n) : say(3, [`${plural(n, 'note')} on word choice. Have a look, hon.`, `${plural(n, 'little note')} on word choice. Indulge me and read them.`]));
+  }
+  if (overused[0] && actions.length < 3) {
+    const w = overused[0].shown;
+    const n = overused[0].n;
+    actions.push(say(4, [`“${w}” turns up ${n} times. Find it a friend.`, `“${w}”, ${n} times? Darling, you’re obsessed. Share the love.`, `You keep coming back to “${w}”. ${n} times. Flattering for “${w}”, dull for me.`]));
+  }
+  if (actions.length === 0 && grade.words > 0) actions.push(say(5, ['Just the right kick. Nothing burning. Serve it up.', 'Nothing to fix, darling. Delicious as it is.', 'I’ve no notes. Rare for me. Don’t get used to it.']));
 
   return {
     id: 'sally',
     title: METERS.sally.report,
     reading,
-    verdict: verdictOf('sally', reading),
+    verdict: verdictOf('sally', reading, seed),
     stats: [
       { label: 'Grade', value: grade.words > 0 ? String(grade.grade) : '—' },
       { label: 'Average sentence', value: plural(average, 'word') },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Issue } from './check';
-import { METERS, SPICE, fixText, meterRemark, ownerOf, perThousand, remark, rulesOff, spiceOf, tasteOf } from './remarks';
+import { METERS, SPICE, fixText, meterRemark, ownerOf, perThousand, remark, rulesOff, spiceOf, tasteOf, waitingRemark } from './remarks';
 import { strayCapitals, unclosedQuote } from './style';
 
 const issue = (kind: Issue['kind'], rule: string, message = ''): Issue => ({ from: 0, to: 1, kind, rule, message, suggestions: [] });
@@ -29,29 +29,50 @@ describe('seasonings', () => {
     const a = remark(issue('spelling', 'spelling'), 'recieve');
     expect(remark(issue('spelling', 'spelling'), 'recieve')).toBe(a);
     expect(a).toContain('recieve');
-    expect(remark(issue('style', 'passive'), 'was eaten')).toMatch(/^Passive voice/);
-    expect(remark(issue('grammar', 'grammar', 'Use “an” here.'), 'a')).toBe('Grammar! Use “an” here.');
-    expect(remark({ ...issue('grammar', 'ThenThan'), suggestions: ['than'] }, 'then')).toBe('Mix-up! You mean “than”.');
-    expect(remark(issue('grammar', 'ThenThan', 'Did you mean “than”?'), 'then')).toBe('Grammar! Did you mean “than”?');
-    expect(remark(issue('grammar', 'agreement', 'With “they”, it’s “were”.'), 'was')).toBe('Agreement! With “they”, it’s “were”.');
+    expect(remark(issue('style', 'passive'), 'was eaten')).toBe(remark(issue('style', 'passive'), 'was eaten'));
+    expect(remark(issue('style', 'passive'), 'was eaten')).toMatch(/[Pp]assive|who|Who|charge/);
+    expect(remark(issue('grammar', 'grammar', 'Use “an” here.'), 'a')).toMatch(/^Grammar!\ Use\ “an”\ here\./);
+    expect(remark({ ...issue('grammar', 'ThenThan'), suggestions: ['than'] }, 'then')).toMatch(/^Mix\-up!\ You\ mean\ “than”\./);
+    expect(remark(issue('grammar', 'ThenThan', 'Did you mean “than”?'), 'then')).toMatch(/^Grammar!\ Did\ you\ mean\ “than”\?/);
+    expect(remark(issue('grammar', 'agreement', 'With “they”, it’s “were”.'), 'was')).toMatch(/^Agreement!\ With\ “they”,\ it’s\ “were”\./);
   });
 
   it('turns the grade into heat, with most fiction at Medium', () => {
     expect([2, 4, 5, 7, 8, 9, 10, 12, 13, 20].map((g) => SPICE[spiceOf(g)]!.level)).toEqual(['Mild', 'Mild', 'Medium', 'Medium', 'Hot', 'Hot', 'Extra hot', 'Extra hot', 'Inferno', 'Inferno']);
   });
 
-  it('gives each seasoning five steps and a remark for each', () => {
+  it('gives each seasoning five steps, each with plenty to say', () => {
+    const all: string[] = [];
     for (const meter of Object.values(METERS)) {
       expect(meter.steps).toHaveLength(5);
       expect(meter.steps[4]!.upTo).toBe(Infinity);
+      for (const step of meter.steps) {
+        expect(step.says.length).toBeGreaterThanOrEqual(6);
+        all.push(...step.says);
+      }
+      expect(meter.waiting.length).toBeGreaterThanOrEqual(3);
     }
-    expect(meterRemark('daniel', tasteOf(METERS.daniel.steps, 79))).toBe('Drunk! All talk! Now that’s a party.');
-    expect(meterRemark('daniel', tasteOf(METERS.daniel.steps, 0))).toMatch(/^Sober!/);
-    expect(meterRemark('sally', spiceOf(9))).toBe('Hot! A few long sentences are burning.');
-    expect(meterRemark('pete', tasteOf(METERS.pete.steps, 0))).toMatch(/^Plain!/);
-    expect(meterRemark('sam', tasteOf(METERS.sam.steps, 80))).toMatch(/^Seawater!/);
+    // No line is used twice anywhere, so each one belongs to its moment.
+    expect(new Set(all).size).toBe(all.length);
     // The mockup's 23 per 1,000 words is in the middle of Pete's meter.
-    expect(meterRemark('pete', tasteOf(METERS.pete.steps, 23))).toMatch(/^Peppery!/);
+    expect(METERS.pete.steps[tasteOf(METERS.pete.steps, 23)]!.level).toBe('Peppery');
+    expect(METERS.daniel.steps[tasteOf(METERS.daniel.steps, 79)]!.level).toBe('Drunk');
+  });
+
+  it('picks a line from the right step, steadily for one seed and freshly across seeds', () => {
+    const at = tasteOf(METERS.daniel.steps, 79);
+    expect(METERS.daniel.steps[at]!.says).toContain(meterRemark('daniel', at, 7));
+    expect(meterRemark('daniel', at, 7)).toBe(meterRemark('daniel', at, 7));
+    const lines = new Set(Array.from({ length: 60 }, (_, seed) => meterRemark('sally', spiceOf(9), seed)));
+    expect(lines.size).toBeGreaterThanOrEqual(5);
+    expect(METERS.sam.waiting).toContain(waitingRemark('sam', 3));
+  });
+
+  it('gives each character many ways to flag the same kind of slip', () => {
+    const sam = new Set(['recieve', 'teh', 'wierd', 'definately', 'seperate', 'occured', 'untill', 'beleive', 'alot', 'tommorow', 'accomodate', 'goverment'].map((w) => remark(issue('spelling', 'spelling'), w).replace(/“[^”]*”/, '“…”')));
+    expect(sam.size).toBeGreaterThanOrEqual(5);
+    const pete = new Set(['was', 'were', 'is', 'are', 'has', 'have', 'do', 'does', 'go', 'goes', 'run', 'runs'].map((w) => remark(issue('grammar', 'agreement', 'Fix it.'), w)));
+    expect(pete.size).toBeGreaterThanOrEqual(5);
   });
 
   it('judges slips per 1,000 words', () => {

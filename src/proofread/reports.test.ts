@@ -60,8 +60,8 @@ describe('Seasonings reports', () => {
     const repeats = report.sections.find((s) => s.title === 'Repeat offenders')!;
     expect(repeats.kind === 'rows' && repeats.rows.map((r) => [r.label, r.count])).toEqual([['Teh', 2]]);
     expect(report.stats.find((s) => s.label === 'Name slips')!.value).toBe('1');
-    expect(report.actions[0]).toMatch(/“Teh” first/);
-    expect(report.actions[1]).toMatch(/you mean Mara/);
+    expect(report.actions[0]).toContain('“Teh”');
+    expect(report.actions[1]).toContain('Mara');
   });
 
   it('Pete sorts slips by kind, in his own words', () => {
@@ -79,7 +79,7 @@ describe('Seasonings reports', () => {
       { label: 'Agreement', value: 2 },
       { label: 'Mix-up', value: 1 },
     ]);
-    expect(report.actions[0]).toMatch(/agreement slips/);
+    expect(report.actions[0]).toContain('agreement slips');
     expect(report.stats.find((s) => s.label === 'Clean paragraphs')!.value).toBe('0%');
   });
 
@@ -113,7 +113,15 @@ describe('Seasonings reports', () => {
       ['harbour', 3],
       ['grey', 3],
     ]);
-    expect(report.actions[0]).toMatch(/^Chop the sentence starting “She walked/);
+    expect(report.actions[0]).toContain('“She walked');
+  });
+
+  it('says things differently from one report to the next', () => {
+    const doc = open(SCENE);
+    const verdicts = new Set(Array.from({ length: 40 }, (_, seed) => drunkReport({ doc, issues: [], seed }).verdict));
+    const actions = new Set(Array.from({ length: 40 }, (_, seed) => spiceReport({ doc, issues: [], seed }).actions[0]));
+    expect(verdicts.size).toBeGreaterThanOrEqual(4);
+    expect(actions.size).toBeGreaterThanOrEqual(3);
   });
 
   it('jumps land on the words they name', () => {

@@ -2,7 +2,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { useEditorState, type Editor } from '@tiptap/react';
 import { checkedOff, isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
 import { type FoundIssue, issuesOf } from '../proofread/plugin';
-import { KIND_OF, METERS, SEASONINGS, type SeasoningId, meterRemark, ownerOf, perThousand, spiceOf, tasteOf } from '../proofread/remarks';
+import { KIND_OF, METERS, SEASONINGS, type SeasoningId, meterRemark, mix, ownerOf, perThousand, spiceOf, tasteOf, waitingRemark } from '../proofread/remarks';
 import { REPORTS } from '../proofread/reports';
 import { readingGrade } from '../proofread/style';
 import { docReading, docTalk, docWords } from '../editor/docStats';
@@ -54,6 +54,8 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   const justDragged = useRef(false);
   // Seasonings picked for the toolbar and menu, by clicking their heads.
   const [marked, setMarked] = useState<SeasoningId[]>([]);
+  // Picks among each seasoning's lines: new each time the panel opens, so the remarks stay fresh.
+  const [seed] = useState(() => Math.floor(Math.random() * 2 ** 31));
   const picked = marked.filter((id) => chosen.includes(id));
   // Every count here is kept per paragraph or per set of underlines (see docStats and issuesOf), so a
   // cursor move costs nothing and a keystroke recounts one paragraph. Only numbers come out, so the
@@ -220,20 +222,22 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     onUnchecked(on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])]);
   };
   /** Where each seasoning's meter stands, and what it shows beside its level; null while there's too little page to read. */
-  const reading = (id: SeasoningId): { at: number; detail: string } | null => {
+  /** Where each seasoning's meter stands, what it shows beside its level, and a number that moves the remark on when the reading changes. */
+  const reading = (id: SeasoningId): { at: number; detail: string; turn: number } | null => {
     if (id === 'daniel') {
       if (page.talkWords === 0) return null;
       const share = Math.round((page.spoken / page.talkWords) * 100);
-      return { at: tasteOf(METERS.daniel.steps, share), detail: `${share}% dialogue · ${100 - share}% narration` };
+      // In steps of five, so typing a word or two doesn't change what he says.
+      return { at: tasteOf(METERS.daniel.steps, share), detail: `${share}% dialogue · ${100 - share}% narration`, turn: Math.round(share / 5) };
     }
     if (id === 'sally') {
       if (page.gradeWords < MIN_GRADE_WORDS) return null;
-      return { at: spiceOf(page.grade), detail: `Grade ${page.grade} · ${plural(page.sally, 'style note')}` };
+      return { at: spiceOf(page.grade), detail: `Grade ${page.grade} · ${plural(page.sally, 'style note')}`, turn: page.sally * 31 + page.grade };
     }
     if (page.words === 0) return null;
     const slips = page[id];
     const per = perThousand(slips, page.words);
-    return { at: tasteOf(METERS[id].steps, per), detail: `${plural(slips, id === 'sam' ? 'spelling slip' : 'grammar slip')} · ${per} per 1,000 words` };
+    return { at: tasteOf(METERS[id].steps, per), detail: `${plural(slips, id === 'sam' ? 'spelling slip' : 'grammar slip')} · ${per} per 1,000 words`, turn: slips };
   };
 
   return (
@@ -311,7 +315,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                   </span>
                 </div>
 
-                <Remark text={read ? meterRemark(id, read.at) : meter.waiting} />
+                <Remark text={read ? meterRemark(id, read.at, mix(seed, read.turn)) : waitingRemark(id, seed)} />
                 <Gauge id={id} reading={read} />
                 <div className="sc-foot">
                   <label className="sc-check">

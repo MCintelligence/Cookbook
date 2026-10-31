@@ -8,6 +8,8 @@ import { textGrade } from '../proofread/style';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
 import { useSuggestions } from './IssueCard';
+import { type MenuItem } from './Menu';
+import { BAR_ICONS, PanelBar } from './PanelBar';
 
 /** A page or book Daniel keeps an eye on, with how much of it is spoken once counted. */
 export interface Tracked {
@@ -32,13 +34,18 @@ interface Props {
   onClose: () => void;
   /** A right-click on an issue. */
   onIssueMenu?: (issue: FoundIssue, x: number, y: number) => void;
+  /** Every seasoning switched off for now, and a way to switch them back on. */
+  paused: boolean;
+  onPaused: (paused: boolean) => void;
+  /** Shows a right-click menu. */
+  onMenu: (label: string, x: number, y: number, items: MenuItem[]) => void;
 }
 
 /** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
 const MIN_GRADE_WORDS = 50;
 const LONG_PRESS_MS = 400;
 
-export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu }: Props) {
+export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu, paused, onPaused, onMenu }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -57,6 +64,10 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
     const to = held instanceof HTMLButtonElement && held.disabled ? held.closest('.sc')?.querySelector<HTMLElement>('.handles button:not(:disabled)') : held;
     to?.focus({ preventScroll: true });
   }, [chosen]);
+  const justDragged = useRef(false);
+  // Seasonings picked for the toolbar and menu, by clicking their heads.
+  const [marked, setMarked] = useState<SeasoningId[]>([]);
+  const picked = marked.filter((id) => chosen.includes(id));
   const page = useEditorState({
     editor,
     selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: textGrade(paragraphs(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
@@ -74,6 +85,47 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
     onChosen([...rest.slice(0, index), id, ...rest.slice(index)]);
   };
   const remove = (id: SeasoningId) => onChosen(chosen.filter((c) => c !== id));
+  const removeAll = (ids: SeasoningId[]) => {
+    onChosen(chosen.filter((c) => !ids.includes(c)));
+    setMarked([]);
+  };
+  const everything = chosen.length > 0 && picked.length === chosen.length;
+  /** A click on a head picks that seasoning; with Ctrl, ⌘ or Shift it adds to or takes from the others. */
+  const pick = (e: React.MouseEvent, id: SeasoningId) => {
+    if (justDragged.current || (e.target as HTMLElement).closest('button')) return;
+    if (e.ctrlKey || e.metaKey || e.shiftKey) setMarked(picked.includes(id) ? picked.filter((m) => m !== id) : [...picked, id]);
+    else setMarked(picked.length === 1 && picked[0] === id ? [] : [id]);
+  };
+  const turn = { label: paused ? 'Turn seasonings on' : 'Turn seasonings off', onPick: () => onPaused(!paused) };
+  const cardMenu = (e: React.MouseEvent, id: SeasoningId, at: number) => {
+    // Issues and Daniel's chips have menus and buttons of their own.
+    if ((e.target as HTMLElement).closest('.say, .chips, .switch-row')) return;
+    e.preventDefault();
+    const who = SEASONINGS.find((s) => s.id === id)!;
+    const several = picked.includes(id) && picked.length > 1;
+    if (!picked.includes(id)) setMarked([id]);
+    onMenu(who.name, e.clientX, e.clientY, [
+      ...(several
+        ? [{ heading: `${picked.length} picked` }, { label: `Remove ${picked.length} picked`, danger: true, onPick: () => removeAll(picked) }]
+        : [
+            { label: 'Move to top', disabled: at === 0, onPick: () => move(id, 'top') },
+            { label: 'Move up', disabled: at === 0, onPick: () => move(id, 'up') },
+            { label: 'Move down', disabled: at === chosen.length - 1, onPick: () => move(id, 'down') },
+            { label: 'Move to bottom', disabled: at === chosen.length - 1, onPick: () => move(id, 'bottom') },
+            { separator: true } as const,
+            { label: `Remove ${who.name}`, danger: true, onPick: () => removeAll([id]) },
+          ]),
+      { separator: true },
+      ...panelItems(),
+    ]);
+  };
+  const panelItems = (): MenuItem[] => [
+    { label: 'Add a seasoning…', disabled: picking, onPick: () => setPicking(true) },
+    { label: 'Select all', disabled: chosen.length === 0 || everything, onPick: () => setMarked([...chosen]) },
+    { label: 'Deselect all', disabled: picked.length === 0, onPick: () => setMarked([]) },
+    { separator: true },
+    turn,
+  ];
   /** Where a drop at (x, y) would put a card, as an index into the list. */
   const target = (x: number, y: number): number | null => {
     const cards = Array.from(list.current?.querySelectorAll<HTMLElement>('.sc') ?? []);
@@ -135,6 +187,11 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
       window.removeEventListener('pointercancel', finish);
       window.removeEventListener('keydown', key);
       window.removeEventListener('touchmove', holdStill);
+      if (active) {
+        // The click that ends a drag should not also pick the card.
+        justDragged.current = true;
+        window.setTimeout(() => (justDragged.current = false), 0);
+      }
       setDrag(null);
     };
     window.addEventListener('pointermove', move);
@@ -150,15 +207,18 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
 
   return (
-    <aside className="panel seasonings" aria-label="Seasonings">
+    <aside
+      className={`panel seasonings${paused ? ' is-paused' : ''}`}
+      aria-label="Seasonings"
+      onContextMenu={(e) => {
+        if ((e.target as Element).closest('.sc, .menu, .panel-bar, .pick')) return;
+        e.preventDefault();
+        onMenu('Seasonings', e.clientX, e.clientY, panelItems());
+      }}
+    >
       <div className="panel-head">
         <h2 className="panel-h">Seasonings</h2>
         <span className="panel-tools">
-          {!showPicker && (
-            <button className="icon-btn icon-text" aria-label="Add a seasoning" onClick={() => setPicking(true)}>
-              + Add
-            </button>
-          )}
           <button className="icon-btn" aria-label="Close Seasonings" onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
@@ -184,18 +244,21 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
             Done
           </button>
         </>
+      ) : paused ? (
+        <p className="panel-quiet">Seasonings are off. Nothing is marked on the page.</p>
       ) : (
         <div className={`panel-list${drag ? ' is-sorting' : ''}${dropAt === chosen.length ? ' drop-end' : ''}`} ref={list}>
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
             const issues = mine(id);
             const count = id === 'daniel' ? tracked.length : issues.length;
-            const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before'].filter(Boolean).join(' ');
+            const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before', picked.includes(id) && 'is-marked'].filter(Boolean).join(' ');
             return (
               <section
                 className={cls}
                 aria-label={who.name}
                 key={id}
+                onContextMenu={(e) => cardMenu(e, id, at)}
                 // Alt+↑ and Alt+↓ move a seasoning up or down the list (Alt+Home and Alt+End to the ends), as on the Shelf.
                 onKeyDown={(e) => {
                   if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -206,7 +269,7 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
                   move(id, to);
                 }}
               >
-                <div className="sc-head" title="Drag to reorder" onPointerDown={(e) => begin(e, id)}>
+                <div className="sc-head" title="Click to pick, drag to reorder" onPointerDown={(e) => begin(e, id)} onClick={(e) => pick(e, id)}>
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>
                   {count > 0 && <span className="count">{count}</span>}
@@ -266,6 +329,16 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
           })}
         </div>
       )}
+      <PanelBar
+        label="Seasonings tools"
+        status={picked.length > 1 ? `${picked.length} picked` : undefined}
+        buttons={[
+          { label: turn.label, icon: BAR_ICONS.power, pressed: !paused, onClick: turn.onPick },
+          { label: 'Add a seasoning', icon: BAR_ICONS.add, disabled: showPicker, onClick: () => setPicking(true) },
+          { label: picked.length > 1 ? `Remove ${picked.length} picked` : 'Remove picked', icon: BAR_ICONS.remove, disabled: picked.length === 0, onClick: () => removeAll(picked) },
+          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: chosen.length === 0 || showPicker, onClick: () => setMarked(everything ? [] : [...chosen]) },
+        ]}
+      />
     </aside>
   );
 }

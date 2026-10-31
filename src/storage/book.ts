@@ -66,6 +66,8 @@ export interface SeasoningsInfo {
   tracked: string[];
   /** Remarks the writer removed, by key; issues removed go in .cookbook/ignored.json with the rest. */
   gone: string[];
+  /** Every seasoning switched off for now, without losing which are picked. */
+  paused?: boolean;
 }
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
@@ -130,7 +132,12 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
     ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
     ...(info.seasonings && typeof info.seasonings === 'object' && {
-      seasonings: { chosen: strings(info.seasonings.chosen), tracked: strings(info.seasonings.tracked), gone: strings(info.seasonings.gone) },
+      seasonings: {
+        chosen: strings(info.seasonings.chosen),
+        tracked: strings(info.seasonings.tracked),
+        gone: strings(info.seasonings.gone),
+        ...(info.seasonings.paused === true && { paused: true }),
+      },
     }),
   };
 }

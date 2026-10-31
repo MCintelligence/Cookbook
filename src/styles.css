@@ -1005,3 +1005,34 @@ button.seas-quote:hover { color: var(--accent); }
 .cb-prose p.bs-heading { border-top: 1px solid var(--page-line); padding-top: 0.6em; }
 .cb-prose p.bs-hint { color: var(--page-text); opacity: 0.4; font-style: italic; cursor: text; user-select: none; }
 .cb-prose p.bs-blank::before { content: attr(data-placeholder); color: var(--page-text); opacity: 0.4; font-style: italic; pointer-events: none; float: left; height: 0; }
+
+/* Panel toolbars: a thin row of icons that stays at the foot of the Shelf, the Pantry and Seasonings. */
+.sidebar { display: flex; flex-direction: column; padding-bottom: 0; }
+.sidebar > .tree { flex: 1 0 auto; }
+.drawer > .panel { flex: 1 0 auto; }
+.panel { padding-bottom: 0; }
+.panel-bar { position: sticky; bottom: 0; z-index: 1; flex: none; display: flex; align-items: center; gap: 2px; height: 32px; margin-top: auto; padding: 0 6px; border-top: 1px solid var(--line); background: inherit; }
+.sidebar > .panel-bar { margin-inline: -8px; background: var(--sidebar); }
+.drawer .panel-bar { margin-inline: -16px; background: var(--bar); }
+.bar-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px; padding: 0; border: none; border-radius: 5px; background: transparent; color: var(--muted); }
+.bar-btn:hover:not(:disabled) { color: var(--accent); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.bar-btn:disabled { color: var(--faint); opacity: 0.55; }
+.bar-btn[aria-pressed='true'] { color: var(--accent); }
+.bar-btn.bar-danger:hover:not(:disabled) { color: var(--danger-text); }
+.bar-status { flex: 1; min-width: 0; padding: 0 6px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Picked rows and seasonings: a soft accent wash, apart from the open Item's outline. */
+.tree .is-marked, .tree .is-marked:hover { background: color-mix(in srgb, var(--accent) 13%, transparent); }
+.sc.is-marked { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.seasonings.is-paused .panel-quiet { margin-top: 8px; }
+
+/* The top menu bar: plain words beside the name, a soft fill on the open one. */
+.menubar { display: flex; align-items: center; gap: 0; flex: none; margin-left: 2px; }
+.menubar-item { height: 28px; padding: 0 8px; border: none; border-radius: 5px; background: transparent; color: var(--text); font-size: 13px; }
+.menubar-item:hover, .menubar-item[aria-expanded='true'] { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.menubar-item[aria-expanded='true'] { color: var(--accent); }
+/* On a narrow window the menus give way; everything in them is in the command palette too. */
+@media (max-width: 820px) {
+  .menubar { display: none; }
+}
+.tree.has-many li[aria-selected='true'] > .is-marked { background: color-mix(in srgb, var(--accent) 13%, var(--paper)); }

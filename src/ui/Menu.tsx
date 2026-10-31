@@ -2,7 +2,19 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import { placeAt } from './zoom';
 
 export type MenuItem =
-  | { label: string; onPick: () => void; disabled?: boolean; danger?: boolean; hint?: string; checked?: boolean; icon?: ReactNode }
+  | {
+      label: string;
+      onPick: () => void;
+      disabled?: boolean;
+      danger?: boolean;
+      hint?: string;
+      checked?: boolean;
+      icon?: ReactNode;
+      /** The shortcut as a binding ("Mod-Shift-F"), for the Mac's own menu bar. */
+      binding?: string;
+      /** In the Mac's own menu bar, the system's item of this kind stands in for this one. */
+      native?: 'Undo' | 'Redo' | 'Cut' | 'Copy' | 'Paste' | 'SelectAll';
+    }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | { separator: true }
   | { heading: string };
@@ -16,6 +28,8 @@ interface Props {
   onClose: () => void;
   /** A submenu: it opens beside its item, and ← closes it. */
   nested?: { from: HTMLElement; onBack: () => void; restore: () => void };
+  /** In the top menu bar: ← and → go to the menu beside this one. */
+  onSide?: (dir: -1 | 1) => void;
 }
 
 /**
@@ -23,7 +37,7 @@ interface Props {
  * between items, → and ← open and close submenus, Escape or a click
  * elsewhere closes it, and choosing an item closes it before the item runs.
  */
-export function Menu({ items, x, y, label, onClose, nested }: Props) {
+export function Menu({ items, x, y, label, onClose, nested, onSide }: Props) {
   const box = useRef<HTMLUListElement>(null);
   const [at, setAt] = useState({ left: x, top: y });
   const [sub, setSub] = useState<{ index: number; from: HTMLElement; focus: boolean } | null>(null);
@@ -80,8 +94,15 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
       if (item && 'items' in item) {
         e.preventDefault();
         setSub({ index, from: document.activeElement as HTMLElement, focus: true });
+      } else if (onSide) {
+        e.preventDefault();
+        onSide(1);
       }
       return;
+    }
+    if (e.key === 'ArrowLeft' && onSide && !nested) {
+      e.preventDefault();
+      return onSide(-1);
     }
     if (e.key === 'ArrowLeft' && nested) {
       e.preventDefault();
@@ -102,6 +123,14 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
   /** Before an item runs, the keyboard goes back where it was (a submenu asks the menu it came from). */
   const restore = nested ? nested.restore : back;
   const subItem = sub ? items[sub.index] : undefined;
+  // When some items can be ticked, every label leaves room for the tick, so they all line up.
+  const ticks = items.some((item) => 'checked' in item && item.checked !== undefined);
+  const tick = (checked: boolean | undefined) =>
+    (ticks || checked !== undefined) && (
+      <span className="menu-check" aria-hidden="true">
+        {checked ? '✓' : ''}
+      </span>
+    );
   return (
     <ul className="menu" role="menu" aria-label={label} ref={box} style={at} onKeyDown={step} onContextMenu={(e) => e.preventDefault()}>
       {items.map((item, i) =>
@@ -127,7 +156,10 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
                 hover.current = window.setTimeout(() => setSub({ index: i, from: el, focus: false }), 150);
               }}
             >
-              <span>{item.label}</span>
+              <span>
+                {tick(undefined)}
+                {item.label}
+              </span>
               <span className="menu-hint" aria-hidden="true">
                 ›
               </span>
@@ -152,11 +184,7 @@ export function Menu({ items, x, y, label, onClose, nested }: Props) {
               }}
             >
               <span>
-                {item.checked !== undefined && (
-                  <span className="menu-check" aria-hidden="true">
-                    {item.checked ? '✓' : ''}
-                  </span>
-                )}
+                {tick(item.checked)}
                 {item.icon}
                 {item.label}
               </span>

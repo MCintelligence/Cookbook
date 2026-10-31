@@ -1,19 +1,28 @@
 #[cfg(desktop)]
 mod menu {
+    use tauri::App;
     #[cfg(target_os = "macos")]
-    use tauri::menu::PredefinedMenuItem;
-    use tauri::menu::{Menu, MenuItem, Submenu};
-    use tauri::{App, Emitter, Manager};
+    use tauri::{
+        menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
+        Emitter, Manager,
+    };
 
-    /// The app menu: Cookbook › Settings… on a Mac, Edit › Settings… elsewhere.
-    /// Picking it tells the page to open Settings, as ⌘, or Ctrl+, does.
+    /// The Mac's menu bar until the page puts its own File to Help menus there
+    /// (src/ui/nativeMenu.ts). On Windows and Linux there is no system menu bar:
+    /// the menus sit in the window, in the app's own colours.
+    /// Picking Settings… tells the page to open Settings, as ⌘, does.
+    #[cfg(not(target_os = "macos"))]
+    pub fn install(_app: &mut App) -> tauri::Result<()> {
+        Ok(())
+    }
+
+    #[cfg(target_os = "macos")]
     pub fn install(app: &mut App) -> tauri::Result<()> {
         let handle = app.handle();
-        let settings = MenuItem::with_id(handle, "settings", "Settings…", true, if cfg!(target_os = "macos") { Some("CmdOrCtrl+,") } else { None })?;
+        let settings = MenuItem::with_id(handle, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
         // Quitting closes the window first, so the page saves the last words typed before the app ends.
-        let quit = MenuItem::with_id(handle, "quit", if cfg!(target_os = "macos") { "Quit Cookbook" } else { "Quit" }, true, Some("CmdOrCtrl+Q"))?;
+        let quit = MenuItem::with_id(handle, "quit", "Quit Cookbook", true, Some("CmdOrCtrl+Q"))?;
 
-        #[cfg(target_os = "macos")]
         let menu = {
             let cookbook = Submenu::with_items(
                 handle,
@@ -60,13 +69,6 @@ mod menu {
                 ],
             )?;
             Menu::with_items(handle, &[&cookbook, &edit, &window])?
-        };
-
-        #[cfg(not(target_os = "macos"))]
-        let menu = {
-            let file = Submenu::with_items(handle, "File", true, &[&quit])?;
-            let edit = Submenu::with_items(handle, "Edit", true, &[&settings])?;
-            Menu::with_items(handle, &[&file, &edit])?
         };
 
         app.set_menu(menu)?;

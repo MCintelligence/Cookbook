@@ -313,6 +313,10 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* The brackets are full-width glyphs inked on one half; the other half is pulled in so they hug the words. */
 .cb-bracket-open { margin-left: -0.5em; }
 .cb-bracket-close { margin-right: -0.5em; }
+/* A seasoning whose Check is off marks nothing on the page; its issues are still counted on its meter. */
+.cb-off-spelling .cb-issue-spelling, .cb-off-grammar .cb-issue-grammar { text-decoration: none; background: none; cursor: text; }
+.cb-off-style .cb-issue-style { background: none; cursor: text; }
+.cb-off-style .cb-bracket { display: none; }
 .issue-card { --issue: var(--spelling); position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); }
 .card-details { flex-wrap: wrap; }
 .card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
@@ -860,21 +864,24 @@ button.seas-quote:hover { color: var(--accent); }
 .chip button { border: none; background: transparent; padding: 0; color: var(--faint); font-size: 11px; }
 .chip button:hover { color: var(--text); }
 .chip.chip-add { background: transparent; border: 1px dashed var(--line-strong); color: var(--accent); }
-.track-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.track-title { font-size: 13px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.track-share { flex: none; font-size: 12px; color: var(--muted); }
-.spice { display: grid; gap: 4px; margin: 4px 0 8px; }
-.spice-row { display: flex; justify-content: space-between; align-items: baseline; }
-.spice-level { font-weight: 700; font-size: 14px; color: var(--text); }
-.spice-grade { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.spice-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
-.spice-step { height: 8px; border-radius: 4px; background: var(--line); }
-.spice-step.is-on.spice-0 { background: #8bbf5a; }
-.spice-step.is-on.spice-1 { background: #e3b23c; }
-.spice-step.is-on.spice-2 { background: #e8792f; }
-.spice-step.is-on.spice-3 { background: #d6452b; }
-.spice-step.is-on.spice-4 { background: #9e1f1f; }
-.spice-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+.gauge { display: grid; gap: 4px; margin: 2px 0 8px; }
+.gauge-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.gauge-level { font-weight: 700; font-size: 14px; color: var(--text); }
+.gauge-detail { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; min-width: 0; }
+.gauge-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.gauge-step { height: 8px; border-radius: 4px; background: var(--line); }
+.gauge-step.is-on.gauge-0 { background: #8bbf5a; }
+.gauge-step.is-on.gauge-1 { background: #e3b23c; }
+.gauge-step.is-on.gauge-2 { background: #e8792f; }
+.gauge-step.is-on.gauge-3 { background: #d6452b; }
+.gauge-step.is-on.gauge-4 { background: #9e1f1f; }
+.gauge-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--faint); }
+/* A seasoning card: the remark, the meter, then its Check and Report. */
+.sc-remark { margin: 2px 0 8px; background: var(--bg); border-radius: 10px; padding: 6px 10px; font-size: 13px; line-height: 1.42; font-style: italic; }
+.sc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sc-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.sc-report { height: 24px; font-size: 12px; }
+.sc-report:disabled { color: var(--faint); cursor: default; }
 .meter { height: 4px; margin: 5px 0 8px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .meter span { display: block; height: 100%; background: var(--accent); }
 

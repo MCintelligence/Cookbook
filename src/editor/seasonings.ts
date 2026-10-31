@@ -7,8 +7,8 @@ import { dialogueRanges } from './dialogue';
 import { textMap, toRange } from './textmap';
 
 /**
- * The review tools that live under Seasonings: notes to self, footnotes and
- * dialogue focus. A note's anchor is a mark in the text and its words live
+ * The review tools that live under Seasonings: notes to self, footnotes,
+ * dialogue focus (Drunk Daniel's Check) and the other seasonings' Checks. A note's anchor is a mark in the text and its words live
  * in the scene's front matter; a footnote is a small inline node that holds
  * its own text.
  */
@@ -236,4 +236,49 @@ export function isDialogueFocus(state: EditorState): boolean {
 
 export function setDialogueFocus(editor: Editor, on: boolean): void {
   editor.view.dispatch(editor.state.tr.setMeta(dialogueKey, on));
+}
+
+// ---------- checks ----------
+
+/**
+ * Each seasoning's Check: with it off, its underlines leave the page but its
+ * meter keeps reading. Only a class on the page changes, so nothing is
+ * checked again and the issues stay counted. Holds issue kinds (spelling,
+ * grammar, style).
+ */
+export const checksKey = new PluginKey<ReadonlySet<string>>('seasoningChecks');
+const ALL_ON: ReadonlySet<string> = new Set();
+
+export const SeasoningChecks = Extension.create({
+  name: 'seasoningChecks',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin<ReadonlySet<string>>({
+        key: checksKey,
+        state: {
+          init: () => ALL_ON,
+          apply: (tr, off) => (tr.getMeta(checksKey) as ReadonlySet<string> | undefined) ?? off,
+        },
+        props: {
+          attributes(state): Record<string, string> {
+            const off = checksKey.getState(state) ?? ALL_ON;
+            return off.size > 0 ? { class: [...off].map((k) => `cb-off-${k}`).join(' ') } : {};
+          },
+        },
+      }),
+    ];
+  },
+});
+
+/** The issue kinds whose Check is off. */
+export function checkedOff(state: EditorState): ReadonlySet<string> {
+  return checksKey.getState(state) ?? ALL_ON;
+}
+
+/** Turns off the Checks for these issue kinds and on for the rest; does nothing when that is already so. */
+export function setChecksOff(editor: Editor, kinds: Iterable<string>): void {
+  const next = new Set(kinds);
+  const now = checkedOff(editor.state);
+  if (next.size === now.size && [...next].every((k) => now.has(k))) return;
+  editor.view.dispatch(editor.state.tr.setMeta(checksKey, next).setMeta('addToHistory', false));
 }

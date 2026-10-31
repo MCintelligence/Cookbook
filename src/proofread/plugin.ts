@@ -8,6 +8,7 @@ import { type Hiding, type IssueKeys, isHidden, keysOf } from './rules';
 import { isSentenceRule } from './style';
 import { type Checker } from './client';
 import { type Around } from './context';
+import { checkedOff } from '../editor/seasonings';
 
 /**
  * The proofreader in the editor. Each paragraph's text is checked in the
@@ -310,8 +311,10 @@ const issueLists = new WeakMap<DecorationSet, FoundIssue[]>();
  * to, and the word being typed isn't counted. Worked out only when the key is pressed.
  */
 export function stepIssue(state: EditorState, dir: 1 | -1): FoundIssue | null {
+  // A seasoning whose Check is off shows nothing on the page, so there is nothing of its to step to.
+  const off = checkedOff(state);
   const list = drawnSet(state)
-    .find(undefined, undefined, (spec) => isIssue(spec) && !isSentenceRule((spec as { issue: Issue }).issue.rule))
+    .find(undefined, undefined, (spec) => isIssue(spec) && !isSentenceRule((spec as { issue: Issue }).issue.rule) && !off.has((spec as { issue: Issue }).issue.kind))
     .map(found)
     .sort((a, b) => a.from - b.from || a.to - b.to);
   if (list.length === 0) return null;
@@ -325,8 +328,9 @@ export function stepIssue(state: EditorState, dir: 1 | -1): FoundIssue | null {
 /** The issue under a document position, for the card that opens when an underline is clicked. */
 export function issueAt(state: EditorState, pos: number): FoundIssue | null {
   const ps = proofreadKey.getState(state);
-  // The narrowest one: a word's issue, not the sentence around it.
-  const here = (ps?.set.find(pos, pos, isIssue) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
+  const off = checkedOff(state);
+  // The narrowest one: a word's issue, not the sentence around it; none whose Check is off.
+  const here = (ps?.set.find(pos, pos, (spec) => isIssue(spec) && !off.has((spec as { issue: Issue }).issue.kind)) ?? []).sort((a, b) => Number(a.from > pos || a.to <= pos) - Number(b.from > pos || b.to <= pos) || a.to - a.from - (b.to - b.from));
   const d = here[0];
   return d ? found(d) : null;
 }

@@ -20,7 +20,7 @@ import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
 import { Brainstorm } from './brainstorm';
-import { DialogueFocus, Footnote, Note, type SeasoningsRequest, insertFootnote } from './seasonings';
+import { DialogueFocus, Footnote, Note, SeasoningChecks, type SeasoningsRequest, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
 export type NextStyle = (style: string) => string;
@@ -560,6 +560,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Gapcursor,
     FindExtension,
     DialogueFocus,
+    SeasoningChecks,
     FocusMode,
     LinkedNames,
     Proofread,

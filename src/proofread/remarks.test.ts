@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Issue } from './check';
-import { SPICE, fixText, ownerOf, remark, rulesOff, spiceOf, talkRemark } from './remarks';
+import { METERS, SPICE, fixText, meterRemark, ownerOf, perThousand, remark, rulesOff, spiceOf, tasteOf } from './remarks';
 import { strayCapitals, unclosedQuote } from './style';
 
 const issue = (kind: Issue['kind'], rule: string, message = ''): Issue => ({ from: 0, to: 1, kind, rule, message, suggestions: [] });
@@ -40,9 +40,23 @@ describe('seasonings', () => {
     expect([2, 4, 5, 7, 8, 9, 10, 12, 13, 20].map((g) => SPICE[spiceOf(g)]!.level)).toEqual(['Mild', 'Mild', 'Medium', 'Medium', 'Hot', 'Hot', 'Extra hot', 'Extra hot', 'Inferno', 'Inferno']);
   });
 
-  it('remarks on talk', () => {
-    expect(talkRemark(0)).toMatch(/Not a word/);
-    expect(talkRemark(80)).toMatch(/All talk/);
+  it('gives each seasoning five steps and a remark for each', () => {
+    for (const meter of Object.values(METERS)) {
+      expect(meter.steps).toHaveLength(5);
+      expect(meter.steps[4]!.upTo).toBe(Infinity);
+    }
+    expect(meterRemark('daniel', tasteOf(METERS.daniel.steps, 79))).toBe('Drunk! All talk! Now that’s a party.');
+    expect(meterRemark('daniel', tasteOf(METERS.daniel.steps, 0))).toMatch(/^Sober!/);
+    expect(meterRemark('sally', spiceOf(9))).toBe('Hot! A few long sentences are burning.');
+    expect(meterRemark('pete', tasteOf(METERS.pete.steps, 0))).toMatch(/^Plain!/);
+    expect(meterRemark('sam', tasteOf(METERS.sam.steps, 80))).toMatch(/^Seawater!/);
+    // The mockup's 23 per 1,000 words is in the middle of Pete's meter.
+    expect(meterRemark('pete', tasteOf(METERS.pete.steps, 23))).toMatch(/^Peppery!/);
+  });
+
+  it('judges slips per 1,000 words', () => {
+    expect(perThousand(2, 87)).toBe(23);
+    expect(perThousand(3, 0)).toBe(0);
   });
 
   it('describes fixes that remove or space things', () => {

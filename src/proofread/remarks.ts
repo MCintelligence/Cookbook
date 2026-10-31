@@ -96,6 +96,13 @@ export function remark(issue: Issue, word: string): string {
   return `${SALLY[issue.rule] ?? SALLY['harper-style']!} ${issue.message}`;
 }
 
+/** One step on a seasoning's meter, up to a reading, and what the seasoning says there. */
+export interface Taste {
+  level: string;
+  upTo: number;
+  says: string;
+}
+
 /**
  * How hard the page is to read, as heat. The grade is the Automated
  * Readability Index. Most published fiction lands between grades 5 and 9,
@@ -104,26 +111,107 @@ export function remark(issue: Issue, word: string): string {
  * honey (6 and under) is Mild to Medium, smooth (7 to 9) is Medium to Hot,
  * chewy (10 and up) is Hot to Inferno.
  */
-export const SPICE: { level: string; upTo: number }[] = [
-  { level: 'Mild', upTo: 4 },
-  { level: 'Medium', upTo: 7 },
-  { level: 'Hot', upTo: 9 },
-  { level: 'Extra hot', upTo: 12 },
-  { level: 'Inferno', upTo: Infinity },
+export const SPICE: Taste[] = [
+  { level: 'Mild', upTo: 4, says: 'Easy going down. Not a drop of sweat.' },
+  { level: 'Medium', upTo: 7, says: 'Just the right kick, hon.' },
+  { level: 'Hot', upTo: 9, says: 'A few long sentences are burning.' },
+  { level: 'Extra hot', upTo: 12, says: 'Break a few sentences up before they boil over.' },
+  { level: 'Inferno', upTo: Infinity, says: 'My tongue’s on fire! Shorter sentences, quick.' },
 ];
 
 export function spiceOf(grade: number): number {
-  return SPICE.findIndex((s) => grade <= s.upTo);
+  return tasteOf(SPICE, grade);
 }
 
-/** Daniel on how much of a page or book is spoken. */
-export function talkRemark(share: number): string {
-  if (share === 0) return 'Not a word out loud. Shhh… hic.';
-  if (share < 20) return 'Shhh. Everyone’s thinking, nobody’s talking.';
-  if (share < 45) return 'A nice mix of talk and walk. Cheers!';
-  if (share < 70) return 'Chatty one! Mostly talk… hic. Lovely.';
-  return 'All talk! Now that’s a party.';
+/** Where a reading falls on a meter, as an index into its steps. */
+export function tasteOf(steps: readonly Taste[], value: number): number {
+  const at = steps.findIndex((s) => value <= s.upTo);
+  return at === -1 ? steps.length - 1 : at;
 }
+
+/**
+ * Each seasoning's meter: the names of its Check and Report, the words at
+ * either end, its five steps, and what it says before there is enough page to
+ * read. Sam and Pete read slips per 1,000 words, so a long Item and a short
+ * one are judged alike (a slip every 100 words is 10 per 1,000); Daniel reads the share of words spoken; Sally reads
+ * the grade level.
+ */
+export interface Meter {
+  /** The meter's own word for what it measures, for screen readers. */
+  measure: string;
+  check: string;
+  report: string;
+  ends: [string, string];
+  steps: Taste[];
+  waiting: string;
+}
+
+export const METERS: Record<SeasoningId, Meter> = {
+  sam: {
+    measure: 'Saltiness',
+    check: 'Salt Check',
+    report: 'Salt Report',
+    ends: ['Unsalted', 'Seawater'],
+    steps: [
+      { level: 'Unsalted', upTo: 0, says: 'Not a grain out of place.' },
+      { level: 'A pinch', upTo: 10, says: 'A slip or two. Brush them off.' },
+      { level: 'Salty', upTo: 25, says: 'A few words need a second look.' },
+      { level: 'Briny', upTo: 50, says: 'The spelling’s getting choppy out here.' },
+      { level: 'Seawater', upTo: Infinity, says: 'Man overboard! Too many words spelt wrong.' },
+    ],
+    waiting: 'Write a few lines and I’ll taste them for salt.',
+  },
+  pete: {
+    measure: 'Pepperiness',
+    check: 'Pepper Check',
+    report: 'Pepper Report',
+    ends: ['Plain', 'Smoking'],
+    steps: [
+      { level: 'Plain', upTo: 0, says: 'Clean grammar. Nothing to grind.' },
+      { level: 'Peppered', upTo: 10, says: 'A slip here and there. Easy fixes.' },
+      { level: 'Peppery', upTo: 25, says: 'A few sentences need tidying.' },
+      { level: 'Fiery', upTo: 50, says: 'The grammar’s starting to sting.' },
+      { level: 'Smoking', upTo: Infinity, says: 'Too many slips! Fix a few before the alarm goes off.' },
+    ],
+    waiting: 'Nothing to grind yet. Write a sentence or two.',
+  },
+  daniel: {
+    measure: 'Drunkenness',
+    check: 'Drunk Check',
+    report: 'Drunk Report',
+    ends: ['Sober', 'Drunk'],
+    steps: [
+      { level: 'Sober', upTo: 10, says: 'Barely a word out loud. Shhh… hic.' },
+      { level: 'Sipping', upTo: 30, says: 'Mostly walk, a little talk.' },
+      { level: 'Tipsy', upTo: 50, says: 'A nice mix of talk and walk. Cheers!' },
+      { level: 'Merry', upTo: 70, says: 'Chatty one! Mostly talk… hic. Lovely.' },
+      { level: 'Drunk', upTo: Infinity, says: 'All talk! Now that’s a party.' },
+    ],
+    waiting: 'Nobody’s said a thing yet. Pour me a line.',
+  },
+  sally: {
+    measure: 'Spice',
+    check: 'Spice Check',
+    report: 'Spice Report',
+    ends: ['Mild', 'Inferno'],
+    steps: SPICE,
+    waiting: 'A paragraph or two and I’ll tell you how hot it runs.',
+  },
+};
+
+/** What a seasoning says about its meter: the level first, then the line. */
+export function meterRemark(id: SeasoningId, at: number): string {
+  const step = METERS[id].steps[at]!;
+  return `${step.level}! ${step.says}`;
+}
+
+/** Slips per 1,000 words, so a long Item and a short one are judged alike. */
+export function perThousand(slips: number, words: number): number {
+  return words > 0 ? Math.round((slips * 1000) / words) : 0;
+}
+
+/** The issue kind each seasoning underlines on the page. Daniel underlines nothing; his Check dims narration. */
+export const KIND_OF: Partial<Record<SeasoningId, 'spelling' | 'grammar' | 'style'>> = { sam: 'spelling', pete: 'grammar', sally: 'style' };
 
 /** How a fix reads beside its button. */
 export function fixText(problem: string, fix: string): string {

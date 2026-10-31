@@ -1,39 +1,22 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
-import { type FoundIssue, applySuggestion, bracketsFor, issuesOf, selectIssue } from '../proofread/plugin';
-import { SEASONINGS, SPICE, type SeasoningId, fixText, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
+import { checkedOff, isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
+import { type FoundIssue, issuesOf } from '../proofread/plugin';
+import { KIND_OF, METERS, SEASONINGS, type SeasoningId, meterRemark, ownerOf, perThousand, spiceOf, tasteOf } from '../proofread/remarks';
 import { readingGrade } from '../proofread/style';
-import { docReading } from '../editor/docStats';
-import { type Proofreader } from '../proofread/useProofreader';
+import { docReading, docTalk, docWords } from '../editor/docStats';
 import { Face } from './Faces';
-import { useSuggestions } from './IssueCard';
 import { type MenuItem } from './Menu';
 import { BAR_ICONS, PanelBar } from './PanelBar';
 
-/** A page or book Daniel keeps an eye on, with how much of it is spoken once counted. */
-export interface Tracked {
-  path: string;
-  title: string;
-  /** Percent of its words inside quotes, or null while it is being counted. */
-  share: number | null;
-}
-
 interface Props {
   editor: Editor | null;
-  proof: Proofreader;
   chosen: SeasoningId[];
   onChosen: (chosen: SeasoningId[]) => void;
-  tracked: Tracked[];
-  /** Opens the list of pages and books Daniel could track, at the pointer. */
-  onTrack: (x: number, y: number) => void;
-  onUntrack: (path: string) => void;
-  /** Remarks removed for good, and a way to remove one. */
-  gone: string[];
-  onGone: (key: string) => void;
+  /** Seasonings whose Check is off: their meter still reads, but nothing of theirs is marked on the page. */
+  unchecked: SeasoningId[];
+  onUnchecked: (unchecked: SeasoningId[]) => void;
   onClose: () => void;
-  /** A right-click on an issue. */
-  onIssueMenu?: (issue: FoundIssue, x: number, y: number) => void;
   /** Every seasoning switched off for now, and a way to switch them back on. */
   paused: boolean;
   onPaused: (paused: boolean) => void;
@@ -45,7 +28,7 @@ interface Props {
 const MIN_GRADE_WORDS = 50;
 const LONG_PRESS_MS = 400;
 
-export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, onUntrack, gone, onGone, onClose, onIssueMenu, paused, onPaused, onMenu }: Props) {
+export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onClose, paused, onPaused, onMenu }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -68,9 +51,30 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   // Seasonings picked for the toolbar and menu, by clicking their heads.
   const [marked, setMarked] = useState<SeasoningId[]>([]);
   const picked = marked.filter((id) => chosen.includes(id));
+  // Every count here is kept per paragraph or per set of underlines (see docStats and issuesOf), so a
+  // cursor move costs nothing and a keystroke recounts one paragraph. Only numbers come out, so the
+  // panel only draws again when one of them changes.
   const page = useEditorState({
     editor,
-    selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: readingGrade(docReading(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
+    selector: ({ editor }) => {
+      if (!editor) return null;
+      const { state } = editor;
+      const slips = slipsOf(issuesOf(state));
+      const grade = readingGrade(docReading(state.doc));
+      const talk = docTalk(state.doc);
+      return {
+        words: docWords(state.doc),
+        sam: slips.sam,
+        pete: slips.pete,
+        sally: slips.sally,
+        grade: grade.grade,
+        gradeWords: grade.words,
+        talkWords: talk.words,
+        spoken: talk.spoken,
+        dim: isDialogueFocus(state),
+        off: [...checkedOff(state)].sort().join(' '),
+      };
+    },
   });
   if (!editor || !page) return null;
 
@@ -98,8 +102,8 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   };
   const turn = { label: paused ? 'Turn seasonings on' : 'Turn seasonings off', onPick: () => onPaused(!paused) };
   const cardMenu = (e: React.MouseEvent, id: SeasoningId, at: number) => {
-    // Issues and Daniel's chips have menus and buttons of their own.
-    if ((e.target as HTMLElement).closest('.say, .chips, .switch-row')) return;
+    // The Check and Report have buttons of their own.
+    if ((e.target as HTMLElement).closest('.sc-foot')) return;
     e.preventDefault();
     const who = SEASONINGS.find((s) => s.id === id)!;
     const several = picked.includes(id) && picked.length > 1;
@@ -204,7 +208,29 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   const from = drag ? chosen.indexOf(drag.id) : -1;
   const dropAt = drag?.index != null && drag.index !== from && drag.index !== from + 1 ? drag.index : null;
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
-  const mine = (id: SeasoningId) => page.issues.filter((i) => ownerOf(i.issue) === id);
+  const off = page.off ? page.off.split(' ') : [];
+  /** Whether a seasoning's Check is on: Daniel's dims the narration, the others' show their underlines. */
+  const checking = (id: SeasoningId) => (id === 'daniel' ? page.dim : !off.includes(KIND_OF[id]!));
+  const setChecking = (id: SeasoningId, on: boolean) => {
+    if (id === 'daniel') return setDialogueFocus(editor, on);
+    onUnchecked(on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])]);
+  };
+  /** Where each seasoning's meter stands, and what it shows beside its level; null while there's too little page to read. */
+  const reading = (id: SeasoningId): { at: number; detail: string } | null => {
+    if (id === 'daniel') {
+      if (page.talkWords === 0) return null;
+      const share = Math.round((page.spoken / page.talkWords) * 100);
+      return { at: tasteOf(METERS.daniel.steps, share), detail: `${share}% dialogue · ${100 - share}% narration` };
+    }
+    if (id === 'sally') {
+      if (page.gradeWords < MIN_GRADE_WORDS) return null;
+      return { at: spiceOf(page.grade), detail: `Grade ${page.grade} · ${plural(page.sally, 'style note')}` };
+    }
+    if (page.words === 0) return null;
+    const slips = page[id];
+    const per = perThousand(slips, page.words);
+    return { at: tasteOf(METERS[id].steps, per), detail: `${plural(slips, id === 'sam' ? 'spelling slip' : 'grammar slip')} · ${per} per 1,000 words` };
+  };
 
   return (
     <aside
@@ -250,8 +276,8 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
         <div className={`panel-list${drag ? ' is-sorting' : ''}${dropAt === chosen.length ? ' drop-end' : ''}`} ref={list}>
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
-            const issues = mine(id);
-            const count = id === 'daniel' ? tracked.length : issues.length;
+            const meter = METERS[id];
+            const read = reading(id);
             const cls = ['sc', drag?.id === id && 'is-dragging', dropAt === at && 'drop-before', picked.includes(id) && 'is-marked'].filter(Boolean).join(' ');
             return (
               <section
@@ -272,7 +298,6 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
                 <div className="sc-head" title="Click to pick, drag to reorder" onPointerDown={(e) => begin(e, id)} onClick={(e) => pick(e, id)}>
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>
-                  {count > 0 && <span className="count">{count}</span>}
                   <span className="handles">
                     <Handle label="Move to top" disabled={at === 0} onClick={() => move(id, 'top')} d="M5 4h14M12 20V9M7 13l5-5 5 5" />
                     <Handle label="Move up" disabled={at === 0} onClick={() => move(id, 'up')} d="M12 19V6M6 11l6-6 6 6" />
@@ -282,48 +307,18 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
                   </span>
                 </div>
 
-                {id === 'daniel' && (
-                  <>
-                    <label className="switch-row">
-                      <span>Dim narration</span>
-                      <input type="checkbox" role="switch" className="switch" checked={page.dim} onChange={(e) => setDialogueFocus(editor, e.target.checked)} />
-                    </label>
-                    <div className="chips">
-                      {tracked.map((t) => (
-                        <span className="chip" key={t.path}>
-                          {t.title}
-                          <button aria-label={`Stop tracking ${t.title}`} onClick={() => onUntrack(t.path)}>
-                            ✕
-                          </button>
-                        </span>
-                      ))}
-                      <button className="chip chip-add" onClick={(e) => onTrack(e.clientX, e.clientY)}>
-                        + Track
-                      </button>
-                    </div>
-                    {tracked.map((t) => {
-                      const said = t.share === null ? null : talkRemark(t.share);
-                      const key = `daniel:${t.path}:${said}`;
-                      return (
-                        <div className="say" key={t.path}>
-                          <div className="track-row">
-                            <span className="track-title">{t.title}</span>
-                            <span className="track-share">{t.share === null ? 'Counting…' : `${t.share}% spoken`}</span>
-                          </div>
-                          <div className="meter" aria-hidden="true">
-                            <span style={{ width: `${t.share ?? 0}%` }} />
-                          </div>
-                          {said && !gone.includes(key) && <Bubble id="daniel" text={said} onRemove={() => onGone(key)} />}
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-
-                {id === 'sally' && page.grade.words >= MIN_GRADE_WORDS && <SpiceMeter grade={page.grade.grade} />}
-                {issues.map((i) => (
-                  <Say key={`${i.from}:${i.issue.rule}:${i.word}`} editor={editor} issue={i} proof={proof} onMenu={onIssueMenu} />
-                ))}
+                <Remark text={read ? meterRemark(id, read.at) : meter.waiting} />
+                <Gauge id={id} reading={read} />
+                <div className="sc-foot">
+                  <label className="sc-check">
+                    <input type="checkbox" role="switch" className="switch" checked={checking(id)} onChange={(e) => setChecking(id, e.target.checked)} />
+                    <span>{meter.check}</span>
+                  </label>
+                  {/* Each report is designed for its seasoning and comes in a later step. */}
+                  <button className="btn sc-report" disabled title="Coming soon">
+                    {meter.report}
+                  </button>
+                </div>
               </section>
             );
           })}
@@ -343,23 +338,46 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   );
 }
 
-/** How hot the page reads, from Mild to Inferno. */
-function SpiceMeter({ grade }: { grade: number }) {
-  const at = spiceOf(grade);
+/** Issues on the page by the seasoning they belong to, worked out once per set of underlines. */
+const slipCounts = new WeakMap<FoundIssue[], Record<SeasoningId, number>>();
+function slipsOf(issues: FoundIssue[]): Record<SeasoningId, number> {
+  let counts = slipCounts.get(issues);
+  if (!counts) {
+    counts = { sam: 0, pete: 0, daniel: 0, sally: 0 };
+    for (const i of issues) counts[ownerOf(i.issue)]++;
+    slipCounts.set(issues, counts);
+  }
+  return counts;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** A seasoning's meter: its level and what it read, five steps from one end to the other. */
+function Gauge({ id, reading }: { id: SeasoningId; reading: { at: number; detail: string } | null }) {
+  const { measure, steps, ends } = METERS[id];
+  const at = reading?.at ?? -1;
   return (
-    <div className="spice" role="meter" aria-label="Spice" aria-valuemin={0} aria-valuemax={SPICE.length - 1} aria-valuenow={at} aria-valuetext={`${SPICE[at]!.level}, grade ${grade}`}>
-      <div className="spice-row">
-        <span className="spice-level">{SPICE[at]!.level}</span>
-        <span className="spice-grade">Grade {grade}</span>
+    <div
+      className="gauge"
+      role="meter"
+      aria-label={measure}
+      aria-valuemin={0}
+      aria-valuemax={steps.length - 1}
+      aria-valuenow={Math.max(at, 0)}
+      aria-valuetext={reading ? `${steps[at]!.level}, ${reading.detail}` : 'Not enough to read yet'}
+    >
+      <div className="gauge-row">
+        <span className="gauge-level">{reading ? steps[at]!.level : '—'}</span>
+        {reading && <span className="gauge-detail">{reading.detail}</span>}
       </div>
-      <div className="spice-bar" aria-hidden="true">
-        {SPICE.map((s, i) => (
-          <span key={s.level} className={`spice-step spice-${i}${i <= at ? ' is-on' : ''}`} />
+      <div className="gauge-bar" aria-hidden="true">
+        {steps.map((s, i) => (
+          <span key={s.level} className={`gauge-step gauge-${i}${i <= at ? ' is-on' : ''}`} />
         ))}
       </div>
-      <div className="spice-ends" aria-hidden="true">
-        <span>Mild</span>
-        <span>Inferno</span>
+      <div className="gauge-ends" aria-hidden="true">
+        <span>{ends[0]}</span>
+        <span>{ends[1]}</span>
       </div>
     </div>
   );
@@ -375,74 +393,11 @@ function Handle({ label, d, disabled = false, className, onClick }: { label: str
   );
 }
 
-function Bubble({ id, text, onRemove }: { id: SeasoningId; text: string; onRemove: () => void }) {
+/** The one thing a seasoning says, about where its meter stands. */
+function Remark({ text }: { text: string }) {
   return (
-    <div className="bubble-row">
-      <Face id={id} size={22} />
-      <div className="bubble">{text}</div>
-      <button className="remove" aria-label="Remove for good" title="Remove for good" onClick={onRemove}>
-        ✕
-      </button>
-    </div>
-  );
-}
-
-/** One issue: the character's remark, the words around it, and the same two buttons every time. */
-function Say({ editor, issue, proof, onMenu }: { editor: Editor; issue: FoundIssue; proof: Proofreader; onMenu?: (issue: FoundIssue, x: number, y: number) => void }) {
-  const suggestions = useSuggestions(editor, issue, proof);
-  const fix = suggestions?.[0];
-  const sentence = issue.word.length > 40;
-  return (
-    <div
-      className="say"
-      onContextMenu={(e) => {
-        if (!onMenu) return;
-        e.preventDefault();
-        onMenu(issue, e.clientX, e.clientY);
-      }}
-    >
-      <Bubble id={ownerOf(issue.issue)} text={remark(issue.issue, issue.word)} onRemove={() => proof.ignore(issue, 'once')} />
-      {sentence ? (
-        <div className="ctx">
-          <span className={`mark-${issue.issue.kind}`}>{issue.word.length > LONG ? `${issue.word.slice(0, LONG).replace(/\s\S*$/, '')}…` : issue.word}</span>
-        </div>
-      ) : (
-        <Context editor={editor} issue={issue} />
-      )}
-      <div className="fix">
-        <span className="sug">{fix !== undefined && <>→ <strong>{fixText(issue.word, fix)}</strong></>}</span>
-        <button className="btn btn-primary" disabled={fix === undefined} onClick={() => fix !== undefined && applySuggestion(editor, issue, fix)}>
-          Fix
-        </button>
-        <button className="btn" onClick={() => selectIssue(editor, issue)}>
-          Show
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const AROUND = 32;
-/** How much of a long sentence its remark quotes. */
-const LONG = 90;
-
-/** A few words either side of the issue, from its own paragraph. */
-function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
-  const { doc } = editor.state;
-  if (issue.to > doc.content.size) return null;
-  const $from = doc.resolve(issue.from);
-  const start = Math.max($from.start(), issue.from - AROUND);
-  const end = Math.min($from.end(), issue.to + AROUND);
-  // Cut at a space, so no word is shown in half.
-  let before = doc.textBetween(start, issue.from, ' ', ' ');
-  if (start > $from.start()) before = `…${before.replace(/^\S*\s/, '')}`;
-  let after = doc.textBetween(issue.to, end, ' ', ' ');
-  if (end < $from.end()) after = `${after.replace(/\s\S*$/, '')}…`;
-  return (
-    <div className="ctx">
-      {before}
-      <span className={`mark-${issue.issue.kind}${issue.issue.kind === 'style' && bracketsFor(issue.word)[0] === '『' ? ' mark-word' : ''}`}>{issue.word}</span>
-      {after}
+    <div className="sc-remark" aria-live="polite">
+      {text}
     </div>
   );
 }

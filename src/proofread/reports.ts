@@ -5,8 +5,8 @@ import { type TextMap, textMap, toRange } from '../editor/textmap';
 import { countWords } from '../storage/index';
 import { words } from './check';
 import { type FoundIssue } from './plugin';
-import { METERS, type SeasoningId, SEASONINGS, perThousand, remark, tasteOf } from './remarks';
-import { NOT_ADVERBS } from './style';
+import { METERS, type SeasoningId, SEASONINGS, perThousand, remark, spiceOf, tasteOf } from './remarks';
+import { GLUE, NOT_ADVERBS, STYLE_RULES, readingGrade, sentences } from './style';
 
 /**
  * The Seasonings reports: a fuller look at the open Item than the meters
@@ -395,8 +395,124 @@ export function drunkReport({ doc, names }: ReportInput): Report {
   };
 }
 
+// ---------- Spicy Sally: style ----------
+
+const LENGTHS: { label: string; upTo: number }[] = [
+  { label: '1–5', upTo: 5 },
+  { label: '6–10', upTo: 10 },
+  { label: '11–15', upTo: 15 },
+  { label: '16–20', upTo: 20 },
+  { label: '21–30', upTo: 30 },
+  { label: '31+', upTo: Infinity },
+];
+/** A sentence this long is worth a look whatever the grade. */
+const LONG_SENTENCE = 30;
+const STYLE_LABEL: Record<string, string> = Object.fromEntries(STYLE_RULES.map((r) => [r.id, r.label]));
+/** Sally's line on each kind of note, for the actions. */
+const SALLY_ON: Record<string, (n: number) => string> = {
+  adverb: (n) => `${plural(n, 'adverb')}. Swap a few for stronger verbs and feel the heat.`,
+  'crutch-word': (n) => `${plural(n, 'crutch word')}. Pull them out and see if the sentence still stands.`,
+  passive: (n) => `${plural(n, 'passive sentence')}. Tell me who’s doing the doing.`,
+  'sticky-sentence': (n) => `${plural(n, 'sticky sentence')}. Too much glue, hon. Trim the little words.`,
+  echo: (n) => `${plural(n, 'echo', 'echoes')}. Same spice twice. Swap one of each pair.`,
+  cliche: (n) => `${plural(n, 'cliché')}. Stale seasoning. Say it your own way.`,
+  'simpler-word': (n) => `${plural(n, 'fancy word')}. Cool it down with something plainer.`,
+  redundancy: (n) => `${plural(n, 'double helping')}. Say it once.`,
+};
+
+export function spiceReport({ doc, issues, names }: ReportInput): Report {
+  const paras = parasOf(doc);
+  const all: { words: number; p: number; from: number; to: number }[] = [];
+  let letters = 0;
+  let wordTotal = 0;
+  // Where each word is, as paragraph and offsets; turned into page positions only for the words listed.
+  const counts = new Map<string, { n: number; at: number[]; shown: string }>();
+  const nameWords = new Set([...(names?.byName.keys() ?? [])].flatMap((n) => n.toLowerCase().split(/\s+/)));
+  paras.forEach((p, pi) => {
+    for (const s of sentences(p.text)) {
+      letters += s.letters;
+      wordTotal += s.words;
+      all.push({ words: s.words, p: pi, from: s.from, to: s.to });
+    }
+    for (const w of words(p.text)) {
+      const lower = w.word.toLowerCase().replace(/’/g, "'");
+      if (lower.length < 4 || GLUE.has(lower) || nameWords.has(lower) || !/^\p{L}/u.test(lower)) continue;
+      const known = counts.get(lower);
+      if (known) {
+        known.n++;
+        known.at.push(pi, w.from, w.to);
+      } else counts.set(lower, { n: 1, at: [pi, w.from, w.to], shown: w.word.toLowerCase() });
+    }
+  });
+  const spotsOf = (at: number[]): Spot[] => {
+    const out: Spot[] = [];
+    for (let i = 0; i < at.length; i += 3) out.push(spotIn(paras[at[i]!]!, at[i + 1]!, at[i + 2]!));
+    return out;
+  };
+  const grade = readingGrade({ letters, words: wordTotal, sentences: all.length });
+  const reading = grade.words >= 50 ? { at: spiceOf(grade.grade), detail: `Grade ${grade.grade}` } : null;
+  const notes = issues.filter((i) => i.issue.kind === 'style');
+  const byRule = grouped(notes, (i) => i.issue.rule);
+  const average = all.length > 0 ? Math.round(wordTotal / all.length) : 0;
+  const buckets = LENGTHS.map((b, i) => ({ label: `${b.label} words`, value: all.filter((s) => s.words <= b.upTo && (i === 0 || s.words > LENGTHS[i - 1]!.upTo)).length }));
+  const commonest = Math.max(0, ...buckets.map((b) => b.value));
+  const long = all.filter((s) => s.words >= LONG_SENTENCE).sort((a, b) => b.words - a.words).map((s) => ({ words: s.words, spot: spotIn(paras[s.p]!, s.from, s.to), text: paras[s.p]!.text.slice(s.from, s.to) }));
+  // Words used more than a writer might notice: three times or more, and at least 5 per 1,000.
+  const overused = [...counts.values()].filter((c) => c.n >= 3 && perThousand(c.n, wordTotal) >= 5).sort((a, b) => b.n - a.n).slice(0, 10);
+
+  const actions: string[] = [];
+  if (long[0]) actions.push(`Chop the sentence starting “${opening(long[0].text)}” in two. ${long[0].words} words is a mouthful, hon.`);
+  if (all.length >= 8 && commonest / all.length >= 0.6) actions.push('Your sentences all taste the same length. Mix a short one in with the long ones.');
+  if (byRule[0]) actions.push(SALLY_ON[byRule[0][0]]?.(byRule[0][1].length) ?? `${plural(byRule[0][1].length, 'note')} on word choice. Have a look.`);
+  if (overused[0] && actions.length < 3) actions.push(`“${overused[0].shown}” turns up ${overused[0].n} times. Find it a friend.`);
+  if (actions.length === 0 && grade.words > 0) actions.push('Just the right kick. Nothing burning. Serve it up.');
+
+  return {
+    id: 'sally',
+    title: METERS.sally.report,
+    reading,
+    verdict: verdictOf('sally', reading),
+    stats: [
+      { label: 'Grade', value: grade.words > 0 ? String(grade.grade) : '—' },
+      { label: 'Average sentence', value: plural(average, 'word') },
+      { label: 'Sentences', value: all.length.toLocaleString('en') },
+      { label: 'Style notes', value: notes.length.toLocaleString('en') },
+    ],
+    actions: actions.slice(0, 3),
+    sections: [
+      {
+        kind: 'bars',
+        title: 'Sentence lengths',
+        note: 'Good writing mixes them. A tall bar with nothing beside it means every sentence tastes the same.',
+        bars: all.length > 0 ? buckets : [],
+        empty: 'No sentences yet.',
+      },
+      {
+        kind: 'rows',
+        title: 'Longest sentences',
+        note: `Sentences of ${LONG_SENTENCE} words or more.`,
+        rows: long.slice(0, 5).map((s) => ({ label: opening(s.text, 10), detail: plural(s.words, 'word'), spots: [s.spot] })),
+        empty: 'None over the limit. Nicely trimmed.',
+      },
+      ...byRule.map(([rule, list]): Section => ({
+        kind: 'rows',
+        title: STYLE_LABEL[rule] ?? 'Word choice',
+        rows: grouped(list, (i) => i.word.toLowerCase()).map(([, same]) => ({ label: same[0]!.word.length > 60 ? opening(same[0]!.word, 10) : same[0]!.word, count: same.length, spots: same.map(spotOf) })),
+        empty: '',
+      })),
+      {
+        kind: 'rows',
+        title: 'Words you lean on',
+        note: 'Used three times or more, and at least 5 per 1,000 words. Glue words and story names are left out.',
+        rows: overused.map((c) => ({ label: c.shown, count: c.n, detail: `${perThousand(c.n, wordTotal)} per 1,000`, spots: spotsOf(c.at) })),
+        empty: 'No word is doing more than its share.',
+      },
+    ],
+  };
+}
+
 /** The reports there are, by seasoning. */
-export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport, daniel: drunkReport };
+export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport, daniel: drunkReport, sally: spiceReport };
 
 // ---------- saving ----------
 

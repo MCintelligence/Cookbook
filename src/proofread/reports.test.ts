@@ -8,7 +8,7 @@ import { nameMatcher } from '../editor/names';
 import { fileNameFor } from '../storage/book';
 import { type IssueKind } from './check';
 import { type FoundIssue } from './plugin';
-import { drunkReport, pepperReport, reportMarkdown, reportName, saltReport } from './reports';
+import { drunkReport, pepperReport, reportMarkdown, reportName, saltReport, spiceReport } from './reports';
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -100,6 +100,22 @@ describe('Seasonings reports', () => {
     expect(longest.kind === 'rows' && longest.rows[0]!.detail).toMatch(/^77 words with no dialogue/);
   });
 
+  it('Sally weighs the sentences and the words leaned on', () => {
+    const doc = open(SCENE);
+    const report = spiceReport({ doc, issues: [], names: null });
+    const lengths = report.sections.find((s) => s.title === 'Sentence lengths')!;
+    const total = lengths.kind === 'bars' ? lengths.bars.reduce((n, b) => n + b.value, 0) : 0;
+    expect(String(total)).toBe(report.stats.find((s) => s.label === 'Sentences')!.value);
+    const long = report.sections.find((s) => s.title === 'Longest sentences')!;
+    expect(long.kind === 'rows' && long.rows[0]!.detail).toBe('40 words');
+    const leaned = report.sections.find((s) => s.title === 'Words you lean on')!;
+    expect(leaned.kind === 'rows' && leaned.rows.slice(0, 2).map((r) => [r.label, r.count])).toEqual([
+      ['harbour', 3],
+      ['grey', 3],
+    ]);
+    expect(report.actions[0]).toMatch(/^Chop the sentence starting “She walked/);
+  });
+
   it('jumps land on the words they name', () => {
     const doc = open(SCENE);
     const report = drunkReport({ doc, issues: [], names: null });
@@ -111,7 +127,7 @@ describe('Seasonings reports', () => {
   it('saves as Markdown that reads back as a page', () => {
     const doc = open(SCENE);
     const when = new Date(2026, 9, 31, 15, 11);
-    for (const report of [saltReport({ doc, issues: [] }), drunkReport({ doc, issues: [] })]) {
+    for (const report of [saltReport({ doc, issues: [] }), drunkReport({ doc, issues: [] }), spiceReport({ doc, issues: [] })]) {
       const md = reportMarkdown(report, 'Item 1', when);
       expect(md).toMatch(/## Try this first/);
       expect(md).toContain('On “Item 1”');

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { footnotes, selectFootnote, setFootnoteText } from '../editor/seasonings';
+import { footnoteTexts } from '../editor/docStats';
+import { selectFootnote, setFootnoteText } from '../editor/seasonings';
 
 /** Grows a footnote's box to fit its text, since footnotes are written right on the page. */
 function fit(el: HTMLTextAreaElement | null) {
@@ -11,7 +12,7 @@ function fit(el: HTMLTextAreaElement | null) {
 
 /** The page's footnotes, under a short rule at its foot, each written in place. */
 export function PageFootnotes({ editor }: { editor: Editor | null }) {
-  const list = useEditorState({ editor, selector: ({ editor }) => (editor ? footnotes(editor.state.doc).map((f) => f.text) : []) }) ?? [];
+  const list = useEditorState({ editor, selector: ({ editor }) => (editor ? footnoteTexts(editor.state.doc) : []) }) ?? [];
   const box = useRef<HTMLOListElement>(null);
   useLayoutEffect(() => {
     box.current?.querySelectorAll('textarea').forEach(fit);

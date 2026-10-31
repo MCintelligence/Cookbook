@@ -45,13 +45,15 @@ interface Options {
   review: boolean;
   /** Every page's text, whose words count for more in suggestions; read only when one is wanted. */
   bookTexts?: () => string[];
-  /** Goes up when the book's text may have changed. */
-  bookVersion?: number;
+  /** Goes up when the book's text may have changed. Read only when a suggestion is wanted. */
+  bookVersion?: () => number;
   onError: (message: string) => void;
 }
 
+const NO_VERSION = () => 0;
+
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, bookTexts, bookVersion = 0, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, bookTexts, bookVersion = NO_VERSION, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -166,8 +168,9 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         if (!c) return Promise.resolve([]);
         // The book is read again only when a suggestion is wanted after it changed.
         const book = bookRef.current;
-        if (book.texts && book.learnt !== book.version) {
-          book.learnt = book.version;
+        const version = book.version();
+        if (book.texts && book.learnt !== version) {
+          book.learnt = version;
           c.learn(book.texts()).catch(() => {});
         }
         return c.suggest(word, around);

@@ -16,7 +16,7 @@ import {
   sortFolder,
 } from './book';
 import { type Order } from './order';
-import { BookIndex, INDEX_FILE, MATCH_END, MATCH_START, countWords, loadIndex, refreshIndex, saveIndex, toFtsQuery } from './index';
+import { BookIndex, INDEX_FILE, MATCH_END, MATCH_START, countWords, loadIndex, refreshIndex, saveIndex, shownOf, toFtsQuery, toIndexed } from './index';
 
 describe('document format', () => {
   it('round-trips front matter and body', () => {
@@ -145,6 +145,22 @@ describe('hidden index', () => {
     expect(index.search('collard')).toHaveLength(1);
     expect(index.search('thought')).toEqual([]);
     expect(index.search('   ')).toEqual([]);
+  });
+
+  it('tells a save that only changed words from one the Shelf shows', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const scene = await createDocument(fs, 'bookshelf', 'Sunday Dinner');
+    const doc = await readDocument(fs, scene);
+    const typed = toIndexed(scene, { ...doc, body: 'Lou stirred the greens.' }, 'a');
+    expect(shownOf(typed)).toBe(shownOf(toIndexed(scene, { ...doc, body: 'Lou stirred the greens again.' }, 'b')));
+    expect(shownOf(typed)).not.toBe(shownOf(toIndexed(scene, { ...doc, title: 'Monday', body: 'Lou stirred the greens.' }, 'a')));
+    expect(shownOf(typed)).not.toBe(shownOf(toIndexed(scene, { ...doc, fields: { ...doc.fields, status: 'done' }, body: 'Lou stirred the greens.' }, 'a')));
+
+    const index = await BookIndex.open();
+    index.upsert(typed);
+    expect(index.textOf(scene)).toBe('Lou stirred the greens.');
+    expect(index.textOf('bookshelf/Nowhere.md')).toBeUndefined();
   });
 
   it('finds word stems and ignores accents', async () => {

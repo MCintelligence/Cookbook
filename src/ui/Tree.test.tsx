@@ -15,7 +15,7 @@ afterEach(() => {
 
 const card = (title: string, words: number) => ({ id: title, title, kind: 'scene', words }) as CardSummary;
 
-function shelf() {
+function shelf(extra: { onOpenGroup?: (p: string) => void; onSelect?: (p: string) => void } = {}) {
   const host = document.body.appendChild(document.createElement('div'));
   const root = createRoot(host);
   roots.push(root);
@@ -44,10 +44,11 @@ function shelf() {
         live={null}
         collapseKey="test.collapsed"
         renaming={null}
-        onSelect={() => {}}
+        onSelect={extra.onSelect ?? (() => {})}
         onMove={() => {}}
         onStartRename={() => {}}
         onRename={() => {}}
+        onOpenGroup={extra.onOpenGroup}
       />,
     ),
   );
@@ -65,5 +66,23 @@ describe('the Shelf', () => {
   it('keeps each Item’s own count on its row', () => {
     const host = shelf();
     expect([...host.querySelectorAll('.tree-card .tree-words')].map((e) => e.textContent)).toEqual(['1,200', '34']);
+  });
+
+  it('opens a Group as Mise en Place from a click on its name, and only opens or closes it from the arrow', () => {
+    const opened: string[] = [];
+    const host = shelf({ onOpenGroup: (p) => opened.push(p) });
+    const group = host.querySelector<HTMLElement>('.tree-folder')!;
+    act(() => group.querySelector<HTMLElement>('.tree-card-title')!.click());
+    expect(opened).toEqual(['bookshelf/Part One']);
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(2);
+    act(() => group.querySelector<HTMLElement>('.chevron')!.click());
+    expect(opened).toEqual(['bookshelf/Part One']);
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(0);
+  });
+
+  it('still opens and closes a Group on a click where Groups have no page, as in the Pantry', () => {
+    const host = shelf();
+    act(() => host.querySelector<HTMLElement>('.tree-folder .tree-card-title')!.click());
+    expect(host.querySelectorAll('.tree-card')).toHaveLength(0);
   });
 });

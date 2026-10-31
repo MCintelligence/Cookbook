@@ -49,6 +49,7 @@ const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
+import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook } from './storage/learnToCook';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
@@ -71,6 +72,7 @@ const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: 
 import {
   type BookLocation,
   DEFAULT_BOOK,
+  bookExists,
   childLocation,
   defaultLocation,
   isTauri,
@@ -375,7 +377,7 @@ export function App() {
    */
   const openAt = async (
     target: BookLocation,
-    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean } = {},
+    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean; learn?: boolean } = {},
   ) => {
     await flushSave();
     await saveUndoNow();
@@ -384,7 +386,16 @@ export function App() {
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
-    else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
+    else if (mode.create && mode.learn) {
+      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
+      rememberLearnToCook(target);
+      // It opens at Welcome, like a recipe reopening where the writer left off.
+      try {
+        localStorage.setItem(lastSceneKey(target), FIRST_ITEM);
+      } catch {
+        // It opens without an Item; the Shelf is still there.
+      }
+    } else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
     else {
       try {
         info = await openBook(nextFs);
@@ -552,12 +563,34 @@ export function App() {
       return 'done';
     });
 
+  /** Opens Learn to Cook, or makes a fresh one if the last was deleted. */
+  const learnToCook = async () => {
+    const kept = learnToCookLocation();
+    if (kept && (await bookExists(kept))) return openAt(kept);
+    const target = await freshLocation(LEARN_TO_COOK, null);
+    // One left in its folder by a Cookbook that has forgotten it is opened again rather than written over.
+    if (await bookExists(target)) {
+      rememberLearnToCook(target);
+      return openAt(target);
+    }
+    return openAt(target, { create: LEARN_TO_COOK, learn: true });
+  };
+
   useEffect(() => {
     // StrictMode runs effects twice in development; open the book only once.
     if (started.current) return;
     started.current = true;
     const last = recentBooks()[0]?.location;
     (async () => {
+      // A writer's very first start opens Learn to Cook, unless an older Cookbook already made their first recipe.
+      if (!last && !learnedBefore() && !(await bookExists(await defaultLocation()))) {
+        try {
+          await learnToCook();
+          return;
+        } catch {
+          // Their own first recipe opens instead.
+        }
+      }
       if (last) {
         try {
           await openAt(last);
@@ -2715,6 +2748,8 @@ export function App() {
     {
       label: 'Help',
       items: () => [
+        { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+        { separator: true },
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
         { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
         { separator: true },
@@ -3046,6 +3081,12 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
+          onLearn={() =>
+            void fromLibrary(async () => {
+              await learnToCook();
+              return 'done';
+            })
+          }
           onCreate={(choice) => void createNewBook(choice)}
           onAdopt={(target) =>
             void fromLibrary(async () => {

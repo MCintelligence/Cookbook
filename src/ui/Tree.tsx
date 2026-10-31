@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { type Editor } from '@tiptap/react';
 import { type TreeNode } from '../storage/book';
 import { LABELS, STATUSES, isCard } from '../storage/document';
 import { type CardSummary } from '../storage/index';
 import { allPaths, between } from './selection';
 import { StatusIcon } from './StatusIcon';
+import { LiveWords } from './LiveCounts';
+import { docWords } from '../editor/docStats';
 import { altMove, pasteMove, placesOf, shownPaths } from './treeKeys';
 import { placeAt } from './zoom';
 import { IS_MAC } from '../shortcuts';
@@ -14,8 +17,8 @@ interface Props {
   root: string;
   selected: string | null;
   cards: Map<string, CardSummary>;
-  /** Words in the open scene right now, ahead of the index. */
-  live: { path: string; words: number } | null;
+  /** The open Item, whose words are counted from the editor as they are now, ahead of the index. */
+  live: { path: string; editor: Editor | null } | null;
   /** Where to remember which folders are closed. */
   collapseKey: string;
   /** Folders that stay put, with the names to show for them: they can't be dragged or renamed. */
@@ -61,6 +64,7 @@ interface Drop {
 
 const LONG_PRESS_MS = 400;
 const fmt = (n: number) => n.toLocaleString('en');
+const wordsTitle = (label: string, total: number) => (total > 0 ? `${label}: ${fmt(total)} ${total === 1 ? 'word' : 'words'}` : undefined);
 
 function readCollapsed(key: string): Set<string> {
   try {
@@ -81,8 +85,8 @@ function readCollapsed(key: string): Set<string> {
  * (or goes up to it). Alt+↑ and Alt+↓ move the row, past the edge of its Group
  * into the next; Mod+X then Mod+V on another row moves it there.
  */
-export function Tree(props: Props) {
-  const { nodes, root, cards, live, collapseKey, onMove } = props;
+export const Tree = memo(function Tree(props: Props) {
+  const { nodes, root, cards, collapseKey, onMove } = props;
   const [collapsed, setCollapsed] = useState(() => readCollapsed(collapseKey));
   const [drag, setDrag] = useState<{ path: string; label: string; x: number; y: number } | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
@@ -199,18 +203,18 @@ export function Tree(props: Props) {
     return true;
   };
 
-  // Words per scene and folder, with the open scene counted as it is now. Pantry cards aren't counted.
+  // Words per Item and Group as last saved. Pantry cards aren't counted. The open Item's row
+  // counts its own words as they are typed, and a Group adds them in when its count is shown.
   const words = useMemo(() => {
     const totals = new Map<string, number>();
     const count = (n: TreeNode): number => {
-      const w =
-        n.kind === 'file' ? (isCard(cards.get(n.path)?.kind) ? 0 : live?.path === n.path ? live.words : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
+      const w = n.kind === 'file' ? (isCard(cards.get(n.path)?.kind) ? 0 : (cards.get(n.path)?.words ?? 0)) : (n.children ?? []).reduce((sum, c) => sum + count(c), 0);
       totals.set(n.path, w);
       return w;
     };
     nodes.forEach(count);
     return totals;
-  }, [nodes, cards, live]);
+  }, [nodes, cards]);
 
   /** Where a drop at (x, y) would land, or null if nowhere sensible. */
   const target = (x: number, y: number, dragged: string): Drop | null => {
@@ -355,7 +359,7 @@ export function Tree(props: Props) {
       )}
     </>
   );
-}
+});
 
 interface Shared extends Props {
   collapsed: Set<string>;
@@ -374,7 +378,7 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; depth: number }) {
-  const { selected, cards, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate } = shared;
+  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate } = shared;
   const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
@@ -445,7 +449,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
             <span className="tree-card-title">{label}</span>
             {card?.skipExport && <span className="tree-flag">Not exported</span>}
             {colour && <span className="label-dot" style={{ background: colour.color }} title={`${colour.name} label`} aria-label={`${colour.name} label`} role="img" />}
-            {total > 0 && <span className="tree-words">{fmt(total)}</span>}
+            {live?.path === node.path ? <LiveWords editor={live.editor} saved={total} /> : total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>
         </button>
         )}
@@ -497,7 +501,14 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
           {...rowProps}
           className={`tree-folder${marker}${picked}${cut === node.path ? ' is-cut' : ''}`}
           // The Group's word count lives on hover; the end of the row is kept for the board icon.
-          title={total > 0 ? `${label}: ${fmt(total)} ${total === 1 ? 'word' : 'words'}` : undefined}
+          title={wordsTitle(label, total)}
+          // The open Item's words as typed are added in as the pointer arrives, so typing never redraws the Shelf.
+          onPointerEnter={(e) => {
+            if (!live?.editor || !live.path.startsWith(node.path + '/')) return;
+            const now = wordsTitle(label, total + docWords(live.editor.state.doc) - (words.get(live.path) ?? 0));
+            if (now) e.currentTarget.title = now;
+            else e.currentTarget.removeAttribute('title');
+          }}
           onClick={(e) => !justDragged.current && !mark(e, node.path) && toggle(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >

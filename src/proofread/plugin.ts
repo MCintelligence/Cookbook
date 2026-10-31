@@ -293,8 +293,16 @@ function found(d: Decoration): FoundIssue {
 /** Every issue shown in the scene, in order. */
 export function issuesOf(state: EditorState): FoundIssue[] {
   const ps = proofreadKey.getState(state);
-  return ps ? ps.set.find(undefined, undefined, isIssue).map(found).sort((a, b) => a.from - b.from) : [];
+  if (!ps) return [];
+  // A cursor move keeps the same set, so the list is only made again when the marks change.
+  let list = issueLists.get(ps.set);
+  if (!list) {
+    list = ps.set.find(undefined, undefined, isIssue).map(found).sort((a, b) => a.from - b.from);
+    issueLists.set(ps.set, list);
+  }
+  return list;
 }
+const issueLists = new WeakMap<DecorationSet, FoundIssue[]>();
 
 /**
  * The issue F7 (or Shift+F7) goes to: the next one after the cursor, or the one before it,

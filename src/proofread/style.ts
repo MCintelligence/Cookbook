@@ -136,6 +136,11 @@ export function textGrade(paragraphs: string[]): { grade: number; words: number;
       total++;
     }
   }
+  return readingGrade({ letters, words: count, sentences: total });
+}
+
+/** The grade level from letter, word and sentence counts, as textGrade gives it. */
+export function readingGrade({ letters, words: count, sentences: total }: { letters: number; words: number; sentences: number }): { grade: number; words: number; sentences: number } {
   return { grade: count > 0 ? Math.max(1, Math.round(gradeLevel(letters, count, total))) : 0, words: count, sentences: total };
 }
 

@@ -1,5 +1,5 @@
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
@@ -39,7 +39,7 @@ const Chevron = () => (
  * change the paragraphs the selection touches. None of them change a style:
  * that is Settings › Styles, or "Update style to match" in the Style list.
  */
-export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle }: Props) {
+export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle }: Props) {
   const at =
     useEditorState({
       editor,
@@ -260,7 +260,7 @@ export function Toolbar({ editor, sheet, onEditStyle, onAddStyle, onRenameStyle 
       />
     </div>
   );
-}
+});
 
 /** A toolbar button with a small pop-up under it, closed by Escape or a click elsewhere. */
 function Pop({ open, onClose, button, children }: { open: boolean; onClose: () => void; button: ReactNode; children: ReactNode }) {

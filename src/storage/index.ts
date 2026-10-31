@@ -95,6 +95,15 @@ export function toIndexed(path: string, doc: CookbookDocument, stamp: string): I
   };
 }
 
+/**
+ * What the Shelf, the Pantry, linked names and relationships show of a file: everything
+ * indexed but its text and word count. A save that leaves this alone only changed words.
+ */
+export function shownOf(doc: IndexedDocument): string {
+  const { text: _text, words: _words, stamp: _stamp, ...shown } = doc;
+  return JSON.stringify(shown);
+}
+
 /** Each word must start a word in the title or text, so "corn" finds "cornbread". */
 export function toFtsQuery(query: string): string {
   const words = query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -202,6 +211,12 @@ export class BookIndex {
   /** The words of every page, for the proofreader to learn the book's own way with words. */
   pageTexts(): string[] {
     return (this.db.selectArrays(`select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.kind = 'scene'`) as [string][]).map(([t]) => t);
+  }
+
+  /** The indexed text of one file, or undefined if it isn't indexed (yet). */
+  textOf(path: string): string | undefined {
+    const rows = this.db.selectArrays('select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.path = ?', [path]) as [string][];
+    return rows[0]?.[0];
   }
 
   /** The relationships other cards have with the card whose id this is. */

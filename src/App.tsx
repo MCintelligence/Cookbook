@@ -51,12 +51,19 @@ import { type WritingHistory, loadHistory, recordWords, saveHistory } from './st
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
-import { GoalsPopup, type Goals } from './ui/GoalsPopup';
+import { type Goals } from './ui/GoalsPopup';
+import { LiveGoals, type SaveState, SavedStatus } from './ui/LiveCounts';
+import { createStore } from './ui/store';
+import { useStable } from './ui/useStable';
+import { docWords } from './editor/docStats';
+import { useTracked } from './ui/useTracked';
+import { useBookIndex } from './storage/useBookIndex';
+import { ownerOf, useBackups } from './storage/useBackups';
 import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
 import { TextSelection } from '@tiptap/pm/state';
-import { type BookIndex, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, saveIndex, toIndexed } from './storage/index';
-import { type NamedCard, castOf, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
+import { type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, shownOf, toIndexed } from './storage/index';
+import { type NamedCard, castIn, countNames, nameMatcher, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
@@ -68,9 +75,7 @@ import {
   defaultLocation,
   isTauri,
   newBookLocation,
-  openBackups,
   openLocation,
-  canPickFolder,
   pickFolder,
   recentBooks,
   rememberBook,
@@ -113,9 +118,9 @@ import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
-import { type BackupInfo, type SettingsSection } from './ui/Settings';
+import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
-import { BACKUP_EVERY_MS, type Backup, listBackups, makeBackup, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
+import { type Backup, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
@@ -123,10 +128,9 @@ import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
 import { checkForUpdates } from './ui/UpdateBanner';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor } from './editor/seasonings';
-import { dialogueRanges } from './editor/dialogue';
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
-import { Seasonings, type Tracked } from './ui/Seasonings';
+import { Seasonings } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
@@ -170,8 +174,6 @@ const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order })
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
 
-/** The search index is cheap to rebuild, so it is written back less often than scenes. */
-const INDEX_SAVE_DELAY_MS = 5000;
 const NOT_A_BOOK = 'This folder is not a Cookbook recipe.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
 const UNDO_SAVE_INTERVAL_MS = 10_000;
@@ -221,9 +223,6 @@ function* walkFolders(nodes: TreeNode[]): Generator<TreeNode> {
   }
 }
 
-/** Whose backups these are. Every book has an id once it has been opened (see openAt). */
-const ownerOf = (info: BookInfo) => ({ title: info.title, id: info.id ?? info.title });
-
 function lastSceneKey(location: BookLocation | null): string {
   return `cookbook.lastScene:${JSON.stringify(location)}`;
 }
@@ -236,10 +235,14 @@ function folderName(location: BookLocation): string {
 export function App() {
   const [fs, setFs] = useState<StorageAdapter | null>(null);
   const [where, setWhere] = useState('');
-  /** Words typed since the last save, for the dot in the footer. */
-  const [dirty, setDirty] = useState(false);
-  /** The last save of the page failed; it is tried again until it works. */
-  const [saveFailed, setSaveFailed] = useState(false);
+  /**
+   * Words typed since the last save, for the dot in the footer, and whether the last save of
+   * the page failed (it is tried again until it works). Kept out of React state so that
+   * starting and finishing a save only redraws the footer's Saved.
+   */
+  const [saveState] = useState(() => createStore<SaveState>({ dirty: false, failed: false }));
+  const setDirty = (dirty: boolean) => saveState.get().dirty !== dirty && saveState.set({ ...saveState.get(), dirty });
+  const setSaveFailed = (failed: boolean) => saveState.get().failed !== failed && saveState.set({ ...saveState.get(), failed });
   const [book, setBook] = useState<BookInfo | null>(null);
   const [sheet, setSheet] = useState<StyleSheet>(defaultStyles);
   /** The Shelf's pages and books, the Pantry's groups, and the recipes, each as read from its folder. */
@@ -277,9 +280,11 @@ export function App() {
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<BookLocation | null>(null);
   const [busy, setBusy] = useState(false);
-  const index = useRef<{ fs: StorageAdapter; index: BookIndex } | null>(null);
-  const indexTimer = useRef<number | undefined>(undefined);
-  const [indexVersion, setIndexVersion] = useState(0);
+  const { index, version: indexVersion, changed: indexChanged, textChanged, show: showIndex, saveNow: saveIndexNow, onText, textCount } = useBookIndex();
+  /** What the Shelf and Pantry show of the open Item as last indexed (see shownOf), to tell a save that only changed words. */
+  const shownBefore = useRef<{ path: string; shown: string } | null>(null);
+  /** Saves since the Shelf last caught up changed only words, so the open Item's saved word count is behind. */
+  const wordsBehind = useRef(false);
   const order = useRef<Order>({});
   const [renaming, setRenaming] = useState<string | null>(null);
   const [pantryGroup, setPantryGroup] = useState<PantrySection>('characters');
@@ -297,6 +302,8 @@ export function App() {
   /** Where the / is that opened the insert menu. */
   const [slash, setSlash] = useState<number | null>(null);
   const [pins, setPinsState] = useState<string[]>([]);
+  const pinsRef = useRef(pins);
+  pinsRef.current = pins;
   /** The Shelf being read as one manuscript (Read book), or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
   const [manuscriptTitle, setManuscriptTitle] = useState('');
@@ -328,7 +335,6 @@ export function App() {
   const lastSection = useRef<SettingsSection>('general');
   const openSettings = (section: SettingsSection = lastSection.current) => setSettingsAt(section);
   const [goalsRequest, setGoalsRequest] = useState<{ tab: 'targets' | 'history'; at: number } | null>(null);
-  const [backups, setBackups] = useState<BackupInfo>({ folder: '', canChoose: canPickFolder(), last: null, count: 0 });
   // Read by handlers that outlive a render: closing the window, keys, backups.
   const fsRef = useRef(fs);
   fsRef.current = fs;
@@ -336,9 +342,8 @@ export function App() {
   bookRef.current = book;
   /** Words pasted since the last save, which don't count towards the goal unless the book says so. */
   const pastedWords = useRef(0);
-  /** Something was saved since the last automatic backup. */
-  const changedSinceBackup = useRef(false);
-  const lastBackupAt = useRef(0);
+  // Saved before a timed backup, so it has the newest words.
+  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current());
 
   /** Changes the open book's settings in book.json. */
   const updateBook = (changes: Partial<BookInfo>) => {
@@ -350,63 +355,6 @@ export function App() {
     saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
   };
 
-  const backupStore = useRef<{ key: string; fs: StorageAdapter; where: string } | null>(null);
-  const openBackupStore = async () => {
-    const chosen = getSettings().backupFolder;
-    const key = JSON.stringify(chosen);
-    if (backupStore.current?.key !== key) backupStore.current = { key, ...(await openBackups(chosen)) };
-    return backupStore.current;
-  };
-  const refreshBackups = async () => {
-    const info = bookRef.current;
-    if (!info) return;
-    try {
-      const store = await openBackupStore();
-      const list = await listBackups(store.fs, ownerOf(info));
-      setBackups({ folder: store.where, canChoose: canPickFolder(), last: list[0]?.date ?? null, count: list.length });
-    } catch (e) {
-      setBackups((b) => ({ ...b, folder: `Can’t reach the backup folder. ${friendlyError(e)}` }));
-    }
-  };
-  /** The backup being made, so a timed one and one on close don't zip the book twice at once. */
-  const backingUp = useRef<Promise<void> | null>(null);
-  /** Zips the open book into the backups folder; automatic ones only when something changed. */
-  const autoBackup = async (always = false): Promise<void> => {
-    // Waits its turn; several waiting at once each check again once the one before is done.
-    while (backingUp.current) await backingUp.current.catch(() => {});
-    const bookFs = fsRef.current;
-    const info = bookRef.current;
-    if (!bookFs || !info || (!always && !changedSinceBackup.current)) return;
-    changedSinceBackup.current = false;
-    lastBackupAt.current = Date.now();
-    const run = (async () => {
-      const store = await openBackupStore();
-      await makeBackup(bookFs, store.fs, ownerOf(info), getSettings().keepBackups);
-    })();
-    backingUp.current = run;
-    try {
-      await run;
-    } catch (e) {
-      // Nothing was backed up, so the changes still need one.
-      changedSinceBackup.current = true;
-      throw e;
-    } finally {
-      if (backingUp.current === run) backingUp.current = null;
-    }
-  };
-
-  const saveIndexNow = useCallback(async () => {
-    window.clearTimeout(indexTimer.current);
-    indexTimer.current = undefined;
-    const current = index.current;
-    if (current) await saveIndex(current.fs, current.index).catch(() => {});
-  }, []);
-
-  const indexChanged = useCallback(() => {
-    setIndexVersion((v) => v + 1);
-    window.clearTimeout(indexTimer.current);
-    indexTimer.current = window.setTimeout(() => void saveIndexNow(), INDEX_SAVE_DELAY_MS);
-  }, [saveIndexNow]);
 
   /**
    * Opens the book at a location. `create` starts a new book there; `adopt`
@@ -480,7 +428,7 @@ export function App() {
     // The index catches up in the background; search works on whatever it has so far.
     const opened = { fs: nextFs, index: await loadIndex(nextFs) };
     index.current = opened;
-    setIndexVersion((v) => v + 1);
+    showIndex();
     refreshIndex(nextFs, opened.index)
       .then((touched) => {
         if (touched > 0 && index.current === opened) indexChanged();
@@ -758,18 +706,6 @@ export function App() {
     };
   }, [flushSave, saveIndexNow, saveUndoNow]);
 
-  useEffect(() => {
-    // A backup every half hour while the writer works, so a long session is never only backed up when it ends.
-    const timer = window.setInterval(() => {
-      if (!getSettings().backupOnClose || !changedSinceBackup.current) return;
-      void (async () => {
-        await flushSave();
-        await autoBackup();
-        await refreshBackups();
-      })().catch(() => {});
-    }, BACKUP_EVERY_MS);
-    return () => window.clearInterval(timer);
-  }, [flushSave]);
 
   useEffect(() => {
     // The app menu's Settings… (Cookbook › Settings… on a Mac, Edit › Settings… elsewhere).
@@ -807,12 +743,14 @@ export function App() {
     pendingSave.current = async () => {
       const latest = currentDoc();
       const next = latest && latest.id === scene.id ? latest : scene;
+      // Serialised and turned into plain text once each: the file, the index and the word count share them.
       const text = serializeDocument(next);
-      await writeDocument(fs, target, next);
+      await fs.writeText(target, text);
       savedText.current = text;
+      const indexed = toIndexed(target, next, '');
       // Count words written, unless the change only moved words between scenes.
       changedSinceBackup.current = true;
-      const words = sceneWords(next);
+      const words = indexed.words;
       const pasted = pastedWords.current;
       pastedWords.current = 0;
       if (!movingWords.current && savedWords.current !== null) {
@@ -828,8 +766,18 @@ export function App() {
       }
       savedWords.current = words;
       if (current && current === index.current) {
-        current.index.upsert(toIndexed(target, next, await fs.stamp(target)));
-        indexChanged();
+        indexed.stamp = await fs.stamp(target);
+        current.index.upsert(indexed);
+        // Only a change to what the Shelf or Pantry shows redraws them; words alone just tell
+        // the few things that read the text (Daniel, the proofreader's suggestions).
+        const shown = shownOf(indexed);
+        const before = shownBefore.current;
+        shownBefore.current = { path: target, shown };
+        if (before?.path !== target || before.shown !== shown || pinsRef.current.includes(target)) indexChanged();
+        else {
+          wordsBehind.current = true;
+          textChanged();
+        }
       }
       if (recorder.current && Date.now() - recorder.current.at > UNDO_SAVE_INTERVAL_MS) await saveUndoNow();
     };
@@ -859,6 +807,13 @@ export function App() {
       // The book just opens without a scene next time.
     }
   };
+
+  // Leaving an Item whose saves only changed words: the Shelf catches up with its word count now.
+  useEffect(() => {
+    if (!wordsBehind.current) return;
+    wordsBehind.current = false;
+    showIndex();
+  }, [path]);
 
   // The scene that was open last time comes back when the book opens.
   const restored = useRef<string | null>(null);
@@ -2005,7 +1960,6 @@ export function App() {
     const current = bookRef.current?.seasonings ?? { chosen: [], tracked: [], gone: [] };
     updateBook({ seasonings: { ...current, ...changes } });
   };
-  const [tracked, setTracked] = useState<Tracked[]>([]);
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
@@ -2045,10 +1999,14 @@ export function App() {
     }
   };
   // Linked names follow the index, but only change when a name does, not on every save.
-  const namedKey = JSON.stringify(
-    [...cards]
-      .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
-      .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind, aka: c.aka }) as NamedCard),
+  const namedKey = useMemo(
+    () =>
+      JSON.stringify(
+        [...cards]
+          .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
+          .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind, aka: c.aka }) as NamedCard),
+      ),
+    [cards],
   );
   const namedCards = useMemo(() => JSON.parse(namedKey) as NamedCard[], [namedKey]);
   const matcher = useMemo(() => nameMatcher(namedCards), [namedCards]);
@@ -2063,38 +2021,11 @@ export function App() {
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: indexVersion, onError: setError });
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
 
-  // Daniel counts the spoken words in what he tracks, the open page as it is now and the rest as saved.
+  // Daniel counts the spoken words in what he tracks, as last saved.
   const trackedKey = (seas?.tracked ?? []).join('\n');
-  useEffect(() => {
-    const paths = trackedKey ? trackedKey.split('\n') : [];
-    if (!fs || !chosen.includes('daniel') || paths.length === 0) return setTracked([]);
-    let live = true;
-    const titled = paths.map((p) => ({ path: p, title: cards.get(p)?.title ?? baseName(p).replace(/\.md$/, ''), share: null as number | null }));
-    setTracked((before) => titled.map((t) => ({ ...t, share: before.find((b) => b.path === t.path)?.share ?? null })));
-    const timer = window.setTimeout(async () => {
-      const counted: Tracked[] = [];
-      for (const t of titled) {
-        const files = t.path.endsWith('.md') ? [t.path] : [...walkFiles(childrenOf(tree, BOOKSHELF, t.path))].map((f) => f.path);
-        let spoken = 0;
-        let all = 0;
-        for (const f of files) {
-          const body = f === path && currentDoc() ? currentDoc()!.body : await readDocument(fs, f).then((d) => d.body, () => '');
-          for (const line of plainText(body).split('\n')) {
-            all += countWords(line);
-            for (const [a, b] of dialogueRanges(line)) spoken += countWords(line.slice(a, b));
-          }
-        }
-        counted.push({ ...t, share: all > 0 ? Math.round((spoken / all) * 100) : 0 });
-      }
-      if (live) setTracked(counted);
-    }, 600);
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-    };
-  }, [fs, trackedKey, chosen, tree, indexVersion]);
+  const tracked = useTracked({ fs, on: chosen.includes('daniel'), paths: trackedKey, tree, cards, index, onText });
   const trackMenu = (x: number, y: number) => {
     const have = new Set(seas?.tracked ?? []);
     const add = (p: string) => setSeasonings({ tracked: [...(bookRef.current?.seasonings?.tracked ?? []), p] });
@@ -2107,7 +2038,7 @@ export function App() {
   };
   const castIds = useEditorState({
     editor,
-    selector: ({ editor }) => (editor ? castOf(editor.state.doc, nameMatcherOf(editor.state)).map((c) => c.id).join('\n') : ''),
+    selector: ({ editor }) => (editor ? castIn(editor.state).map((c) => c.id).join('\n') : ''),
   });
   const cast = useMemo(() => {
     const byId = new Map(namedCards.map((c) => [c.id, c]));
@@ -2120,16 +2051,10 @@ export function App() {
     if (!fs || !current || !doc || (doc.kind !== 'character' && doc.kind !== 'setting')) return setAppearsIn(null);
     const { id } = doc;
     const mentions = current.index.scenesNaming([doc.title, ...akaOf(doc.fields)], (text) => countNames(text, matcher).get(id) ?? 0);
-    let live = true;
-    // In the order the scenes come on the Bookshelf.
-    readTree(fs, BOOKSHELF, order.current).then((shelf) => {
-      const at = new Map([...walkFiles(shelf)].map((f, i) => [f.path, i]));
-      if (live) setAppearsIn(mentions.sort((a, b) => (at.get(a.path) ?? Infinity) - (at.get(b.path) ?? Infinity)));
-    }, () => live && setAppearsIn(mentions));
-    return () => {
-      live = false;
-    };
-  }, [fs, doc?.id, doc?.kind, indexVersion, matcher]); // the card's own edits show once saved
+    // In the order the scenes come on the Shelf.
+    const at = new Map([...walkFiles(tree)].map((f, i) => [f.path, i]));
+    setAppearsIn(mentions.sort((a, b) => (at.get(a.path) ?? Infinity) - (at.get(b.path) ?? Infinity)));
+  }, [fs, doc?.id, doc?.kind, indexVersion, matcher, tree]); // the card's own edits show once saved
   const loadCard = useCallback((p: string) => (fs ? readDocument(fs, p) : Promise.reject(new Error('No recipe is open.'))), [fs]);
 
   // Pinned cards are remembered per book on this device.
@@ -2570,19 +2495,20 @@ export function App() {
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
-  const undoSteps = useEditorState({ editor, selector: ({ editor }) => (editor ? undoDepth(editor.state) : 0) }) ?? 0;
-  const words = useEditorState({
-    editor,
-    selector: ({ editor }) => (editor ? countWords(editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ')) : 0),
-  });
 
   const page = pageOf(book?.page);
   const goals: Goals = { dailyGoal: book?.dailyGoal ?? DEFAULT_DAILY_GOAL, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };
-  const bookWords = useMemo(() => {
+  // Words on the Shelf but the open Item's, which the footer counts as they are typed.
+  const otherWords = useMemo(() => {
     let total = 0;
-    for (const [p, c] of cards) if (p.startsWith(BOOKSHELF + '/') && c.kind === 'scene') total += p === path ? (words ?? c.words) : c.words;
+    for (const [p, c] of cards) if (p.startsWith(BOOKSHELF + '/') && c.kind === 'scene' && p !== path) total += c.words;
     return total;
-  }, [cards, path, words]);
+  }, [cards, path]);
+  /** Words on the Shelf now, with the open Item counted from the editor. Read when needed, not while typing. */
+  const bookWordsNow = () => {
+    if (!path || !path.startsWith(BOOKSHELF + '/') || doc?.kind !== 'scene') return otherWords;
+    return otherWords + (editor ? docWords(editor.state.doc) : (cards.get(path)?.words ?? 0));
+  };
   /**
    * Notes the open recipe's title, words, goal and series in Your Recipes, so the list shows them without
    * opening it. Run when Your Recipes opens and when the recipe closes, never while typing.
@@ -2592,7 +2518,7 @@ export function App() {
     const at = locationRef.current;
     const info = bookRef.current;
     if (!at || !info || editingTemplate.current) return;
-    updateRecent(at, { title: info.title, words: bookWords, goal: info.bookTarget, series: info.series, seriesNumber: info.seriesNumber, ...(lastEdited.current && { edited: lastEdited.current }), ...extra });
+    updateRecent(at, { title: info.title, words: bookWordsNow(), goal: info.bookTarget, series: info.series, seriesNumber: info.seriesNumber, ...(lastEdited.current && { edited: lastEdited.current }), ...extra });
   };
   useEffect(() => {
     const onHide = () => noteRecipe.current();
@@ -2689,7 +2615,7 @@ export function App() {
         const none = !ed;
         const empty = !ed || ed.state.selection.empty;
         return [
-          { label: 'Undo', native: 'Undo', hint: keys('Mod-Z'), disabled: none || undoSteps === 0, onPick: () => void ed?.chain().focus().undo().run() },
+          { label: 'Undo', native: 'Undo', hint: keys('Mod-Z'), disabled: none || undoDepth(ed.state) === 0, onPick: () => void ed?.chain().focus().undo().run() },
           { label: 'Redo', native: 'Redo', hint: keys(IS_MAC ? 'Mod-Shift-Z' : 'Mod-Y'), disabled: none || !ed.can().redo(), onPick: () => void ed?.chain().focus().redo().run() },
           { separator: true },
           { label: 'Cut', native: 'Cut', hint: keys('Mod-X'), disabled: empty, onPick: () => ed && clip(ed, 'cut') },
@@ -2797,6 +2723,18 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [menuKey]);
 
+  // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
+  // their identity; anything else that re-renders the app then leaves them be.
+  const onSelect = useStable(select);
+  const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
+  const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
+  const onRowMenu = useStable(rowMenu);
+  const onTreeTrash = useStable(trashFromTree);
+  const onEditStyle = useStable(editStyle);
+  const onAddStyle = useStable(addStyle);
+  const onRenameStyle = useStable((id: string, name: string) => changeSheet(renameParagraphStyle(sheet, id, name)));
+  const shelfLive = useMemo(() => (doc && path ? { path, editor } : null), [!!doc, path, editor]);
+
   return (
     <div
       className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
@@ -2859,7 +2797,7 @@ export function App() {
 
       {/* Read book is for reading, so the formatting toolbar steps aside. */}
       {!manuscript && (
-        <Toolbar editor={editor} sheet={sheet} onEditStyle={editStyle} onAddStyle={addStyle} onRenameStyle={(id, name) => changeSheet(renameParagraphStyle(sheet, id, name))} />
+        <Toolbar editor={editor} sheet={sheet} onEditStyle={onEditStyle} onAddStyle={onAddStyle} onRenameStyle={onRenameStyle} />
       )}
 
       <nav
@@ -2893,15 +2831,15 @@ export function App() {
           root={BOOKSHELF}
           selected={path}
           cards={cards}
-          live={doc && path ? { path, words: words ?? 0 } : null}
+          live={shelfLive}
           collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
           renaming={renaming}
-          onSelect={select}
-          onMove={(from, folder, at) => moveInTree(from, folder, at)}
+          onSelect={onSelect}
+          onMove={onTreeMove}
           onStartRename={setRenaming}
-          onRename={(p, title) => void renameInTree(p, title)}
-          onMenu={rowMenu}
-          onTrash={trashFromTree}
+          onRename={onTreeRename}
+          onMenu={onRowMenu}
+          onTrash={onTreeTrash}
           dropTarget={fileDrop}
           folding={folding}
           recipes={recipes}
@@ -3020,12 +2958,12 @@ export function App() {
                 live={null}
                 collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${PANTRY}`}
                 renaming={renaming}
-                onSelect={select}
-                onMove={(from, folder, at) => moveInTree(from, folder, at)}
+                onSelect={onSelect}
+                onMove={onTreeMove}
                 onStartRename={setRenaming}
-                onRename={(p, title) => void renameInTree(p, title)}
-                onMenu={rowMenu}
-                onTrash={trashFromTree}
+                onRename={onTreeRename}
+                onMenu={onRowMenu}
+                onTrash={onTreeTrash}
                 folding={folding}
                 loadPicture={loadPicture}
                 marked={pantryMarked}
@@ -3200,11 +3138,14 @@ export function App() {
       />
 
       <footer className="footer">
-        <GoalsPopup
+        <LiveGoals
+          editor={editor}
           history={history}
           goals={goals}
           onGoals={(changes) => updateBook(changes)}
-          scene={doc && doc.kind === 'scene' ? { title: doc.title, words: words ?? 0, goal: sceneGoal(doc) } : null}
+          item={doc && path && doc.kind === 'scene' ? { title: doc.title, goal: sceneGoal(doc), onShelf: path.startsWith(BOOKSHELF + '/') } : null}
+          savedItemWords={(path && cards.get(path)?.words) || 0}
+          otherWords={otherWords}
           onSceneGoal={(goal) => {
             const base = currentDoc() ?? doc;
             if (!base) return;
@@ -3213,7 +3154,6 @@ export function App() {
             setDoc(updated);
             scheduleSave(updated);
           }}
-          bookWords={bookWords}
           onExport={exportHistoryCsv}
           request={goalsRequest}
         />
@@ -3235,16 +3175,7 @@ export function App() {
             />
           )}
           {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
-          <span className={`saved${saveFailed ? ' is-failed' : dirty ? ' is-dirty' : ''}`} tabIndex={0} title={[where, doc && undoSteps > 0 ? `Undo remembers ${undoSteps.toLocaleString('en')} ${undoSteps === 1 ? 'step' : 'steps'}, even after closing` : ''].filter(Boolean).join('\n')}>
-            {saveFailed || dirty ? (
-              <span className="saved-dot" aria-hidden="true" />
-            ) : (
-              <svg className="saved-tick" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 8.5 6.5 12 13 4.5" />
-              </svg>
-            )}
-            {saveFailed ? 'Not saved' : dirty ? 'Saving…' : 'Saved'}
-          </span>
+          <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
           <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />

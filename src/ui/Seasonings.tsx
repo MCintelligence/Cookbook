@@ -1,10 +1,10 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { type Node as PMNode } from '@tiptap/pm/model';
 import { isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
 import { type FoundIssue, applySuggestion, bracketsFor, issuesOf, selectIssue } from '../proofread/plugin';
 import { SEASONINGS, SPICE, type SeasoningId, fixText, ownerOf, remark, spiceOf, talkRemark } from '../proofread/remarks';
-import { textGrade } from '../proofread/style';
+import { readingGrade } from '../proofread/style';
+import { docReading } from '../editor/docStats';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
 import { useSuggestions } from './IssueCard';
@@ -70,7 +70,7 @@ export function Seasonings({ editor, proof, chosen, onChosen, tracked, onTrack, 
   const picked = marked.filter((id) => chosen.includes(id));
   const page = useEditorState({
     editor,
-    selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: textGrade(paragraphs(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
+    selector: ({ editor }) => (editor ? { issues: issuesOf(editor.state), grade: readingGrade(docReading(editor.state.doc)), dim: isDialogueFocus(editor.state) } : null),
   });
   if (!editor || !page) return null;
 
@@ -445,15 +445,4 @@ function Context({ editor, issue }: { editor: Editor; issue: FoundIssue }) {
       {after}
     </div>
   );
-}
-
-/** Every paragraph's text, for the grade level. */
-function paragraphs(doc: PMNode): string[] {
-  const out: string[] = [];
-  doc.descendants((node) => {
-    if (!node.isTextblock) return true;
-    out.push(node.textContent);
-    return false;
-  });
-  return out;
 }

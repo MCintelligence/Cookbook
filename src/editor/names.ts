@@ -88,6 +88,18 @@ interface NamesState {
   /** Names per text block, relative to the block, so typing only rescans the paragraph that changed. */
   blocks: WeakMap<PMNode, NameHit[]>;
   sets: WeakMap<PMNode, DecorationSet>;
+  casts: WeakMap<PMNode, NamedCard[]>;
+}
+
+/** A text block's names, relative to the block, from the cache when the block hasn't changed. */
+function blockNames(node: PMNode, matcher: NameMatcher, blocks: WeakMap<PMNode, NameHit[]>): NameHit[] {
+  let local = blocks.get(node);
+  if (!local) {
+    const map = textMap(node, -1);
+    local = findNames(map.text, matcher).map((hit) => ({ ...toRange(map, hit.from, hit.to), card: hit.card }));
+    blocks.set(node, local);
+  }
+  return local;
 }
 
 export const namesKey = new PluginKey<NamesState>('linkedNames');
@@ -99,10 +111,10 @@ export const LinkedNames = Extension.create({
       new Plugin<NamesState>({
         key: namesKey,
         state: {
-          init: () => ({ matcher: null, blocks: new WeakMap(), sets: new WeakMap() }),
+          init: () => ({ matcher: null, blocks: new WeakMap(), sets: new WeakMap(), casts: new WeakMap() }),
           apply: (tr, value) => {
             const matcher = tr.getMeta(namesKey) as NameMatcher | null | undefined;
-            return matcher === undefined ? value : { matcher, blocks: new WeakMap(), sets: new WeakMap() };
+            return matcher === undefined ? value : { matcher, blocks: new WeakMap(), sets: new WeakMap(), casts: new WeakMap() };
           },
         },
         props: {
@@ -114,13 +126,7 @@ export const LinkedNames = Extension.create({
             const all: Decoration[] = [];
             state.doc.descendants((node, pos) => {
               if (!node.isTextblock) return true;
-              let local = blocks.get(node);
-              if (!local) {
-                const map = textMap(node, -1);
-                local = findNames(map.text, matcher).map((hit) => ({ ...toRange(map, hit.from, hit.to), card: hit.card }));
-                blocks.set(node, local);
-              }
-              for (const hit of local) {
+              for (const hit of blockNames(node, matcher, blocks)) {
                 all.push(Decoration.inline(pos + 1 + hit.from, pos + 1 + hit.to, { class: 'cb-name', 'data-card': hit.card.path, 'data-kind': hit.card.kind }));
               }
               return false;
@@ -142,4 +148,25 @@ export function setNameMatcher(editor: Editor, matcher: NameMatcher | null): voi
 
 export function nameMatcherOf(state: EditorState): NameMatcher | null {
   return namesKey.getState(state)?.matcher ?? null;
+}
+
+/**
+ * The cards named in the editor's text, in the order they first appear, like castOf. Only
+ * blocks that changed since the linked names were last drawn are searched again.
+ */
+export function castIn(state: EditorState): NamedCard[] {
+  const names = namesKey.getState(state);
+  if (!names?.matcher) return [];
+  const { matcher, blocks, casts } = names;
+  let cast = casts.get(state.doc);
+  if (cast) return cast;
+  const seen = new Map<string, NamedCard>();
+  state.doc.descendants((node) => {
+    if (!node.isTextblock) return true;
+    for (const hit of blockNames(node, matcher, blocks)) if (!seen.has(hit.card.id)) seen.set(hit.card.id, hit.card);
+    return false;
+  });
+  cast = [...seen.values()];
+  casts.set(state.doc, cast);
+  return cast;
 }

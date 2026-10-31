@@ -393,6 +393,10 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cb-prose { outline: none; -webkit-hyphens: auto; hyphens: auto; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
+/* !Word: the ! is hidden and the letter is a drop cap at the start of a paragraph, a raised initial anywhere else (see dropCaps.ts). */
+.cb-dropmark { display: none; }
+.cb-dropcap { font-size: 1.6em; line-height: 0; }
+.cb-dropcap-start { float: left; font-size: 3.3em; line-height: 0.8; margin: 0.08em 0.08em 0 0; }
 .cb-prose p:first-child { margin-top: 0; }
 .cb-prose hr[data-scene-break] { border: none; margin: 16px 0; text-align: center; overflow: visible; height: 24px; }
 .cb-prose hr[data-scene-break]::after { content: '⁂'; color: var(--page-muted); font-size: 16px; line-height: 24px; }
@@ -609,6 +613,7 @@ button.seas-quote:hover { color: var(--accent); }
 .set-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: left 0.15s; }
 .set-sw[aria-checked='true'] { background: var(--accent); }
 .set-sw[aria-checked='true']::after { left: 16px; background: #fff; }
+.set-sw:disabled { opacity: 0.4; cursor: default; }
 .set-sel { flex: none; min-width: 160px; max-width: 100%; height: 28px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); font-size: 13px; }
 .set-num { flex: none; width: 100px; height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); text-align: right; font-size: 13px; }
 .set-num-wide { width: auto; text-align: left; }

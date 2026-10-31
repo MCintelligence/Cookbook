@@ -171,6 +171,9 @@ Markdown works too, if you know it. Try each on an empty line below:
 - \`**bold**\`, \`*italic*\` and \`_underline_\`
 - \`# \` at the start of a line for a chapter title, \`> \` for a quote
 - \`- \` for a bulleted list, \`-1 \` for a numbered one, \`-TD \` for a checklist
+- \`!\` before a word, as in \`!Sword\`, makes its first letter a drop cap, like the !Dragon here. At the start of a paragraph it drops two lines deep. Click into the word to see the ! again.
+
+Don't want some of these? Settings › Writing turns Markdown off, or any one rule on its own.
 
 Type **/** at the start of a line for the **insert menu**: styles, lists, a table, a section break or a footnote. Or use the Insert and Format menus at the top.
 

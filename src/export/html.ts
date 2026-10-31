@@ -3,6 +3,7 @@ import { PX_PER_PT, type StyleSheet, fontStack, stylesToCss } from '../styles/st
 import { paragraphFormatOf, textFormatOf } from '../editor/format';
 import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
+import { dropCapClass, withDropCaps } from '../editor/dropCaps';
 
 export function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -83,7 +84,7 @@ export class HtmlWriter {
   }
 
   private inline(nodes: NodeJSON[]): string {
-    return nodes
+    return withDropCaps(nodes)
       .map((n) => {
         if (n.type === 'footnote') {
           this.count++;
@@ -95,6 +96,7 @@ export class HtmlWriter {
         if (n.type === 'image') return n.attrs?.alt ? `<em class="picture">[${escapeHtml(String(n.attrs.alt))}]</em>` : '';
         if (n.type !== 'text') return '';
         let html = escapeHtml(n.text ?? '');
+        if (n.dropCap) html = `<span class="${dropCapClass(n.dropCap === 'start')}">${html}</span>`;
         const styles = charStyles(n);
         // Innermost first, the same nesting the editor uses.
         for (const m of [...(n.marks ?? [])].reverse()) {
@@ -127,6 +129,8 @@ ${scope} table { border-collapse: collapse; margin: 1em auto; }
 ${scope} th, ${scope} td { border: 1px solid #999; padding: 0.25em 0.6em; text-indent: 0; text-align: left; }
 ${scope} pre { font-family: 'Courier Prime', monospace; font-size: 0.85em; white-space: pre-wrap; margin: 1em 0; }
 ${scope} code { font-family: 'Courier Prime', monospace; font-size: 0.92em; }
+${scope} .cb-dropcap { font-size: 1.6em; line-height: 0; }
+${scope} .cb-dropcap-start { float: left; font-size: 3.2em; line-height: 0.8; padding: 0.06em 0.08em 0 0; }
 ${scope} a { color: inherit; }
 ${scope} sup.fn a { text-decoration: none; color: inherit; }`;
 }

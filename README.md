@@ -73,9 +73,10 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `--` | an em dash |
 | `"` and `'` | curly quotes |
 | `* * *` on its own line | a section break |
+| `!Word` | a drop cap on the word's first letter: two lines deep at the start of a paragraph, a raised initial anywhere else. The file keeps the `!` |
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
-Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+Pressing Backspace straight after a shortcut turns it back into exactly what you typed. Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
 
 ## The Shelf
 

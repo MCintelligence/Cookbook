@@ -2626,7 +2626,7 @@ export function App() {
     const sections: [SettingsSection, string, string][] = [
       ['general', 'General', 'reopen startup shortcuts mac ctrl'],
       ['appearance', 'Appearance', 'theme dark light sepia size motion page colour'],
-      ['writing', 'Writing', 'quotes dash markdown typewriter focus paste @'],
+      ['writing', 'Writing', 'quotes dash markdown drop cap typewriter focus paste @'],
       ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
       ['shortcuts', 'Keyboard shortcuts', 'keys'],
       ['updates', 'Updates and privacy', 'version'],

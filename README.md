@@ -118,7 +118,7 @@ Character and place pages start empty. Put the cursor on an empty line and a + a
 
 ### Linked names
 
-Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. The card above each item shows chips for the characters and places it names, and each character or place card lists the items it appears in, in Shelf order.
+Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or place card lists the items it appears in, in Shelf order.
 
 ### The Pantry shelf and pins
 

@@ -143,7 +143,6 @@ import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
-import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
 import { shrinkPicture } from './ui/pictures';
@@ -3114,12 +3113,6 @@ export function App() {
           </div>
         ) : (
           <>
-          {doc && path && doc.kind === 'scene' && (
-            <CardDetails
-              style={cardStyle}
-              cast={cast}
-            />
-          )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
               style={cardStyle}

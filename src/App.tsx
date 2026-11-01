@@ -87,7 +87,8 @@ import {
 } from './storage/platform';
 import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
 import type { NewRecipeChoice } from './ui/NewRecipe';
-import { deskScrollKey } from './ui/scrollKeys';
+import { pageKeyAnywhere } from './ui/scrollKeys';
+import type { EditorView } from '@tiptap/pm/view';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -2432,7 +2433,6 @@ export function App() {
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onAppKey.current = (e: KeyboardEvent) => {
     if (e.defaultPrevented) return;
-    if (deskScrollKey(e, desk.current)) return;
     if (e.key === 'Escape' && !settingsAt) {
       // Escape in the Shelf or a panel goes back to the page, unless a box or menu there wanted it.
       const at = document.activeElement;
@@ -2488,6 +2488,15 @@ export function App() {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  /** The text that Home, End and the page keys go to from outside it (see scrollKeys). */
+  const keysPage = useRef<EditorView | null>(null);
+  keysPage.current = editor && !editor.isDestroyed && doc && !manuscript ? editor.view : null;
+  useEffect(() => {
+    // Caught on the way down, before the Shelf or a list can take them for itself.
+    const onKey = (e: KeyboardEvent) => void pageKeyAnywhere(e, keysPage.current, desk.current);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
   const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});

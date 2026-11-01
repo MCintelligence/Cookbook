@@ -1,9 +1,9 @@
+import { type EditorView } from '@tiptap/pm/view';
+
 /*
- * Home, End, Page Up, Page Down and the arrows when the page is showing but
- * nothing on it has the caret: after a click on the desk around the page, say.
- * Left to the browser these keys scroll with an animation, so a quick second
- * press starts from wherever the first had got to and Home can stop short of
- * the top. Here each press scrolls at once, the way the page's own keys do.
+ * Left to the browser, Home, End and the page keys scroll with an animation,
+ * so a quick second press starts from wherever the first had got to and Home
+ * can stop short of the top. Here each press goes where it should at once.
  */
 
 /** How far one press of ↑ or ↓ goes. */
@@ -24,21 +24,36 @@ export function scrollKeyTarget(key: string, o: { top: number; height: number; c
   return to === null ? null : Math.min(Math.max(to, 0), bottom);
 }
 
-/** Whatever has the keyboard wants these keys for itself: a text box, a list, a menu. */
+/** Places that need these keys for themselves: a text box, a menu, a dialog. */
 function keepsKeys(el: Element): boolean {
-  return !!el.closest('input, textarea, select, [contenteditable="true"], [role="menu"], [role="menubar"], [role="listbox"], [role="tree"], [role="slider"], [role="tablist"], [role="grid"], [role="dialog"]');
+  return !!el.closest('input, textarea, select, [contenteditable="true"], .menu, [role="menu"], [role="menubar"], [role="dialog"]');
 }
 
-/** Scrolls `desk` for a key pressed with the keyboard on the desk or nowhere in particular. Returns whether it did. */
-export function deskScrollKey(e: KeyboardEvent, desk: HTMLElement | null): boolean {
-  if (!desk || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return false;
-  // Ctrl+Home and Ctrl+End go to the top and bottom too, as in a browser.
-  if (e.ctrlKey && e.key !== 'Home' && e.key !== 'End') return false;
+const PAGE_KEYS = new Set(['Home', 'End', 'PageUp', 'PageDown']);
+
+/**
+ * Home, End, Page Up and Page Down belong to the page wherever the keyboard
+ * is, except in a text box, a menu or a dialog: from the Shelf, the toolbar or
+ * the desk they go to the text as though the caret had them. With no text
+ * showing (the manuscript, Mise en Place), they scroll the desk at once.
+ * Returns whether it took the key.
+ */
+export function pageKeyAnywhere(e: KeyboardEvent, view: EditorView | null, desk: HTMLElement | null): boolean {
+  if (!PAGE_KEYS.has(e.key) || e.altKey || e.isComposing || e.defaultPrevented) return false;
   const at = e.target instanceof Element ? e.target : null;
-  if (at && at !== document.body && at !== document.documentElement && !(desk.contains(at) && !keepsKeys(at))) return false;
+  if (view && at && view.dom.contains(at)) return false;
+  if (at && keepsKeys(at)) return false;
+  if (view && view.editable) {
+    e.preventDefault();
+    e.stopPropagation();
+    view.focus();
+    if (view.someProp('handleKeyDown', (f) => f(view, e))) return true;
+  }
+  if (!desk || e.shiftKey || e.metaKey) return !!view;
   const to = scrollKeyTarget(e.key, { top: desk.scrollTop, height: desk.scrollHeight, client: desk.clientHeight });
-  if (to === null) return false;
+  if (to === null) return !!view;
   e.preventDefault();
+  e.stopPropagation();
   desk.scrollTop = to;
   return true;
 }

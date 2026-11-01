@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, type MenuItem } from './Menu';
 
 export interface BarMenu {
@@ -15,8 +15,9 @@ export interface BarMenu {
 export function MenuBar({ menus }: { menus: BarMenu[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  // A click on the open menu's own name closes it, rather than closing and opening it again.
-  const closed = useRef<{ index: number; at: number } | null>(null);
+  // Pointing at another menu opens it after the same short pause as a submenu, so passing over one on the way doesn't.
+  const hover = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(hover.current), []);
   const go = (index: number) => {
     buttons.current[index]?.focus();
     setOpen(index);
@@ -36,11 +37,14 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           aria-expanded={open === i}
           className="menubar-item"
           onClick={() => {
-            const c = closed.current;
-            if (c && c.index === i && Date.now() - c.at < 400) return;
+            window.clearTimeout(hover.current);
             setOpen(open === i ? null : i);
           }}
-          onPointerEnter={() => open !== null && open !== i && go(i)}
+          onPointerEnter={() => {
+            window.clearTimeout(hover.current);
+            if (open !== null && open !== i) hover.current = window.setTimeout(() => go(i), 150);
+          }}
+          onPointerLeave={() => window.clearTimeout(hover.current)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -61,8 +65,9 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           label={menus[open]!.label}
           x={at.left}
           y={at.bottom + 4}
+          opener={buttons.current[open]}
           onClose={() => {
-            closed.current = { index: open, at: Date.now() };
+            window.clearTimeout(hover.current);
             setOpen(null);
           }}
           onSide={(dir) => go(step(open, dir))}

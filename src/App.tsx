@@ -86,6 +86,8 @@ import {
 } from './storage/platform';
 import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
 import type { NewRecipeChoice } from './ui/NewRecipe';
+import { pageKeyAnywhere } from './ui/scrollKeys';
+import type { EditorView } from '@tiptap/pm/view';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -344,7 +346,7 @@ export function App() {
   const [folding, setFolding] = useState<{ open: boolean; under?: string; at: number } | null>(null);
   const portraitInput = useRef<HTMLInputElement>(null);
   const portraitFor = useRef<string | null>(null);
-  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
+  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string; opener?: HTMLElement } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
@@ -1408,9 +1410,12 @@ export function App() {
   };
 
   const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
+    // A second click on the recipe's name closes its menu.
+    if (menu?.label === 'Recipe' && menu.opener === e.currentTarget) return setMenu(null);
     const r = e.currentTarget.getBoundingClientRect();
     setMenu({
       label: 'Recipe',
+      opener: e.currentTarget,
       x: r.left,
       y: r.bottom + 4,
       items: [
@@ -2509,6 +2514,15 @@ export function App() {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  /** The text that Home, End and the page keys go to from outside it (see scrollKeys). */
+  const keysPage = useRef<EditorView | null>(null);
+  keysPage.current = editor && !editor.isDestroyed && doc ? editor.view : null;
+  useEffect(() => {
+    // Caught on the way down, before the Shelf or a list can take them for itself.
+    const onKey = (e: KeyboardEvent) => void pageKeyAnywhere(e, keysPage.current, desk.current);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, []);
   /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
   const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});

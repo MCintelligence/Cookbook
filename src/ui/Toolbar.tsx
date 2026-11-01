@@ -84,8 +84,6 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
   const color = text.color === 'mixed' || text.color === null ? style.color : text.color;
   const align = paragraph.align ?? style.align;
   const lineSpacing = paragraph.lineSpacing ?? style.lineSpacing;
-  const onWords = 'Changes the selected words, or what you type next';
-  const onParagraphs = 'Changes the selected paragraphs';
   const alignment = ALIGNMENTS.find((a) => a.value === align) ?? ALIGNMENTS[0]!;
   // Anything set by hand here, which "Update style to match" can take into the style.
   const handSet = !!(paragraph.align || paragraph.lineSpacing || (text.font && text.font !== 'mixed') || (text.size && text.size !== 'mixed') || (text.color && text.color !== 'mixed'));
@@ -138,6 +136,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
           label="Paragraph style"
           listLabel="Styles"
           className="tb-style"
+          title="Paragraph style"
           items={sheet.paragraph}
           current={styleId}
           disabled={disabled}
@@ -158,7 +157,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         label="Font"
         listLabel="Fonts"
         className="tb-font"
-        title={onWords}
+        title="Font"
         items={fonts}
         current={font}
         disabled={textDisabled}
@@ -172,7 +171,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         label="Size in points"
         listLabel="Sizes"
         className="tb-size"
-        title={onWords}
+        title="Font size"
         value={size}
         blank={text.size === 'mixed'}
         presets={SIZES}
@@ -188,7 +187,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         open={open === 'colour'}
         onClose={close}
         button={
-          <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title={onWords} disabled={textDisabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
+          <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title="Text colour" disabled={textDisabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
             <span className="tb-wheel" aria-hidden="true" />
             <span className="tb-ink" style={{ '--ink': color, '--ink-dark': darkPageColor(color) } as CSSProperties} aria-hidden="true" />
             <Chevron />
@@ -211,7 +210,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         open={open === 'align'}
         onClose={close}
         button={
-          <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={open === 'align'} title={onParagraphs} disabled={disabled} onClick={() => setOpen(open === 'align' ? null : 'align')}>
+          <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={open === 'align'} title="Alignment" disabled={disabled} onClick={() => setOpen(open === 'align' ? null : 'align')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d={alignment.lines} />
             </svg>
@@ -243,7 +242,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         label="Line spacing"
         listLabel="Line spacings"
         className="tb-spacing"
-        title={onParagraphs}
+        title="Line spacing"
         icon={
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />

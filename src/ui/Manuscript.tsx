@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getSchema } from '@tiptap/core';
-import { DOMSerializer, Node as PMNode } from '@tiptap/pm/model';
 import { cookbookExtensions } from '../editor/extensions';
 import { type NodeJSON, parseMarkdown, plainText } from '../editor/markdown';
+import { SceneText, footnotesOf } from './SceneText';
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode, readDocument } from '../storage/book';
 import { countWords } from '../storage/index';
@@ -34,11 +34,6 @@ function flatten(nodes: TreeNode[], depth = 0): ({ folder: TreeNode; depth: numb
     const inside = flatten(n.children ?? [], depth + 1);
     return inside.some((i) => 'file' in i) ? [{ folder: n, depth }, ...inside] : [];
   });
-}
-
-function footnotesOf(node: NodeJSON): string[] {
-  if (node.type === 'footnote') return [String(node.attrs?.text ?? '')];
-  return (node.content ?? []).flatMap(footnotesOf);
 }
 
 export function readingTime(words: number): string {
@@ -145,20 +140,4 @@ export function Manuscript({ fs, tree, title, onOpen, onClose, onMenu }: Props) 
       </article>
     </>
   );
-}
-
-/** A scene's text drawn with the same schema and styles as the editor, but not editable. */
-export function SceneText({ schema, body }: { schema: ReturnType<typeof getSchema>; body: NodeJSON }) {
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    try {
-      const doc = PMNode.fromJSON(schema, body);
-      el.replaceChildren(DOMSerializer.fromSchema(schema).serializeFragment(doc.content));
-    } catch {
-      el.textContent = 'This item could not be shown.';
-    }
-  }, [schema, body]);
-  return <div className="cb-prose ms-text" ref={box} />;
 }

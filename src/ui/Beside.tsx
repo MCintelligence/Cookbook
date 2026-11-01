@@ -3,7 +3,7 @@ import { getSchema } from '@tiptap/core';
 import { cookbookExtensions } from '../editor/extensions';
 import { type NodeJSON, parseMarkdown } from '../editor/markdown';
 import { type CookbookDocument } from '../storage/document';
-import { SceneText } from './Manuscript';
+import { SceneText } from './SceneText';
 
 interface Props {
   path: string;

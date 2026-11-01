@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { cookbookExtensions, type NextStyle } from './extensions';
 import { parseMarkdown } from './markdown';
@@ -19,9 +19,16 @@ interface Props {
   onSeasonings: (request: SeasoningsRequest) => void;
   /** The kind of page, read once when it opens: character and place pages get brainstorming cards. */
   cardKind?: string | null;
+  /**
+   * Read once as the editor is made. When the same Item's editor is made again somewhere else on
+   * the page (into or out of Mise en Place), this gives its text and undo history as they are now,
+   * since `initialBody` and `undoLog` are as the Item was opened.
+   */
+  takeOver?: () => { initialBody: string; undoLog: UndoLog | null } | null;
 }
 
-export function PageEditor({ initialBody, undoLog, onRecorder, nextStyle, onChange, onReady, onSeasonings, cardKind = null }: Props) {
+export function PageEditor({ onRecorder, nextStyle, onChange, onReady, onSeasonings, cardKind = null, takeOver, ...opened }: Props) {
+  const [{ initialBody, undoLog }] = useState(() => takeOver?.() ?? opened);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const nextStyleRef = useRef(nextStyle);

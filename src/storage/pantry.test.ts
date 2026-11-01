@@ -11,7 +11,7 @@ const character = CARD_TEMPLATES.find((t) => t.id === 'character')!;
 describe('Pantry cards', () => {
   it('reads the writer’s fields and leaves Cookbook’s own keys alone', () => {
     const fields = { role: 'Cook', age: 62, notes: { n1: 'x' }, aka: ['Mama J'], portrait: 'pictures/June.jpg', wants: null };
-    expect(cardFieldsOf(fields)).toEqual([
+    expect(cardFieldsOf({ fields })).toEqual([
       ['role', 'Cook'],
       ['age', '62'],
       ['wants', ''],
@@ -38,10 +38,28 @@ describe('Pantry cards', () => {
     const back = parseDocument(serializeDocument(withCardFields(doc, [[keys[0]!, 'Chef'], [keys[1]!, 'Married']])));
     expect(back.title).toBe('June');
     expect(back.kind).toBe('character');
-    expect(cardFieldsOf(back.fields)).toEqual([
+    expect(cardFieldsOf(back)).toEqual([
       ['title 2', 'Chef'],
       ['status 2', 'Married'],
     ]);
+  });
+
+  it('keeps fields named with a number where the writer put them', () => {
+    const doc = { id: '1', title: 'June', kind: 'character' as const, fields: { status: 'done' }, body: '' };
+    const keys = cardFieldKeys(['Role', '3', 'Age', '10']);
+    const saved = serializeDocument(withCardFields(doc, [[keys[0]!, 'Chef'], [keys[1]!, 'Ada'], [keys[2]!, '62'], [keys[3]!, '']]));
+    expect(saved).toMatch(/Role: Chef\n"?3"?: Ada\nAge: "?62"?\n"?10"?: ""\nstatus: done/);
+    const back = parseDocument(saved);
+    expect(cardFieldsOf(back)).toEqual([
+      ['Role', 'Chef'],
+      ['3', 'Ada'],
+      ['Age', '62'],
+      ['10', ''],
+    ]);
+    // Still in place after another round, and after a field elsewhere changes.
+    const again = parseDocument(serializeDocument({ ...back, fields: { ...back.fields, status: 'simmering' } }));
+    expect(cardFieldsOf(again).map(([k]) => k)).toEqual(['Role', '3', 'Age', '10']);
+    expect(again.fields.status).toBe('simmering');
   });
 
   it('reads nicknames as a list or a comma-separated line', () => {

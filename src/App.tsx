@@ -30,7 +30,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -49,10 +49,11 @@ const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
+import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook } from './storage/learnToCook';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
-import { LiveGoals, type SaveState, SavedStatus } from './ui/LiveCounts';
+import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
 import { createStore } from './ui/store';
 import { useStable } from './ui/useStable';
 import { docWords } from './editor/docStats';
@@ -70,6 +71,7 @@ const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: 
 import {
   type BookLocation,
   DEFAULT_BOOK,
+  bookExists,
   childLocation,
   defaultLocation,
   isTauri,
@@ -97,6 +99,8 @@ import {
 } from './styles/styles';
 import { setPictureLoader } from './editor/formatting';
 import { PageEditor } from './editor/PageEditor';
+import { MiseEnPlace } from './ui/MiseEnPlace';
+import { type MiseView, findGroup, findNode, inRoots, miseEntries, miseEntriesOf, miseItems, miseWords, viewOfPicked } from './ui/mise';
 import { type SeasoningsRequest } from './editor/seasonings';
 import { type UndoLog, type UndoRecorder, readUndoLog, writeUndoLog } from './editor/undoLog';
 import { undoDepth } from '@tiptap/pm/history';
@@ -121,7 +125,7 @@ import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
-import { type Backup, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
+import { type Backup, BackupCheckError, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
@@ -140,7 +144,6 @@ import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
-import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
 import { shrinkPicture } from './ui/pictures';
@@ -149,6 +152,14 @@ import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePictu
 type Notes = Record<string, string>;
 /** The panel open on the right of the page, if any. */
 type Panel = 'pantry' | 'seasonings';
+/** Where the cursor was in an Item whose editor is being made again elsewhere on the page. */
+interface KeptCaret {
+  id: string;
+  from: number;
+  to: number;
+  /** Whether the editor had the keyboard, so the new one takes it back. */
+  focus: boolean;
+}
 
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
@@ -309,6 +320,8 @@ export function App() {
   pinsRef.current = pins;
   /** The Shelf being read as one manuscript (Read book), or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
+  /** The Groups shown as Mise en Place, all their Items as one page, or null for a single Item. */
+  const [mise, setMise] = useState<MiseView | null>(null);
   const [manuscriptTitle, setManuscriptTitle] = useState('');
   /** Words for Search, from "Search everywhere" on a right-click. */
   const [findRequest, setFindRequest] = useState<{ query: string; at: number } | null>(null);
@@ -321,8 +334,9 @@ export function App() {
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
   /** A short message at the bottom of the window, sometimes with an Undo. */
-  const [notice, setNotice] = useState<{ text: string; undo?: () => void; at: number } | null>(null);
-  const say = (text: string, undo?: () => void) => setNotice({ text, undo, at: Date.now() });
+  /** A passing message; `undo` adds a button, labelled `action` or else Undo. */
+  const [notice, setNotice] = useState<{ text: string; undo?: () => void; action?: string; at: number } | null>(null);
+  const say = (text: string, undo?: () => void, action?: string) => setNotice({ text, undo, action, at: Date.now() });
   const importInput = useRef<HTMLInputElement>(null);
   /** The folder the next "Import files…" goes into, or null for the usual place. */
   const importInto = useRef<string | null>(null);
@@ -346,7 +360,19 @@ export function App() {
   /** Words pasted since the last save, which don't count towards the goal unless the book says so. */
   const pastedWords = useRef(0);
   // Saved before a timed backup, so it has the newest words.
-  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current());
+  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current(), {
+    failed: (text) => setError(text),
+    mended: (text) => {
+      setError((shown) => (shown === text ? null : shown));
+      say('Backups are working again.');
+    },
+    sameDisk: () =>
+      say(
+        'Your backups are on the same disk as your recipes, so a broken or lost computer would take both. A folder on another drive, or one a cloud service syncs, keeps them apart.',
+        () => openSettings('saving'),
+        'Choose folder…',
+      ),
+  });
 
   /** Changes the open book's settings in book.json. */
   const updateBook = (changes: Partial<BookInfo>) => {
@@ -365,7 +391,7 @@ export function App() {
    */
   const openAt = async (
     target: BookLocation,
-    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean } = {},
+    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean; learn?: boolean } = {},
   ) => {
     await flushSave();
     await saveUndoNow();
@@ -374,7 +400,16 @@ export function App() {
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
-    else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
+    else if (mode.create && mode.learn) {
+      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
+      rememberLearnToCook(target);
+      // It opens at Welcome, like a recipe reopening where the writer left off.
+      try {
+        localStorage.setItem(lastSceneKey(target), FIRST_ITEM);
+      } catch {
+        // It opens without an Item; the Shelf is still there.
+      }
+    } else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
     else {
       try {
         info = await openBook(nextFs);
@@ -542,12 +577,34 @@ export function App() {
       return 'done';
     });
 
+  /** Opens Learn to Cook, or makes a fresh one if the last was deleted. */
+  const learnToCook = async () => {
+    const kept = learnToCookLocation();
+    if (kept && (await bookExists(kept))) return openAt(kept);
+    const target = await freshLocation(LEARN_TO_COOK, null);
+    // One left in its folder by a Cookbook that has forgotten it is opened again rather than written over.
+    if (await bookExists(target)) {
+      rememberLearnToCook(target);
+      return openAt(target);
+    }
+    return openAt(target, { create: LEARN_TO_COOK, learn: true });
+  };
+
   useEffect(() => {
     // StrictMode runs effects twice in development; open the book only once.
     if (started.current) return;
     started.current = true;
     const last = recentBooks()[0]?.location;
     (async () => {
+      // A writer's very first start opens Learn to Cook, unless an older Cookbook already made their first recipe.
+      if (!last && !learnedBefore() && !(await bookExists(await defaultLocation()))) {
+        try {
+          await learnToCook();
+          return;
+        } catch {
+          // Their own first recipe opens instead.
+        }
+      }
       if (last) {
         try {
           await openAt(last);
@@ -795,13 +852,19 @@ export function App() {
     const section = sectionOf(p);
     if (section) setPantryGroup(section);
     const opened = await readDocument(fs, p);
+    const log = await readUndoLog(fs, opened.id);
+    // Words typed while the next Item was being read still belong to the one being left.
+    if (pendingSave.current) {
+      await flushSave();
+      await saveUndoNow();
+    }
     setManuscript(null);
     setSideOpen(false);
     docRef.current = opened;
     bodyFrom.current = null;
     savedText.current = serializeDocument(opened);
     savedWords.current = sceneWords(opened);
-    setUndoLog(await readUndoLog(fs, opened.id));
+    setUndoLog(log);
     setPath(p);
     setDoc(opened);
     try {
@@ -810,6 +873,20 @@ export function App() {
       // The book just opens without a scene next time.
     }
   };
+
+  /**
+   * The open Item's editor made again in another place on the page, into or out of Mise en Place:
+   * it starts from the text and undo history as they are now, not as the Item was opened.
+   * Read once as the editor is made, while the one it replaces is still there.
+   */
+  const editorTakeOver = useCallback(() => {
+    const r = recorder.current;
+    const now = currentDoc();
+    if (!r || !now || r.id !== now.id) return null;
+    // The steps the old editor hadn't written yet are written now, so they survive closing too.
+    void saveUndoNow();
+    return { initialBody: now.body, undoLog: r.recorder.toJSON() };
+  }, [currentDoc, saveUndoNow]);
 
   // Leaving an Item whose saves only changed words: the Shelf catches up with its word count now.
   useEffect(() => {
@@ -836,11 +913,88 @@ export function App() {
     }
   }, [fs, location]);
 
-  // A page opens at its top, with its status and synopsis card in view.
+  // A page opens at its top.
+  // In Mise en Place the page stays where it is: the open Item is somewhere down it.
   useLayoutEffect(() => {
-    if (!path) return;
+    if (!path || mise) return;
     document.querySelector('.desk')?.scrollTo({ top: 0 });
   }, [path]);
+
+  // Opening an Item outside the Groups shown (from Search, the Pantry or the Shelf) leaves Mise en Place.
+  useEffect(() => {
+    if (mise && path && !inRoots(path, mise.roots)) setMise(null);
+  }, [path]);
+  // What is shown, as the Shelf has it now. Groups moved, renamed or put in the trash drop out; when
+  // none is left, Mise en Place closes. Worked out when the Shelf or the view changes.
+  const miseShown = useMemo(() => {
+    if (!mise) return null;
+    const nodes = mise.roots.map((r) => findNode(tree, r)).filter((n): n is TreeNode => !!n);
+    const groups = nodes.filter((n) => n.kind === 'folder');
+    if (groups.length === 0) return null;
+    const anchor = findGroup(tree, mise.anchor) && inRoots(mise.anchor, mise.roots) ? mise.anchor : groups[0]!.path;
+    const targetNode = findGroup(tree, mise.target) ?? findGroup(tree, anchor)!;
+    const title = nodes.length === 1 ? groups[0]!.name : `${groups.length.toLocaleString('en')} ${groups.length === 1 ? 'group' : 'groups'}${nodes.length > groups.length ? ' and items' : ''}`;
+    return { nodes, roots: nodes.map((n) => n.path), groups: new Set(groups.map((g) => g.path)), anchor, target: { path: targetNode.path, name: targetNode.name }, title };
+  }, [tree, mise]);
+  useEffect(() => {
+    if (mise && !miseShown) setMise(null);
+  }, [mise, miseShown]);
+
+  /**
+   * Shows Groups as Mise en Place, opening at the anchor Group with the open Item (if it is among
+   * them) or the anchor's first Item ready to write in.
+   */
+  const openView = async (view: MiseView) => {
+    if (!fs) return;
+    const nodes = view.roots.map((r) => findNode(tree, r)).filter((n): n is TreeNode => !!n);
+    if (nodes.length === 0) return;
+    // Saved before the page changes, since the editor of an Item outside the Groups goes as it does.
+    await flushSave();
+    await saveUndoNow();
+    setManuscript(null);
+    setSideOpen(false);
+    setMise(view);
+    if (path && inRoots(path, view.roots)) return;
+    const anchorNode = findGroup(tree, view.anchor);
+    const first = (anchorNode ? miseItems(miseEntries(anchorNode))[0] : undefined) ?? miseItems(miseEntriesOf(nodes))[0];
+    if (first) await select(first);
+    // Empty Groups open as an empty page; the Item open before is put away.
+    else closeScene();
+  };
+  /** Clicking a Group on the Shelf: its Items joined as one page. */
+  const openGroup = (g: string) => openView({ roots: [g], anchor: g, target: g });
+  /**
+   * Groups picked together on the Shelf (Ctrl or ⌘-click, Shift-click, Select all) show together, in
+   * Shelf order. The page stays at the Group it was showing, or the open Item's Group.
+   */
+  const showPicked = (picked: Set<string>) => {
+    const here = path && topOf(path) === BOOKSHELF && parentOf(path) !== BOOKSHELF ? parentOf(path) : null;
+    const view = viewOfPicked(picked, tree, miseShown?.anchor ?? here);
+    if (view) void openView(view);
+  };
+
+  /** The first words typed into an all-empty page make the first Item, in the Group picked first. */
+  const startWriting = async (made: (p: string) => void): Promise<string | null> => {
+    const g = miseShown?.target.path;
+    if (!fs || !g) return null;
+    try {
+      const p = await createDocument(fs, g, SCENE_TEMPLATES[0]!.title);
+      // Before the Shelf is drawn again, which takes the empty page and its typed words away.
+      made(p);
+      order.current = await placeNew(fs, order.current, tree, BOOKSHELF, p, null);
+      const current = index.current;
+      if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
+      indexChanged();
+      await refreshTree();
+      await select(p);
+      const groupName = baseName(g);
+      say(`Started a new item in “${groupName}”.`, () => void trashPath(p));
+      return p;
+    } catch (e) {
+      setError(`Couldn’t start a new item. ${friendlyError(e)}`);
+      return null;
+    }
+  };
 
   const addScene = (template?: DocTemplate) => {
     // New pages go in the book of the one being written, so they land in the same chapter.
@@ -1143,7 +1297,7 @@ export function App() {
       await refreshBackups();
       say(`Backed up “${bookRef.current?.title ?? 'the recipe'}”.`);
     } catch (e) {
-      setError(`Couldn’t back up the recipe. ${friendlyError(e)}`);
+      setError(e instanceof BackupCheckError ? e.message : `Couldn’t back up the recipe. ${friendlyError(e)}`);
     }
   };
   /** Shows the book's backups; picking one opens a copy of the book as it was, beside this one. */
@@ -1442,7 +1596,7 @@ export function App() {
       { label: 'Expand all', onPick: () => setFolding({ open: true, at: Date.now() }) },
       { label: 'Collapse all', onPick: () => setFolding({ open: false, at: Date.now() }) },
       { separator: true },
-      { label: 'Select all', hint: keys('Mod-A'), disabled: tree.length === 0, onPick: () => setShelfMarked(new Set(allPaths(tree))) },
+      { label: 'Select all', hint: keys('Mod-A'), disabled: tree.length === 0, onPick: () => onShelfMark(new Set(allPaths(tree)), true) },
       { label: 'Deselect all', disabled: shelfMarked.size === 0, onPick: () => setShelfMarked(new Set()) },
     ]);
   };
@@ -1501,6 +1655,7 @@ export function App() {
     if (node.kind === 'folder') {
       const kids = childrenOf(treeOf(top), top, p);
       showMenu('Group', x, y, [
+        ...(onShelf ? [{ label: 'Show as one page', onPick: () => void openGroup(p) }, { separator: true as const }] : []),
         {
           label: onShelf ? 'New item here' : 'New card here',
           onPick: () => void addFrom(onShelf ? SCENE_TEMPLATES[0]! : CARD_TEMPLATES.find((t) => t.folder === sectionOf(p + '/x'))!, p),
@@ -1597,6 +1752,8 @@ export function App() {
     const setMarks = top === PANTRY ? setPantryMarked : setShelfMarked;
     const inside = (f: string) => list.some((p) => f === p || f.startsWith(p + '/'));
     const targets: MenuItem[] = [];
+    // Picked Groups can be shown together as one page.
+    const together = top === BOOKSHELF ? viewOfPicked(paths, tree, miseShown?.anchor ?? null) : null;
     if (top === BOOKSHELF) targets.push({ label: 'Top of the Shelf', onPick: () => void moveMany(list, top) });
     const walk = (nodes: TreeNode[], depth: number) => {
       for (const n of nodes) {
@@ -1609,6 +1766,7 @@ export function App() {
     const each = (key: string, value: unknown) => () => void Promise.all(files.map((p) => setFieldOf(p, key, value)));
     showMenu('Picked', x, y, [
       { heading: `${paths.length} picked` },
+      ...(together ? [{ label: 'Show together as one page', onPick: () => void openView(together) }] : []),
       { label: 'Move to', items: targets.length > 0 ? targets : [{ label: 'No other groups', onPick: () => {}, disabled: true }] },
       {
         label: 'Label',
@@ -1653,7 +1811,7 @@ export function App() {
         label="Shelf tools"
         status={shelfMarked.size > 1 ? `${shelfMarked.size} picked` : undefined}
         buttons={[
-          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => setShelfMarked(everything ? new Set() : new Set(all)) },
+          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => (everything ? setShelfMarked(new Set()) : onShelfMark(new Set(all), true)) },
           { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
           { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group) : addScene()) },
           { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
@@ -2135,9 +2293,12 @@ export function App() {
    */
   const goToArea = (area: Area) => {
     if (area === 'page') {
-      if (!editor) return;
+      // An empty Group in Mise en Place has a blank page to type on instead of an editor.
+      const blank = editor ? null : document.querySelector<HTMLElement>('.mise-blank');
+      if (!editor && !blank) return;
       setSideOpen(false);
-      editor.commands.focus();
+      if (editor) editor.commands.focus();
+      else blank!.focus();
       return;
     }
     if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
@@ -2175,12 +2336,50 @@ export function App() {
     focusNextPage.current = 'start';
     void select(to);
   };
+  /**
+   * Mod+Shift+G: between the open Item on its own page and its whole Group as one page (Mise en
+   * Place), with the cursor kept where it is. The same editor is made again in its new place.
+   */
+  const toggleMise = () => {
+    if (manuscript) return;
+    const keep = () => {
+      if (!editor || !doc) return;
+      const { from, to } = editor.state.selection;
+      focusNextPage.current = { id: doc.id, from, to, focus: editor.isFocused };
+    };
+    if (miseShown) {
+      if (!path || !inRoots(path, miseShown.roots)) return;
+      keep();
+      return setMise(null);
+    }
+    if (!path || topOf(path) !== BOOKSHELF) return say('Mise en Place shows a group from the Shelf.');
+    const g = parentOf(path);
+    if (g === BOOKSHELF) return say('This item isn’t in a group, so there is nothing to show with it.');
+    keep();
+    void openGroup(g);
+  };
+  /** Whether the open Item could be shown with its whole Group, or is being. */
+  const canMise = !!miseShown || (!!path && topOf(path) === BOOKSHELF && parentOf(path) !== BOOKSHELF);
   /** Where the next editor to appear takes the keyboard: at the top of a new item, or where its cursor already is. */
-  const focusNextPage = useRef<false | 'start' | 'here'>(false);
+  const focusNextPage = useRef<false | 'start' | 'here' | KeptCaret>(false);
   useEffect(() => {
     if (!editor || !focusNextPage.current) return;
     const at = focusNextPage.current;
     focusNextPage.current = false;
+    if (typeof at === 'object') {
+      // The same Item's editor made again elsewhere on the page: the cursor goes back where it was.
+      if (docRef.current?.id !== at.id) return;
+      const size = editor.state.doc.content.size;
+      const clamp = (n: number) => Math.max(0, Math.min(n, size));
+      try {
+        editor.commands.setTextSelection({ from: clamp(at.from), to: clamp(at.to) });
+      } catch {
+        // A place that no longer exists: the cursor stays at the start.
+      }
+      if (at.focus) editor.commands.focus(undefined, { scrollIntoView: true });
+      else editor.commands.scrollIntoView();
+      return;
+    }
     // Unless something else (a menu, a box) has taken the keyboard meanwhile.
     if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
     editor.commands.focus(at === 'start' ? 'start' : undefined);
@@ -2198,7 +2397,7 @@ export function App() {
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
       const from = areaOf(document.activeElement);
-      const to = nextArea(from, dir, (a) => (a === 'page' ? !!editor && !!doc && !manuscript : areaShown(a)));
+      const to = nextArea(from, dir, (a) => (a === 'page' ? !manuscript && ((!!editor && !!doc) || !!document.querySelector('.mise-blank')) : areaShown(a)));
       if (to) goToArea(to);
     };
     // Oven Mode hides everything but the page, so F6 brings the panels back first.
@@ -2221,7 +2420,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2260,6 +2459,7 @@ export function App() {
     else if (AREA_SHORTCUTS[id]) goToArea(AREA_SHORTCUTS[id]!);
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
+    else if (id === 'mise') toggleMise();
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -2475,12 +2675,23 @@ export function App() {
         return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
       })
       .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
+    // The Shelf's Groups too, each opening as one page. Walked only as the palette opens.
+    const groups: PaletteItem[] = [];
+    const walk = (list: TreeNode[]) =>
+      list.forEach((n) => {
+        if (n.kind !== 'folder') return;
+        const above = parentOf(n.path) === BOOKSHELF ? '' : ` · ${baseName(parentOf(n.path))}`;
+        groups.push({ id: `group:${n.path}`, label: n.name, hint: `Group, as one page${above}`, group: scenesOnly ? 'Go to' : 'Shelf', words: 'group mise en place', run: () => void openGroup(n.path) });
+        walk(n.children ?? []);
+      });
+    walk(tree);
+    places.push(...groups);
     if (scenesOnly) return places;
     const cmd = (id: string, label: string, run: () => void, group = 'Actions', hint?: string, words?: string): PaletteItem => ({ id, label, run, group, hint, words });
     const sections: [SettingsSection, string, string][] = [
       ['general', 'General', 'reopen startup shortcuts mac ctrl'],
       ['appearance', 'Appearance', 'theme dark light sepia size motion page colour'],
-      ['writing', 'Writing', 'quotes dash markdown typewriter focus paste @'],
+      ['writing', 'Writing', 'quotes dash markdown drop cap typewriter focus paste @'],
       ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
       ['shortcuts', 'Keyboard shortcuts', 'keys'],
       ['updates', 'Updates and privacy', 'version'],
@@ -2501,6 +2712,7 @@ export function App() {
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
+      ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -2609,6 +2821,40 @@ export function App() {
   // The cards above the page are as wide as the page itself, at any size and zoom.
   const cardStyle = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
+  /** The open Item's editor and what goes with it: on its own page, or in its place in Mise en Place. */
+  const pageBody = () => {
+    if (!doc || !path) return null;
+    const forId = doc.id;
+    return (
+      <>
+        <PageEditor
+          initialBody={doc.body}
+          undoLog={undoLog}
+          takeOver={editorTakeOver}
+          onRecorder={onRecorder}
+          nextStyle={nextStyle}
+          onReady={setEditor}
+          onChange={(ed) => {
+            // An editor on its way out, typed in after its Item's words were saved, mustn't write into the next one.
+            if (docRef.current?.id !== forId) return;
+            bodyFrom.current = ed;
+            scheduleSave();
+          }}
+          onSeasonings={showFootnote}
+          cardKind={doc.kind}
+        />
+        {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
+        <PageFootnotes editor={editor} />
+        <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
+      </>
+    );
+  };
+  // Words in the Group shown as Mise en Place. The others are added up when the Shelf or the index
+  // changes, not on every keystroke; the footer adds the open Item's words as they are typed.
+  const miseList = useMemo(() => (miseShown ? miseItems(miseEntriesOf(miseShown.nodes)) : []), [miseShown]);
+  const miseActive = miseShown && path && inRoots(path, miseShown.roots) ? path : null;
+  const miseOthers = useMemo(() => miseWords(miseList, (p) => cards.get(p)?.words ?? 0, miseActive, 0), [miseList, cards, miseActive]);
+
   /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
   const topMenus: BarMenu[] = [
     {
@@ -2675,6 +2921,7 @@ export function App() {
           { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
           { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
+          { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise || !!manuscript, onPick: toggleMise },
           { separator: true },
           { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
           { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
@@ -2739,6 +2986,8 @@ export function App() {
     {
       label: 'Help',
       items: () => [
+        { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+        { separator: true },
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
         { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
         { separator: true },
@@ -2762,7 +3011,17 @@ export function App() {
 
   // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
   // their identity; anything else that re-renders the app then leaves them be.
-  const onSelect = useStable(select);
+  // An Item picked on the Shelf opens on its own page, even from inside the Group shown.
+  const onSelect = useStable((p: string) => {
+    setMise(null);
+    void select(p);
+  });
+  const onOpenGroup = useStable((g: string) => void openGroup(g));
+  // Picking with Ctrl or ⌘, Shift or Select all shows the Groups picked; a plain click or Escape only marks.
+  const onShelfMark = useStable((next: Set<string>, picking?: boolean) => {
+    setShelfMarked(next);
+    if (picking) showPicked(next);
+  });
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
   const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
@@ -2881,7 +3140,9 @@ export function App() {
           folding={folding}
           recipes={recipes}
           marked={shelfMarked}
-          onMark={setShelfMarked}
+          onMark={onShelfMark}
+          onOpenGroup={onOpenGroup}
+          shownGroups={miseShown?.groups}
         />
         {shelfBar()}
       </nav>
@@ -2902,16 +3163,30 @@ export function App() {
         )}
         {manuscript && fs ? (
           <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} title={manuscriptTitle} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
+        ) : miseShown && fs ? (
+          <div className="page-row">
+            <MiseEnPlace
+              key={miseShown.anchor}
+              fs={fs}
+              roots={miseShown.nodes}
+              anchor={miseShown.anchor}
+              target={miseShown.target}
+              title={miseShown.title}
+              active={miseActive}
+              editor={editor}
+              cards={cards}
+              className={`cb-page${asDraft ? ' draft' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              style={pageStyle}
+              renderActive={pageBody}
+              onActivate={select}
+              onStartWriting={startWriting}
+              onDiscard={(p) => void trashPath(p)}
+              onPageMenu={pageMenu}
+              onItemMenu={readerMenu}
+            />
+          </div>
         ) : (
           <>
-          {doc && path && doc.kind === 'scene' && (
-            <CardDetails
-              style={cardStyle}
-              synopsis={synopsisOf(doc.fields)}
-              onSynopsis={(text) => setCardField('synopsis', text)}
-              cast={cast}
-            />
-          )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
               style={cardStyle}
@@ -2933,22 +3208,7 @@ export function App() {
           <div className="page-row">
           {doc && path ? (
             <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
-              <PageEditor
-                initialBody={doc.body}
-                undoLog={undoLog}
-                onRecorder={onRecorder}
-                nextStyle={nextStyle}
-                onReady={setEditor}
-                onChange={(ed) => {
-                  bodyFrom.current = ed;
-                  scheduleSave();
-                }}
-                onSeasonings={showFootnote}
-                cardKind={doc.kind}
-              />
-              {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
-              <PageFootnotes editor={editor} />
-              <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
+              {pageBody()}
             </article>
           ) : null}
           {doc && path && beside && beside !== path ? (
@@ -3067,6 +3327,12 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
+          onLearn={() =>
+            void fromLibrary(async () => {
+              await learnToCook();
+              return 'done';
+            })
+          }
           onCreate={(choice) => void createNewBook(choice)}
           onAdopt={(target) =>
             void fromLibrary(async () => {
@@ -3135,7 +3401,7 @@ export function App() {
                 undo();
               }}
             >
-              Undo
+              {notice.action ?? 'Undo'}
             </button>
           )}
           <button className="notice-close" aria-label="Dismiss" onClick={() => setNotice(null)}>
@@ -3192,6 +3458,15 @@ export function App() {
           request={goalsRequest}
         />
         <span className="footer-end">
+          {miseShown && (
+            <MiseCount
+              name={miseShown.title}
+              items={miseList.length}
+              otherWords={miseOthers}
+              editor={miseActive ? editor : null}
+              savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
+            />
+          )}
           {settings.focus && (
             <button className="oven-exit" title={`Back to Stove Mode (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
               Oven Mode

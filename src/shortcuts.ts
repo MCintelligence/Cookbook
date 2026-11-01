@@ -28,6 +28,8 @@ export const SHORTCUTS: Shortcut[] = [
   // The browser keeps Ctrl+N for a new window, so the web version adds Alt.
   { id: 'newScene', label: 'New item', key: isTauri() ? 'Mod-N' : 'Mod-Alt-N' },
   { id: 'bookread', label: 'Read the recipe', key: 'Mod-Shift-R' },
+  // Between the open Item on its own and its whole Group as one page, keeping the cursor where it is.
+  { id: 'mise', label: 'Mise en Place (the whole group)', key: 'Mod-Shift-G' },
   { id: 'settings', label: 'Settings', key: 'Mod-,' },
   // Cookbook saves as you type; this saves anything still waiting straight away and says so.
   { id: 'save', label: 'Save now', key: 'Mod-S' },

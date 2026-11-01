@@ -172,7 +172,7 @@ describe('typing shortcuts', () => {
   });
 
   it('leaves typing shortcuts alone when they are switched off', () => {
-    setSettings({ curlyQuotes: false, emDash: false, markdown: false, lineStarters: false });
+    setSettings({ curlyQuotes: false, emDash: false, markdown: false });
     try {
       const editor = make();
       type(editor, '"Well--" **so**');

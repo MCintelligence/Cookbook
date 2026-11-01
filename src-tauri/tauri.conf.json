@@ -17,6 +17,7 @@
         "height": 820,
         "minWidth": 720,
         "minHeight": 480,
+        "fullscreen": true,
         "dragDropEnabled": false
       }
     ],
@@ -27,6 +28,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "MCintelligence",
+    "copyright": "Copyright © 2026 MCintelligence",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/MCintelligence/Cookbook",
+    "category": "Productivity",
+    "shortDescription": "An offline writing app with an on-device proofreader",
+    "longDescription": "Cookbook is a writing app for novels and long projects. It works offline, needs no account, and keeps your books as plain files on your computer. It has a shelf for chapters and scenes, a pantry for characters, settings and research notes, a smart proofreader that runs on your own device, and Plate mode to set your book like a published novel and export it as EPUB or print-ready PDF.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,7 +44,17 @@
     ],
     "createUpdaterArtifacts": true,
     "macOS": {
+      "minimumSystemVersion": "10.15",
       "signingIdentity": "-"
+    },
+    "linux": {
+      "deb": {
+        "section": "editors",
+        "desktopTemplate": "linux/cookbook.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "linux/cookbook.desktop"
+      }
     }
   },
   "plugins": {

@@ -147,6 +147,8 @@ The footer also has the zoom (click the percentage for a slider), whether the it
 
 Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
 
+The desktop app opens full screen. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
+
 ## Plate: the finished book
 
 Recipe › **Plate and serve…** (or the command palette) shows the book as it will reach readers, set like a novel rather than a manuscript. On the left, the **Book** panel lists the front matter (title page, copyright, dedication, contents), the chapters, one for each top-level Group or Item on the Shelf, and the back matter (acknowledgements, about the author). Tick or untick each to put it in or leave it out, drag to reorder (or Alt+↑ and Alt+↓), and click a front or back matter part to write its text. None of this changes the Shelf.

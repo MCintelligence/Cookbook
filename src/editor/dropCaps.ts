@@ -154,7 +154,7 @@ export const DropCaps = Extension.create({
   },
 });
 
-// ---------- in Read the recipe and exports ----------
+// ---------- in exports and text drawn outside the editor ----------
 
 export type DropCapNode = NodeJSON & { dropCap?: 'start' | 'inline' };
 
@@ -198,7 +198,7 @@ export function withDropCaps(nodes: NodeJSON[]): DropCapNode[] {
 }
 
 /**
- * The same for text already drawn on the page (Read the recipe and the page
+ * The same for text already drawn on the page (Mise en Place and the page
  * beside), drawn from the same schema as the editor: every paragraph's !Words
  * get their drop caps.
  */

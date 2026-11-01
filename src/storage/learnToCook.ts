@@ -325,10 +325,12 @@ Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so
         },
         {
           title: 'Sharing your recipe',
-          synopsis: 'Export, print and import.',
+          synopsis: 'Plate and serve, export, print and import.',
           body: `# Sharing your recipe
 
-When it’s ready for readers, File › **Export** makes a Word document, an EPUB e-book or Markdown, and **Print or save as PDF** does what it says. One Group or Item can be exported alone from its right-click menu.
+When it’s ready for readers, Recipe › **Plate and serve** sets it like a real book: pick a template and a trim size, add a title page, a dedication and contents, and watch the pages change. **Serve** then makes an EPUB e-book or a print-ready PDF.
+
+For a plain copy, File › **Export** makes a Word document, an EPUB e-book or Markdown, and **Print or save as PDF** does what it says. One Group or Item can be exported alone from its right-click menu.
 
 Leave an Item out of every export by right-clicking it and unticking **Include in export**.
 

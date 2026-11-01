@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type TreeNode } from '../storage/book';
-import { estimatedHeight, findGroup, isInside, itemBeside, miseEntries, miseItems, miseWords } from './mise';
+import { estimatedHeight, findGroup, inRoots, isInside, itemBeside, miseEntries, miseEntriesOf, miseItems, miseWords, viewOfPicked } from './mise';
 
 const file = (path: string): TreeNode => ({ name: path.split('/').pop()!, path, kind: 'file' });
 const shelf: TreeNode[] = [
@@ -78,5 +78,36 @@ describe('Mise en Place', () => {
   it('draws an Item that hasn’t loaded at about its height', () => {
     expect(estimatedHeight(0)).toBe(56);
     expect(estimatedHeight(1100)).toBe(2800);
+  });
+
+  it('joins several Groups, and Items picked on their own, each Group under its own name', () => {
+    const roots = [findGroup(shelf, 'bookshelf/Part One/Chapter 1')!, findGroup(shelf, 'bookshelf/Part Two')!, file('bookshelf/Loose.md')];
+    expect(miseEntriesOf(roots).map((e) => (e.type === 'group' ? `# ${e.name} (${e.depth})` : e.name))).toEqual(['# Chapter 1 (0)', 'Kitchen', 'Porch', '# Part Two (0)', 'Loose']);
+    expect(inRoots('bookshelf/Part One/Chapter 1/Porch.md', ['bookshelf/Part One/Chapter 1'])).toBe(true);
+    expect(inRoots('bookshelf/Loose.md', ['bookshelf/Loose.md'])).toBe(true);
+    expect(inRoots('bookshelf/Part One/Opening.md', ['bookshelf/Part One/Chapter 1'])).toBe(false);
+  });
+});
+
+describe('Groups picked together', () => {
+  it('shows them in Shelf order whatever order they were picked in, with typing going to the first picked', () => {
+    const view = viewOfPicked(['bookshelf/Part Two', 'bookshelf/Part One/Chapter 1'], shelf, null);
+    expect(view).toEqual({ roots: ['bookshelf/Part One/Chapter 1', 'bookshelf/Part Two'], anchor: 'bookshelf/Part Two', target: 'bookshelf/Part Two' });
+  });
+
+  it('opens Select all at the Group clicked before, with typing going to the top Group', () => {
+    const everything = ['bookshelf/Part One', 'bookshelf/Part One/Opening.md', 'bookshelf/Part One/Chapter 1', 'bookshelf/Part One/Chapter 1/Kitchen.md', 'bookshelf/Part One/Chapter 1/Porch.md', 'bookshelf/Part One/Empty', 'bookshelf/Part Two', 'bookshelf/Loose.md'];
+    const view = viewOfPicked(everything, shelf, 'bookshelf/Part One/Chapter 1');
+    expect(view).toEqual({ roots: ['bookshelf/Part One', 'bookshelf/Part Two', 'bookshelf/Loose.md'], anchor: 'bookshelf/Part One/Chapter 1', target: 'bookshelf/Part One' });
+  });
+
+  it('keeps the anchor when another Group is added, and moves it when its Group is let go', () => {
+    expect(viewOfPicked(['bookshelf/Part Two', 'bookshelf/Part One'], shelf, 'bookshelf/Part Two')?.anchor).toBe('bookshelf/Part Two');
+    expect(viewOfPicked(['bookshelf/Part One'], shelf, 'bookshelf/Part Two')?.anchor).toBe('bookshelf/Part One');
+  });
+
+  it('shows nothing new when only Items are picked, or what was picked has gone', () => {
+    expect(viewOfPicked(['bookshelf/Loose.md', 'bookshelf/Part One/Opening.md'], shelf, null)).toBeNull();
+    expect(viewOfPicked(['bookshelf/Gone'], shelf, null)).toBeNull();
   });
 });

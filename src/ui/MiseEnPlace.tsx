@@ -1,7 +1,7 @@
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getSchema } from '@tiptap/core';
 import { type Editor } from '@tiptap/react';
-import { Selection } from '@tiptap/pm/state';
+import { Selection, TextSelection } from '@tiptap/pm/state';
 import { undoDepth } from '@tiptap/pm/history';
 import { cookbookExtensions } from '../editor/extensions';
 import { type NodeJSON, parseMarkdown } from '../editor/markdown';
@@ -10,6 +10,7 @@ import { type TreeNode, readDocument } from '../storage/book';
 import { type Seen, firstSeen, keepStill } from './scrollAnchor';
 import { type CardSummary } from '../storage/index';
 import { IS_MAC } from '../shortcuts';
+import { MISE_PAGE_KEY, type MisePageKey } from '../editor/pageKeys';
 import { SceneText, footnotesOf } from './SceneText';
 import { estimatedHeight, isInside, itemBeside, miseEntriesOf, miseItems } from './mise';
 
@@ -257,6 +258,87 @@ export function MiseEnPlace(props: Props) {
     }
     void onActivate(path);
   };
+
+  /**
+   * Page Up and Page Down go a screen through the whole page, into whichever Item is there, with
+   * the cursor at the same place on the screen; Ctrl+Home and Ctrl+End go to the start of the
+   * first Item and the end of the last. Left to the editor, which holds only one Item, they flew
+   * to the bottom of the page and back. A selection being stretched stops at its Item's edge.
+   */
+  const pageKey = useRef<(d: MisePageKey) => boolean>(() => false);
+  pageKey.current = ({ dir, ends, extend }) => {
+    const desk = page.current?.closest<HTMLElement>('.desk');
+    if (!desk || !editor || !active || items.length === 0) return false;
+    const { view, state } = editor;
+    const toEdge = () => {
+      const $to = state.doc.resolve(dir < 0 ? Selection.atStart(state.doc).from : Selection.atEnd(state.doc).to);
+      const tr = state.tr.setSelection(extend ? TextSelection.between(state.selection.$anchor, $to) : Selection.near($to, dir));
+      // A selection stopped at the Item's edge is brought back into sight.
+      view.dispatch(extend ? tr.scrollIntoView() : tr);
+    };
+    const toItem = (path: string) => {
+      if (path === active) toEdge();
+      else open(path, { path, at: dir < 0 ? 'start' : 'end' });
+    };
+    if (ends) {
+      if (extend) return false;
+      toItem(dir < 0 ? items[0]! : items[items.length - 1]!);
+      desk.scrollTop = dir < 0 ? 0 : desk.scrollHeight;
+      return true;
+    }
+    const box = desk.getBoundingClientRect();
+    const top = Math.max(box.top, 0);
+    const bottom = Math.min(box.top + desk.clientHeight, window.innerHeight);
+    const caret = view.coordsAtPos(state.selection.head);
+    const line = Math.max(caret.bottom - caret.top, 12);
+    // A caret scrolled out of sight pages from the edge of the window, as on a single page.
+    const y = Math.min(Math.max((caret.top + caret.bottom) / 2, top + line / 2), bottom - line / 2);
+    const step = Math.max(bottom - top - 2 * line, line);
+    const before = desk.scrollTop;
+    desk.scrollTop = before + dir * step;
+    const goal = y + dir * step - (desk.scrollTop - before);
+    const all = Array.from(page.current!.querySelectorAll<HTMLElement>(':scope > .mise-item'));
+    if (all.length === 0) return true;
+    const rects = all.map((a) => a.getBoundingClientRect());
+    if (goal < rects[0]!.top || goal > rects[rects.length - 1]!.bottom) {
+      if (extend) toEdge();
+      else toItem(dir < 0 ? items[0]! : items[items.length - 1]!);
+      return true;
+    }
+    const at = Math.min(Math.max(goal, top + 1), bottom - 1);
+    // The Item at that height, or, in the gap at a Group's name, the next one along.
+    let i = rects.findIndex((r) => at >= r.top && at <= r.bottom);
+    if (i < 0) i = dir > 0 ? rects.findIndex((r) => r.top > at) : rects.length - 1 - [...rects].reverse().findIndex((r) => r.bottom < at);
+    const art = all[i];
+    if (!art) return true;
+    const r = rects[i]!;
+    // Below the Item's name, where its text starts.
+    const name = art.querySelector('.mise-item-name')?.getBoundingClientRect().bottom ?? r.top;
+    const ty = Math.min(Math.max(at, name + line / 2), r.bottom - 1);
+    if (art === activeBox.current) {
+      const text = view.dom.getBoundingClientRect();
+      const found = view.posAtCoords({ left: Math.min(Math.max(caret.left, text.left + 1), text.right - 1), top: Math.min(Math.max(ty, text.top + 1), text.bottom - 1) });
+      if (found) {
+        const $pos = state.doc.resolve(found.pos);
+        view.dispatch(state.tr.setSelection(extend ? TextSelection.between(state.selection.$anchor, $pos) : Selection.near($pos, dir)));
+      }
+      return true;
+    }
+    if (extend) {
+      toEdge();
+      return true;
+    }
+    const path = art.dataset.path;
+    if (path) open(path, { path, dx: Math.max(caret.left - r.left, 0), dy: ty - r.top });
+    return true;
+  };
+  useEffect(() => {
+    const el = page.current;
+    if (!el) return;
+    const onPageKey = (e: Event) => pageKey.current((e as CustomEvent<MisePageKey>).detail) && e.preventDefault();
+    el.addEventListener(MISE_PAGE_KEY, onPageKey);
+    return () => el.removeEventListener(MISE_PAGE_KEY, onPageKey);
+  }, []);
 
   /** The arrow keys at the very start or end of an Item go on into the one before or after. */
   const crossing = (e: ReactKeyboardEvent) => {

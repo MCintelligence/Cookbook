@@ -59,18 +59,20 @@ export interface BookInfo {
   /** The series the book belongs to, and its place in it, shown in Your Recipes. */
   series?: string;
   seriesNumber?: number;
-  /** Seasonings: the characters picked, in the order shown, what Daniel tracks, and remarks removed for good. */
+  /** Seasonings: the characters picked, in the order shown, and which of their Checks are off. */
   seasonings?: SeasoningsInfo;
 }
 
 export interface SeasoningsInfo {
   chosen: string[];
-  /** Paths of the pages and books Daniel tracks. */
+  /** Pages and Groups Daniel used to track; he now reads only the open page. Kept so older Recipes keep their settings. */
   tracked: string[];
-  /** Remarks the writer removed, by key; issues removed go in .cookbook/ignored.json with the rest. */
+  /** Remarks the writer removed, by key, from before each seasoning had one remark; kept for older Recipes. */
   gone: string[];
   /** Every seasoning switched off for now, without losing which are picked. */
   paused?: boolean;
+  /** Seasonings whose Check is off: they keep their meter and remark but mark nothing on the page. */
+  unchecked?: string[];
 }
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
@@ -142,6 +144,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
         tracked: strings(info.seasonings.tracked),
         gone: strings(info.seasonings.gone),
         ...(info.seasonings.paused === true && { paused: true }),
+        ...(strings(info.seasonings.unchecked).length > 0 && { unchecked: strings(info.seasonings.unchecked) }),
       },
     }),
   };

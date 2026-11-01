@@ -30,6 +30,12 @@ interface Props {
   nested?: { from: HTMLElement; onBack: () => void; restore: () => void };
   /** In the top menu bar: ← and → go to the menu beside this one. */
   onSide?: (dir: -1 | 1) => void;
+  /**
+   * The button that opened the menu. A press on it is left to its own click,
+   * which closes the menu, rather than closing the menu here and letting the
+   * click open it again.
+   */
+  opener?: HTMLElement | null;
 }
 
 /**
@@ -37,7 +43,7 @@ interface Props {
  * between items, → and ← open and close submenus, Escape or a click
  * elsewhere closes it, and choosing an item closes it before the item runs.
  */
-export function Menu({ items, x, y, label, onClose, nested, onSide }: Props) {
+export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Props) {
   const box = useRef<HTMLUListElement>(null);
   const [at, setAt] = useState({ left: x, top: y });
   const [sub, setSub] = useState<{ index: number; from: HTMLElement; focus: boolean } | null>(null);
@@ -59,7 +65,7 @@ export function Menu({ items, x, y, label, onClose, nested, onSide }: Props) {
 
   useEffect(() => {
     if (nested) return;
-    const onDown = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && onClose();
+    const onDown = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && !opener?.contains(e.target as Node) && onClose();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -77,7 +83,7 @@ export function Menu({ items, x, y, label, onClose, nested, onSide }: Props) {
       window.removeEventListener('blur', onClose);
       window.removeEventListener('resize', onClose);
     };
-  }, [onClose, nested]);
+  }, [onClose, nested, opener]);
 
   useEffect(() => () => window.clearTimeout(hover.current), []);
 

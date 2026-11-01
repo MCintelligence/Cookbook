@@ -87,6 +87,7 @@ import {
 } from './storage/platform';
 import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
 import type { NewRecipeChoice } from './ui/NewRecipe';
+import { deskScrollKey } from './ui/scrollKeys';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -333,7 +334,7 @@ export function App() {
   const [folding, setFolding] = useState<{ open: boolean; under?: string; at: number } | null>(null);
   const portraitInput = useRef<HTMLInputElement>(null);
   const portraitFor = useRef<string | null>(null);
-  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
+  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string; opener?: HTMLElement } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
@@ -1369,9 +1370,12 @@ export function App() {
   };
 
   const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
+    // A second click on the recipe's name closes its menu.
+    if (menu?.label === 'Recipe' && menu.opener === e.currentTarget) return setMenu(null);
     const r = e.currentTarget.getBoundingClientRect();
     setMenu({
       label: 'Recipe',
+      opener: e.currentTarget,
       x: r.left,
       y: r.bottom + 4,
       items: [
@@ -2428,6 +2432,7 @@ export function App() {
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
   onAppKey.current = (e: KeyboardEvent) => {
     if (e.defaultPrevented) return;
+    if (deskScrollKey(e, desk.current)) return;
     if (e.key === 'Escape' && !settingsAt) {
       // Escape in the Shelf or a panel goes back to the page, unless a box or menu there wanted it.
       const at = document.activeElement;

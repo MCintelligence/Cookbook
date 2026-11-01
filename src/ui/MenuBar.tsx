@@ -15,8 +15,6 @@ export interface BarMenu {
 export function MenuBar({ menus }: { menus: BarMenu[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  // A click on the open menu's own name closes it, rather than closing and opening it again.
-  const closed = useRef<{ index: number; at: number } | null>(null);
   const go = (index: number) => {
     buttons.current[index]?.focus();
     setOpen(index);
@@ -35,11 +33,7 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           aria-haspopup="menu"
           aria-expanded={open === i}
           className="menubar-item"
-          onClick={() => {
-            const c = closed.current;
-            if (c && c.index === i && Date.now() - c.at < 400) return;
-            setOpen(open === i ? null : i);
-          }}
+          onClick={() => setOpen(open === i ? null : i)}
           onPointerEnter={() => open !== null && open !== i && go(i)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
@@ -61,10 +55,8 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           label={menus[open]!.label}
           x={at.left}
           y={at.bottom + 4}
-          onClose={() => {
-            closed.current = { index: open, at: Date.now() };
-            setOpen(null);
-          }}
+          opener={buttons.current[open]}
+          onClose={() => setOpen(null)}
           onSide={(dir) => go(step(open, dir))}
         />
       )}

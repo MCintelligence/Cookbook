@@ -28,8 +28,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "publisher": "MCintelligence",
-    "copyright": "Copyright © 2026 MCintelligence",
+    "publisher": "SlopLVI",
+    "copyright": "Copyright © 2026 SlopLVI",
     "license": "Apache-2.0",
     "homepage": "https://github.com/MCintelligence/Cookbook",
     "category": "Productivity",

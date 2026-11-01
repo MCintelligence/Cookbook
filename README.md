@@ -76,7 +76,7 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `!Word` | a drop cap on the word's first letter: two lines deep at the start of a paragraph, a raised initial anywhere else. The file keeps the `!` |
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
-Pressing Backspace straight after a shortcut turns it back into exactly what you typed. Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
+Pressing Backspace straight after a shortcut turns it back into exactly what you typed. App Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
 
 ## The Shelf
 
@@ -141,11 +141,11 @@ The first time Cookbook starts, it opens **Learn to Cook**, a recipe made for tr
 
 A new recipe can start as a novel (a group of items, plus a main character and setting in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
 
-The footer also has the zoom (click the percentage for a slider), whether the item is saved, and Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
+The footer also has the zoom (click the percentage for a slider), whether the item is saved, and App Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
 
 ## Oven Mode and Stove Mode
 
-Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
+Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
 
 ## Plate: the finished book
 
@@ -165,13 +165,13 @@ Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and
 
 ## Backups
 
-Your text is saved as you type. On top of that, Cookbook zips the whole recipe into a backups folder outside it: every half hour while you write, when you close Cookbook or open another recipe, and when a recipe opens after Cookbook stopped without closing it (a crash or a power cut). Back up now, on the recipe menu or in Settings › Saving and backups, makes one straight away.
+Your text is saved as you type. On top of that, Cookbook zips the whole recipe into a backups folder outside it: every half hour while you write, when you close Cookbook or open another recipe, and when a recipe opens after Cookbook stopped without closing it (a crash or a power cut). Back up now, on the recipe menu or in App Settings › Saving and backups, makes one straight away.
 
-A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
+A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in App Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
 
-The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
+The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in App Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
 
-Each backup is opened again as soon as it is written and checked file by file against the recipe. One that doesn't open whole is removed, never counted among the backups kept, and Cookbook says so. If automatic backups stop working, Cookbook tells you once and Settings shows why until one works again. In the desktop app, saves and backups are forced onto the disk before they replace the old file, Settings marks a backup folder that is on the same disk as the recipe, and Cookbook suggests choosing another drive or a cloud-synced folder the first time it finds them together.
+Each backup is opened again as soon as it is written and checked file by file against the recipe. One that doesn't open whole is removed, never counted among the backups kept, and Cookbook says so. If automatic backups stop working, Cookbook tells you once and App Settings shows why until one works again. In the desktop app, saves and backups are forced onto the disk before they replace the old file, App Settings marks a backup folder that is on the same disk as the recipe, and Cookbook suggests choosing another drive or a cloud-synced folder the first time it finds them together.
 
 ## Seasonings
 
@@ -188,13 +188,13 @@ Each seasoning is one card: a remark in the character's voice, a five-step meter
 
 Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
-Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
+Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in App Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - A real word with a common prefix or suffix counts too (un-, re-, non-, pre-, mis-, over-, under-, out-, anti-, semi-, multi-, sub-, super-, counter-, -less, -like, -ness), so “untextured” and “textureless” pass while “untexturred” doesn't. So do hyphenated words whose parts are real.
 - Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
 - Suggestions come in the order that fits the words around the misspelling, so in “she sat on the bech by the river”, Sam offers *bench* before *beech*. He knows which words follow which from the counts of word pairs in English fiction, and words and pairs from your own book count for more, so a word you use often comes first.
 - Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
-- Removed remarks are kept in `.cookbook/ignored.json`. Settings can bring them all back.
+- Removed remarks are kept in `.cookbook/ignored.json`. App Settings can bring them all back.
 
 Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running on the device as WebAssembly. It checks agreement, articles, repeated words, punctuation and word choice. Harper is about 20 MB (8 MB compressed), so it loads the first time it's needed, and the offline web app keeps a copy.
 

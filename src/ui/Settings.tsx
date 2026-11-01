@@ -232,7 +232,7 @@ export function Settings(props: Props) {
       className="settings"
       role="dialog"
       aria-modal="true"
-      aria-label="Settings"
+      aria-label="App Settings"
       ref={box}
       // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
       tabIndex={-1}
@@ -240,7 +240,7 @@ export function Settings(props: Props) {
       <header className="set-top">
         <div className="set-brand">
           <span className="brand">cookbook</span>
-          <span className="set-crumb">· Settings</span>
+          <span className="set-crumb">· App Settings</span>
         </div>
         <div className="set-top-actions">
           <label className="set-search">
@@ -256,7 +256,7 @@ export function Settings(props: Props) {
         </div>
       </header>
       <div className="set-body">
-        <nav className="set-nav" aria-label="Settings sections">
+        <nav className="set-nav" aria-label="App Settings sections">
           <div className="set-scope">App Settings</div>
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />

@@ -1377,7 +1377,7 @@ export function App() {
       items: [
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
-        { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
+        { label: 'App Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
         { label: 'Plate and serve…', onPick: () => void openPlate() },
         { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
@@ -2747,14 +2747,14 @@ export function App() {
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
       cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
-      cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
+      cmd('settings', 'App Settings', () => openSettings(), 'App Settings', keysFor('settings'), 'settings preferences options'),
       // Also here because a web browser keeps Ctrl+1 to Ctrl+8 for its own tabs.
       cmd('goShelf', 'Go to the Shelf', () => goToArea('shelf'), 'Go to', keysFor('goShelf'), 'keyboard focus panel'),
       cmd('goPantry', 'Go to the Pantry', () => goToArea('pantry'), 'Go to', keysFor('goPantry'), 'keyboard focus panel'),
       cmd('goSeasonings', 'Go to Seasonings', () => goToArea('seasonings'), 'Go to', keysFor('goSeasonings'), 'keyboard focus panel proofread'),
       cmd('goToolbar', 'Go to the toolbar', () => goToArea('toolbar'), 'Go to', keysFor('goToolbar'), 'keyboard focus formatting'),
       cmd('nextIssue', 'Next issue', () => goToIssue(1), 'Go to', keysFor('nextIssue'), 'proofread spelling grammar mistake'),
-      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
+      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `App Settings › ${label}`, () => openSettings(id), 'App Settings', undefined, words)),
       ...places,
     ];
   };
@@ -2905,7 +2905,7 @@ export function App() {
           ? []
           : ([
               { separator: true },
-              { label: 'Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
+              { label: 'App Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
               ...(isTauri() ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
             ] as MenuItem[])),
       ],
@@ -3505,7 +3505,7 @@ export function App() {
           )}
           {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
-          <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+          <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />

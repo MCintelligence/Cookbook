@@ -135,7 +135,7 @@ A draft rarely falls into Items the first time. Below is a section break, the th
 
 Right-click the break and choose **Split into a new item here**. Everything after it moves into a new Item, just below this one on the Shelf.
 
-To join them again, open the first and right-click it on the Shelf: **Merge with next**. Cookbook takes a snapshot before splitting or merging, so you can always go back (Settings › Saving and backups can turn this off).
+To join them again, open the first and right-click it on the Shelf: **Merge with next**. Cookbook takes a snapshot before splitting or merging, so you can always go back (App Settings › Saving and backups can turn this off).
 `,
         },
         {
@@ -173,7 +173,7 @@ Markdown works too, if you know it. Try each on an empty line below:
 - \`- \` for a bulleted list, \`-1 \` for a numbered one, \`-TD \` for a checklist
 - \`!\` before a word, as in \`!Sword\`, makes its first letter a drop cap, like the !Dragon here. At the start of a paragraph it drops two lines deep. Click into the word to see the ! again.
 
-Don't want some of these? Settings › Writing turns Markdown off, or any one rule on its own.
+Don't want some of these? App Settings › Writing turns Markdown off, or any one rule on its own.
 
 Type **/** at the start of a line for the **insert menu**: styles, lists, a table, a section break or a footnote. Or use the Insert and Format menus at the top.
 
@@ -191,7 +191,7 @@ Type here:
 Every paragraph has a **style**. This one is Body text; the line above is a Chapter title. Change a paragraph’s style from the Format menu, or right-click it.
 
 ::: letter
-Dear writer, this paragraph is in the Letter style. Change how Letter looks once, in Settings › Styles, and every letter in the recipe follows.
+Dear writer, this paragraph is in the Letter style. Change how Letter looks once, in App Settings › Styles, and every letter in the recipe follows.
 :::
 
 Character styles work the same way for words inside a paragraph: [Strong]{.strong} and [Emphasis]{.emphasis} are two. ${k('strong') ? `${k('strong')}, ${k('emphasis')} and ${k('underline')} apply them.` : ''}
@@ -259,7 +259,7 @@ Each seasoning's card has a meter for this page, a Check that shows or hides its
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
-Which checks run, and American or British spelling, are in Settings › Proofreader.
+Which checks run, and American or British spelling, are in App Settings › Proofreader.
 `,
         },
       ],
@@ -302,7 +302,7 @@ In Goals, set:
 - **Whole recipe**: the words you’re aiming for in total.
 - **Deadline**, and Cookbook works out the words a day you need.
 
-**Writing history** shows what you wrote each day. Pasted text doesn’t count, unless you say so in Settings › Goals.
+**Writing history** shows what you wrote each day. Pasted text doesn’t count, unless you say so in App Settings › Goals.
 
 You can also give an Item a goal of its own; the bottom bar then shows how close it is.
 `,
@@ -320,7 +320,7 @@ You can also give an Item a goal of its own; the bottom bar then shows how close
 Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so it opens in any text editor and nothing is locked inside Cookbook.
 
 - **Snapshots** keep earlier versions of one Item. Take one from Recipe › Snapshots of this item, then compare and roll back whenever you like.
-- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
+- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. App Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
 - **Trash** keeps whatever you delete until you empty it: File › Trash.
 - **Undo** reaches back past closing the app.
 `,
@@ -372,7 +372,7 @@ When you’re ready to write, choose File › **New Recipe**. Pick a template, N
 
 **Your Recipes**, in the File menu, lists them all. Star the ones you love, archive the finished ones, or keep a series together.
 
-Settings has everything else, from the theme to how your words are saved${k('settings') ? `: ${k('settings')}` : ''}.
+App Settings has everything else, from the theme to how your words are saved${k('settings') ? `: ${k('settings')}` : ''}.
 
 When you no longer need Learn to Cook, open your own recipe, then right-click Learn to Cook in Your Recipes and choose **Delete**. **Help › Learn to Cook** brings back a fresh copy whenever you want one.
 

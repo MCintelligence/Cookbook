@@ -53,7 +53,9 @@ ${scope} p[data-style='quote'], ${scope} p[data-style='letter'] { font-style: it
 ${scope} p[data-style='epigraph'] { font-style: italic; text-indent: 0; text-align: right; margin-bottom: 1em; }
 ${scope} .scene-break { text-align: center; text-indent: 0; margin: ${s.lineHeight * 0.5}em 0; letter-spacing: 0.3em; }
 ${scope} .scene-break::before { content: ${glyph}; }
-${s.dropCap ? `${scope} p.first::first-letter { float: left; font-size: ${cap}em; line-height: 0.82; padding: 0.06em 0.07em 0 0; margin-top: 0.02em; }
+${scope} .cb-dropcap { font-size: 1.6em; line-height: 1; }
+${scope} .cb-dropcap-start { float: left; font-size: 3.2em; line-height: 0.8; padding: 0.06em 0.08em 0 0; }
+${s.dropCap ? `${scope} p.first:not(.own-cap)::first-letter { float: left; font-size: ${cap}em; line-height: 0.82; padding: 0.06em 0.07em 0 0; margin-top: 0.02em; }
 ${scope} p.first::first-line { font-variant: small-caps; letter-spacing: 0.04em; }` : ''}
 ${scope} .opener { text-align: center; text-indent: 0; margin-bottom: ${s.lineHeight * 2}em; }
 ${scope} .opener .num { font-size: 0.85em; letter-spacing: 0.3em; text-transform: uppercase; color: #555; }
@@ -105,7 +107,10 @@ export function openerHtml(s: PlateSettings, n: number, title: string, xhtml = f
 /** Marks the paragraph a chapter starts with, for its drop cap and the missing indent. */
 export function markFirst(html: string): string {
   // A body paragraph, not a heading or quote the scene begins with.
-  return html.replace(/<p(?![^>]*(?:class|data-style)=)(?=[\s>])/, '<p class="first"');
+  // A chapter that starts with the writer's own !Word drop cap keeps it, rather than getting the template's on top.
+  return html
+    .replace(/<p(?![^>]*(?:class|data-style)=)(?=[\s>])/, '<p class="first"')
+    .replace(/<p class="first"(?=[^>]*>\s*<span class="cb-dropcap cb-dropcap-start">)/, '<p class="first own-cap"');
 }
 
 /**

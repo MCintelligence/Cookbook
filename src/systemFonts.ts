@@ -127,9 +127,3 @@ export function useFontList(): FontList {
     () => list,
   );
 }
-
-/** Test hook: forget what was found. */
-export function resetSystemFonts(): void {
-  started = false;
-  list = { system: [], complete: false, canAsk: false };
-}

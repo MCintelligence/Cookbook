@@ -43,17 +43,6 @@ export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode
   return { title, parts };
 }
 
-/** Footnotes in a scene, in order, so each format can number them. */
-export function footnotesOf(body: NodeJSON): string[] {
-  const out: string[] = [];
-  const visit = (n: NodeJSON) => {
-    if (n.type === 'footnote') out.push(String(n.attrs?.text ?? ''));
-    n.content?.forEach(visit);
-  };
-  visit(body);
-  return out;
-}
-
 /** Character styles on a text node, leaving out notes to self, which never leave the app. */
 export function charStyles(node: NodeJSON): string[] {
   return (node.marks ?? []).flatMap((m) => (m.type === 'charStyle' ? [m.attrs.style] : []));

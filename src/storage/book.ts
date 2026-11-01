@@ -77,6 +77,11 @@ export interface SeasoningsInfo {
   paused?: boolean;
   /** Seasonings whose Check is off: they keep their meter and remark but mark nothing on the page. */
   unchecked?: string[];
+  /**
+   * Daniel's Check (the narration dimmed), which starts off rather than on. Like every Check it is one
+   * setting for the whole Recipe: every Item, Mise en Place and split view follow it.
+   */
+  drunk?: boolean;
 }
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
@@ -150,6 +155,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
         gone: strings(info.seasonings.gone),
         ...(info.seasonings.paused === true && { paused: true }),
         ...(strings(info.seasonings.unchecked).length > 0 && { unchecked: strings(info.seasonings.unchecked) }),
+        ...(info.seasonings.drunk === true && { drunk: true }),
       },
     }),
   };

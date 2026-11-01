@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { BRAINSTORM_GROUPS, type BrainstormKind } from '../storage/brainstorm';
 import { emptyLineAt, insertBrainstorm } from '../editor/brainstorm';
@@ -17,6 +17,7 @@ interface Props {
  */
 export function BrainstormPlus({ editor, kind }: Props) {
   const [menu, setMenu] = useState<{ pos: number; x: number; y: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const at = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -53,6 +54,7 @@ export function BrainstormPlus({ editor, kind }: Props) {
     <>
       {at && (
         <button
+          ref={button}
           className="bs-plus"
           style={{ top: at.top - 11, left: Math.max(4, at.left - 30) }}
           aria-label="Add a brainstorming card"
@@ -60,7 +62,9 @@ export function BrainstormPlus({ editor, kind }: Props) {
           aria-haspopup="menu"
           // Keep the cursor on the line, so the cards go where it is.
           onMouseDown={(e) => e.preventDefault()}
+          aria-expanded={!!menu}
           onClick={(e) => {
+            if (menu) return setMenu(null);
             const r = e.currentTarget.getBoundingClientRect();
             setMenu({ pos: at.pos, x: r.left, y: r.bottom + 4 });
           }}
@@ -70,7 +74,7 @@ export function BrainstormPlus({ editor, kind }: Props) {
           </svg>
         </button>
       )}
-      {menu && <Menu items={items} x={menu.x} y={menu.y} label="Brainstorming cards" onClose={() => setMenu(null)} />}
+      {menu && <Menu items={items} x={menu.x} y={menu.y} label="Brainstorming cards" opener={button.current} onClose={() => setMenu(null)} />}
     </>
   );
 }

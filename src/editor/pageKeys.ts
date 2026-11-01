@@ -50,10 +50,32 @@ function windowOf(scroller: HTMLElement): { top: number; bottom: number } {
   return { top: Math.max(r.top, 0), bottom: Math.min(r.top + scroller.clientHeight, window.innerHeight) };
 }
 
+/**
+ * In Mise en Place the editor holds one Item of many, so the page keys there are the page's
+ * business: they are handed to it as this event, on the Item, and it says it took them by
+ * cancelling the event.
+ */
+export const MISE_PAGE_KEY = 'cookbook-mise-page-key';
+export interface MisePageKey {
+  dir: -1 | 1;
+  /** Ctrl+Home or Ctrl+End, rather than Page Up or Page Down. */
+  ends: boolean;
+  extend: boolean;
+}
+
+function handedToMise(view: EditorView, detail: MisePageKey): boolean {
+  const item = view.dom.closest('.mise-item.is-active');
+  if (!item) return false;
+  const e = new CustomEvent<MisePageKey>(MISE_PAGE_KEY, { detail, bubbles: true, cancelable: true });
+  item.dispatchEvent(e);
+  return e.defaultPrevented;
+}
+
 /** Where a string of Page presses started across the line, so the caret keeps to its column. */
 let goal: { x: number; head: number } | null = null;
 
 function pageKey(view: EditorView, dir: -1 | 1, extend: boolean): boolean {
+  if (handedToMise(view, { dir, ends: false, extend })) return true;
   const { state } = view;
   const scroller = scrollerOf(view.dom);
   const shown = windowOf(scroller);
@@ -96,6 +118,7 @@ function pageKey(view: EditorView, dir: -1 | 1, extend: boolean): boolean {
  * browser's own Ctrl+End stops short of a table at the end of the scene.
  */
 function endsKey(view: EditorView, dir: -1 | 1, extend: boolean): boolean {
+  if (handedToMise(view, { dir, ends: true, extend })) return true;
   const { state } = view;
   const $to = state.doc.resolve(dir < 0 ? Selection.atStart(state.doc).from : Selection.atEnd(state.doc).to);
   view.dispatch(state.tr.setSelection(extend ? TextSelection.between(state.selection.$anchor, $to) : Selection.near($to, dir)));

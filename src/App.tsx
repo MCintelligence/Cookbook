@@ -68,7 +68,6 @@ import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
 const Plate = lazy(() => import('./ui/Plate').then((m) => ({ default: m.Plate })));
-const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: m.Manuscript })));
 import {
   type BookLocation,
   DEFAULT_BOOK,
@@ -86,6 +85,8 @@ import {
 } from './storage/platform';
 import { type UserTemplate, copyRecipe, deleteForGood, firstLines, freeName, renameCopy, saveTemplate } from './storage/library';
 import type { NewRecipeChoice } from './ui/NewRecipe';
+import { pageKeyAnywhere } from './ui/scrollKeys';
+import type { EditorView } from '@tiptap/pm/view';
 import {
   type ParagraphStyle,
   type StyleSheet,
@@ -120,7 +121,7 @@ import { dialectOf, systemEnglish } from './proofread/english';
 import { recipeDefaults } from './writers';
 import { tableSetBefore } from './ui/tableSet';
 import { IssueCard } from './ui/IssueCard';
-import { KIND_OF, type SeasoningId, fixText, isSeasoning, rulesOff } from './proofread/remarks';
+import { KIND_OF, type SeasoningId, fixText, isSeasoning, needsReview, rulesOff } from './proofread/remarks';
 import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
 import { ReportWindow } from './ui/ReportWindow';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, stepIssue } from './proofread/plugin';
@@ -137,13 +138,14 @@ import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnap
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
 import { checkForUpdates } from './ui/UpdateBanner';
-import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff } from './editor/seasonings';
+import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff, setDialogueFocus } from './editor/seasonings';
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings } from './ui/Seasonings';
-import { Logo } from './ui/Logo';
+import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
+import { OvenEdges, useSlideAway } from './ui/OvenEdges';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
@@ -189,7 +191,7 @@ const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
 const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order });
-/** The Group in the Pantry's Research where Seasonings reports are kept. */
+/** The Group in the Pantry's Materials where Seasonings reports are kept. */
 const REPORT_GROUP = 'Seasoning Reports';
 
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
@@ -278,7 +280,21 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const seasoningsOpen = panel === 'seasonings';
-  const togglePanel = (p: Panel) => setPanel((open) => (open === p ? null : p));
+  /** In Oven Mode the Shelf (sideOpen) and the right-hand panel (ovenSide) stay tucked away until asked for. */
+  const [sideOpen, setSideOpen] = useState(false);
+  const [ovenSide, setOvenSide] = useState(false);
+  const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
+  panelNow.current = { panel, ovenSide };
+  const togglePanel = (p: Panel) => {
+    if (!getSettings().focus) return setPanel((open) => (open === p ? null : p));
+    // Oven Mode: the panel slides in over the page, or back out if it is the one showing.
+    setSideOpen(false);
+    if (panelNow.current.ovenSide && panelNow.current.panel === p) return setOvenSide(false);
+    setPanel(p);
+    setOvenSide(true);
+  };
+  /** A panel's own close button: in Oven Mode it only slides away, so Stove Mode keeps it. */
+  const closePanel = () => (getSettings().focus ? setOvenSide(false) : setPanel(null));
   const docRef = useRef<CookbookDocument | null>(null);
   /**
    * Set when the editor's text has changed since docRef.current.body was last brought up to
@@ -327,20 +343,17 @@ export function App() {
   const [pins, setPinsState] = useState<string[]>([]);
   const pinsRef = useRef(pins);
   pinsRef.current = pins;
-  /** The Shelf being read as one manuscript (Read book), or null while writing. */
-  const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
   /** Plate mode, with the Shelf as it was when it opened. */
   const [plateShelf, setPlateShelf] = useState<TreeNode[] | null>(null);
   /** The Groups shown as Mise en Place, all their Items as one page, or null for a single Item. */
   const [mise, setMise] = useState<MiseView | null>(null);
-  const [manuscriptTitle, setManuscriptTitle] = useState('');
   /** Words for Search, from "Search everywhere" on a right-click. */
   const [findRequest, setFindRequest] = useState<{ query: string; at: number } | null>(null);
   /** Opens or closes every folder (or every one inside `under`), from a right-click. */
   const [folding, setFolding] = useState<{ open: boolean; under?: string; at: number } | null>(null);
   const portraitInput = useRef<HTMLInputElement>(null);
   const portraitFor = useRef<string | null>(null);
-  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string } | null>(null);
+  const [menu, setMenu] = useState<{ items: MenuItem[]; x: number; y: number; label: string; opener?: HTMLElement } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
@@ -354,8 +367,7 @@ export function App() {
   /** The sidebar folder files are being dragged over, for the drop highlight. */
   const [fileDrop, setFileDrop] = useState<string | null>(null);
   const settings = useSettings();
-  /** On a phone, the sidebar slides out over the page. */
-  const [sideOpen, setSideOpen] = useState(false);
+  // On a phone (and in Oven Mode) the sidebar slides out over the page: sideOpen, above.
   const [shelfWidth, setShelfWidth] = useShelfWidth();
   const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
@@ -641,7 +653,8 @@ export function App() {
     // The Pantry's groups come in their usual order unless the writer has listed them otherwise.
     const ordered = ORDERED(order.current);
     setTree(await readTree(fs, BOOKSHELF, ordered));
-    setPantryTree(await readTree(fs, PANTRY, ordered));
+    // A Recipe folder with no Pantry yet (its folder deleted by hand, say) shows an empty one.
+    setPantryTree((await fs.exists(PANTRY)) ? await readTree(fs, PANTRY, ordered) : []);
     // Recipes are listed under the page they name, so they follow it wherever it moves.
     const byPage = new Map<string, Recipe[]>();
     if (NOTES_ON && (await fs.exists(RECIPES))) {
@@ -758,6 +771,36 @@ export function App() {
     };
   }, [currentDoc, flushSave, saveIndexNow, saveUndoNow]);
 
+  // Whether the desktop window fills the screen, for View › Full screen. It starts full screen
+  // (src-tauri/tauri.conf.json), and a Mac's own Window menu or a double-click on Linux can change it too.
+  const [fullScreen, setFullScreen] = useState(false);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let stop: (() => void) | undefined;
+    let gone = false;
+    void import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      const check = () => void win.isFullscreen().then((on) => !gone && setFullScreen(on), () => {});
+      check();
+      const unlisten = await win.onResized(check);
+      if (gone) unlisten();
+      else stop = unlisten;
+    });
+    return () => {
+      gone = true;
+      stop?.();
+    };
+  }, []);
+  const toggleFullScreen = useCallback(() => {
+    if (!isTauri()) return;
+    void import('@tauri-apps/api/window').then(async ({ getCurrentWindow }) => {
+      const win = getCurrentWindow();
+      const on = !(await win.isFullscreen());
+      await win.setFullscreen(on);
+      setFullScreen(on);
+    });
+  }, []);
+
   useEffect(() => {
     // The desktop app waits for the last save before the window closes.
     if (!isTauri()) return;
@@ -871,7 +914,6 @@ export function App() {
       await flushSave();
       await saveUndoNow();
     }
-    setManuscript(null);
     setSideOpen(false);
     docRef.current = opened;
     bodyFrom.current = null;
@@ -964,7 +1006,6 @@ export function App() {
     // Saved before the page changes, since the editor of an Item outside the Groups goes as it does.
     await flushSave();
     await saveUndoNow();
-    setManuscript(null);
     setSideOpen(false);
     setMise(view);
     if (path && inRoots(path, view.roots)) return;
@@ -1382,15 +1423,18 @@ export function App() {
   };
 
   const bookMenu = (e: React.MouseEvent<HTMLElement>) => {
+    // A second click on the recipe's name closes its menu.
+    if (menu?.label === 'Recipe' && menu.opener === e.currentTarget) return setMenu(null);
     const r = e.currentTarget.getBoundingClientRect();
     setMenu({
       label: 'Recipe',
+      opener: e.currentTarget,
       x: r.left,
       y: r.bottom + 4,
       items: [
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
-        { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
+        { label: 'App Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
         { label: 'Plate and serve…', onPick: () => void openPlate() },
         { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
@@ -1575,7 +1619,6 @@ export function App() {
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
       { label: 'Oven Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
-      { label: 'Read the recipe', hint: keysFor('bookread'), onPick: () => void readManuscript() },
     ];
     if (words) {
       const short = words.length > 24 ? `${words.slice(0, 23)}…` : words;
@@ -1599,6 +1642,7 @@ export function App() {
   /** Shows the Pantry cards whose names or notes match. */
   const lookUp = (query: string) => {
     setPanel('pantry');
+    setOvenSide(true);
     setPantryQuery(query);
   };
 
@@ -1621,8 +1665,6 @@ export function App() {
       { label: 'New group', onPick: () => void addFolder() },
       { label: 'New item from template', items: SCENE_TEMPLATES.map((t) => ({ label: t.name, onPick: () => void addScene(t) })) },
       { label: 'Import files…', onPick: () => chooseImport(null) },
-      { separator: true },
-      { label: 'Read the recipe', onPick: () => void readManuscript() },
       { separator: true },
       { label: 'Expand all', onPick: () => setFolding({ open: true, at: Date.now() }) },
       { label: 'Collapse all', onPick: () => setFolding({ open: false, at: Date.now() }) },
@@ -1703,7 +1745,7 @@ export function App() {
             { label: 'Z to A', onPick: () => void sortContents(p, true) },
           ],
         },
-        ...(onShelf ? [{ label: 'Read this group', onPick: () => void readManuscript(p) }, { label: 'Export group', items: exportItems(p) }] : []),
+        ...(onShelf ? [{ label: 'Export group', items: exportItems(p) }] : []),
         { label: 'Expand all inside', onPick: () => setFolding({ open: true, under: p, at: Date.now() }) },
         { label: 'Collapse all inside', onPick: () => setFolding({ open: false, under: p, at: Date.now() }) },
         ...trash,
@@ -2002,7 +2044,7 @@ export function App() {
     ];
   };
 
-  /** A page in Read book. */
+  /** An Item's page in Mise en Place. */
   const readerMenu = (p: string, x: number, y: number) =>
     showMenu('Item', x, y, [
       { label: 'Open to write', onPick: () => void select(p) },
@@ -2104,22 +2146,6 @@ export function App() {
     scheduleSave(updated);
   };
 
-  /** Read book, for the whole Shelf or for one book on it. */
-  const readManuscript = async (folder?: string) => {
-    if (!fs) return;
-    await flushSave();
-    await saveUndoNow();
-    // The page is put away while reading and comes back from these, so it must come back as it is now,
-    // not as it was opened, with the undo history it has now.
-    const scene = currentDoc();
-    if (scene) setDoc(scene);
-    if (recorder.current) setUndoLog(recorder.current.recorder.toJSON());
-    const shelf = await readTree(fs, BOOKSHELF, order.current);
-    const only = folder ? [...walkFolders(shelf)].find((n) => n.path === folder) : undefined;
-    setManuscriptTitle(only ? only.name : 'The whole recipe');
-    setManuscript(only ? [only] : shelf);
-  };
-
   const changeSheet = (next: StyleSheet) => {
     setSheet(next);
     if (fs) saveStyles(fs, next).catch((e: unknown) => setError(friendlyError(e)));
@@ -2211,14 +2237,20 @@ export function App() {
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
-  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
-
   // A seasoning's Check, switched off, takes its underlines off the page; Daniel's Check is the narration dimming, kept on the page itself.
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
+  // The checks keep running with Seasonings closed; see needsReview for when grammar and style are left out.
+  const review = !!doc && needsReview(chosen, unchecked, paused, seasoningsOpen);
+  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
   const uncheckedKinds = unchecked.flatMap((id) => KIND_OF[id] ?? []).join(' ');
+  // Every Check is one setting for the whole Recipe, put on each editor as it is made, so every Item,
+  // Mise en Place and split view show the same. Daniel dims only while he is picked and not paused.
+  const drunk = !!seas?.drunk && !paused && chosen.includes('daniel');
   useEffect(() => {
-    if (editor && !editor.isDestroyed) setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);
-  }, [editor, uncheckedKinds, doc?.id]);
+    if (!editor || editor.isDestroyed) return;
+    setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);
+    setDialogueFocus(editor, drunk);
+  }, [editor, uncheckedKinds, drunk, doc?.id]);
 
   // A seasoning's report on the open Item. It is worked out once, when asked for, and kept in the
   // Pantry's Research under Seasoning Reports, named after the seasoning and the time.
@@ -2328,16 +2360,22 @@ export function App() {
       const blank = editor ? null : document.querySelector<HTMLElement>('.mise-blank');
       if (!editor && !blank) return;
       setSideOpen(false);
+      setOvenSide(false);
       if (editor) editor.commands.focus();
       else blank!.focus();
       return;
     }
     if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
+    // Oven Mode keeps its quiet: the Shelf and panels slide in over the page. Only the toolbar needs Stove Mode.
     const oven = getSettings().focus;
-    if (oven) setSettings({ focus: false });
+    if (oven && area === 'toolbar') setSettings({ focus: false });
     if (area === 'pantry' && panel !== 'pantry') setPanel('pantry');
     if (area === 'seasonings' && panel !== 'seasonings') setPanel('seasonings');
-    // On a narrow window the Shelf slides in. (In Oven Mode it's hidden for that reason alone.)
+    if (oven && area !== 'toolbar') {
+      setSideOpen(area === 'shelf');
+      setOvenSide(area !== 'shelf');
+    }
+    // On a narrow window the Shelf slides in.
     if (area === 'shelf' && !oven && !areaShown('shelf')) setSideOpen(true);
     // After React has drawn what was just opened.
     requestAnimationFrame(() => {
@@ -2349,7 +2387,7 @@ export function App() {
   /** F7 and Shift+F7: the next or previous issue in the page, with its card open. */
   const [issueRequest, setIssueRequest] = useState<{ issue: FoundIssue; at: number } | null>(null);
   const goToIssue = (dir: 1 | -1) => {
-    if (!editor || !doc || manuscript) return;
+    if (!editor || !doc) return;
     const found = stepIssue(editor.state, dir);
     if (found) setIssueRequest({ issue: found, at: Date.now() });
     // Grammar and style are only checked while Seasonings is open, so this may be spelling alone.
@@ -2357,7 +2395,7 @@ export function App() {
   };
   /** Mod+Page Up and Mod+Page Down: the item before or after this one, in Shelf (or Pantry) order. */
   const stepItem = (dir: 1 | -1) => {
-    if (!path || manuscript) return;
+    if (!path) return;
     const files: string[] = [];
     const walk = (list: TreeNode[]) => list.forEach((n) => (n.kind === 'file' ? files.push(n.path) : walk(n.children ?? [])));
     walk(treeOf(topOf(path)));
@@ -2372,7 +2410,6 @@ export function App() {
    * Place), with the cursor kept where it is. The same editor is made again in its new place.
    */
   const toggleMise = () => {
-    if (manuscript) return;
     const keep = () => {
       if (!editor || !doc) return;
       const { from, to } = editor.state.selection;
@@ -2415,27 +2452,21 @@ export function App() {
     if (at === 'here' && document.activeElement && document.activeElement !== document.body) return;
     editor.commands.focus(at === 'start' ? 'start' : undefined);
   }, [editor]);
-  // Read the recipe takes the page away; coming back from it (or opening an item from it) hands the keyboard back.
-  const wasReading = useRef(false);
-  useEffect(() => {
-    if (manuscript) wasReading.current = true;
-    else if (wasReading.current) {
-      wasReading.current = false;
-      if (!focusNextPage.current) focusNextPage.current = 'here';
-    }
-  }, [manuscript]);
   /** F6 and Shift+F6: round the parts of the window that are on screen. */
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
       const from = areaOf(document.activeElement);
-      const to = nextArea(from, dir, (a) => (a === 'page' ? !manuscript && ((!!editor && !!doc) || !!document.querySelector('.mise-blank')) : areaShown(a)));
+      // In Oven Mode the Shelf and panels wait off screen, so F6 slides each in as it gets there.
+      const oven = getSettings().focus;
+      const shown = (a: Area) => {
+        if (a === 'page') return (!!editor && !!doc) || !!document.querySelector('.mise-blank');
+        if (!oven) return areaShown(a);
+        return a === 'shelf' || (a === 'pantry' && (panel === 'pantry' || panel === null)) || (a === 'seasonings' && !!doc && panel === 'seasonings');
+      };
+      const to = nextArea(from, dir, shown);
       if (to) goToArea(to);
     };
-    // Oven Mode hides everything but the page, so F6 brings the panels back first.
-    if (getSettings().focus) {
-      setSettings({ focus: false });
-      requestAnimationFrame(go);
-    } else go();
+    go();
   };
   /** The app's own shortcuts (Settings › Keyboard shortcuts); the page's are in the editor. */
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -2451,7 +2482,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'manual']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2469,7 +2500,7 @@ export function App() {
     }
     if (!id) {
       // ⌘= and ⌘− zoom the page as far as the zoom pop-up goes; ⌘0 goes back to 100%.
-      if (!(IS_MAC ? e.metaKey : e.ctrlKey) || e.altKey || !book || manuscript) return;
+      if (!(IS_MAC ? e.metaKey : e.ctrlKey) || e.altKey || !book) return;
       const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : null;
       if (dir === null && e.key !== '0') return;
       e.preventDefault();
@@ -2485,23 +2516,32 @@ export function App() {
     else if (id === 'seasonings') doc && togglePanel('seasonings');
     else if (id === 'focus') toggleFocus();
     else if (id === 'newScene') void addScene();
-    else if (id === 'bookread') manuscript ? setManuscript(null) : void readManuscript();
     else if (id === 'settings') openSettings();
     else if (id === 'nextArea' || id === 'prevArea') cycleArea(id === 'nextArea' ? 1 : -1);
     else if (AREA_SHORTCUTS[id]) goToArea(AREA_SHORTCUTS[id]!);
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
     else if (id === 'mise') toggleMise();
+    else if (id === 'fullscreen') toggleFullScreen();
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  /** The text that Home, End and the page keys go to from outside it (see scrollKeys). */
+  const keysPage = useRef<EditorView | null>(null);
+  keysPage.current = editor && !editor.isDestroyed && doc ? editor.view : null;
+  useEffect(() => {
+    // Caught on the way down, before the Shelf or a list can take them for itself.
+    const onKey = (e: KeyboardEvent) => void pageKeyAnywhere(e, keysPage.current, desk.current);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
   /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
   const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});
   const zoomOk = useRef(false);
-  zoomOk.current = !!book && !manuscript && !settingsAt;
+  zoomOk.current = !!book && !settingsAt;
   // Ctrl and the mouse wheel (or a pinch on a trackpad) zoom the page too, instead of the whole window.
   useEffect(() => {
     let spun = 0;
@@ -2533,11 +2573,22 @@ export function App() {
       // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
       const handled = e.defaultPrevented && !(e.target instanceof Element && e.target.closest('.ProseMirror'));
       if (e.key !== 'Escape' || handled || document.querySelector('.menu, .shelf, .settings, .palette, .goals-pop, .issue-card')) return;
+      // A panel slid in over the page goes first; the next Escape leaves Oven Mode.
+      if (sideOpen || ovenSide) {
+        setSideOpen(false);
+        setOvenSide(false);
+        return;
+      }
       setSettings({ focus: false });
       say('Stove Mode.');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [settings.focus, sideOpen, ovenSide]);
+  useEffect(() => {
+    // Oven Mode starts with everything tucked away, and Stove Mode has its own columns.
+    setSideOpen(false);
+    setOvenSide(false);
   }, [settings.focus]);
   useEffect(() => {
     // The page redraws its fading when focus mode or what it keeps bright changes.
@@ -2664,7 +2715,7 @@ export function App() {
       item('checklist', 'Checklist', 'Insert', 'list todo tasks checkbox', () => void editor.chain().focus().toggleTaskList().run()),
       item('table', 'Table', 'Insert', 'table grid', () => void editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()),
       item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
-      item('name', 'Name from the Pantry', 'Insert', 'pantry character place @ name', () => setShelf({ at: null }), keysFor('shelf')),
+      item('name', 'Name from the Pantry', 'Insert', 'pantry character setting place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
       // On a character or place page, the brainstorming cards the + offers, so they can be added without the mouse.
       ...(isBrainstormKind(cardKind)
@@ -2684,6 +2735,17 @@ export function App() {
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
   const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
+  // What the Pantry and Seasonings buttons show as on: in Oven Mode, only a panel slid in counts.
+  const pantryShown = panel === 'pantry' && (!settings.focus || ovenSide);
+  /** In Oven Mode a slid-in panel slides away once the pointer leaves it; the keyboard goes back to the page if it was in there. */
+  const tuckAway = () => {
+    if (areaOf(document.activeElement) && areaOf(document.activeElement) !== 'page') goToArea('page');
+    setSideOpen(false);
+    setOvenSide(false);
+  };
+  const shelfAway = useSlideAway(settings.focus && sideOpen, tuckAway);
+  const sideAway = useSlideAway(settings.focus && ovenSide, tuckAway);
+  const seasoningsShown = seasoningsOpen && (!settings.focus || ovenSide);
   const saveEverything = useCallback(async () => {
     await flushSave();
     await saveUndoNow();
@@ -2729,24 +2791,24 @@ export function App() {
       ['updates', 'Updates and privacy', 'version'],
       ['page', 'Layout', 'page size margins zoom draft letter a4 indent'],
       ['styles', 'Styles', 'paragraph character font'],
-      ['proofreader', 'Proofreader', 'spelling grammar dictionary british american'],
+      ['proofreader', 'Seasonings', 'proofreader spelling grammar dictionary british american'],
       ['goals', 'Goals', 'target deadline words a day pasted'],
     ];
     const page = pageOf(book?.page);
     return [
       cmd('new', 'New item', () => void addScene(), 'Actions', keysFor('newScene'), 'page chapter scene'),
-      cmd('card', 'New card', () => void addCard(), 'Actions', undefined, 'pantry character place research'),
+      cmd('card', 'New card', () => void addCard(), 'Actions', undefined, 'pantry character setting place material materials research'),
       cmd('folder', 'New group', () => void addFolder(), 'Actions', undefined, 'book volume folder part'),
-      cmd('bookread', manuscript ? 'Back to writing' : 'Read the recipe', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
       cmd('manual', 'Open the manual', () => setManualAt({ chapter: '', at: Date.now() }), 'Help', keysFor('manual'), 'help guide how to documentation'),
       cmd('table', 'Set the Table (welcome questions)', () => setTable('again'), 'Help', undefined, 'onboarding name english spelling writer goal'),
       cmd('find', 'Search', () => setFindRequest({ query: '', at: Date.now() }), 'Actions', keysFor('find'), 'find replace'),
       cmd('shelf', 'Name from the Pantry', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters insert'),
-      cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places research'),
+      cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places materials research'),
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
       ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
+      ...(isTauri() && !IS_MAC ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -2763,14 +2825,14 @@ export function App() {
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
       cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
-      cmd('settings', 'Settings', () => openSettings(), 'Settings', keysFor('settings'), 'preferences options'),
+      cmd('settings', 'App Settings', () => openSettings(), 'App Settings', keysFor('settings'), 'settings preferences options'),
       // Also here because a web browser keeps Ctrl+1 to Ctrl+8 for its own tabs.
       cmd('goShelf', 'Go to the Shelf', () => goToArea('shelf'), 'Go to', keysFor('goShelf'), 'keyboard focus panel'),
       cmd('goPantry', 'Go to the Pantry', () => goToArea('pantry'), 'Go to', keysFor('goPantry'), 'keyboard focus panel'),
       cmd('goSeasonings', 'Go to Seasonings', () => goToArea('seasonings'), 'Go to', keysFor('goSeasonings'), 'keyboard focus panel proofread'),
       cmd('goToolbar', 'Go to the toolbar', () => goToArea('toolbar'), 'Go to', keysFor('goToolbar'), 'keyboard focus formatting'),
       cmd('nextIssue', 'Next issue', () => goToIssue(1), 'Go to', keysFor('nextIssue'), 'proofread spelling grammar mistake'),
-      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Settings › ${label}`, () => openSettings(id), 'Settings', undefined, words)),
+      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `App Settings › ${label}`, () => openSettings(id), 'App Settings', undefined, words)),
       ...places,
     ];
   };
@@ -2921,7 +2983,7 @@ export function App() {
           ? []
           : ([
               { separator: true },
-              { label: 'Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
+              { label: 'App Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
               ...(isTauri() ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
             ] as MenuItem[])),
       ],
@@ -2956,8 +3018,10 @@ export function App() {
           { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
           { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
-          { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise || !!manuscript, onPick: toggleMise },
+          { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
           { separator: true },
+          // On a Mac the menu bar's own Window › Enter Full Screen does this.
+          ...(isTauri() && !IS_MAC ? [{ label: 'Full screen', hint: keysFor('fullscreen'), binding: binding('fullscreen'), checked: fullScreen, onPick: toggleFullScreen }, { separator: true as const }] : []),
           { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
           { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
           { label: 'Zoom', disabled: !book, items: ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })) },
@@ -2966,10 +3030,8 @@ export function App() {
             items: (['system', 'light', 'dark', 'sepia'] as const).map((t) => ({ label: `${t[0]!.toUpperCase()}${t.slice(1)}`, checked: settings.theme === t, onPick: () => setSettings({ theme: t }) })),
           },
           { separator: true },
-          { label: 'Pantry', checked: panel === 'pantry', onPick: () => togglePanel('pantry') },
-          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsOpen, disabled: !doc, onPick: () => togglePanel('seasonings') },
-          { separator: true },
-          { label: manuscript ? 'Back to writing' : 'Read the recipe', hint: keysFor('bookread'), binding: binding('bookread'), disabled: !fs, onPick: () => (manuscript ? setManuscript(null) : void readManuscript()) },
+          { label: 'Pantry', checked: pantryShown, onPick: () => togglePanel('pantry') },
+          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsShown, disabled: !doc, onPick: () => togglePanel('seasonings') },
         ];
       },
     },
@@ -3038,7 +3100,7 @@ export function App() {
   // On a Mac the menus go in the system's own menu bar at the top of the screen, rebuilt when what they show changes.
   const menusNow = useRef(topMenus);
   menusNow.current = topMenus;
-  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, !!doc, !!editor, !!fs, !!book, !!manuscript, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
+  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, ovenSide, !!doc, !!editor, !!fs, !!book, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
   useEffect(() => {
     if (!MAC_APP) return;
     const t = window.setTimeout(() => {
@@ -3071,18 +3133,20 @@ export function App() {
 
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
         <div className="brand-wrap">
-          <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => setSideOpen(!sideOpen)}>
+          <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => {
+            setSideOpen(!sideOpen);
+            setOvenSide(false);
+          }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Logo />
           <span className="brand">cookbook</span>
           {!MAC_APP && <MenuBar menus={topMenus} />}
           <span className="crumb">
@@ -3112,32 +3176,31 @@ export function App() {
           </span>
         </div>
         <div className="top-actions">
-          <button className="panel-btn" aria-pressed={panel === 'pantry'} aria-expanded={panel === 'pantry'} onClick={() => togglePanel('pantry')}>
+          <button className="panel-btn" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
             </svg>
             Pantry
           </button>
-          <button className="panel-btn" aria-pressed={seasoningsOpen} aria-expanded={seasoningsOpen} disabled={!doc} onClick={() => togglePanel('seasonings')}>
+          <button className="panel-btn" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
               <path d="M5 19 13 11" />
             </svg>
             Seasonings
+            <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
           <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
         </div>
       </header>
 
-      {/* Read book is for reading, so the formatting toolbar steps aside. */}
-      {!manuscript && (
-        <Toolbar editor={editor} sheet={sheet} onEditStyle={onEditStyle} onAddStyle={onAddStyle} onRenameStyle={onRenameStyle} />
-      )}
+      <Toolbar editor={editor} sheet={sheet} onEditStyle={onEditStyle} onAddStyle={onAddStyle} onRenameStyle={onRenameStyle} />
 
       <nav
         ref={shelfRef}
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
         aria-label="Shelf"
+        {...shelfAway}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
@@ -3185,7 +3248,16 @@ export function App() {
         {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
-      {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
+      {(sideOpen || (settings.focus && ovenSide)) && (
+        <div
+          className="side-backdrop"
+          onClick={() => {
+            setSideOpen(false);
+            setOvenSide(false);
+          }}
+        />
+      )}
+      {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
       <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         <UpdateBanner beforeRestart={saveEverything} />
@@ -3199,9 +3271,7 @@ export function App() {
             </button>
           </div>
         )}
-        {manuscript && fs ? (
-          <Suspense fallback={null}><Manuscript fs={fs} tree={manuscript} title={manuscriptTitle} onOpen={(p) => void select(p)} onClose={() => setManuscript(null)} onMenu={readerMenu} /></Suspense>
-        ) : miseShown && fs ? (
+        {miseShown && fs ? (
           <div className="page-row">
             <MiseEnPlace
               key={miseShown.anchor}
@@ -3259,7 +3329,7 @@ export function App() {
       </main>
 
       {drawerOpen && (
-        <div className="drawer">
+        <div className="drawer" {...sideAway}>
           {pins.length > 0 && (
             <PinnedCards
               paths={pins}
@@ -3280,7 +3350,7 @@ export function App() {
               hits={pantryHits}
               selected={path}
               onOpen={(p) => void select(p)}
-              onClose={() => setPanel(null)}
+              onClose={closePanel}
               onMenu={pantryMenu}
               onHitMenu={(p, x, y) => rowMenu({ name: baseName(p), path: p, kind: 'file' }, x, y)}
               bar={pantryBar()}
@@ -3313,7 +3383,8 @@ export function App() {
               onChosen={(next) => setSeasonings({ chosen: next })}
               unchecked={unchecked}
               onUnchecked={(next) => setSeasonings({ unchecked: next.length > 0 ? next : undefined })}
-              onClose={() => setPanel(null)}
+              onDrunk={(on) => setSeasonings({ drunk: on || undefined })}
+              onClose={closePanel}
               paused={paused}
               onPaused={(on) => setSeasonings({ paused: on || undefined })}
               onMenu={showMenu}
@@ -3523,7 +3594,7 @@ export function App() {
           )}
           {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
-          <button className="gear" aria-label="Settings" title={`Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+          <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />

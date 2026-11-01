@@ -190,7 +190,8 @@ Type **@** after a space, or press {key:shelf|Edit › Name from the Pantry}, to
 
 Each seasoning is one card: a remark in its own voice, its meter for the open page, a **Check** switch and a **Report** button.
 
-- **Check** shows or hides its underlines. With Check off, its meter keeps counting. Drunk Daniel's Check dims the narration so only the speech stands out.
+- **Check** shows or hides its underlines. With Check off, its meter keeps counting. Drunk Daniel's Check dims the narration so only the speech stands out. A Check is one switch for the whole recipe: every Item, Mise en Place and split view follow it.
+- Close Seasonings and the checks keep running: the underlines stay on the page, and the number beside the Seasonings button says how many seasonings have something to say.
 - Spelling is a red wavy underline, grammar a blue one, and Sally marks style in chili red. A word is only checked once you've moved past it.
 - **Fix** a slip by clicking its underline and picking a suggestion. {key:nextIssue|F7} steps to the next, {key:prevIssue|Shift+F7} to the one before.
 - **Right-click** an underlined word to add it to your dictionary or remove the mark for good.
@@ -198,9 +199,9 @@ Each seasoning is one card: a remark in its own voice, its meter for the open pa
 
 ## Your English
 
-Salty Sam spells in American, British, Canadian or Australian English. A recipe uses the English you chose in Set the Table (App Settings › General › Your English) until it picks its own in Recipe Settings › Proofreader. New Zealand English uses the Australian word list; Irish, Indian and South African English use the British one.
+Salty Sam spells in American, British, Canadian or Australian English. A recipe uses the English you chose in Set the Table (App Settings › General › Your English) until it picks its own in Recipe Settings › Seasonings. New Zealand English uses the Australian word list; Irish, Indian and South African English use the British one.
 
-Every character's and place's name counts as a word. Your own words go in \`dictionary.txt\` in the recipe's folder, one a line; Recipe Settings › Proofreader shows them and can bring back every mark you removed.`,
+Every character's and place's name counts as a word. Your own words go in \`dictionary.txt\` in the recipe's folder, one a line; Recipe Settings › Seasonings shows them and can bring back every mark you removed.`,
   },
   {
     id: 'modes',
@@ -208,14 +209,15 @@ Every character's and place's name counts as a word. Your own words go in \`dict
     summary: 'The normal view, focus mode, and other ways to see the page.',
     body: `**Stove Mode** is the normal view, with the Shelf, toolbar and panels around the page.
 
-**Oven Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with {key:focus|View › Oven Mode}, the page's right-click menu or the command palette. Press it again, press Escape, or click Oven Mode in the bottom bar to go back to Stove Mode.
+**Oven Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Oven Mode}, the page's right-click menu or the command palette. Press it again, press Escape, or click Oven Mode in the bottom bar to go back to Stove Mode.
 
 Also in the View menu:
 
 - **Typewriter scrolling** keeps the line you're typing in the middle of the window.
 - **Paper** shows the page as a sheet; **Draft** is a plain column of text. The page's size, margins and indents are in Recipe Settings › Layout.
 - **Zoom**: the percentage in the bottom bar opens a slider; ⌘= and ⌘− (Ctrl+= and Ctrl+−) zoom, ⌘0 (Ctrl+0) goes back to 100%.
-- **Open beside this one** (right-click an Item) shows another Item next to the one you're writing.`,
+- **Open beside this one** (right-click an Item) shows another Item next to the one you're writing.
+- **Full screen**: the desktop app starts full screen. On Windows and Linux, F11 or View › Full screen switches it; on a Mac, use Window › Enter Full Screen.`,
   },
   {
     id: 'goals',
@@ -292,7 +294,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 
 - **Layout**: page size, margins and indents.
 - **Styles**: paragraph and character styles.
-- **Proofreader**: the recipe's spelling, your dictionary, and which checks run.
+- **Seasonings**: the recipe's spelling, your dictionary, and which checks run.
 - **Goals**: words a day, the whole-recipe target, the deadline and what counts.`,
   },
   {

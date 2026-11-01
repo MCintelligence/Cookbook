@@ -25,7 +25,7 @@ const APP_SECTIONS: [SettingsSection, string][] = [
 const BOOK_SECTIONS: [SettingsSection, string][] = [
   ['page', 'Layout'],
   ['styles', 'Styles'],
-  ['proofreader', 'Proofreader'],
+  ['proofreader', 'Seasonings'],
   ['goals', 'Goals'],
 ];
 const ALL_SECTIONS = [...APP_SECTIONS, ...BOOK_SECTIONS];
@@ -237,7 +237,7 @@ export function Settings(props: Props) {
       className="settings"
       role="dialog"
       aria-modal="true"
-      aria-label="Settings"
+      aria-label="App Settings"
       ref={box}
       // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
       tabIndex={-1}
@@ -245,7 +245,7 @@ export function Settings(props: Props) {
       <header className="set-top">
         <div className="set-brand">
           <span className="brand">cookbook</span>
-          <span className="set-crumb">· Settings</span>
+          <span className="set-crumb">· App Settings</span>
         </div>
         <div className="set-top-actions">
           <label className="set-search">
@@ -261,7 +261,7 @@ export function Settings(props: Props) {
         </div>
       </header>
       <div className="set-body">
-        <nav className="set-nav" aria-label="Settings sections">
+        <nav className="set-nav" aria-label="App Settings sections">
           <div className="set-scope">App Settings</div>
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
@@ -311,7 +311,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Your name" help="Optional. New recipes put it on their title page when they’re plated." words="author">
               <input className="set-text" aria-label="Your name" placeholder="Not set" defaultValue={s.writerName} onBlur={(e) => e.target.value !== s.writerName && set({ writerName: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
             </Row>
-            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Recipe Settings › Proofreader)." words="language spelling dialect american british canadian australian">
+            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Recipe Settings › Seasonings)." words="language spelling dialect american british canadian australian">
               <Select label="Your English" value={s.english} options={[['auto', 'As my system'], ...ENGLISHES.map((e): [string, string] => [e.id, e.name])] as [AppSettings['english'], string][]} onChange={(english) => set({ english })} />
             </Row>
             <Row title="What you write" help="Picks the template New Recipe offers first." words="writer novelist template">
@@ -689,7 +689,7 @@ function Updates({ version, onCheck }: { version: string; onCheck: () => Promise
       <Group title="Privacy" plain>
         <Row
           title="Your writing stays on this device"
-          help="The proofreader runs here, and there is no account, no tracking and no crash reporting. Checking for updates is the only time Cookbook goes online."
+          help="Seasonings run here, and there is no account, no tracking and no crash reporting. Checking for updates is the only time Cookbook goes online."
         />
       </Group>
     </>

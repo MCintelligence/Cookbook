@@ -1,11 +1,8 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { checkedOff, isDialogueFocus, setDialogueFocus } from '../editor/seasonings';
-import { type FoundIssue, issuesOf } from '../proofread/plugin';
-import { KIND_OF, METERS, SEASONINGS, type SeasoningId, meterRemark, mix, ownerOf, perThousand, spiceOf, tasteOf, waitingRemark } from '../proofread/remarks';
+import { METERS, SEASONINGS, type SeasoningId, meterRemark, mix, waitingRemark } from '../proofread/remarks';
+import { isChecking, readingOf, tastePage } from '../proofread/tasting';
 import { REPORTS } from '../proofread/reports';
-import { readingGrade } from '../proofread/style';
-import { docReading, docTalk, docWords } from '../editor/docStats';
 import { Face } from './Faces';
 import { Gauge } from './Gauge';
 import { type MenuItem } from './Menu';
@@ -18,6 +15,8 @@ interface Props {
   /** Seasonings whose Check is off: their meter still reads, but nothing of theirs is marked on the page. */
   unchecked: SeasoningId[];
   onUnchecked: (unchecked: SeasoningId[]) => void;
+  /** Daniel's Check, switched on or off for the whole Recipe. */
+  onDrunk: (on: boolean) => void;
   onClose: () => void;
   /** Every seasoning switched off for now, and a way to switch them back on. */
   paused: boolean;
@@ -28,11 +27,9 @@ interface Props {
   onReport: (id: SeasoningId) => void;
 }
 
-/** A grade level from a few words means nothing, so Sally waits for a paragraph or two. */
-const MIN_GRADE_WORDS = 50;
 const LONG_PRESS_MS = 400;
 
-export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onClose, paused, onPaused, onMenu, onReport }: Props) {
+export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onDrunk, onClose, paused, onPaused, onMenu, onReport }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -62,25 +59,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   // panel only draws again when one of them changes.
   const page = useEditorState({
     editor,
-    selector: ({ editor }) => {
-      if (!editor) return null;
-      const { state } = editor;
-      const slips = slipsOf(issuesOf(state));
-      const grade = readingGrade(docReading(state.doc));
-      const talk = docTalk(state.doc);
-      return {
-        words: docWords(state.doc),
-        sam: slips.sam,
-        pete: slips.pete,
-        sally: slips.sally,
-        grade: grade.grade,
-        gradeWords: grade.words,
-        talkWords: talk.words,
-        spoken: talk.spoken,
-        dim: isDialogueFocus(state),
-        off: [...checkedOff(state)].sort().join(' '),
-      };
-    },
+    selector: ({ editor }) => (editor ? tastePage(editor.state) : null),
   });
   if (!editor || !page) return null;
 
@@ -214,31 +193,12 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   const from = drag ? chosen.indexOf(drag.id) : -1;
   const dropAt = drag?.index != null && drag.index !== from && drag.index !== from + 1 ? drag.index : null;
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
-  const off = page.off ? page.off.split(' ') : [];
-  /** Whether a seasoning's Check is on: Daniel's dims the narration, the others' show their underlines. */
-  const checking = (id: SeasoningId) => (id === 'daniel' ? page.dim : !off.includes(KIND_OF[id]!));
+  const checking = (id: SeasoningId) => isChecking(id, page);
   const setChecking = (id: SeasoningId, on: boolean) => {
-    if (id === 'daniel') return setDialogueFocus(editor, on);
+    if (id === 'daniel') return onDrunk(on);
     onUnchecked(on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])]);
   };
-  /** Where each seasoning's meter stands, and what it shows beside its level; null while there's too little page to read. */
-  /** Where each seasoning's meter stands, what it shows beside its level, and a number that moves the remark on when the reading changes. */
-  const reading = (id: SeasoningId): { at: number; detail: string; turn: number } | null => {
-    if (id === 'daniel') {
-      if (page.talkWords === 0) return null;
-      const share = Math.round((page.spoken / page.talkWords) * 100);
-      // In steps of five, so typing a word or two doesn't change what he says.
-      return { at: tasteOf(METERS.daniel.steps, share), detail: `${share}% dialogue · ${100 - share}% narration`, turn: Math.round(share / 5) };
-    }
-    if (id === 'sally') {
-      if (page.gradeWords < MIN_GRADE_WORDS) return null;
-      return { at: spiceOf(page.grade), detail: `Grade ${page.grade} · ${plural(page.sally, 'style note')}`, turn: page.sally * 31 + page.grade };
-    }
-    if (page.words === 0) return null;
-    const slips = page[id];
-    const per = perThousand(slips, page.words);
-    return { at: tasteOf(METERS[id].steps, per), detail: `${plural(slips, id === 'sam' ? 'spelling slip' : 'grammar slip')} · ${per} per 1,000 words`, turn: slips };
-  };
+  const reading = (id: SeasoningId) => readingOf(id, page);
 
   return (
     <aside
@@ -325,7 +285,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                   <button
                     className="btn sc-report"
                     disabled={!REPORTS[id]}
-                    title={REPORTS[id] ? `${who.name}’s full report on this Item, saved to Research` : 'Coming soon'}
+                    title={REPORTS[id] ? `${who.name}’s full report on this Item, saved to Materials` : 'Coming soon'}
                     onClick={() => onReport(id)}
                   >
                     {meter.report}
@@ -349,20 +309,6 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     </aside>
   );
 }
-
-/** Issues on the page by the seasoning they belong to, worked out once per set of underlines. */
-const slipCounts = new WeakMap<FoundIssue[], Record<SeasoningId, number>>();
-function slipsOf(issues: FoundIssue[]): Record<SeasoningId, number> {
-  let counts = slipCounts.get(issues);
-  if (!counts) {
-    counts = { sam: 0, pete: 0, daniel: 0, sally: 0 };
-    for (const i of issues) counts[ownerOf(i.issue)]++;
-    slipCounts.set(issues, counts);
-  }
-  return counts;
-}
-
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function Handle({ label, d, disabled = false, className, onClick }: { label: string; d: string; disabled?: boolean; className?: string; onClick: () => void }) {
   return (

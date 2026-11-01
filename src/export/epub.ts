@@ -1,6 +1,6 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { type StyleSheet } from '../styles/styles';
-import { HtmlWriter, bookCss, escapeHtml } from './html';
+import { HtmlWriter, bookCss, escapeHtml, xmlSafe } from './html';
 import { type Manuscript, type Part } from './manuscript';
 
 /**
@@ -27,7 +27,7 @@ export function bookEpub(m: Manuscript, sheet: StyleSheet, id: string, now = new
 ${body}
 </body></html>`;
   const files: Zippable = { mimetype: [strToU8('application/epub+zip'), { level: 0 }] };
-  const add = (name: string, text: string) => (files[name] = strToU8(text));
+  const add = (name: string, text: string) => (files[name] = strToU8(xmlSafe(text)));
   add(
     'META-INF/container.xml',
     `<?xml version="1.0" encoding="UTF-8"?>

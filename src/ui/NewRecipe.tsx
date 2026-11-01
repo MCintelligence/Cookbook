@@ -98,6 +98,7 @@ export function NewRecipe({ busy, error, current, currentTitle, defaultWhere, on
   const [menu, setMenu] = useState<{ label: string; x: number; y: number; items: MenuItem[] } | null>(null);
   const [outline, setOutline] = useState<TemplateOutline | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [needsTitle, setNeedsTitle] = useState(false);
   const outlines = useRef(new Map<string, TemplateOutline>());
   const titleField = useRef<HTMLInputElement>(null);
 
@@ -204,7 +205,13 @@ export function NewRecipe({ busy, error, current, currentTitle, defaultWhere, on
 
   const create = () => {
     const name = title.trim();
-    if (!name || busy) return;
+    if (busy) return;
+    // A press with no title says what's missing, rather than doing nothing.
+    if (!name) {
+      setNeedsTitle(true);
+      titleField.current?.focus();
+      return;
+    }
     onCreate({
       title: name,
       ...(builtIn ? { builtIn: builtIn.id } : { template: user }),
@@ -361,7 +368,20 @@ export function NewRecipe({ busy, error, current, currentTitle, defaultWhere, on
             </div>
             <label className="new-field">
               <span className="sub-h">Title</span>
-              <input ref={titleField} className="new-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What’s it called?" />
+              <input
+                ref={titleField}
+                className="new-input"
+                value={title}
+                onChange={(e) => (setTitle(e.target.value), setNeedsTitle(false))}
+                placeholder="What’s it called?"
+                aria-invalid={needsTitle}
+                aria-describedby={needsTitle ? 'new-needs-title' : undefined}
+              />
+              {needsTitle && (
+                <span id="new-needs-title" role="alert" className="new-needs">
+                  Give your recipe a title first.
+                </span>
+              )}
             </label>
             <div className="new-row">
               <label className="new-field new-grow">
@@ -400,7 +420,7 @@ export function NewRecipe({ busy, error, current, currentTitle, defaultWhere, on
             <button type="button" className="btn" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={!title.trim() || busy || (!builtIn && !user)}>
+            <button type="submit" className="btn btn-primary" disabled={busy || (!builtIn && !user)}>
               Create Recipe
             </button>
           </span>

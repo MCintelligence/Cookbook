@@ -70,7 +70,7 @@ export async function setMacMenu(menus: BarMenu[], latest: () => BarMenu[], app:
     items: [
       { item: { About: null } },
       { item: 'Separator' },
-      { id: 'app-settings', text: 'Settings…', accelerator: 'CmdOrCtrl+,', action: app.settings },
+      { id: 'app-settings', text: 'App Settings…', accelerator: 'CmdOrCtrl+,', action: app.settings },
       { item: 'Separator' },
       { item: 'Services' },
       { item: 'Separator' },

@@ -10,6 +10,14 @@ export function escapeHtml(text: string): string {
 }
 
 /**
+ * Takes out the characters XML can't hold (control characters such as a vertical tab pasted from
+ * Word, and halves of broken emoji), which would stop an e-book reader opening the file at all.
+ */
+export function xmlSafe(text: string): string {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+}
+
+/**
  * Renders scene bodies as HTML with the same data-style and data-char
  * attributes the editor uses, so the book's own style sheet applies.
  * Footnotes are numbered through each chapter and listed at its end.

@@ -88,6 +88,21 @@ describe('exports', () => {
     expect(strFromU8(files['word/footnotes.xml']!)).toContain('Collards, really.');
   });
 
+  it('gives !Word drop caps: a real Word drop cap at the start and a raised initial elsewhere', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Steel');
+    const p = await createDocument(fs, 'bookshelf', 'Forge');
+    await writeDocument(fs, p, { ...(await readDocument(fs, p)), body: '!Once the smith drew the !Sword.\n' });
+    const m = await collect(fs, 'Steel', await readTree(fs, 'bookshelf'));
+    expect(bookHtml(m, defaultStyles())).toContain('<p><span class="cb-dropcap cb-dropcap-start">O</span>nce the smith drew the <span class="cb-dropcap">S</span>word.</p>');
+    const docx = bookDocx(m, defaultStyles());
+    const xml = strFromU8(unzipSync(docx)['word/document.xml']!);
+    expect(xml).toContain('w:dropCap="drop" w:lines="2"');
+    expect(new DOMParser().parseFromString(xml, 'application/xml').getElementsByTagName('parsererror')).toHaveLength(0);
+    // The drop cap comes back as !Word; a raised initial is just a larger letter to Word, so it comes back as one.
+    expect(importDocx('Steel.docx', docx).body).toContain('!Once the smith drew the ');
+  });
+
   it('comes back through import with its words, bold, list and footnote', async () => {
     const { m } = await sampleBook();
     const back = importDocx('Summer.docx', bookDocx(m, defaultStyles()));

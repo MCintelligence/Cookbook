@@ -73,9 +73,10 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `--` | an em dash |
 | `"` and `'` | curly quotes |
 | `* * *` on its own line | a section break |
+| `!Word` | a drop cap on the word's first letter: two lines deep at the start of a paragraph, a raised initial anywhere else. The file keeps the `!` |
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
-Pressing Backspace straight after a shortcut turns it back into exactly what you typed.
+Pressing Backspace straight after a shortcut turns it back into exactly what you typed. Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
 
 ## The Shelf
 
@@ -83,7 +84,7 @@ Items sit on the Shelf with a status dot (not started, simmering or done) and th
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
-The open item's status and synopsis are on the card above the page, so they never end up in the manuscript.
+The open item's status sits in the footer and on the Shelf, never on the page, so it never ends up in the manuscript.
 
 Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as one document, under its group headings, with the total words and an estimated reading time. Double-click a section to go back to writing in it.
 
@@ -92,6 +93,8 @@ Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as
 Click a group's name (or press Enter on it) to see every item inside it as one page, in Shelf order, with the names of the groups inside it as dividers. Write anywhere: click into an item's text and the cursor lands where you clicked, and the arrow keys at the start or end of an item carry on into the one before or after. Each item is still its own file, saved, proofread and undone on its own. Long groups load as you scroll. The footer shows the group's items and words.
 
 An empty group opens as an empty page. Start typing and a new item is made in it; Undo takes it away again. Clicking an item on the Shelf opens it on its own page.
+
+Groups picked together show together. Ctrl-click (⌘-click on a Mac) or Shift-click groups on the Shelf, or press ⌘A (Ctrl+A) there or use Select all, and every group picked is shown as one page in Shelf order, each under its own name. The page stays at the group you were on (the one you clicked, or the open item's group): picking Select all from the middle of the story shows everything, with the earlier groups above and the later ones below, and the page stays still as they load. If every group picked is empty, typing makes the first item in the group picked first, or the top one after Select all. In the page itself, ⌘A selects text as usual.
 
 ⌘⇧G (Ctrl+Shift+G) switches between the open item on its own page and its whole group as one page, with the cursor where it was; it is also in the View menu and the command palette. Right-click a group for Show as one page, or find a group by name with ⌘O.
 
@@ -118,7 +121,7 @@ Character and place pages start empty. Put the cursor on an empty line and a + a
 
 ### Linked names
 
-Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. The card above each item shows chips for the characters and places it names, and each character or place card lists the items it appears in, in Shelf order.
+Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or place card lists the items it appears in, in Shelf order.
 
 ### The Pantry shelf and pins
 

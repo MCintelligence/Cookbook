@@ -4,12 +4,11 @@ import { Editor } from '@tiptap/core';
 import { type Node as PMNode } from '@tiptap/pm/model';
 import { cookbookExtensions } from './extensions';
 import { parseMarkdown } from './markdown';
-import { docReading, docWords, footnoteTexts } from './docStats';
+import { docReading, docTalk, docWords, footnoteTexts } from './docStats';
 import { castIn, castOf, nameMatcher, nameMatcherOf, setNameMatcher } from './names';
-import { footnotes } from './seasonings';
+import { dialogueStats, footnotes } from './seasonings';
 import { countWords } from '../storage/index';
 import { readingGrade, textGrade } from '../proofread/style';
-import { spokenWords } from '../ui/useTracked';
 
 const STORY = [
   'June set the bowl down. “Not another word,” she said, and didn’t look up.^[Her mother’s bowl.]',
@@ -83,7 +82,16 @@ describe('counts that only redo what changed', () => {
 });
 
 describe('Daniel’s count', () => {
-  it('counts words and the spoken ones line by line', () => {
-    expect(spokenWords('June said, “Not another word.”\nNobody spoke.')).toEqual({ all: 7, spoken: 3 });
+  it('counts the open page’s spoken words a block at a time, as dialogueStats does', () => {
+    const editor = open(STORY);
+    const all = dialogueStats(editor.state.doc);
+    expect(docTalk(editor.state.doc)).toEqual({ words: all.totalWords, spoken: all.dialogueWords });
+    expect(docTalk(editor.state.doc).spoken).toBeGreaterThan(0);
+    // A cursor move keeps the same answer; typing changes only the paragraph typed in.
+    expect(docTalk(editor.state.doc)).toBe(docTalk(editor.state.doc));
+    editor.commands.setTextSelection(1);
+    editor.commands.insertContent('“Hello,” ');
+    const after = dialogueStats(editor.state.doc);
+    expect(docTalk(editor.state.doc)).toEqual({ words: after.totalWords, spoken: after.dialogueWords });
   });
 });

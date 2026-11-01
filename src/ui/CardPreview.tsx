@@ -27,7 +27,7 @@ export function usePicture(path: string | null, load: (path: string) => Promise<
  */
 export function CardPreview({ card, loadPicture, full = false }: { card: CookbookDocument; loadPicture: (path: string) => Promise<string>; full?: boolean }) {
   const picture = usePicture(portraitOf(card.fields), loadPicture);
-  const fields = cardFieldsOf(card.fields).filter(([, v]) => v.trim());
+  const fields = cardFieldsOf(card).filter(([, v]) => v.trim());
   const aka = akaOf(card.fields);
   const text = plainText(card.body).replace(/\s+/g, ' ').trim();
   const limit = full ? 900 : 180;

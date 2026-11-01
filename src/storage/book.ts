@@ -61,6 +61,8 @@ export interface BookInfo {
   seriesNumber?: number;
   /** Seasonings: the characters picked, in the order shown, what Daniel tracks, and remarks removed for good. */
   seasonings?: SeasoningsInfo;
+  /** Plate mode: how the finished book is set; read with plateOf in plate/settings.ts. */
+  plate?: Record<string, unknown>;
 }
 
 export interface SeasoningsInfo {
@@ -136,6 +138,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.seriesNumber === 'number' && info.seriesNumber > 0 && { seriesNumber: info.seriesNumber }),
     ...(typeof info.countPasted === 'boolean' && { countPasted: info.countPasted }),
     ...(typeof info.weekendsOff === 'boolean' && { weekendsOff: info.weekendsOff }),
+    ...(info.plate && typeof info.plate === 'object' && !Array.isArray(info.plate) && { plate: info.plate }),
     ...(info.seasonings && typeof info.seasonings === 'object' && {
       seasonings: {
         chosen: strings(info.seasonings.chosen),

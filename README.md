@@ -144,6 +144,14 @@ The footer also has the zoom (click the percentage for a slider), whether the it
 
 Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
 
+## Plate: the finished book
+
+Recipe › **Plate and serve…** (or the command palette) shows the book as it will reach readers, set like a novel rather than a manuscript. On the left, the **Book** panel lists the front matter (title page, copyright, dedication, contents), the chapters, one for each top-level Group or Item on the Shelf, and the back matter (acknowledgements, about the author). Tick or untick each to put it in or leave it out, drag to reorder (or Alt+↑ and Alt+↓), and click a front or back matter part to write its text. None of this changes the Shelf.
+
+In the middle are the pages, as a two-page spread for print (← and → turn them) or as an e-book reader. On the right, the **Style** panel picks a template (Classic, Modern, Literary, Cozy), the trim size (5 × 8, 5.5 × 8.5 or 6 × 9 inches), the font, size and line spacing, the chapter opener and the scene break, and switches drop caps, running headers, page numbers and right-hand chapter starts on or off. Plate settings are kept in the recipe's book.json and save as you change them; Cancel goes back to writing.
+
+**Serve** makes an EPUB e-book, or a print-ready PDF through the print dialog's Save as PDF, page for page as the preview shows. Word is coming later.
+
 ## Undo, splitting and merging
 
 Undo reaches back past closing an item or the app. Each item's changes are logged in `.cookbook/undo/`, and opening the item replays them, so ⌘Z picks up where you left off. If an item's file was changed in another app, its undo history starts fresh; your text is never touched.

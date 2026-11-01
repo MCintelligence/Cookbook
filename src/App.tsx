@@ -41,6 +41,7 @@ import { bookEpub } from './export/epub';
 import { bookHtml } from './export/html';
 import { bookMarkdown } from './export/markdownExport';
 import { printHtml } from './export/print';
+import { type PlateSettings, plateOf } from './plate/settings';
 import { KINDS, saveFile } from './ui/saveFile';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
@@ -68,6 +69,7 @@ import { type NamedCard, castIn, countNames, nameMatcher, setNameMatcher } from 
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
 import { PinnedCards } from './ui/PinnedCards';
+const Plate = lazy(() => import('./ui/Plate').then((m) => ({ default: m.Plate })));
 const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: m.Manuscript })));
 import {
   type BookLocation,
@@ -318,6 +320,8 @@ export function App() {
   pinsRef.current = pins;
   /** The Shelf being read as one manuscript (Read book), or null while writing. */
   const [manuscript, setManuscript] = useState<TreeNode[] | null>(null);
+  /** Plate mode, with the Shelf as it was when it opened. */
+  const [plateShelf, setPlateShelf] = useState<TreeNode[] | null>(null);
   /** The Group shown as Mise en Place, all its Items as one page, or null for a single Item. */
   const [mise, setMise] = useState<string | null>(null);
   const [manuscriptTitle, setManuscriptTitle] = useState('');
@@ -1172,6 +1176,23 @@ export function App() {
     }
   };
 
+  /** Plate mode: the finished book, set and served. */
+  const openPlate = async () => {
+    if (!fs || !book) return;
+    await flushSave();
+    await saveUndoNow();
+    setPlateShelf(await readTree(fs, BOOKSHELF, order.current));
+  };
+
+  /** The book's own id, made and saved the first time an e-book needs one. */
+  const ensureBookId = async (): Promise<string> => {
+    const current = bookRef.current;
+    if (current?.id) return current.id;
+    const id = globalThis.crypto.randomUUID();
+    updateBook({ id });
+    return id;
+  };
+
   /** The whole Bookshelf as a Word file, an e-book, Markdown, or printed (where Save as PDF lives). */
   const exportBook = async (kind: 'docx' | 'epub' | 'md' | 'print', part?: { title: string; nodes: TreeNode[] }) => {
     if (!fs || !book) return;
@@ -1334,6 +1355,7 @@ export function App() {
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
         { label: 'Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
+        { label: 'Plate and serve…', onPick: () => void openPlate() },
         { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
         { label: 'Export as EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
         { label: 'Export as Markdown…', hint: '.md', onPick: () => void exportBook('md') },
@@ -2654,6 +2676,7 @@ export function App() {
       ...(['system', 'light', 'dark', 'sepia'] as const).map((t) => cmd(`theme-${t}`, `Theme: ${t[0]!.toUpperCase()}${t.slice(1)}`, () => setSettings({ theme: t }), 'View', settings.theme === t ? '✓' : undefined)),
       cmd('goals', 'Goals', () => setGoalsRequest({ tab: 'targets', at: Date.now() }), 'Recipe', undefined, 'target daily words streak'),
       cmd('history', 'Writing history', () => setGoalsRequest({ tab: 'history', at: Date.now() }), 'Recipe', undefined, 'words written days'),
+      cmd('plate', 'Plate and serve (set the finished book)…', () => void openPlate(), 'Recipe', undefined, 'publish typeset print pdf epub book layout trim drop cap serve'),
       cmd('docx', 'Export as Word…', () => void exportBook('docx'), 'Recipe', '.docx'),
       cmd('epub', 'Export as EPUB…', () => void exportBook('epub'), 'Recipe', '.epub'),
       cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Recipe', '.md'),
@@ -2902,6 +2925,7 @@ export function App() {
       label: 'Recipe',
       items: () => [
         { label: 'Configure this recipe…', disabled: !book, onPick: () => openSettings('page') },
+        { label: 'Plate and serve…', disabled: !book, onPick: () => void openPlate() },
         { label: 'Goals…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
         { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
         { separator: true },
@@ -3460,6 +3484,22 @@ export function App() {
             onChooseNewBooksFolder={() => void chooseNewBooksFolder()}
             version={__APP_VERSION__}
             onCheckUpdates={checkForUpdates}
+          />
+        </Suspense>
+      )}
+
+      {plateShelf && fs && book && (
+        <Suspense fallback={null}>
+          <Plate
+            fs={fs}
+            title={book.title}
+            shelf={plateShelf}
+            settings={plateOf(book.plate)}
+            onChange={(next: PlateSettings) => updateBook({ plate: next as unknown as Record<string, unknown> })}
+            bookId={ensureBookId}
+            onClose={() => setPlateShelf(null)}
+            say={(text) => say(text)}
+            onError={setError}
           />
         </Suspense>
       )}

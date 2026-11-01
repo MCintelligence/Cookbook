@@ -702,7 +702,36 @@ button.seas-quote:hover { color: var(--accent); }
 .beside-page { width: auto !important; min-height: 0 !important; padding: 24px 28px !important; border: none !important; box-shadow: none !important; overflow-y: auto; zoom: 0.85; }
 
 /* Focus mode: the panels step aside and the page fades around where you are */
-.app.focus .sidebar, .app.focus .shelf-resize, .app.focus .toolbar, .app.focus .drawer, .app.focus .pantry-card { display: none; }
+.app.focus .shelf-resize, .app.focus .toolbar, .app.focus .pantry-card { display: none; }
+/*
+ * Oven Mode keeps the Shelf (left) and the Pantry or Seasonings (right) off screen, and they ease in
+ * over the page when asked for, so the text never moves. Hidden ones are out of the Tab order too.
+ */
+.app.focus .sidebar, .app.focus .drawer {
+  display: flex; position: fixed; top: 0; bottom: 0; z-index: 8; visibility: hidden;
+  transition: transform 0.24s ease-in, visibility 0s linear 0.24s;
+}
+.app.focus .sidebar { left: 0; width: min(var(--shelf-w, 232px), 86vw); transform: translateX(-100%); }
+.app.focus .drawer { right: 0; width: min(340px, 100vw); transform: translateX(100%); }
+.app.focus.side-open .sidebar, .app.focus.oven-side .drawer { visibility: visible; transform: none; transition: transform 0.24s ease-in; }
+.app.focus.side-open .sidebar { box-shadow: 12px 0 32px rgba(var(--shadow), 0.18); animation: oven-in-left 0.24s ease-in; }
+.app.focus.oven-side .drawer { box-shadow: -12px 0 32px rgba(var(--shadow), 0.18); animation: oven-in-right 0.24s ease-in; }
+/* A panel opened in the same moment it appears has no "before" to slide from, so it starts here. */
+@keyframes oven-in-left { from { transform: translateX(-100%); } }
+@keyframes oven-in-right { from { transform: translateX(100%); } }
+@keyframes oven-dim { from { opacity: 0; } }
+.app.focus .side-backdrop { display: block; position: fixed; inset: 0; z-index: 7; background: rgba(var(--shadow), 0.12); animation: oven-dim 0.24s ease-in; }
+/* The window's edges: resting the pointer there (or clicking) slides a panel in. */
+.oven-edge { position: fixed; top: 52px; bottom: 36px; width: 14px; z-index: 6; cursor: pointer; display: flex; align-items: center; }
+.oven-edge.left { left: 0; justify-content: flex-start; }
+.oven-edge.right { right: 0; justify-content: flex-end; }
+.oven-edge-tab { width: 4px; height: 56px; border-radius: 2px; background: var(--accent); opacity: 0; transition: opacity 0.2s; }
+.oven-edge:hover .oven-edge-tab { opacity: 0.6; }
+/* In Oven Mode the Shelf button sits in the top bar at every width. */
+.app.focus .side-toggle { display: inline-flex; }
+@media (prefers-reduced-motion: reduce) {
+  .app.focus .sidebar, .app.focus .drawer, .app.focus.side-open .sidebar, .app.focus.oven-side .drawer, .app.focus .side-backdrop { transition: none; animation: none; }
+}
 .app.focus { grid-template-columns: 0 1fr !important; }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
 .oven-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }

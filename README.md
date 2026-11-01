@@ -147,6 +147,8 @@ Stove Mode is the normal view, with the Shelf, toolbar and panels around the pag
 
 The desktop app opens full screen. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
 
+Nothing is out of reach in Oven Mode: the Shelf, the Pantry, Seasonings and pinned cards start tucked away and slide in over the page when you want them, without moving the text. Rest the pointer on the left edge of the window (or click it) for the Shelf, or the right edge for the Pantry (Seasonings, if that was the last one open). The Shelf button and the Pantry and Seasonings buttons in the top bar, View › Pantry and Seasonings, ⌘2 to ⌘4 (Ctrl+2 to Ctrl+4) and F6 slide them in too. Click the page, pick an item on the Shelf, or press Escape to tuck them away again; the next Escape leaves Oven Mode. Settings › Appearance › Reduce motion (or your computer's reduce-motion setting) shows them without the slide.
+
 ## Plate: the finished book
 
 Recipe › **Plate and serve…** (or the command palette) shows the book as it will reach readers, set like a novel rather than a manuscript. On the left, the **Book** panel lists the front matter (title page, copyright, dedication, contents), the chapters, one for each top-level Group or Item on the Shelf, and the back matter (acknowledgements, about the author). Tick or untick each to put it in or leave it out, drag to reorder (or Alt+↑ and Alt+↓), and click a front or back matter part to write its text. None of this changes the Shelf.

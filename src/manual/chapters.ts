@@ -247,7 +247,16 @@ Plate settings are kept with the recipe and save as you change them. **Serve** m
 
 ## Plain exports
 
-File › **Export** makes a Word document, an EPUB or Markdown of the manuscript as it is, and **Print or save as PDF** prints it. Right-click a Group or Item to export it alone, or untick **Include in export** to leave an Item out. File › **Import files…** brings in Word, Markdown and plain text as new Items.`,
+File › **Export** makes a Word document, an EPUB or Markdown of the manuscript as it is, and **Print or save as PDF** prints it. Right-click a Group or Item to export it alone, or untick **Include in export** to leave an Item out. File › **Import files…** brings in Word, Markdown and plain text as new Items.
+
+## Coming from Scrivener
+
+File › **Import Scrivener project…** turns a whole Scrivener 2 or 3 project into a new recipe. Choose the project’s .scriv folder (or the folder it sits in); a zip of it, such as one of Scrivener’s backups, works through **Import files…** too. Your recipe is backed up first, and the Scrivener project is only read, never changed.
+
+- The **Draft** (Manuscript) goes on the Shelf in Binder order: folders become Groups and documents become Items. A document with documents inside it becomes a Group whose first Item holds its own text.
+- A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Materials. The Trash is left behind.
+- Titles, synopses, status, label colours and Include in Compile come with each document, and so do bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks. Fonts and sizes take your recipe’s look.
+- PDFs, pictures and web pages stay in Scrivener, and Cookbook says how many there were. Document notes, comments and snapshots aren’t brought in yet.`,
   },
   {
     id: 'safe',

@@ -34,6 +34,8 @@ import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescu
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
 import { IMPORTABLE, canImport, importFile } from './storage/importer';
+import { type ScrivenerSource, findProject, importScrivener, isScrivenerZip, zipSource } from './storage/scrivener';
+import { folderFilesSource, pickScrivener } from './ui/scrivenerPick';
 import { collect } from './export/manuscript';
 import { bookDocx } from './export/docx';
 import { bookEpub } from './export/epub';
@@ -362,6 +364,8 @@ export function App() {
   const [notice, setNotice] = useState<{ text: string; undo?: () => void; action?: string; at: number } | null>(null);
   const say = (text: string, undo?: () => void, action?: string) => setNotice({ text, undo, action, at: Date.now() });
   const importInput = useRef<HTMLInputElement>(null);
+  /** A folder input, for a Scrivener project in browsers that can't open folders any other way. */
+  const scrivenerInput = useRef<HTMLInputElement>(null);
   /** The folder the next "Import files…" goes into, or null for the usual place. */
   const importInto = useRef<string | null>(null);
   /** The sidebar folder files are being dragged over, for the drop highlight. */
@@ -418,7 +422,17 @@ export function App() {
    */
   const openAt = async (
     target: BookLocation,
-    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean; learn?: boolean } = {},
+    mode: {
+      create?: string;
+      template?: BookTemplateId;
+      from?: BookLocation;
+      setup?: Partial<BookInfo>;
+      adopt?: boolean;
+      editingTemplate?: boolean;
+      learn?: boolean;
+      /** Lays the new recipe out some other way, such as from a Scrivener project. */
+      make?: (fs: StorageAdapter) => Promise<BookInfo>;
+    } = {},
   ) => {
     await flushSave();
     await saveUndoNow();
@@ -427,6 +441,7 @@ export function App() {
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
+    else if (mode.create && mode.make) info = await makeBookOrUndo(nextFs, () => mode.make!(nextFs));
     else if (mode.create && mode.learn) {
       info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
       rememberLearnToCook(target);
@@ -1319,6 +1334,12 @@ export function App() {
     const top = folder.split('/')[0]!;
     const section = sectionOf(folder + '/x');
     const kind = top === PANTRY && section ? SECTION_KIND[section] : 'scene';
+    // A zipped Scrivener project, such as one of Scrivener's backups, becomes a recipe of its own.
+    const zip = files.find((f) => f.name.toLowerCase().endsWith('.zip'));
+    if (zip && files.length === 1) {
+      const bytes = new Uint8Array(await zip.arrayBuffer());
+      if (isScrivenerZip(bytes)) return importScrivenerFrom(zipSource(bytes)!);
+    }
     const problems: string[] = files.filter((f) => !canImport(f.name)).map((f) => `${f.name} isn’t a Word, Markdown or text file`);
     let after = path && parentOf(path) === folder ? path : null;
     let first: string | null = null;
@@ -1344,6 +1365,62 @@ export function App() {
       await select(first);
       const where = folder === top ? (top === BOOKSHELF ? 'the Shelf' : 'the Pantry') : `“${baseName(folder)}”`;
       say(`Imported ${count === 1 ? 'one file' : `${count} files`} into ${where}.`);
+    }
+  };
+
+  /**
+   * Makes a new recipe from a Scrivener project and opens it. The project is only read. The open
+   * recipe is backed up first, and nothing is imported if that fails.
+   */
+  const importScrivenerFrom = async (source: ScrivenerSource) => {
+    try {
+      const { scrivx } = await findProject(source);
+      const title = (scrivx.split('/').pop() ?? 'Scrivener project').replace(/\.scrivx$/i, '');
+      if (fsRef.current && bookRef.current) {
+        try {
+          await flushSave();
+          await saveUndoNow();
+          await autoBackup(true);
+          await refreshBackups();
+        } catch (e) {
+          setError(`Nothing was imported, because “${bookRef.current.title}” couldn’t be backed up first. ${e instanceof BackupCheckError ? e.message : friendlyError(e)}`);
+          return;
+        }
+      }
+      const target = await freshLocation(title, null);
+      let done: Awaited<ReturnType<typeof importScrivener>> | null = null;
+      await openAt(target, {
+        create: title,
+        make: async (nextFs) => {
+          done = await importScrivener(source, nextFs, '', title);
+          if (done.first) {
+            try {
+              localStorage.setItem(lastSceneKey(target), done.first);
+            } catch {
+              // It opens without an Item; the Shelf is still there.
+            }
+          }
+          return done.info;
+        },
+      });
+      const result = done as Awaited<ReturnType<typeof importScrivener>> | null;
+      if (!result) return;
+      const count = (n: number, one: string, many: string) => (n === 1 ? `one ${one}` : `${n} ${many}`);
+      const n = result.skipped.length;
+      const left = n === 0 ? '' : n === 1 ? ' One PDF, picture or web page was left in Scrivener.' : ` ${n} PDFs, pictures and web pages were left in Scrivener.`;
+      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf and ${count(result.cards, 'card', 'cards')} in the Pantry.${left}`);
+    } catch (e) {
+      setError(`Couldn’t import the Scrivener project. ${friendlyError(e)}`);
+    }
+  };
+
+  const chooseScrivener = async () => {
+    try {
+      const picked = await pickScrivener();
+      if (picked === 'files') scrivenerInput.current?.click();
+      else if (picked) await importScrivenerFrom(picked);
+    } catch (e) {
+      setError(`Couldn’t open the Scrivener project. ${friendlyError(e)}`);
     }
   };
 
@@ -1443,6 +1520,7 @@ export function App() {
         { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
         { separator: true },
         { label: 'Import files…', hint: '.docx .md .txt', onPick: () => chooseImport(null) },
+        { label: 'Import Scrivener project…', hint: '.scriv', onPick: () => void chooseScrivener() },
         { label: 'Back up as a zip…', onPick: () => void backUp() },
         { separator: true },
         { label: 'Trash', onPick: openTrash },
@@ -2821,6 +2899,7 @@ export function App() {
       cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Recipe', '.md'),
       cmd('print', 'Print or save as PDF…', () => void exportBook('print'), 'Recipe'),
       cmd('import', 'Import files…', () => chooseImport(null), 'Recipe', '.docx .md .txt'),
+      cmd('scrivener', 'Import Scrivener project…', () => void chooseScrivener(), 'Recipe', '.scriv', 'scrivener scriv binder move switch'),
       cmd('zip', 'Back up as a zip…', () => void backUp(), 'Recipe'),
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
       cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
@@ -2964,6 +3043,7 @@ export function App() {
         { label: 'New Recipe…', onPick: () => (setLibraryNew(true), setLibraryOpen(true)) },
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
+        { label: 'Import Scrivener project…', hint: '.scriv', onPick: () => void chooseScrivener() },
         {
           label: 'Export',
           disabled: !fs,
@@ -3538,11 +3618,23 @@ export function App() {
         type="file"
         multiple
         hidden
-        accept={IMPORTABLE.join(',')}
+        accept={[...IMPORTABLE, '.zip'].join(',')}
         onChange={(e) => {
           const files = Array.from(e.currentTarget.files ?? []);
           e.currentTarget.value = '';
           void importFiles(files, importInto.current);
+        }}
+      />
+
+      <input
+        ref={scrivenerInput}
+        type="file"
+        hidden
+        {...{ webkitdirectory: '' }}
+        onChange={(e) => {
+          const files = Array.from(e.currentTarget.files ?? []);
+          e.currentTarget.value = '';
+          if (files.length > 0) void importScrivenerFrom(folderFilesSource(files));
         }}
       />
 

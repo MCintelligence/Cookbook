@@ -165,6 +165,12 @@ In the middle are the pages, as a two-page spread for print (← and → turn th
 
 **Serve** makes an EPUB e-book, or a print-ready PDF through the print dialog's Save as PDF, page for page as the preview shows. Word is coming later.
 
+## Coming from Scrivener
+
+File › **Import Scrivener project…** (also in the Recipe menu and the command palette) makes a new recipe from a Scrivener 2 or 3 project, from macOS or Windows. Pick the `.scriv` folder or the folder it is in; a zip of a project, such as a Scrivener backup, goes through **Import files…**. The open recipe is backed up first, and the project is only read.
+
+The Draft goes on the Shelf in Binder order (folders become Groups, documents Items; a document with children becomes a Group whose first Item holds its text). A top-level Characters folder goes to the Pantry's Characters, Places, Locations or Settings to Settings, and Research and other folders to Materials; the Trash is skipped. Titles, synopses, status, label colours, Include in Compile, and the text's bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks come through. PDFs, pictures and web pages, document notes, comments and snapshots stay in Scrivener for now. The reader is `src/storage/rtf.ts` and `src/storage/scrivener.ts`.
+
 ## Undo, splitting and merging
 
 Undo reaches back past closing an item or the app. Each item's changes are logged in `.cookbook/undo/`, and opening the item replays them, so ⌘Z picks up where you left off. If an item's file was changed in another app, its undo history starts fresh; your text is never touched.

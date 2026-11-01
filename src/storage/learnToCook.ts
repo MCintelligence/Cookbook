@@ -240,7 +240,7 @@ Cookbook’s proofreader works on this device, with no account and nothing sent 
 
 - **Salty Sam** checks spelling, and near misses of names in the Pantry.
 - **Peppery Pete** checks grammar and punctuation.
-- **Drunk Daniel** measures how much of your writing is dialogue.
+- **Drunk Daniel** measures how much of the open page is dialogue.
 - **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness.
 
 Salty Sam is already picked for this recipe. Click the **+** at the bottom of Seasonings to add the other three, then watch what they find below:
@@ -254,6 +254,8 @@ She had a apple pie cooling on the sill.
 The MOnster in the cellar was only the boiler.
 
 She very quickly and really suddenly ran, and at the end of the day the end result was a free gift.
+
+Each seasoning's card has a meter for this page, a Check that shows or hides its underlines, and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Research › Seasoning Reports.
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
@@ -421,7 +423,6 @@ export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel): Promise<
   const info: BookInfo = {
     ...(await createBook(fs, LEARN_TO_COOK)),
     // Sam is picked, so a misspelling shows at once; the writer adds the others on the Seasonings page.
-    // Daniel counts that page's dialogue once he is added.
     seasonings: { chosen: ['sam'], tracked: [SEASONINGS_ITEM], gone: [] },
   };
   const order: Record<string, string[]> = { [BOOKSHELF]: [] };

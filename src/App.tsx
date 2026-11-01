@@ -117,7 +117,7 @@ import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
-import { KIND_OF, type SeasoningId, fixText, isSeasoning, rulesOff } from './proofread/remarks';
+import { KIND_OF, type SeasoningId, fixText, isSeasoning, needsReview, rulesOff } from './proofread/remarks';
 import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
 import { ReportWindow } from './ui/ReportWindow';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, stepIssue } from './proofread/plugin';
@@ -134,10 +134,11 @@ import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnap
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
 import { checkForUpdates } from './ui/UpdateBanner';
-import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff } from './editor/seasonings';
+import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff, setDialogueFocus } from './editor/seasonings';
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings } from './ui/Seasonings';
+import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
@@ -2197,14 +2198,20 @@ export function App() {
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
-
   // A seasoning's Check, switched off, takes its underlines off the page; Daniel's Check is the narration dimming, kept on the page itself.
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
+  // The checks keep running with Seasonings closed; see needsReview for when grammar and style are left out.
+  const review = !!doc && needsReview(chosen, unchecked, paused, seasoningsOpen);
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
   const uncheckedKinds = unchecked.flatMap((id) => KIND_OF[id] ?? []).join(' ');
+  // Every Check is one setting for the whole Recipe, put on each editor as it is made, so every Item,
+  // Mise en Place and split view show the same. Daniel dims only while he is picked and not paused.
+  const drunk = !!seas?.drunk && !paused && chosen.includes('daniel');
   useEffect(() => {
-    if (editor && !editor.isDestroyed) setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);
-  }, [editor, uncheckedKinds, doc?.id]);
+    if (!editor || editor.isDestroyed) return;
+    setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);
+    setDialogueFocus(editor, drunk);
+  }, [editor, uncheckedKinds, drunk, doc?.id]);
 
   // A seasoning's report on the open Item. It is worked out once, when asked for, and kept in the
   // Pantry's Research under Seasoning Reports, named after the seasoning and the time.
@@ -3104,6 +3111,7 @@ export function App() {
               <path d="M5 19 13 11" />
             </svg>
             Seasonings
+            <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
           <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
         </div>
@@ -3293,6 +3301,7 @@ export function App() {
               onChosen={(next) => setSeasonings({ chosen: next })}
               unchecked={unchecked}
               onUnchecked={(next) => setSeasonings({ unchecked: next.length > 0 ? next : undefined })}
+              onDrunk={(on) => setSeasonings({ drunk: on || undefined })}
               onClose={() => setPanel(null)}
               paused={paused}
               onPaused={(on) => setSeasonings({ paused: on || undefined })}

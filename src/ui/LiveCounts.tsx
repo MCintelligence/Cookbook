@@ -25,8 +25,10 @@ export function LiveWords({ editor, saved }: { editor: Editor | null; saved: num
 type GoalsProps = Parameters<typeof GoalsPopup>[0];
 
 /** The Goals pop-up in the footer, with the open Item's words counted as they are now. */
-export function LiveGoals({ editor, item, savedItemWords, otherWords, ...rest }: Omit<GoalsProps, 'scene' | 'bookWords'> & {
+export function LiveGoals({ editor, item, savedItemWords, otherWords, history, ...rest }: Omit<GoalsProps, 'scene' | 'bookWords' | 'history'> & {
   editor: Editor | null;
+  /** Words written each day, which a save adds to. */
+  history: Store<GoalsProps['history']>;
   /** The open Item, when it is on the Shelf. */
   item: { title: string; goal: number | null; onShelf: boolean } | null;
   /** The open Item's words as last saved, until the editor is ready. */
@@ -35,8 +37,9 @@ export function LiveGoals({ editor, item, savedItemWords, otherWords, ...rest }:
   otherWords: number;
 }) {
   const live = useLiveWords(editor);
+  const days = useStore(history);
   const words = item ? (live ?? savedItemWords) : 0;
-  return <GoalsPopup {...rest} scene={item ? { title: item.title, words, goal: item.goal } : null} bookWords={otherWords + (item?.onShelf ? words : 0)} />;
+  return <GoalsPopup {...rest} history={days} scene={item ? { title: item.title, words, goal: item.goal } : null} bookWords={otherWords + (item?.onShelf ? words : 0)} />;
 }
 
 /** Mise en Place's Items and words in the footer, with the open Item's words counted as they are now. */

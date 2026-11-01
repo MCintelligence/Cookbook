@@ -652,12 +652,9 @@ export function App() {
   const treeOf = (top: string) => (top === PANTRY ? pantryTree : tree);
 
   const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
-  const [history, setHistoryState] = useState<WritingHistory>(() => new Map());
-  const historyRef = useRef<WritingHistory>(history);
-  const setHistory = (h: WritingHistory) => {
-    historyRef.current = h;
-    setHistoryState(h);
-  };
+  /** Words written each day. Kept in a store, so a save that adds to today redraws the Goals pop-up, not the whole app. */
+  const [history] = useState(() => createStore<WritingHistory>(new Map()));
+  const setHistory = history.set;
   /** Words in the open scene when it was last saved, to count what was written since. */
   const savedWords = useRef<number | null>(null);
   /** Set while splitting or merging, which moves words without writing any. */
@@ -821,10 +818,9 @@ export function App() {
         let delta = words - savedWords.current;
         // Pasting a chapter in isn't writing it, unless the book counts pasted words.
         if (delta > 0 && !bookRef.current?.countPasted) delta -= Math.min(delta, pasted);
-        const updated = recordWords(historyRef.current, delta);
-        if (updated !== historyRef.current) {
-          historyRef.current = updated;
-          setHistoryState(updated);
+        const updated = recordWords(history.get(), delta);
+        if (updated !== history.get()) {
+          history.set(updated);
           await saveHistory(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
         }
       }
@@ -2817,7 +2813,7 @@ export function App() {
     };
   }, [libraryOpen]);
   const exportHistoryCsv = () =>
-    void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
+    void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history.get()), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
   // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
   const desk = useRef<HTMLElement>(null);
   const [deskWidth, setDeskWidth] = useState(0);

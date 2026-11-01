@@ -5,7 +5,7 @@ import { createBook, createDocument, openBook, readDocument, readTree, saveBookI
 import { withField } from '../storage/document';
 import { readChapters, textHtml } from './book';
 import { plateEpub } from './epub';
-import { geometry, markFirst, openerHtml, printBookHtml } from './layout';
+import { geometry, markFirst, plateCss, openerHtml, printBookHtml } from './layout';
 import { DEFAULT_PLATE, numberWords, orderChapters, plateOf, withTemplate } from './settings';
 
 async function sampleShelf() {
@@ -74,6 +74,12 @@ describe('the book’s chapters', () => {
 
   it('marks the first body paragraph for the drop cap, past any heading', () => {
     expect(markFirst('<p data-style="chapter-title">Morning</p><p>The kitchen</p><p>Then</p>')).toBe('<p data-style="chapter-title">Morning</p><p class="first">The kitchen</p><p>Then</p>');
+  });
+
+  it('leaves the template drop cap off a chapter that starts with a !Word one', () => {
+    expect(markFirst('<p>The kitchen</p>')).toBe('<p class="first">The kitchen</p>');
+    expect(markFirst('<p><span class="cb-dropcap cb-dropcap-start">O</span>nce</p><p>Then</p>')).toBe('<p class="first own-cap"><span class="cb-dropcap cb-dropcap-start">O</span>nce</p><p>Then</p>');
+    expect(plateCss({ ...DEFAULT_PLATE, dropCap: true })).toContain('p.first:not(.own-cap)::first-letter');
   });
 
   it('sets openers the way the writer picked', () => {

@@ -272,9 +272,6 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .tree-rename { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--field); color: var(--text); font-weight: 700; }
 
 /* The open scene's card, above the page */
-.card-details { width: 816px; max-width: 100%; flex: none; display: flex; align-items: flex-start; gap: 14px; margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
-.card-synopsis { flex: 1; min-width: 0; resize: none; overflow: hidden; border: none; outline: none; background: transparent; color: var(--text); font-family: 'Literata', Georgia, serif; font-size: 14px; font-style: italic; line-height: 1.5; padding: 4px 0; }
-.card-synopsis::placeholder { color: var(--muted); opacity: 0.8; }
 
 /* Pantry */
 .pantry-results mark { background: var(--find); color: inherit; border-radius: 2px; }
@@ -314,12 +311,6 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .cb-bracket-open { margin-left: -0.5em; }
 .cb-bracket-close { margin-right: -0.5em; }
 .issue-card { --issue: var(--spelling); position: fixed; z-index: 30; width: 290px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-strong); border-top: 3px solid var(--issue); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); }
-.card-details { flex-wrap: wrap; }
-.card-cast { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
-.cast-chip { min-height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; }
-.cast-chip::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
-.cast-chip.cast-setting::before { border-radius: 2px; background: var(--green); }
-.cast-chip:hover { border-color: var(--accent); }
 .peek { position: fixed; z-index: 30; width: 300px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card); color: var(--text); box-shadow: 0 14px 34px rgba(var(--shadow), 0.24); font-family: 'Nunito', sans-serif; }
 .peek-head { display: flex; gap: 12px; align-items: center; }
 .peek-head > div { display: flex; flex-direction: column; min-width: 0; }
@@ -393,6 +384,10 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cb-prose { outline: none; -webkit-hyphens: auto; hyphens: auto; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
+/* !Word: the ! is hidden and the letter is a drop cap at the start of a paragraph, a raised initial anywhere else (see dropCaps.ts). */
+.cb-dropmark { display: none; }
+.cb-dropcap { font-size: 1.6em; line-height: 0; }
+.cb-dropcap-start { float: left; font-size: 3.3em; line-height: 0.8; margin: 0.08em 0.08em 0 0; }
 .cb-prose p:first-child { margin-top: 0; }
 .cb-prose hr[data-scene-break] { border: none; margin: 16px 0; text-align: center; overflow: visible; height: 24px; }
 .cb-prose hr[data-scene-break]::after { content: '⁂'; color: var(--page-muted); font-size: 16px; line-height: 24px; }
@@ -494,7 +489,6 @@ button.seas-quote:hover { color: var(--accent); }
 @media (max-width: 900px) {
   .app, .app.drawer-open { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'top' 'tools' 'desk' 'foot'; }
   .sidebar, .shelf-resize { display: none; }
-  .card-details { flex-direction: column; gap: 6px; }
   .shelf-body { flex-direction: column; }
   .shelf-list { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); }
   /* On a phone, pinned cards wait in the drawer until Seasonings opens it. */
@@ -603,11 +597,13 @@ button.seas-quote:hover { color: var(--accent); }
 .set-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .set-row-title { font-weight: 700; }
 .set-row-help { color: var(--muted); font-size: 12px; }
+.set-row-warn { display: block; margin-top: 2px; color: var(--danger-text); }
 .set-card-plain > .set-row-help { margin: 12px 0 0; }
 .set-sw { flex: none; position: relative; width: 32px; height: 18px; padding: 0; border-radius: 9px; border: none; background: var(--line-strong); }
 .set-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: left 0.15s; }
 .set-sw[aria-checked='true'] { background: var(--accent); }
 .set-sw[aria-checked='true']::after { left: 16px; background: #fff; }
+.set-sw:disabled { opacity: 0.4; cursor: default; }
 .set-sel { flex: none; min-width: 160px; max-width: 100%; height: 28px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); font-size: 13px; }
 .set-num { flex: none; width: 100px; height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); text-align: right; font-size: 13px; }
 .set-num-wide { width: auto; text-align: left; }
@@ -709,7 +705,7 @@ button.seas-quote:hover { color: var(--accent); }
 .beside-page { width: auto !important; min-height: 0 !important; padding: 24px 28px !important; border: none !important; box-shadow: none !important; overflow-y: auto; zoom: 0.85; }
 
 /* Focus mode: the panels step aside and the page fades around where you are */
-.app.focus .sidebar, .app.focus .shelf-resize, .app.focus .toolbar, .app.focus .drawer, .app.focus .card-details, .app.focus .pantry-card { display: none; }
+.app.focus .sidebar, .app.focus .shelf-resize, .app.focus .toolbar, .app.focus .drawer, .app.focus .pantry-card { display: none; }
 .app.focus { grid-template-columns: 0 1fr !important; }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
 .oven-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }

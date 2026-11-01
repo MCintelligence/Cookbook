@@ -30,7 +30,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -49,6 +49,7 @@ const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default
 import { type Order, loadOrder } from './storage/order';
 import { type WritingHistory, loadHistory, recordWords, saveHistory } from './storage/history';
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
+import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook } from './storage/learnToCook';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
@@ -71,6 +72,7 @@ const Manuscript = lazy(() => import('./ui/Manuscript').then((m) => ({ default: 
 import {
   type BookLocation,
   DEFAULT_BOOK,
+  bookExists,
   childLocation,
   defaultLocation,
   isTauri,
@@ -122,7 +124,7 @@ import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
 import { getSettings, setSettings, useSettings } from './settings';
 import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
-import { type Backup, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
+import { type Backup, BackupCheckError, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
 import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
@@ -141,7 +143,6 @@ import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
-import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
 import { shrinkPicture } from './ui/pictures';
@@ -330,8 +331,9 @@ export function App() {
   /** The trash dialog's list: undefined while closed, null while it loads. */
   const [trashItems, setTrashItems] = useState<TrashItem[] | null | undefined>(undefined);
   /** A short message at the bottom of the window, sometimes with an Undo. */
-  const [notice, setNotice] = useState<{ text: string; undo?: () => void; at: number } | null>(null);
-  const say = (text: string, undo?: () => void) => setNotice({ text, undo, at: Date.now() });
+  /** A passing message; `undo` adds a button, labelled `action` or else Undo. */
+  const [notice, setNotice] = useState<{ text: string; undo?: () => void; action?: string; at: number } | null>(null);
+  const say = (text: string, undo?: () => void, action?: string) => setNotice({ text, undo, action, at: Date.now() });
   const importInput = useRef<HTMLInputElement>(null);
   /** The folder the next "Import files…" goes into, or null for the usual place. */
   const importInto = useRef<string | null>(null);
@@ -355,7 +357,19 @@ export function App() {
   /** Words pasted since the last save, which don't count towards the goal unless the book says so. */
   const pastedWords = useRef(0);
   // Saved before a timed backup, so it has the newest words.
-  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current());
+  const { backups, refreshBackups, autoBackup, openBackupStore, changedSinceBackup, lastBackupAt } = useBackups(fsRef, bookRef, () => flushRef.current(), {
+    failed: (text) => setError(text),
+    mended: (text) => {
+      setError((shown) => (shown === text ? null : shown));
+      say('Backups are working again.');
+    },
+    sameDisk: () =>
+      say(
+        'Your backups are on the same disk as your recipes, so a broken or lost computer would take both. A folder on another drive, or one a cloud service syncs, keeps them apart.',
+        () => openSettings('saving'),
+        'Choose folder…',
+      ),
+  });
 
   /** Changes the open book's settings in book.json. */
   const updateBook = (changes: Partial<BookInfo>) => {
@@ -374,7 +388,7 @@ export function App() {
    */
   const openAt = async (
     target: BookLocation,
-    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean } = {},
+    mode: { create?: string; template?: BookTemplateId; from?: BookLocation; setup?: Partial<BookInfo>; adopt?: boolean; editingTemplate?: boolean; learn?: boolean } = {},
   ) => {
     await flushSave();
     await saveUndoNow();
@@ -383,7 +397,16 @@ export function App() {
     const { fs: nextFs, where: nextWhere } = await openLocation(target);
     let info: BookInfo;
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
-    else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
+    else if (mode.create && mode.learn) {
+      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
+      rememberLearnToCook(target);
+      // It opens at Welcome, like a recipe reopening where the writer left off.
+      try {
+        localStorage.setItem(lastSceneKey(target), FIRST_ITEM);
+      } catch {
+        // It opens without an Item; the Shelf is still there.
+      }
+    } else if (mode.create) info = await startBook(nextFs, mode.create, mode.template, mode.setup);
     else {
       try {
         info = await openBook(nextFs);
@@ -551,12 +574,34 @@ export function App() {
       return 'done';
     });
 
+  /** Opens Learn to Cook, or makes a fresh one if the last was deleted. */
+  const learnToCook = async () => {
+    const kept = learnToCookLocation();
+    if (kept && (await bookExists(kept))) return openAt(kept);
+    const target = await freshLocation(LEARN_TO_COOK, null);
+    // One left in its folder by a Cookbook that has forgotten it is opened again rather than written over.
+    if (await bookExists(target)) {
+      rememberLearnToCook(target);
+      return openAt(target);
+    }
+    return openAt(target, { create: LEARN_TO_COOK, learn: true });
+  };
+
   useEffect(() => {
     // StrictMode runs effects twice in development; open the book only once.
     if (started.current) return;
     started.current = true;
     const last = recentBooks()[0]?.location;
     (async () => {
+      // A writer's very first start opens Learn to Cook, unless an older Cookbook already made their first recipe.
+      if (!last && !learnedBefore() && !(await bookExists(await defaultLocation()))) {
+        try {
+          await learnToCook();
+          return;
+        } catch {
+          // Their own first recipe opens instead.
+        }
+      }
       if (last) {
         try {
           await openAt(last);
@@ -865,7 +910,7 @@ export function App() {
     }
   }, [fs, location]);
 
-  // A page opens at its top, with its status and synopsis card in view.
+  // A page opens at its top.
   // In Mise en Place the page stays where it is: the open Item is somewhere down it.
   useLayoutEffect(() => {
     if (!path || mise) return;
@@ -1249,7 +1294,7 @@ export function App() {
       await refreshBackups();
       say(`Backed up “${bookRef.current?.title ?? 'the recipe'}”.`);
     } catch (e) {
-      setError(`Couldn’t back up the recipe. ${friendlyError(e)}`);
+      setError(e instanceof BackupCheckError ? e.message : `Couldn’t back up the recipe. ${friendlyError(e)}`);
     }
   };
   /** Shows the book's backups; picking one opens a copy of the book as it was, beside this one. */
@@ -2609,7 +2654,7 @@ export function App() {
     const sections: [SettingsSection, string, string][] = [
       ['general', 'General', 'reopen startup shortcuts mac ctrl'],
       ['appearance', 'Appearance', 'theme dark light sepia size motion page colour'],
-      ['writing', 'Writing', 'quotes dash markdown typewriter focus paste @'],
+      ['writing', 'Writing', 'quotes dash markdown drop cap typewriter focus paste @'],
       ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
       ['shortcuts', 'Keyboard shortcuts', 'keys'],
       ['updates', 'Updates and privacy', 'version'],
@@ -2904,6 +2949,8 @@ export function App() {
     {
       label: 'Help',
       items: () => [
+        { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+        { separator: true },
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
         { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
         { separator: true },
@@ -3103,14 +3150,6 @@ export function App() {
           </div>
         ) : (
           <>
-          {doc && path && doc.kind === 'scene' && (
-            <CardDetails
-              style={cardStyle}
-              synopsis={synopsisOf(doc.fields)}
-              onSynopsis={(text) => setCardField('synopsis', text)}
-              cast={cast}
-            />
-          )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
               style={cardStyle}
@@ -3254,6 +3293,12 @@ export function App() {
             })
           }
           onOpenFolder={() => void openFolder()}
+          onLearn={() =>
+            void fromLibrary(async () => {
+              await learnToCook();
+              return 'done';
+            })
+          }
           onCreate={(choice) => void createNewBook(choice)}
           onAdopt={(target) =>
             void fromLibrary(async () => {
@@ -3322,7 +3367,7 @@ export function App() {
                 undo();
               }}
             >
-              Undo
+              {notice.action ?? 'Undo'}
             </button>
           )}
           <button className="notice-close" aria-label="Dismiss" onClick={() => setNotice(null)}>

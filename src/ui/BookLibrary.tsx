@@ -30,6 +30,8 @@ interface Props {
   startNew?: boolean;
   onOpen: (location: BookLocation) => void;
   onOpenFolder: () => void;
+  /** Opens Learn to Cook, making a fresh one if it was deleted. */
+  onLearn: () => void;
   onCreate: (choice: NewRecipeChoice) => void;
   onAdopt: (location: BookLocation) => void;
   onCancelAdopt: () => void;
@@ -160,7 +162,7 @@ const Icon = {
 
 /** Your Recipes: every recipe the writer has opened, as cards or a list, with New Recipe and the writer's templates. */
 export function BookLibrary(props: Props) {
-  const { current, adopting, error, busy, version, onOpen, onOpenFolder, onAdopt, onCancelAdopt, onClose, openBookItems = [] } = props;
+  const { current, adopting, error, busy, version, onOpen, onOpenFolder, onLearn, onAdopt, onCancelAdopt, onClose, openBookItems = [] } = props;
   const [books, setBooks] = useState<RecentBook[]>(recentBooks);
   const [inBrowser, setInBrowser] = useState<string[]>([]);
   const [view, setView] = useState<View>('recent');
@@ -642,7 +644,7 @@ export function BookLibrary(props: Props) {
                 <div className="recipes-empty">
                   <span className="recipes-pot">{Icon.pot}</span>
                   <p className="recipes-empty-line">The kitchen’s ready when you are.</p>
-                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have.</p>
+                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have. New to Cookbook? Learn to Cook is a recipe that shows you round.</p>
                   <div className="lib-row">
                     <button className="btn btn-primary" onClick={() => setMaking(true)}>
                       New Recipe
@@ -652,6 +654,9 @@ export function BookLibrary(props: Props) {
                         Open a recipe’s folder…
                       </button>
                     )}
+                    <button className="btn" onClick={onLearn} disabled={busy}>
+                      Learn to Cook
+                    </button>
                   </div>
                 </div>
               ) : (

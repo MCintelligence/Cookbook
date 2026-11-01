@@ -140,6 +140,50 @@ async fn system_fonts() -> Vec<String> {
     Vec::new()
 }
 
+/// Puts a save onto the disk itself, then swaps it in: the page has written
+/// `<file>.cookbook-tmp` beside the file, and this forces it out of the system's
+/// cache, renames it over the file, and forces the folder's record of the rename
+/// out too. Without it, a power cut just after a save can leave the file empty or
+/// at its older version on some systems. Only a `.cookbook-tmp` file can be put in
+/// place of the file of the same name, so this reaches nothing the page didn't write.
+#[tauri::command]
+async fn commit_write(tmp: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || durable::commit(std::path::Path::new(&tmp)))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+mod durable {
+    use std::{fs, io, path::Path};
+
+    pub fn commit(tmp: &Path) -> io::Result<()> {
+        let name = tmp.file_name().and_then(|n| n.to_str()).unwrap_or_default();
+        let Some(real) = name.strip_suffix(".cookbook-tmp").filter(|r| !r.is_empty()) else {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a Cookbook save"));
+        };
+        let dest = tmp.with_file_name(real);
+        // Opened for writing, without creating or emptying it, since Windows only flushes a file opened so.
+        fs::OpenOptions::new().write(true).open(tmp)?.sync_all()?;
+        fs::rename(tmp, &dest)?;
+        sync_folder(dest.parent());
+        Ok(())
+    }
+
+    /// The rename itself is kept in the folder, so the folder is flushed too where the system allows it.
+    /// Some disks (network shares, memory cards) refuse; the file's own words are already safe by then.
+    #[cfg(unix)]
+    fn sync_folder(folder: Option<&Path>) {
+        if let Some(folder) = folder {
+            let _ = fs::File::open(folder).and_then(|f| f.sync_all());
+        }
+    }
+
+    /// Windows keeps a rename safe once the file is flushed, and can't open a folder to flush it.
+    #[cfg(not(unix))]
+    fn sync_folder(_folder: Option<&Path>) {}
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -147,7 +191,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts])
+        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts, commit_write])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;

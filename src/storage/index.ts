@@ -75,7 +75,7 @@ export function countWords(text: string): number {
 export function toIndexed(path: string, doc: CookbookDocument, stamp: string): IndexedDocument {
   const body = plainText(doc.body);
   // A Pantry card's names and fields are searchable too, so "baker" finds the character whose role it is.
-  const extra = !isCard(doc.kind) ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc.fields).map(([, v]) => v)].filter(Boolean);
+  const extra = !isCard(doc.kind) ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc).map(([, v]) => v)].filter(Boolean);
   const text = extra.length > 0 ? `${body}\n${extra.join('\n')}` : body;
   return {
     path,

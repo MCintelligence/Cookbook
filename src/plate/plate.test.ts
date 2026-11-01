@@ -133,3 +133,20 @@ describe('serving', () => {
     expect(html).toContain('<div class="pp-folio"');
   });
 });
+
+describe('served e-books stay well-formed', () => {
+  it('drops characters XML cannot hold', async () => {
+    const { xmlSafe } = await import('../export/html');
+    expect(xmlSafe('a\u0000b\u000bc\u0008d\te\nf')).toBe('abcd\te\nf');
+    expect(xmlSafe('chef 👩‍🍳 ok')).toBe('chef 👩‍🍳 ok');
+    expect(xmlSafe('half \uD83D here')).toBe('half  here');
+  });
+
+  it('keeps a pasted vertical tab out of the EPUB', () => {
+    const book = { title: 'T', chapters: [{ path: 'bookshelf/a.md', title: 'A', html: '<p>Line\u000bbreak\u0000</p>', words: 2 }] };
+    const zip = unzipSync(plateEpub(book as never, DEFAULT_PLATE, 'id'));
+    const chapter = strFromU8(zip['OEBPS/chapter1.xhtml']!);
+    expect(chapter).toContain('Linebreak');
+    expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(chapter)).toBe(false);
+  });
+});

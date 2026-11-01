@@ -30,11 +30,6 @@ export interface Speller {
 
 export type Dialect = 'en-US' | 'en-GB';
 
-export const DIALECTS: { id: Dialect; label: string }[] = [
-  { id: 'en-US', label: 'American' },
-  { id: 'en-GB', label: 'British' },
-];
-
 /** Letters with apostrophes or hyphens inside, like "didn’t" and "well-to-do". */
 const WORD = /\p{L}(?:[\p{L}\p{M}]|['’-](?=\p{L}))*/gu;
 /** Things that look like words but aren't prose: links, emails, handles and code. */

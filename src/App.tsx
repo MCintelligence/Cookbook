@@ -30,7 +30,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, synopsisOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -143,7 +143,6 @@ import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
-import { CardDetails } from './ui/CardDetails';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
 import { shrinkPicture } from './ui/pictures';
@@ -911,7 +910,7 @@ export function App() {
     }
   }, [fs, location]);
 
-  // A page opens at its top, with its status and synopsis card in view.
+  // A page opens at its top.
   // In Mise en Place the page stays where it is: the open Item is somewhere down it.
   useLayoutEffect(() => {
     if (!path || mise) return;
@@ -3114,14 +3113,6 @@ export function App() {
           </div>
         ) : (
           <>
-          {doc && path && doc.kind === 'scene' && (
-            <CardDetails
-              style={cardStyle}
-              synopsis={synopsisOf(doc.fields)}
-              onSynopsis={(text) => setCardField('synopsis', text)}
-              cast={cast}
-            />
-          )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
               style={cardStyle}

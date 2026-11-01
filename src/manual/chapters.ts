@@ -148,6 +148,26 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 Long Groups load as you scroll. The bottom bar shows the Group's Items and words. To go back to one Item, click it on the Shelf.`,
   },
   {
+    id: 'changes',
+    title: 'Track changes',
+    summary: 'Suggest edits, then accept or reject them.',
+    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} and every edit becomes a suggestion instead of going straight in:
+
+- **New words** are underlined in the accent colour.
+- **Deleted words** stay on the page, struck through, until you decide. Backspace walks back over them, so you can keep deleting.
+- Deleting words you suggested yourself just takes them out.
+
+Suggest changes is set for the whole recipe, so every Item follows it, and the word **Suggesting** sits in the bottom bar while it is on. Click it to stop.
+
+## Accepting and rejecting
+
+Right-click a change for **Accept change** or **Reject change**. Edit › **Track changes** also has Next change and Previous change, and Accept all or Reject all on this page. With text selected, Accept and Reject work on every change inside it. Undo takes back any of them.
+
+Only words are tracked for now. Enter and Backspace still split and join paragraphs, and formatting and styles change straight away.
+
+Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don't count towards your goals or word counts.`,
+  },
+  {
     id: 'pantry',
     title: 'The Pantry',
     summary: 'Characters, Settings and Materials, linked to your writing.',

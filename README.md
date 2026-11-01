@@ -165,6 +165,12 @@ In the middle are the pages, as a two-page spread for print (← and → turn th
 
 **Serve** makes an EPUB e-book, or a print-ready PDF through the print dialog's Save as PDF, page for page as the preview shows. Word is coming later.
 
+## Track changes
+
+Edit › Track changes › **Suggest changes** (⌘⇧E, Ctrl+Shift+E) turns every edit into a suggestion: new words are underlined in the accent colour and deleted words stay on the page, struck through. Right-click a change to accept or reject it, or use Edit › Track changes to step through them or settle the whole page at once. It is a setting of the recipe (`suggest` in `book.json`), and a **Suggesting** chip in the bottom bar turns it off.
+
+In the file a change is a span like any other: `[new words]{.ins}` and `[old words]{.del}`. Plate, Serve, exports and word counts read the text as if every change were accepted. Only words are tracked so far; splitting and joining paragraphs, formatting and styles go straight in.
+
 ## Undo, splitting and merging
 
 Undo reaches back past closing an item or the app. Each item's changes are logged in `.cookbook/undo/`, and opening the item replays them, so ⌘Z picks up where you left off. If an item's file was changed in another app, its undo history starts fresh; your text is never touched.

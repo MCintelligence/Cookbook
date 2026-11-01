@@ -3,6 +3,7 @@ import { countWords } from '../storage/index';
 import { sentences } from '../proofread/style';
 import { dialogueRanges } from './dialogue';
 import { textMap } from './textmap';
+import { liveText } from './trackChanges';
 
 /**
  * Counts over the open Item that only redo the blocks that changed.
@@ -17,7 +18,7 @@ import { textMap } from './textmap';
 const wordsByBlock = new WeakMap<PMNode, number>();
 const wordsByDoc = new WeakMap<PMNode, number>();
 
-/** Words in a document, the same as counting `doc.textBetween(0, size, ' ')`. */
+/** Words in a document, the same as counting `doc.textBetween(0, size, ' ')`, less any suggested for deletion. */
 export function docWords(doc: PMNode): number {
   let total = wordsByDoc.get(doc);
   if (total !== undefined) return total;
@@ -25,7 +26,7 @@ export function docWords(doc: PMNode): number {
   doc.forEach((block) => {
     let n = wordsByBlock.get(block);
     if (n === undefined) {
-      n = countWords(block.textBetween(0, block.content.size, ' '));
+      n = countWords(liveText(block));
       wordsByBlock.set(block, n);
     }
     total! += n;

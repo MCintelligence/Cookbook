@@ -19,6 +19,7 @@
  *   **bold**  *italic*  [underline]{.ul}  ~~struck~~  `code`  [a link](https://…)
  *   ![a picture](pantry/pictures/lou.jpg)
  *   [any character style]{.thought}   [text a note is attached to]{.note #n1}
+ *   [words suggested]{.ins}   [words suggested for deletion]{.del}     (track changes)
  *   [words set by hand]{font="EB Garamond" size=14 color=#7a2e1f}
  *   ::: {.letter align=center spacing=2}     a paragraph's own alignment and spacing (see format.ts)
  *   ^[an inline footnote]     a line ending in \ breaks the line there
@@ -38,6 +39,7 @@ export type MarkJSON =
   | { type: 'textStyle'; attrs: TextFormat }
   | { type: 'note'; attrs: { id: string } }
   | { type: 'link'; attrs: { href: string } }
+  | { type: 'insertion' | 'deletion'; attrs?: undefined }
   | { type: PlainMark; attrs?: undefined };
 
 export interface NodeJSON {
@@ -60,6 +62,10 @@ const LINK_PREFIX = '@';
 const FORMAT_PREFIX = '%';
 /** Internal keys for plain formatting. Style ids can't start with *, so they never clash. */
 const PLAIN_KEY: Record<PlainMark, string> = { bold: '*b', italic: '*i', underline: '*u', strike: '*s', code: '*c' };
+/** Track changes: a suggested insertion and deletion, written as [..]{.ins} and [..]{.del}. */
+const INS_KEY = '*ins';
+const DEL_KEY = '*del';
+const isChangeKey = (key: string) => key === INS_KEY || key === DEL_KEY;
 const KEY_PLAIN = Object.fromEntries(Object.entries(PLAIN_KEY).map(([k, v]) => [v, k])) as Record<string, PlainMark>;
 /** Outermost first: notes, links, character styles, then bold, italic, underline, strike, and code innermost. */
 const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*c': 5 };
@@ -67,6 +73,8 @@ const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*c':
 /** Marks are handled internally as string keys: a style id, *b for bold, note#<id>, @<href>, %<format>. */
 export function markKey(m: MarkJSON): string {
   if (m.type === 'note') return NOTE_PREFIX + m.attrs.id;
+  if (m.type === 'insertion') return INS_KEY;
+  if (m.type === 'deletion') return DEL_KEY;
   if (m.type === 'textStyle') return FORMAT_PREFIX + writeTextFormat(textFormatOf(m.attrs));
   if (m.type === 'charStyle') return m.attrs.style;
   if (m.type === 'link') return LINK_PREFIX + m.attrs.href;
@@ -75,6 +83,8 @@ export function markKey(m: MarkJSON): string {
 
 function keyToMark(key: string): MarkJSON {
   if (key.startsWith(NOTE_PREFIX)) return { type: 'note', attrs: { id: key.slice(NOTE_PREFIX.length) } };
+  if (key === INS_KEY) return { type: 'insertion' };
+  if (key === DEL_KEY) return { type: 'deletion' };
   if (key.startsWith(LINK_PREFIX)) return { type: 'link', attrs: { href: key.slice(LINK_PREFIX.length) } };
   if (key.startsWith(FORMAT_PREFIX)) return { type: 'textStyle', attrs: parseTextFormat(key.slice(FORMAT_PREFIX.length)) ?? {} };
   if (KEY_PLAIN[key]) return { type: KEY_PLAIN[key]! };
@@ -444,7 +454,7 @@ function tokenize(src: string): Token[] {
       const m = /^\]\{\.([A-Za-z0-9_-]+)(?: #([A-Za-z0-9_-]+))?\}/.exec(rest);
       if (m && (m[2] === undefined || m[1] === 'note')) {
         pushText();
-        const style = m[2] !== undefined ? NOTE_PREFIX + m[2] : m[1] === 'ul' ? PLAIN_KEY.underline : m[1]!;
+        const style = m[2] !== undefined ? NOTE_PREFIX + m[2] : m[1] === 'ul' ? PLAIN_KEY.underline : m[1] === 'ins' ? INS_KEY : m[1] === 'del' ? DEL_KEY : m[1]!;
         tokens.push({ kind: 'close', style, raw: m[0] });
         i += m[0].length;
         continue;
@@ -538,6 +548,8 @@ function sameMarks(a: MarkJSON[] | undefined, b: MarkJSON[]): boolean {
 }
 
 function rank(key: string): number {
+  // Outermost of all, so a suggestion stays one span whatever is styled inside it.
+  if (isChangeKey(key)) return -3;
   if (key.startsWith(NOTE_PREFIX)) return -2;
   // Inside character styles, so what's set by hand shows through them.
   if (key.startsWith(FORMAT_PREFIX)) return 0.5;
@@ -713,7 +725,10 @@ function serializeInline(nodes: NodeJSON[]): string {
     if (!p.space) return;
     const prev = pieces.slice(0, i).reverse().find((q) => !q.space);
     const next = pieces.slice(i + 1).find((q) => !q.space);
-    p.styles = prev && next ? p.styles.filter((s) => prev.styles.includes(s) && next.styles.includes(s)) : [];
+    // A space suggested for deletion or insertion keeps its mark, or it would come back as plain text.
+    const own = p.styles.filter(isChangeKey);
+    const shared = prev && next ? p.styles.filter((s) => prev.styles.includes(s) && next.styles.includes(s)) : [];
+    p.styles = [...new Set([...own, ...shared])].sort(compareStyles);
     if (p.text.includes('\n')) p.styles = p.styles.filter((s) => s !== PLAIN_KEY.code);
   });
 
@@ -723,7 +738,9 @@ function serializeInline(nodes: NodeJSON[]): string {
     STAR[style] ??
     (style.startsWith(NOTE_PREFIX)
       ? `]{.note #${style.slice(NOTE_PREFIX.length)}}`
-      : style.startsWith(LINK_PREFIX)
+      : isChangeKey(style)
+        ? `]{.${style.slice(1)}}`
+        : style.startsWith(LINK_PREFIX)
         ? `](${linkTarget(style.slice(LINK_PREFIX.length))})`
         : style.startsWith(FORMAT_PREFIX)
           ? `]{${style.slice(FORMAT_PREFIX.length)}}`
@@ -767,11 +784,13 @@ function linkTarget(href: string): string {
   return href;
 }
 
-/** The words of a scene without any markup, one block per line; footnotes follow the text they belong to. */
+/** The words of a scene without any markup, one block per line; footnotes follow the text they belong to. Text suggested for deletion is left out. */
 export function plainText(markdown: string): string {
   const lines: string[] = [];
   const walk = (node: NodeJSON, line: string[]): void => {
-    if (node.type === 'text') line.push(node.text ?? '');
+    if (node.type === 'text') {
+      if (!node.marks?.some((m) => m.type === 'deletion')) line.push(node.text ?? '');
+    }
     else if (node.type === 'footnote') line.push(` ${String(node.attrs?.text ?? '')} `);
     else if (node.type === 'hardBreak') line.push(' ');
     else for (const child of node.content ?? []) walk(child, line);

@@ -9,10 +9,16 @@ export interface TextMap {
 /** Stands in for an inline node such as a footnote marker, so offsets stay one per position. */
 const OBJECT = '￼';
 
+/**
+ * Text suggested for deletion (track changes) is left out, so the proofreader, Search and
+ * linked names read the page as it would be with the change accepted; every other
+ * character keeps its own position, so ranges still map back.
+ */
 export function textMap(block: PMNode, pos: number): TextMap {
   let text = '';
   const positions: number[] = [];
   block.forEach((child, offset) => {
+    if (child.isText && child.marks.some((m) => m.type.name === 'deletion')) return;
     const start = pos + 1 + offset;
     const piece = child.isText ? child.text! : OBJECT;
     for (let i = 0; i < piece.length; i++) positions.push(start + i);

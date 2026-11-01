@@ -73,7 +73,7 @@ describe('Learn to Cook', () => {
     expect(relationshipsOf(lou.fields)).toEqual([{ to: june.id, as: 'Mother of' }]);
     expect(relationshipsOf(june.fields)).toEqual([{ to: lou.id, as: 'Daughter of' }]);
     expect((await readDocument(fs, 'pantry/settings/Kitchen.md')).kind).toBe('setting');
-    expect((await readDocument(fs, 'pantry/research/Research notes.md')).kind).toBe('research');
+    expect((await readDocument(fs, 'pantry/research/Materials.md')).kind).toBe('research');
   });
 
   it('remembers where it was made, so Help can open it again', () => {

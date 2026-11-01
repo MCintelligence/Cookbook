@@ -107,7 +107,7 @@ export function ReportWindow({ editor, report, item, saved, onClose }: Props) {
         ))}
 
         <p className="report-saved" aria-live="polite">
-          {saved ? `Saved to Research › Seasoning Reports as “${saved}”.` : 'Saving to Research › Seasoning Reports…'}
+          {saved ? `Saved to Materials › Seasoning Reports as “${saved}”.` : 'Saving to Materials › Seasoning Reports…'}
         </p>
       </div>
     </div>,

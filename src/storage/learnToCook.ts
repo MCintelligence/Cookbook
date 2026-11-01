@@ -208,10 +208,10 @@ The page itself, its size, margins and indents, is set in **Recipe › Configure
       items: [
         {
           title: 'Names on the page',
-          synopsis: 'Characters, places and research, kept beside your writing.',
+          synopsis: 'Characters, settings and materials, kept beside your writing.',
           body: `# Names on the page
 
-The **Pantry** keeps everything that isn’t the writing itself: **Characters**, **Places** and **Research**. Open it from View › Pantry, or with the Pantry button in the bar at the top.
+The **Pantry** keeps everything that isn’t the writing itself: **Characters**, **Settings** and **Materials**. Open it from View › Pantry, or with the Pantry button in the bar at the top.
 
 This recipe’s Pantry already has Mama Lou, her daughter June, and the Kitchen. Look:
 
@@ -255,7 +255,7 @@ The MOnster in the cellar was only the boiler.
 
 She very quickly and really suddenly ran, and at the end of the day the end result was a free gift.
 
-Each seasoning's card has a meter for this page, a Check that shows or hides its underlines, and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Research › Seasoning Reports.
+Each seasoning's card has a meter for this page, a Check that shows or hides its underlines, and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Materials › Seasoning Reports.
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
@@ -404,13 +404,13 @@ export const PANTRY_CARDS: Card[] = [
     kind: 'setting',
     title: 'Kitchen',
     fields: { role: 'Where everything happens', when: 'Every evening since 1971', offers: 'Warmth, and an audience', threatens: 'The boiler in the cellar' },
-    body: 'An example place. Places have their own fields: what the place offers and what it threatens.\n',
+    body: 'An example setting. Settings have their own fields: what the place offers and what it threatens.\n',
   },
   {
     section: 'research',
     kind: 'research',
-    title: 'Research notes',
-    body: 'Research notes hold anything you need to keep to hand: sources, links, pictures, timelines. Unlike characters and places, they have no fields, just the page.\n',
+    title: 'Materials',
+    body: 'Materials hold anything you need to keep to hand: sources, links, pictures, timelines. Unlike characters and settings, they have no fields, just the page.\n',
   },
 ];
 

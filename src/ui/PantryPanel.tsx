@@ -55,7 +55,7 @@ export function PantryPanel({ group, onGroup, query, onQuery, hits, selected, on
         <input
           type="search"
           aria-label="Search the Pantry"
-          placeholder="Search names, places, notes"
+          placeholder="Search names, settings, notes"
           value={query}
           onChange={(e) => onQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && onQuery('')}

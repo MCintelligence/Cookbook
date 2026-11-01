@@ -3,7 +3,7 @@
 A warm, cozy writing app for novelists. It works fully offline, needs no account, and runs on desktop, mobile and in the browser.
 
 - **Shelf:** write items on a quiet page, organised into groups that nest inside each other.
-- **Pantry:** character, place and research cards that stay linked to the manuscript.
+- **Pantry:** character, setting and material cards that stay linked to the manuscript.
 - **Seasonings:** four characters who proofread on the device: spelling, grammar, dialogue, and style with a spice meter for how hard the page is to read.
 
 Cookbook is free and open source under the [Apache 2.0 licence](LICENSE).
@@ -20,8 +20,8 @@ My Recipe/
   bookshelf/       the Shelf: items, in nested groups
   pantry/
     characters/
-    settings/
-    research/
+    settings/      shown as Settings
+    research/      shown as Materials
   pictures/        portraits for Pantry cards
   .cookbook/       hidden: search index, undo history, snapshots and trash (see below)
 ```
@@ -102,9 +102,9 @@ From the keyboard, Enter on a group shows it and leaves the keyboard on the Shel
 
 ## The Pantry
 
-The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Places and Research. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.
+The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Settings and Materials. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.
 
-A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a place; or any you add, each with a hint of what goes in it) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
+A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a setting; or any you add, each with a hint of what goes in it) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
 
 ```yaml
 aka: [Mama J]
@@ -117,11 +117,11 @@ relationships:
 
 Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
 
-Character and place pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
+Character and setting pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
 
 ### Linked names
 
-Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or place card lists the items it appears in, in Shelf order.
+Every character's and setting's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or setting card lists the items it appears in, in Shelf order.
 
 ### The Pantry shelf and pins
 
@@ -139,7 +139,7 @@ The first time Cookbook starts, it opens **Learn to Cook**, a recipe made for tr
 
 ## Starting points and goals
 
-A new recipe can start as a novel (a group of items, plus a main character and place in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
+A new recipe can start as a novel (a group of items, plus a main character and setting in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
 
 The footer also has the zoom (click the percentage for a slider), whether the item is saved, and Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
 
@@ -184,14 +184,14 @@ The Seasonings button in the top bar opens four characters who each read the pag
 
 Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are off is saved in `book.json`. A slip is fixed from its underline, or with F7 to step through them.
 
-**Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Research › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
+**Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Materials › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
 
 Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
 Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - A real word with a common prefix or suffix counts too (un-, re-, non-, pre-, mis-, over-, under-, out-, anti-, semi-, multi-, sub-, super-, counter-, -less, -like, -ness), so “untextured” and “textureless” pass while “untexturred” doesn't. So do hyphenated words whose parts are real.
-- Every character's and place's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
+- Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
 - Suggestions come in the order that fits the words around the misspelling, so in “she sat on the bech by the river”, Sam offers *bench* before *beech*. He knows which words follow which from the counts of word pairs in English fiction, and words and pairs from your own book count for more, so a word you use often comes first.
 - Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
 - Removed remarks are kept in `.cookbook/ignored.json`. Settings can bring them all back.
@@ -236,7 +236,7 @@ src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android
 
 0. **Foundations** (this): app shell, plain-files storage, offline web build, CI.
 1. Offline editor: rich text, named paragraph and character styles, notes, find and replace.
-2. Shelf and Pantry: groups and items, character and place cards, linked names.
+2. Shelf and Pantry: groups and items, character and setting cards, linked names.
 3. Seasonings v1: spelling, grammar and style checks on the device.
 4. Mobile apps.
 5. Signed updates for the desktop app (see [RELEASING.md](RELEASING.md)).

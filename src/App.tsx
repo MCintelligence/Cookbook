@@ -12,7 +12,6 @@ import {
   type TreeNode,
   createBook,
   makeBookOrUndo,
-  DEFAULT_DAILY_GOAL,
   createDocument,
   createFolder,
   duplicateItem,
@@ -116,6 +115,10 @@ import { emptyLineAt, insertBrainstorm } from './editor/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
+import { type Dialect } from './proofread/check';
+import { dialectOf, systemEnglish } from './proofread/english';
+import { recipeDefaults } from './writers';
+import { tableSetBefore } from './ui/tableSet';
 import { IssueCard } from './ui/IssueCard';
 import { KIND_OF, type SeasoningId, fixText, isSeasoning, rulesOff } from './proofread/remarks';
 import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
@@ -165,6 +168,8 @@ interface KeptCaret {
 
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
+const SetTheTable = lazy(() => import('./ui/SetTheTable').then((m) => ({ default: m.SetTheTable })));
+const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.Manual })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 /** The right-hand panel's column; matches .app.drawer-open in styles.css. */
 const DRAWER_WIDTH = 320;
@@ -204,9 +209,11 @@ function readNotes(doc: CookbookDocument | null): Notes {
 
 async function startBook(fs: StorageAdapter, title: string, template: BookTemplateId = 'novel', setup: Partial<BookInfo> = {}): Promise<BookInfo> {
   return makeBookOrUndo(fs, async () => {
-    const info = { ...(await createBook(fs, title)), ...setup };
+    // The writer's own starting points from Set the Table, under anything New Recipe asked for.
+    const defaults = recipeDefaults(getSettings());
+    const info = { ...(await createBook(fs, title)), ...defaults, ...setup };
     await applyBookTemplate(fs, template);
-    if (Object.keys(setup).length > 0) await saveBookInfo(fs, info);
+    if (Object.keys(defaults).length + Object.keys(setup).length > 0) await saveBookInfo(fs, info);
     return info;
   });
 }
@@ -353,6 +360,10 @@ export function App() {
   const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
+  /** Set the Table, the welcome questions: on the very first start, or again from App Settings or Help. */
+  const [table, setTable] = useState<'first' | 'again' | null>(null);
+  /** The manual, open at a chapter. */
+  const [manualAt, setManualAt] = useState<{ chapter: string; at: number } | null>(null);
   const lastSection = useRef<SettingsSection>('general');
   const openSettings = (section: SettingsSection = lastSection.current) => setSettingsAt(section);
   const [goalsRequest, setGoalsRequest] = useState<{ tab: 'targets' | 'history'; at: number } | null>(null);
@@ -604,6 +615,8 @@ export function App() {
       if (!last && !learnedBefore() && !(await bookExists(await defaultLocation()))) {
         try {
           await learnToCook();
+          // The welcome questions come first, over Learn to Cook, which is there when they're done.
+          if (!tableSetBefore()) setTable('first');
           return;
         } catch {
           // Their own first recipe opens instead.
@@ -2192,13 +2205,13 @@ export function App() {
   }, [editor, matcher]);
   const storyNames = useMemo(() => namedCards.flatMap((c) => [c.title, ...c.aka]), [namedCards]);
   // Through updateBook, so a change made a moment before isn't written back over with the old settings.
-  const onDialect = useCallback((dialect: 'en-US' | 'en-GB') => updateBook({ dialect }), [fs, book]);
+  const onDialect = useCallback((dialect: Dialect) => updateBook({ dialect }), [fs, book]);
   const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
   // Switched off, every seasoning rests and nothing is marked on the page.
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
+  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
 
   // A seasoning's Check, switched off, takes its underlines off the page; Daniel's Check is the narration dimming, kept on the page itself.
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
@@ -2438,7 +2451,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'bookread', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'manual']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2466,6 +2479,7 @@ export function App() {
     }
     e.preventDefault();
     if (id === 'palette') setPalette({ scenesOnly: false, at: Date.now() });
+    else if (id === 'manual') setManualAt((m) => (m ? null : { chapter: '', at: Date.now() }));
     else if (id === 'switcher') setPalette({ scenesOnly: true, at: Date.now() });
     else if (id === 'shelf') setShelf({ at: null });
     else if (id === 'seasonings') doc && togglePanel('seasonings');
@@ -2724,6 +2738,8 @@ export function App() {
       cmd('card', 'New card', () => void addCard(), 'Actions', undefined, 'pantry character place research'),
       cmd('folder', 'New group', () => void addFolder(), 'Actions', undefined, 'book volume folder part'),
       cmd('bookread', manuscript ? 'Back to writing' : 'Read the recipe', () => (manuscript ? setManuscript(null) : void readManuscript()), 'Actions', keysFor('bookread'), 'read manuscript'),
+      cmd('manual', 'Open the manual', () => setManualAt({ chapter: '', at: Date.now() }), 'Help', keysFor('manual'), 'help guide how to documentation'),
+      cmd('table', 'Set the Table (welcome questions)', () => setTable('again'), 'Help', undefined, 'onboarding name english spelling writer goal'),
       cmd('find', 'Search', () => setFindRequest({ query: '', at: Date.now() }), 'Actions', keysFor('find'), 'find replace'),
       cmd('shelf', 'Name from the Pantry', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters insert'),
       cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places research'),
@@ -2765,7 +2781,7 @@ export function App() {
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
 
   const page = pageOf(book?.page);
-  const goals: Goals = { dailyGoal: book?.dailyGoal ?? DEFAULT_DAILY_GOAL, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };
+  const goals: Goals = { dailyGoal: book?.dailyGoal ?? settings.dailyGoal, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };
   // Words on the Shelf but the open Item's, which the footer counts as they are typed.
   const otherWords = useMemo(() => {
     let total = 0;
@@ -3006,7 +3022,9 @@ export function App() {
     {
       label: 'Help',
       items: () => [
+        { label: 'Manual', hint: keysFor('manual'), binding: binding('manual'), onPick: () => setManualAt({ chapter: '', at: Date.now() }) },
         { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+        { label: 'Set the Table…', onPick: () => setTable('again') },
         { separator: true },
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
         { label: 'Command palette…', hint: keysFor('palette'), binding: binding('palette'), onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
@@ -3542,7 +3560,21 @@ export function App() {
             onChooseNewBooksFolder={() => void chooseNewBooksFolder()}
             version={__APP_VERSION__}
             onCheckUpdates={checkForUpdates}
+            onSetTable={() => {
+              setSettingsAt(null);
+              setTable('again');
+            }}
           />
+        </Suspense>
+      )}
+      {table && (
+        <Suspense fallback={null}>
+          <SetTheTable first={table === 'first'} onDone={() => setTable(null)} />
+        </Suspense>
+      )}
+      {manualAt && (
+        <Suspense fallback={null}>
+          <ManualWindow chapter={manualAt.chapter} at={manualAt.at} onClose={() => setManualAt(null)} onLearn={() => void learnToCook().catch((e: unknown) => setError(friendlyError(e)))} />
         </Suspense>
       )}
 

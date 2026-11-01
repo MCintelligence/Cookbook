@@ -1,6 +1,7 @@
 import { type StorageAdapter, joinPath } from '../storage/adapter';
 import { HIDDEN_FOLDER } from '../storage/book';
 import { type Dialect } from './check';
+import { dialectOf, systemEnglish } from './english';
 
 /**
  * What the proofreader remembers for a book:
@@ -59,8 +60,7 @@ export async function saveIgnored(fs: StorageAdapter, ignored: Ignored): Promise
   await fs.writeText(IGNORED_FILE, JSON.stringify(kept, null, 2) + '\n');
 }
 
-/** British spelling for writers whose system is set to a Commonwealth English; American otherwise. */
+/** The spelling for the English the system is set to: British, Canadian or Australian where it is one of those (or close to one), American otherwise. */
 export function defaultDialect(languages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages): Dialect {
-  const english = languages.find((l) => /^en\b/i.test(l));
-  return english && /^en-(GB|AU|NZ|IE|ZA|IN)\b/i.test(english) ? 'en-GB' : 'en-US';
+  return dialectOf(systemEnglish(languages));
 }

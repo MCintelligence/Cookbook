@@ -2,6 +2,8 @@ import { type StorageAdapter, joinPath, baseName, parentOf } from './adapter';
 import { type PageSettings, pageOf } from './page';
 import { type CookbookDocument, type DocumentKind, newId, parseDocument, serializeDocument } from './document';
 import { type Order, forgetItem, freeName, moveFolderKeys, placeItem, saveOrder, sortEntries } from './order';
+import { type Dialect } from '../proofread/check';
+import { isDialect } from '../proofread/english';
 
 /**
  * A book is a plain folder the writer owns:
@@ -41,8 +43,8 @@ export interface BookInfo {
   created: string;
   /** Words a day the writer is aiming for. */
   dailyGoal?: number;
-  /** American or British spelling, for the proofreader. */
-  dialect?: 'en-US' | 'en-GB';
+  /** American, British, Canadian or Australian spelling, for the proofreader. */
+  dialect?: Dialect;
   /** Proofreader checks the writer switched off. */
   proofreadOff?: string[];
   /** The book's own id: files its backups, and tells readers a new e-book is the same book. Given to every book when it opens. */
@@ -130,7 +132,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     title: info.title ?? 'Untitled recipe',
     created: info.created ?? '',
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
-    ...((info.dialect === 'en-US' || info.dialect === 'en-GB') && { dialect: info.dialect }),
+    ...(isDialect(info.dialect) && { dialect: info.dialect }),
     ...(Array.isArray(info.proofreadOff) && { proofreadOff: info.proofreadOff.filter((r): r is string => typeof r === 'string') }),
     ...(typeof info.id === 'string' && { id: info.id }),
     ...(info.page && typeof info.page === 'object' && { page: pageOf(info.page) }),

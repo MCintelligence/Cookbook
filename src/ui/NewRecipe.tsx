@@ -13,6 +13,8 @@ import {
 import { type BookLocation, canPickFolder, openLocation } from '../storage/platform';
 import { BOOK_TEMPLATES, type BookTemplateId } from '../storage/templates';
 import { newId } from '../storage/document';
+import { getSettings } from '../settings';
+import { writerOf } from '../writers';
 import { Menu, type MenuItem } from './Menu';
 
 /** What the writer asked New Recipe for. */
@@ -83,7 +85,8 @@ function InlineName({ value, label, onDone }: { value: string; label: string; on
 /** New Recipe: templates down the left, built in and the writer's own in groups they make; what you get and the details on the right. */
 export function NewRecipe({ busy, error, current, currentTitle, defaultWhere, onCreate, onSaveTemplate, onEditTemplate, onBack, onClose }: Props) {
   const [shelf, setShelfState] = useState<TemplateShelf>(loadTemplates);
-  const [picked, setPicked] = useState<Picked>({ builtIn: 'novel' });
+  // The template for the kind of writing they told Set the Table about comes first.
+  const [picked, setPicked] = useState<Picked>(() => ({ builtIn: writerOf(getSettings().writer)?.template ?? 'novel' }));
   const [title, setTitle] = useState('');
   const [series, setSeries] = useState('');
   const [seriesNumber, setSeriesNumber] = useState('');

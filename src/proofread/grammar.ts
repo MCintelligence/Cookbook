@@ -21,7 +21,7 @@ const STYLE_KINDS = new Set<LintKind>(['Style', 'Readability', 'Enhancement', 'R
 /** Already covered by the spelling check. */
 const SKIP_KINDS = new Set<LintKind>(['Spelling', 'Typo']);
 
-export const HARPER_DIALECT: Record<Dialect, number> = { 'en-US': 0, 'en-GB': 1 };
+export const HARPER_DIALECT: Record<Dialect, number> = { 'en-US': 0, 'en-GB': 1, 'en-AU': 2, 'en-CA': 3 };
 
 /** Harper writes code in backticks; on a writer's card it reads better in quotes. */
 export const quoteTicks = (s: string) => s.replace(/`([^`]*)`/g, '“$1”');

@@ -28,7 +28,8 @@ export interface Speller {
   correct(word: string): boolean;
 }
 
-export type Dialect = 'en-US' | 'en-GB';
+/** The word lists the proofreader spells with: see english.ts for the Englishes that use each. */
+export type Dialect = 'en-US' | 'en-GB' | 'en-CA' | 'en-AU';
 
 /** Letters with apostrophes or hyphens inside, like "didn’t" and "well-to-do". */
 const WORD = /\p{L}(?:[\p{L}\p{M}]|['’-](?=\p{L}))*/gu;

@@ -1,11 +1,14 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type AppSettings, MARKDOWN_RULES, type Theme, setSettings, useSettings } from '../settings';
+import { type AppSettings, MARKDOWN_RULES, type Theme, getSettings, setSettings, useSettings } from '../settings';
+import { WRITERS } from '../writers';
+import { SEASONINGS } from '../proofread/remarks';
 import { SHORTCUTS, binding, bindingOf, keys, setBinding } from '../shortcuts';
-import { type BookInfo, DEFAULT_DAILY_GOAL } from '../storage/book';
+import { type BookInfo } from '../storage/book';
 import { MARGINS, PAGE_SIZES, type PageSettings, pageOf } from '../storage/page';
 import { ZoomSlider } from './ZoomControl';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
+import { DIALECTS, ENGLISHES } from '../proofread/english';
 import { FontOptions, pickFont } from './FontOptions';
 import { BODY, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 
@@ -59,6 +62,8 @@ interface Props {
   newBooksFolder: string | null;
   onChooseNewBooksFolder: () => void;
   version: string;
+  /** Opens Set the Table, the welcome questions. */
+  onSetTable: () => void;
   onCheckUpdates: () => Promise<string>;
 }
 
@@ -149,7 +154,7 @@ function NumberField({ label, value, placeholder, required, onCommit }: { label:
   );
 }
 
-const THEMES: { id: Theme; label: string; bg: string; side: string; page: string }[] = [
+export const THEMES: { id: Theme; label: string; bg: string; side: string; page: string }[] = [
   { id: 'system', label: 'System', bg: 'linear-gradient(90deg, #f4f4f2 50%, #121212 50%)', side: '#a3a39e', page: '#fdfdfc' },
   { id: 'light', label: 'Light', bg: '#f4f4f2', side: '#f1f1ef', page: '#fdfdfc' },
   { id: 'dark', label: 'Dark', bg: '#121212', side: '#161616', page: '#1f1f1f' },
@@ -302,6 +307,35 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
     case 'general':
       return (
         <>
+          <Group title="About you">
+            <Row title="Your name" help="Optional. New recipes put it on their title page when they’re plated." words="author">
+              <input className="set-text" aria-label="Your name" placeholder="Not set" defaultValue={s.writerName} onBlur={(e) => e.target.value !== s.writerName && set({ writerName: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+            </Row>
+            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Recipe Settings › Proofreader)." words="language spelling dialect american british canadian australian">
+              <Select label="Your English" value={s.english} options={[['auto', 'As my system'], ...ENGLISHES.map((e): [string, string] => [e.id, e.name])] as [AppSettings['english'], string][]} onChange={(english) => set({ english })} />
+            </Row>
+            <Row title="What you write" help="Picks the template New Recipe offers first." words="writer novelist template">
+              <Select label="What you write" value={s.writer} options={[['', 'Not set'], ...WRITERS.map((w): [string, string] => [w.id, w.name])] as [AppSettings['writer'], string][]} onChange={(writer) => set({ writer })} />
+            </Row>
+            <Row title="Daily goal" help="Words a day, for every recipe that hasn’t set its own goal." words="words goal streak">
+              <NumberField label="Daily goal" value={s.dailyGoal} required onCommit={(dailyGoal) => dailyGoal && set({ dailyGoal })} />
+            </Row>
+            <Row title="Seasonings for new recipes" help="Who reads a new recipe from the start. With none, the Seasonings panel asks." words="proofreader salty sam peppery pete drunk daniel spicy sally">
+              <div className="set-checks" role="group" aria-label="Seasonings for new recipes">
+                {SEASONINGS.map((x) => (
+                  <label key={x.id} className="set-check" title={x.role}>
+                    <input type="checkbox" checked={s.newSeasonings.includes(x.id)} onChange={(e) => set({ newSeasonings: e.target.checked ? SEASONINGS.map((y) => y.id).filter((id) => id === x.id || s.newSeasonings.includes(id)) : s.newSeasonings.filter((id) => id !== x.id) })} />
+                    {x.name.split(' ')[1]}
+                  </label>
+                ))}
+              </div>
+            </Row>
+            <Row title="Set the Table" help="Go through the welcome questions again." words="onboarding welcome questions">
+              <button className="set-btn" onClick={props.onSetTable}>
+                Set the Table…
+              </button>
+            </Row>
+          </Group>
           <Group title="Starting up">
             <Row title="Reopen where I left off" help="Open the last recipe at the item you were writing when Cookbook starts.">
               <Switch label="Reopen where I left off" on={s.reopenLast} onChange={(reopenLast) => set({ reopenLast })} />
@@ -852,16 +886,8 @@ function Proofreading({ proof }: { proof: Proofreader }) {
   return (
     <>
       <Group title="Language">
-        <Row title="American or British" help="Saved with the recipe, so a co-author gets the same.">
-          <Seg
-            label="Spelling"
-            value={proof.dialect}
-            options={[
-              ['en-US', 'American'],
-              ['en-GB', 'British'],
-            ]}
-            onChange={proof.setDialect}
-          />
+        <Row title="Spelling" help="Saved with the recipe, so a co-author gets the same. A recipe that never chose follows your English in App Settings › General.">
+          <Seg label="Spelling" value={proof.dialect} options={DIALECTS.map((d) => [d.id, d.name])} onChange={proof.setDialect} />
         </Row>
         <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the recipe.`} words={proof.words.join(' ')}>
           <button className="set-btn" aria-expanded={editing} disabled={proof.words.length === 0} onClick={() => setEditing(!editing)}>
@@ -903,7 +929,7 @@ function GoalSettings({ book, onBook, onExport }: Pick<Props, 'book' | 'onBook'>
     <>
       <Group title="Targets">
         <Row title="Words a day" help="Fills the ring in the bottom bar and keeps the streak.">
-          <NumberField label="Words a day" value={book.dailyGoal ?? DEFAULT_DAILY_GOAL} required onCommit={(dailyGoal) => onBook({ dailyGoal })} />
+          <NumberField label="Words a day" value={book.dailyGoal ?? getSettings().dailyGoal} required onCommit={(dailyGoal) => onBook({ dailyGoal })} />
         </Row>
         <Row title="Whole recipe" help="Words on the Shelf you’re aiming for.">
           <NumberField label="Whole recipe target" value={book.bookTarget} placeholder="No target" onCommit={(bookTarget) => onBook({ bookTarget })} />

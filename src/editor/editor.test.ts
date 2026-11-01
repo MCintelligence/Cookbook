@@ -5,13 +5,17 @@ import { Editor } from '@tiptap/core';
 import { cookbookExtensions, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
+import { EditorState } from '@tiptap/pm/state';
 import {
+  checkedOff,
   deleteFootnote,
   dialogueSpans,
   dialogueStats,
   footnotes,
   insertFootnote,
+  isDialogueFocus,
   removeNoteAnchor,
+  setChecksOff,
   setDialogueFocus,
   setFootnoteText,
 } from './seasonings';
@@ -278,6 +282,15 @@ describe('dialogue focus', () => {
     expect([...editor.view.dom.querySelectorAll('.cb-narration')].map((e) => e.textContent)).toEqual([' Lou asked.', 'She stirred the pot.']);
     setDialogueFocus(editor, false);
     expect(editor.view.dom.classList.contains('cb-dialogue-focus')).toBe(false);
+  });
+
+  it('keeps the Checks when the page state is made afresh, as opening an Item with its undo history does', () => {
+    const editor = make('“Hi,” she said.');
+    setDialogueFocus(editor, true);
+    setChecksOff(editor, ['spelling']);
+    editor.view.updateState(EditorState.create({ doc: editor.state.doc, plugins: editor.state.plugins }));
+    expect(isDialogueFocus(editor.state)).toBe(true);
+    expect([...checkedOff(editor.state)]).toEqual(['spelling']);
   });
 });
 

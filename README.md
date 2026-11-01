@@ -80,13 +80,11 @@ Pressing Backspace straight after a shortcut turns it back into exactly what you
 
 ## The Shelf
 
-Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import and Read the recipe; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
+Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import, Expand all and Collapse all; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
 The open item's status sits in the footer and on the Shelf, never on the page, so it never ends up in the manuscript.
-
-Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as one document, under its group headings, with the total words and an estimated reading time. Double-click a section to go back to writing in it.
 
 ### Mise en Place
 
@@ -182,7 +180,9 @@ The Seasonings button in the top bar opens four characters who each read the pag
 - **Drunk Daniel** watches dialogue: his meter runs from Sober to Drunk with how much of the open page is spoken, and his Drunk Check dims the narration so only the speech stands out.
 - **Spicy Sally** checks style, and rates the page on a spice meter from Mild to Inferno. The meter follows the page's grade level (the Automated Readability Index, as Hemingway uses): most published fiction sits around grades 5 to 9, so grades 5 to 7 are Medium, 4 and under Mild, 8 to 9 Hot, 10 to 12 Extra hot, and 13 and up Inferno.
 
-Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are off is saved in `book.json`. A slip is fixed from its underline, or with F7 to step through them.
+Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are on is saved in `book.json`, once for the whole Recipe, so every Item, Mise en Place and split view follow the same switches. Daniel's Drunk Check starts off; the others start on. The checks keep running when Seasonings is closed: the underlines of every picked seasoning whose Check is on stay on the page while you write. Only the open page is checked, a paragraph at a time as it changes, and Pete's and Sally's grammar engine stays asleep while neither of them is picked with their Check on. A slip is fixed from its underline, or with F7 to step through them.
+
+A number beside the Seasonings button says how many picked seasonings with their Check on have something to say about the open page, so you know to look without opening the panel. A seasoning has something to say when its meter is off the step it's happy at: any slip for Sam or Pete, anything but Medium for Sally, anything but Tipsy for Daniel. The number goes away when they're all happy or when Seasonings are turned off, and it stays in Oven Mode, in the dimmed top bar. Screen readers hear it as part of the button, for example "Seasonings, 2 seasonings have something to say".
 
 **Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Materials › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
 

@@ -255,7 +255,11 @@ The MOnster in the cellar was only the boiler.
 
 She very quickly and really suddenly ran, and at the end of the day the end result was a free gift.
 
-Each seasoning's card has a meter for this page, a Check that shows or hides its underlines, and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Materials › Seasoning Reports.
+Each seasoning's card has a meter for this page, a Check that shows or hides its underlines (Daniel's dims the narration instead), and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Materials › Seasoning Reports.
+
+A Check is one switch for the whole recipe: turn it on or off once and every Item follows, in Mise en Place too.
+
+Close Seasonings and keep writing: the underlines stay, and every picked seasoning with its Check on keeps tasting the page. The number beside the **Seasonings** button says how many of them have something to say; close the panel now and watch it go down as you fix the slips above.
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
@@ -279,7 +283,7 @@ Also in the View menu:
 - **Typewriter scrolling** keeps the line you’re typing in the middle of the window.
 - **Paper** shows the page as a sheet; **Draft** is a plain column of text.
 - **Zoom** and **Theme**: Light, Dark, Sepia, or follow your computer.
-- **Read the recipe** shows the whole thing from start to finish, as a reader will see it${k('bookread') ? ` (${k('bookread')})` : ''}.
+- **Mise en Place** shows a whole Group as one page; click **The Shelf** to read the whole thing from start to finish.
 
 To read one Item while writing another, right-click it on the Shelf and choose **Open beside this one**.
 `,

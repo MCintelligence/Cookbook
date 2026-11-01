@@ -118,7 +118,7 @@ To add one, use the buttons at the bottom of the Shelf, or File › **New item**
 - **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, and Move to trash.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
 
-Each Item can carry a **status**: Not started, Simmering or Done. This page is Simmering; Welcome is Done. The card above the page holds the Item’s **synopsis**: a line on what happens. Click it to change it.
+Each Item can carry a **status**: Not started, Simmering or Done. This page is Simmering; Welcome is Done.
 
 Hover over a Group to see how many words it holds.
 `,

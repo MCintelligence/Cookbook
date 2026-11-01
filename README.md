@@ -84,7 +84,7 @@ Items sit on the Shelf with a status dot (not started, simmering or done) and th
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
-The open item's status and synopsis are on the card above the page, so they never end up in the manuscript.
+The open item's status sits in the footer and on the Shelf, never on the page, so it never ends up in the manuscript.
 
 Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as one document, under its group headings, with the total words and an estimated reading time. Double-click a section to go back to writing in it.
 
@@ -119,7 +119,7 @@ Character and place pages start empty. Put the cursor on an empty line and a + a
 
 ### Linked names
 
-Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. The card above each item shows chips for the characters and places it names, and each character or place card lists the items it appears in, in Shelf order.
+Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or place card lists the items it appears in, in Shelf order.
 
 ### The Pantry shelf and pins
 

@@ -188,7 +188,7 @@ Each seasoning is one card: a remark in the character's voice, a five-step meter
 
 Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
-Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in App Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
+Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in App Settings › Seasonings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - A real word with a common prefix or suffix counts too (un-, re-, non-, pre-, mis-, over-, under-, out-, anti-, semi-, multi-, sub-, super-, counter-, -less, -like, -ness), so “untextured” and “textureless” pass while “untexturred” doesn't. So do hyphenated words whose parts are real.
 - Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.

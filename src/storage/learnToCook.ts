@@ -233,10 +233,10 @@ Right-click any words on the page and choose **Make it a Pantry card** to start 
       items: [
         {
           title: 'Meet the seasonings',
-          synopsis: 'The proofreader: four seasonings, each tasting for something different.',
+          synopsis: 'Four seasonings check your writing, each tasting for something different.',
           body: `# Meet the seasonings
 
-Cookbook’s proofreader works on this device, with no account and nothing sent anywhere. It comes as four **Seasonings**, and each recipe picks its own. Open them from View › Seasonings${k('seasonings') ? ` or with ${k('seasonings')}` : ''}.
+Cookbook checks your writing on this device, with no account and nothing sent anywhere, using four **Seasonings**. Each recipe picks its own. Open them from View › Seasonings${k('seasonings') ? ` or with ${k('seasonings')}` : ''}.
 
 - **Salty Sam** checks spelling, and near misses of names in the Pantry.
 - **Peppery Pete** checks grammar and punctuation.
@@ -259,7 +259,7 @@ Each seasoning's card has a meter for this page, a Check that shows or hides its
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
-Which checks run, and American or British spelling, are in App Settings › Proofreader.
+Which checks run, and American or British spelling, are in App Settings › Seasonings.
 `,
         },
       ],

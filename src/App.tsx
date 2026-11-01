@@ -2715,7 +2715,7 @@ export function App() {
       ['updates', 'Updates and privacy', 'version'],
       ['page', 'Layout', 'page size margins zoom draft letter a4 indent'],
       ['styles', 'Styles', 'paragraph character font'],
-      ['proofreader', 'Proofreader', 'spelling grammar dictionary british american'],
+      ['proofreader', 'Seasonings', 'proofreader spelling grammar dictionary british american'],
       ['goals', 'Goals', 'target deadline words a day pasted'],
     ];
     const page = pageOf(book?.page);

@@ -22,7 +22,7 @@ const APP_SECTIONS: [SettingsSection, string][] = [
 const BOOK_SECTIONS: [SettingsSection, string][] = [
   ['page', 'Layout'],
   ['styles', 'Styles'],
-  ['proofreader', 'Proofreader'],
+  ['proofreader', 'Seasonings'],
   ['goals', 'Goals'],
 ];
 const ALL_SECTIONS = [...APP_SECTIONS, ...BOOK_SECTIONS];
@@ -655,7 +655,7 @@ function Updates({ version, onCheck }: { version: string; onCheck: () => Promise
       <Group title="Privacy" plain>
         <Row
           title="Your writing stays on this device"
-          help="The proofreader runs here, and there is no account, no tracking and no crash reporting. Checking for updates is the only time Cookbook goes online."
+          help="Seasonings run here, and there is no account, no tracking and no crash reporting. Checking for updates is the only time Cookbook goes online."
         />
       </Group>
     </>

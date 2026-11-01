@@ -117,7 +117,7 @@ import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
 import { IssueCard } from './ui/IssueCard';
-import { KIND_OF, type SeasoningId, fixText, isSeasoning, rulesOff } from './proofread/remarks';
+import { KIND_OF, type SeasoningId, fixText, isSeasoning, needsReview, rulesOff } from './proofread/remarks';
 import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
 import { ReportWindow } from './ui/ReportWindow';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, stepIssue } from './proofread/plugin';
@@ -2198,10 +2198,11 @@ export function App() {
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
   const bookTexts = useCallback(() => index.current?.index.pageTexts() ?? [], []);
-  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review: seasoningsOpen && !!doc, bookTexts, bookVersion: textCount, onError: setError });
-
   // A seasoning's Check, switched off, takes its underlines off the page; Daniel's Check is the narration dimming, kept on the page itself.
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
+  // The checks keep running with Seasonings closed; see needsReview for when grammar and style are left out.
+  const review = !!doc && needsReview(chosen, unchecked, paused, seasoningsOpen);
+  const proof = useProofreader({ fs, dialect: book?.dialect, onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
   const uncheckedKinds = unchecked.flatMap((id) => KIND_OF[id] ?? []).join(' ');
   useEffect(() => {
     if (editor && !editor.isDestroyed) setChecksOff(editor, uncheckedKinds ? uncheckedKinds.split(' ') : []);

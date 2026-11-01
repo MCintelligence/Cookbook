@@ -265,7 +265,7 @@ export function setChecker(editor: Editor, checker: Checker | null): void {
   send(editor, { checker });
 }
 
-/** Grammar and style are checked only while the writer is reviewing. */
+/** Grammar and style are checked only while something wants them (see needsReview in remarks.ts). */
 export function setReview(editor: Editor, review: boolean): void {
   send(editor, { review });
 }

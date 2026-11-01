@@ -31,6 +31,17 @@ export function rulesOff(chosen: readonly SeasoningId[]): string[] {
   return SEASONINGS.filter((s) => !chosen.includes(s.id)).flatMap((s) => RULES_OF[s.id]);
 }
 
+/**
+ * Whether grammar and style are checked on the open page. With Seasonings open, always, so every meter
+ * reads. With it closed the checks go on, but the grammar engine only runs if it has something to
+ * underline: Pete or Sally is picked, not paused, and their Check is on. Spelling always runs.
+ */
+export function needsReview(chosen: readonly SeasoningId[], unchecked: readonly SeasoningId[], paused: boolean, open: boolean): boolean {
+  if (open) return true;
+  if (paused) return false;
+  return (['pete', 'sally'] as const).some((id) => chosen.includes(id) && !unchecked.includes(id));
+}
+
 /** Whose an issue is. */
 export function ownerOf(issue: Pick<Issue, 'kind' | 'rule'>): SeasoningId {
   if (issue.kind === 'spelling') return 'sam';

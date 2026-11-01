@@ -628,7 +628,8 @@ export function App() {
     // The Pantry's groups come in their usual order unless the writer has listed them otherwise.
     const ordered = ORDERED(order.current);
     setTree(await readTree(fs, BOOKSHELF, ordered));
-    setPantryTree(await readTree(fs, PANTRY, ordered));
+    // A Recipe folder with no Pantry yet (its folder deleted by hand, say) shows an empty one.
+    setPantryTree((await fs.exists(PANTRY)) ? await readTree(fs, PANTRY, ordered) : []);
     // Recipes are listed under the page they name, so they follow it wherever it moves.
     const byPage = new Map<string, Recipe[]>();
     if (NOTES_ON && (await fs.exists(RECIPES))) {

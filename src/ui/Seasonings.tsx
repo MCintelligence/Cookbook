@@ -1,6 +1,5 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { setDialogueFocus } from '../editor/seasonings';
 import { METERS, SEASONINGS, type SeasoningId, meterRemark, mix, waitingRemark } from '../proofread/remarks';
 import { isChecking, readingOf, tastePage } from '../proofread/tasting';
 import { REPORTS } from '../proofread/reports';
@@ -16,6 +15,8 @@ interface Props {
   /** Seasonings whose Check is off: their meter still reads, but nothing of theirs is marked on the page. */
   unchecked: SeasoningId[];
   onUnchecked: (unchecked: SeasoningId[]) => void;
+  /** Daniel's Check, switched on or off for the whole Recipe. */
+  onDrunk: (on: boolean) => void;
   onClose: () => void;
   /** Every seasoning switched off for now, and a way to switch them back on. */
   paused: boolean;
@@ -28,7 +29,7 @@ interface Props {
 
 const LONG_PRESS_MS = 400;
 
-export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onClose, paused, onPaused, onMenu, onReport }: Props) {
+export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, onDrunk, onClose, paused, onPaused, onMenu, onReport }: Props) {
   // A new work starts with nothing picked, so the picker shows until Done.
   const [picking, setPicking] = useState(chosen.length === 0);
   useEffect(() => {
@@ -194,7 +195,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   const toggle = (id: SeasoningId) => onChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
   const checking = (id: SeasoningId) => isChecking(id, page);
   const setChecking = (id: SeasoningId, on: boolean) => {
-    if (id === 'daniel') return setDialogueFocus(editor, on);
+    if (id === 'daniel') return onDrunk(on);
     onUnchecked(on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])]);
   };
   const reading = (id: SeasoningId) => readingOf(id, page);

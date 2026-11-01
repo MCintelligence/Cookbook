@@ -138,6 +138,7 @@ import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksO
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings } from './ui/Seasonings';
+import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
@@ -3107,6 +3108,7 @@ export function App() {
               <path d="M5 19 13 11" />
             </svg>
             Seasonings
+            <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
           <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
         </div>

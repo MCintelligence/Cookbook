@@ -146,6 +146,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .panel-btn svg { flex: none; width: 24px; height: 24px; }
 .panel-btn:hover:not(:disabled) { color: var(--accent); }
 .panel-btn[aria-pressed='true'] { color: var(--accent); }
+/* How many seasonings have something to say; the accent colour suits every theme, and it keeps its size when the button's label is hidden. */
+.panel-btn .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; margin-left: 2px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* Search, under its button */
 .find { position: relative; flex: none; }

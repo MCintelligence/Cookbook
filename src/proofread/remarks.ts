@@ -285,6 +285,8 @@ export interface Meter {
   report: string;
   ends: [string, string];
   steps: Taste[];
+  /** The step where the seasoning is happy with the page; anywhere else, it has something to say (see tasting.ts). */
+  happy: number;
   waiting: readonly string[];
 }
 
@@ -292,6 +294,7 @@ export const METERS: Record<SeasoningId, Meter> = {
   sam: {
     measure: 'Saltiness',
     check: 'Salt Check',
+    happy: 0,
     report: 'Salt Report',
     ends: ['Unsalted', 'Seawater'],
     steps: [
@@ -361,6 +364,7 @@ export const METERS: Record<SeasoningId, Meter> = {
   pete: {
     measure: 'Pepperiness',
     check: 'Pepper Check',
+    happy: 0,
     report: 'Pepper Report',
     ends: ['Plain', 'Smoking'],
     steps: [
@@ -430,6 +434,7 @@ export const METERS: Record<SeasoningId, Meter> = {
   daniel: {
     measure: 'Drunkenness',
     check: 'Drunk Check',
+    happy: 2,
     report: 'Drunk Report',
     ends: ['Sober', 'Drunk'],
     steps: [
@@ -499,6 +504,7 @@ export const METERS: Record<SeasoningId, Meter> = {
   sally: {
     measure: 'Spice',
     check: 'Spice Check',
+    happy: 1,
     report: 'Spice Report',
     ends: ['Mild', 'Inferno'],
     steps: SPICE,

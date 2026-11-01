@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, type MenuItem } from './Menu';
 
 export interface BarMenu {
@@ -15,6 +15,9 @@ export interface BarMenu {
 export function MenuBar({ menus }: { menus: BarMenu[] }) {
   const [open, setOpen] = useState<number | null>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  // Pointing at another menu opens it after the same short pause as a submenu, so passing over one on the way doesn't.
+  const hover = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(hover.current), []);
   const go = (index: number) => {
     buttons.current[index]?.focus();
     setOpen(index);
@@ -33,8 +36,15 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           aria-haspopup="menu"
           aria-expanded={open === i}
           className="menubar-item"
-          onClick={() => setOpen(open === i ? null : i)}
-          onPointerEnter={() => open !== null && open !== i && go(i)}
+          onClick={() => {
+            window.clearTimeout(hover.current);
+            setOpen(open === i ? null : i);
+          }}
+          onPointerEnter={() => {
+            window.clearTimeout(hover.current);
+            if (open !== null && open !== i) hover.current = window.setTimeout(() => go(i), 150);
+          }}
+          onPointerLeave={() => window.clearTimeout(hover.current)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -56,7 +66,10 @@ export function MenuBar({ menus }: { menus: BarMenu[] }) {
           x={at.left}
           y={at.bottom + 4}
           opener={buttons.current[open]}
-          onClose={() => setOpen(null)}
+          onClose={() => {
+            window.clearTimeout(hover.current);
+            setOpen(null);
+          }}
           onSide={(dir) => go(step(open, dir))}
         />
       )}

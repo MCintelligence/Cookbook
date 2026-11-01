@@ -138,7 +138,6 @@ import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleF
 import { UpdateBanner } from './ui/UpdateBanner';
 import { Seasonings } from './ui/Seasonings';
 import { SeasoningsBadge } from './ui/SeasoningsBadge';
-import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
@@ -3032,7 +3031,6 @@ export function App() {
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <Logo />
           <span className="brand">cookbook</span>
           {!MAC_APP && <MenuBar menus={topMenus} />}
           <span className="crumb">

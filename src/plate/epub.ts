@@ -1,5 +1,5 @@
 import { strToU8, zipSync, type Zippable } from 'fflate';
-import { escapeHtml } from '../export/html';
+import { escapeHtml, xmlSafe } from '../export/html';
 import { textHtml } from './book';
 import { type PlateBook, markFirst, openerHtml, plateCss } from './layout';
 import { type PlateSettings, defaultCopyright } from './settings';
@@ -18,7 +18,7 @@ export function plateEpub(book: PlateBook, s: PlateSettings, id: string, now = n
 ${body}
 </body></html>`;
   const files: Zippable = { mimetype: [strToU8('application/epub+zip'), { level: 0 }] };
-  const add = (name: string, text: string) => (files[name] = strToU8(text));
+  const add = (name: string, text: string) => (files[name] = strToU8(xmlSafe(text)));
   const sections: { file: string; title: string; toc: boolean }[] = [];
   const section = (file: string, title: string, body: string, toc: boolean, type = '') => {
     add(`OEBPS/${file}`, doc(title, body, type));

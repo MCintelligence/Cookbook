@@ -12,7 +12,7 @@ export type BookTemplateId = 'empty' | 'novel' | 'short-story' | 'nonfiction';
 
 export const BOOK_TEMPLATES: { id: BookTemplateId; name: string; description: string }[] = [
   { id: 'empty', name: 'Empty', description: 'One blank item and an empty Pantry. Start from nothing.' },
-  { id: 'novel', name: 'Novel', description: 'A group of items, with a main character and a place in the Pantry.' },
+  { id: 'novel', name: 'Novel', description: 'A group of items, with a main character and a setting in the Pantry.' },
   { id: 'short-story', name: 'Short story', description: 'A single item and a main character.' },
   { id: 'nonfiction', name: 'Nonfiction', description: 'A group of items, with a note for your sources.' },
 ];
@@ -59,14 +59,14 @@ export const CARD_TEMPLATES: DocTemplate[] = [
   },
   {
     id: 'setting',
-    name: 'Place',
+    name: 'Setting',
     kind: 'setting',
     folder: 'settings',
-    title: 'New place',
+    title: 'New setting',
     fields: { role: '', when: '', offers: '', threatens: '' },
     body: '',
   },
-  { id: 'research', name: 'Research note', kind: 'research', folder: 'research', title: 'New note', body: '' },
+  { id: 'research', name: 'Material', kind: 'research', folder: 'research', title: 'New material', body: '' },
 ];
 
 /** Writes a new scene or card from a template and returns its path. */

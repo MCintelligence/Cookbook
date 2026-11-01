@@ -3,7 +3,7 @@
 A warm, cozy writing app for novelists. It works fully offline, needs no account, and runs on desktop, mobile and in the browser.
 
 - **Shelf:** write items on a quiet page, organised into groups that nest inside each other.
-- **Pantry:** character, place and research cards that stay linked to the manuscript.
+- **Pantry:** character, setting and material cards that stay linked to the manuscript.
 - **Seasonings:** four characters who proofread on the device: spelling, grammar, dialogue, and style with a spice meter for how hard the page is to read.
 
 Cookbook is free and open source under the [Apache 2.0 licence](LICENSE).
@@ -20,8 +20,8 @@ My Recipe/
   bookshelf/       the Shelf: items, in nested groups
   pantry/
     characters/
-    settings/
-    research/
+    settings/      shown as Settings
+    research/      shown as Materials
   pictures/        portraits for Pantry cards
   .cookbook/       hidden: search index, undo history, snapshots and trash (see below)
 ```
@@ -76,17 +76,15 @@ Plain paragraphs use the Body style. `::: name` blocks use a named paragraph sty
 | `!Word` | a drop cap on the word's first letter: two lines deep at the start of a paragraph, a raised initial anywhere else. The file keeps the `!` |
 | ⌘⌥F (Ctrl+Alt+F) | a footnote at the cursor |
 
-Pressing Backspace straight after a shortcut turns it back into exactly what you typed. Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
+Pressing Backspace straight after a shortcut turns it back into exactly what you typed. App Settings › Writing › Markdown turns all the Markdown shortcuts off at once, or any one of them on its own; formatting already on the page stays, and with drop caps off `!Word` shows as written.
 
 ## The Shelf
 
-Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import and Read the recipe; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
+Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import, Expand all and Collapse all; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 
 The open item's status sits in the footer and on the Shelf, never on the page, so it never ends up in the manuscript.
-
-Read the recipe (⌘⇧R, or right-click the Shelf) shows every item in order as one document, under its group headings, with the total words and an estimated reading time. Double-click a section to go back to writing in it.
 
 ### Mise en Place
 
@@ -102,9 +100,9 @@ From the keyboard, Enter on a group shows it and leaves the keyboard on the Shel
 
 ## The Pantry
 
-The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Places and Research. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.
+The Pantry button in the top bar opens the Pantry beside the page: a search, which also looks at nicknames and fields, and a switch between Characters, Settings and Materials. Each of these can hold your own groups, nested as deep as you like, and cards drag between them like items do. The + button makes a new card.
 
-A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a place; or any you add, each with a hint of what goes in it) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
+A card opens on the same page as an item, as one card with its name at the top, so its free writing gets the same editor. Above the page are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a setting; or any you add, each with a hint of what goes in it) and its relationships. A relationship such as "Mother of June" links two cards and shows on both. In the file it looks like this:
 
 ```yaml
 aka: [Mama J]
@@ -117,11 +115,11 @@ relationships:
 
 Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
 
-Character and place pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
+Character and setting pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
 
 ### Linked names
 
-Every character's and place's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or place card lists the items it appears in, in Shelf order.
+Every character's and setting's name, and the other names it goes by, is linked wherever it appears in your writing. There is no special syntax, and nothing is added to the file. Names match whole words and their capital letters, so June the cook isn't the month of june, though "June's" still counts. Hover a name, or press and hold on a touch screen, to peek at the card. Each character or setting card lists the items it appears in, in Shelf order.
 
 ### The Pantry shelf and pins
 
@@ -139,13 +137,17 @@ The first time Cookbook starts, it opens **Learn to Cook**, a recipe made for tr
 
 ## Starting points and goals
 
-A new recipe can start as a novel (a group of items, plus a main character and place in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
+A new recipe can start as a novel (a group of items, plus a main character and setting in the Pantry), a short story, or nonfiction (a group of items, plus a note for sources). "New item from template" on the Shelf's right-click offers a blank item, a chapter opener or a letter.
 
-The footer also has the zoom (click the percentage for a slider), whether the item is saved, and Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
+The footer also has the zoom (click the percentage for a slider), whether the item is saved, and App Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
 
 ## Oven Mode and Stove Mode
 
-Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
+Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
+
+The desktop app opens full screen. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
+
+Nothing is out of reach in Oven Mode: the Shelf, the Pantry, Seasonings and pinned cards start tucked away and slide in over the page when you want them, without moving the text. Rest the pointer on the left edge of the window (or click it) for the Shelf, or the right edge for the Pantry (Seasonings, if that was the last one open). The Shelf button and the Pantry and Seasonings buttons in the top bar, View › Pantry and Seasonings, ⌘2 to ⌘4 (Ctrl+2 to Ctrl+4) and F6 slide them in too. Click the page, pick an item on the Shelf, or press Escape to tuck them away again; the next Escape leaves Oven Mode. Settings › Appearance › Reduce motion (or your computer's reduce-motion setting) shows them without the slide.
 
 ## Plate: the finished book
 
@@ -165,13 +167,13 @@ Deleting `.cookbook/` is safe for your writing: the search index is rebuilt, and
 
 ## Backups
 
-Your text is saved as you type. On top of that, Cookbook zips the whole recipe into a backups folder outside it: every half hour while you write, when you close Cookbook or open another recipe, and when a recipe opens after Cookbook stopped without closing it (a crash or a power cut). Back up now, on the recipe menu or in Settings › Saving and backups, makes one straight away.
+Your text is saved as you type. On top of that, Cookbook zips the whole recipe into a backups folder outside it: every half hour while you write, when you close Cookbook or open another recipe, and when a recipe opens after Cookbook stopped without closing it (a crash or a power cut). Back up now, on the recipe menu or in App Settings › Saving and backups, makes one straight away.
 
-A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
+A backup holds every item and card, the pictures, the settings, the snapshots and the trash. The search index and undo history are left out, since Cookbook rebuilds them. Each recipe has its own folder, named after its title and the start of its id (`My Recipe 1a2b3c4d/2026-10-30 14.05.09.zip`), so two recipes with the same title never share one, and the folder follows a renamed recipe. Cookbook keeps the newest 10 (or 25, or all, in App Settings), plus one a day for the last week and one a week for the last month. Restore opens a copy of the recipe as it was, beside your own, and never writes over it.
 
-The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
+The backups folder is in Cookbook's app data on the same disk as your recipes unless you choose another one in App Settings, such as a synced or external folder. Choosing one is the best protection against a lost or broken computer.
 
-Each backup is opened again as soon as it is written and checked file by file against the recipe. One that doesn't open whole is removed, never counted among the backups kept, and Cookbook says so. If automatic backups stop working, Cookbook tells you once and Settings shows why until one works again. In the desktop app, saves and backups are forced onto the disk before they replace the old file, Settings marks a backup folder that is on the same disk as the recipe, and Cookbook suggests choosing another drive or a cloud-synced folder the first time it finds them together.
+Each backup is opened again as soon as it is written and checked file by file against the recipe. One that doesn't open whole is removed, never counted among the backups kept, and Cookbook says so. If automatic backups stop working, Cookbook tells you once and App Settings shows why until one works again. In the desktop app, saves and backups are forced onto the disk before they replace the old file, App Settings marks a backup folder that is on the same disk as the recipe, and Cookbook suggests choosing another drive or a cloud-synced folder the first time it finds them together.
 
 ## Seasonings
 
@@ -182,19 +184,21 @@ The Seasonings button in the top bar opens four characters who each read the pag
 - **Drunk Daniel** watches dialogue: his meter runs from Sober to Drunk with how much of the open page is spoken, and his Drunk Check dims the narration so only the speech stands out.
 - **Spicy Sally** checks style, and rates the page on a spice meter from Mild to Inferno. The meter follows the page's grade level (the Automated Readability Index, as Hemingway uses): most published fiction sits around grades 5 to 9, so grades 5 to 7 are Medium, 4 and under Mild, 8 to 9 Hot, 10 to 12 Extra hot, and 13 and up Inferno.
 
-Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are off is saved in `book.json`. A slip is fixed from its underline, or with F7 to step through them.
+Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are on is saved in `book.json`, once for the whole Recipe, so every Item, Mise en Place and split view follow the same switches. Daniel's Drunk Check starts off; the others start on. The checks keep running when Seasonings is closed: the underlines of every picked seasoning whose Check is on stay on the page while you write. Only the open page is checked, a paragraph at a time as it changes, and Pete's and Sally's grammar engine stays asleep while neither of them is picked with their Check on. A slip is fixed from its underline, or with F7 to step through them.
 
-**Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Research › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
+A number beside the Seasonings button says how many picked seasonings with their Check on have something to say about the open page, so you know to look without opening the panel. A seasoning has something to say when its meter is off the step it's happy at: any slip for Sam or Pete, anything but Medium for Sally, anything but Tipsy for Daniel. The number goes away when they're all happy or when Seasonings are turned off, and it stays in Oven Mode, in the dimmed top bar. Screen readers hear it as part of the button, for example "Seasonings, 2 seasonings have something to say".
+
+**Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Materials › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
 
 Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
-Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
+Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in App Settings › Seasonings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 
 - A real word with a common prefix or suffix counts too (un-, re-, non-, pre-, mis-, over-, under-, out-, anti-, semi-, multi-, sub-, super-, counter-, -less, -like, -ness), so “untextured” and “textureless” pass while “untexturred” doesn't. So do hyphenated words whose parts are real.
-- Every character's and place's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
+- Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.
 - Suggestions come in the order that fits the words around the misspelling, so in “she sat on the bech by the river”, Sam offers *bench* before *beech*. He knows which words follow which from the counts of word pairs in English fiction, and words and pairs from your own book count for more, so a word you use often comes first.
 - Your dictionary is `dictionary.txt` in the book folder, one word a line, and can be edited by hand.
-- Removed remarks are kept in `.cookbook/ignored.json`. Settings can bring them all back.
+- Removed remarks are kept in `.cookbook/ignored.json`. App Settings can bring them all back.
 
 Grammar comes from [Harper](https://writewithharper.com) (Apache 2.0), running on the device as WebAssembly. It checks agreement, articles, repeated words, punctuation and word choice. Harper is about 20 MB (8 MB compressed), so it loads the first time it's needed, and the offline web app keeps a copy.
 
@@ -236,7 +240,7 @@ src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android
 
 0. **Foundations** (this): app shell, plain-files storage, offline web build, CI.
 1. Offline editor: rich text, named paragraph and character styles, notes, find and replace.
-2. Shelf and Pantry: groups and items, character and place cards, linked names.
+2. Shelf and Pantry: groups and items, character and setting cards, linked names.
 3. Seasonings v1: spelling, grammar and style checks on the device.
 4. Mobile apps.
 5. Signed updates for the desktop app (see [RELEASING.md](RELEASING.md)).

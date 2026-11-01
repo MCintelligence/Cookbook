@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { type AppSettings, type Theme, setSettings, useSettings } from '../settings';
+import { type AppSettings, MARKDOWN_RULES, type Theme, setSettings, useSettings } from '../settings';
 import { SHORTCUTS, binding, bindingOf, keys, setBinding } from '../shortcuts';
 import { type BookInfo, DEFAULT_DAILY_GOAL } from '../storage/book';
 import { MARGINS, PAGE_SIZES, type PageSettings, pageOf } from '../storage/page';
@@ -95,8 +95,8 @@ function Group({ title, children, plain }: { title: string; children: ReactNode;
   );
 }
 
-function Switch({ label, on, onChange }: { label: string; on: boolean; onChange: (on: boolean) => void }) {
-  return <button className="set-sw" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />;
+function Switch({ label, on, onChange, disabled }: { label: string; on: boolean; onChange: (on: boolean) => void; disabled?: boolean }) {
+  return <button className="set-sw" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} />;
 }
 
 function Seg<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
@@ -392,21 +392,31 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Two hyphens make an em dash" help="-- becomes —, and ... becomes …">
               <Switch label="Em dash" on={s.emDash} onChange={(emDash) => set({ emDash })} />
             </Row>
-            <Row
-              title="Markdown formatting as you type"
-              help={`**bold**, *italic* and _underline_ give plain formatting; # makes a heading and > a quote. ${keys('Mod-B')}, I and U apply your character styles.`}
-            >
-              <Switch label="Markdown formatting" on={s.markdown} onChange={(markdown) => set({ markdown })} />
-            </Row>
-            <Row title="Line starters" help={'At the start of a line: "- " bullets, "-1 " a numbered list, "-TD " a checklist, and "* * *" then Enter a section break.'}>
-              <Switch label="Line starters" on={s.lineStarters} onChange={(lineStarters) => set({ lineStarters })} />
-            </Row>
             <Row title="Typing @ opens the Pantry shelf" help="Not after a letter or number, so email addresses are left alone.">
               <Switch label="Typing @ opens the Pantry shelf" on={s.atShelf} onChange={(atShelf) => set({ atShelf })} />
             </Row>
             <Row title="Typing / opens the insert menu" help="At the start of a line or after a space: styles, lists, a table, a section break or a footnote.">
               <Switch label="Typing / opens the insert menu" on={s.slashMenu} onChange={(slashMenu) => set({ slashMenu })} />
             </Row>
+          </Group>
+          <Group title="Markdown">
+            <Row
+              title="Markdown"
+              help={`Turns every rule below on or off at once. Off, typing never turns into formatting, and !Word shows as written. Formatting already on the page stays, and nothing in your text changes. ${keys('Mod-B')}, I and U still apply your character styles.`}
+              words="markdown formatting shortcuts typing"
+            >
+              <Switch label="Markdown" on={s.markdown} onChange={(markdown) => set({ markdown })} />
+            </Row>
+            {MARKDOWN_RULES.map((rule) => (
+              <Row key={rule.id} title={rule.label} help={rule.id === 'dropCap' ? '!Word shows its first letter as a drop cap. The file keeps the !.' : rule.example} words="markdown rule">
+                <Switch
+                  label={rule.label}
+                  on={s.markdownRules[rule.id]}
+                  disabled={!s.markdown}
+                  onChange={(on) => set({ markdownRules: { ...s.markdownRules, [rule.id]: on } })}
+                />
+              </Row>
+            ))}
           </Group>
           <Group title="While writing">
             <Row title="Oven Mode" help={`Focus mode: hides the panels and fades everything but where you are. Stove Mode is the normal view. ${keys(binding('focus'))} turns it on and off.`}>

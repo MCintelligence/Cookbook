@@ -3,6 +3,7 @@ import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
 import { HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { cleanPastedHtml } from './paste';
+import { type MarkdownRule, markdownOn } from '../settings';
 
 /**
  * Plain formatting (bold, italic, underline, strikethrough, code and links),
@@ -98,10 +99,11 @@ export const Link = Mark.create({
  * Turns `**word**` into bold (and so on) as it is typed. The text keeps any
  * marks it already had, such as a character style around it.
  */
-export function markRule(find: RegExp, make: (type: MarkType) => PMMark, type: () => MarkType): InputRule {
+export function markRule(find: RegExp, make: (type: MarkType) => PMMark, type: () => MarkType, on: () => boolean = () => true): InputRule {
   return new InputRule({
     find,
     handler: ({ state, range, match }) => {
+      if (!on()) return null;
       // The closing delimiter has not been inserted yet; range.to is just before it.
       const delimited = match[1]!;
       const inner = match[2]!;
@@ -125,18 +127,18 @@ const span = (d: string) => {
   return new RegExp(`${OPEN}(${e}([^${c}\\s](?:[^${c}]*[^${c}\\s])?)${e})$`);
 };
 
-/** The plain marks' typing shortcuts. */
+/** The plain marks' typing shortcuts, each working while its Markdown rule is on. */
 export const PlainMarkRules = Extension.create({
   name: 'plainMarkRules',
   addInputRules() {
     const schema = () => this.editor.schema;
     const plain = (t: MarkType) => t.create();
     return [
-      markRule(span('**'), plain, () => schema().marks.bold!),
-      markRule(span('*'), plain, () => schema().marks.italic!),
-      markRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, plain, () => schema().marks.underline!),
-      markRule(span('~~'), plain, () => schema().marks.strike!),
-      markRule(span('`'), plain, () => schema().marks.code!),
+      markRule(span('**'), plain, () => schema().marks.bold!, () => markdownOn('bold')),
+      markRule(span('*'), plain, () => schema().marks.italic!, () => markdownOn('italic')),
+      markRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, plain, () => schema().marks.underline!, () => markdownOn('underline')),
+      markRule(span('~~'), plain, () => schema().marks.strike!, () => markdownOn('strike')),
+      markRule(span('`'), plain, () => schema().marks.code!, () => markdownOn('code')),
     ];
   },
 });
@@ -258,16 +260,17 @@ export const Image = Node.create({
 export const BlockShortcuts = Extension.create({
   name: 'blockShortcuts',
   addInputRules() {
-    const rule = (find: RegExp, style: (m: RegExpMatchArray) => string) =>
+    const rule = (find: RegExp, style: (m: RegExpMatchArray) => string, setting: MarkdownRule) =>
       new InputRule({
         find,
         handler: ({ state, range, match }) => {
+          if (!markdownOn(setting)) return null;
           const $from = state.doc.resolve(range.from);
           if ($from.depth !== 1 || $from.parent.type.name !== 'paragraph') return null;
           state.tr.delete(range.from, range.to).setNodeMarkup($from.before(), undefined, { ...$from.parent.attrs, style: style(match) });
         },
       });
-    return [rule(/^(#{1,3})\s$/, (m) => HEADING_STYLES[m[1]!.length - 1]!), rule(/^>\s$/, () => QUOTE_STYLE)];
+    return [rule(/^(#{1,3})\s$/, (m) => HEADING_STYLES[m[1]!.length - 1]!, 'heading'), rule(/^>\s$/, () => QUOTE_STYLE, 'quote')];
   },
 });
 

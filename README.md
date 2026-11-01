@@ -179,10 +179,14 @@ The Seasonings button in the top bar opens four characters who each read the pag
 
 - **Salty Sam** checks spelling.
 - **Peppery Pete** checks grammar: agreement, punctuation, quotes left open, and capitals in the wrong place (“MOnster”, “mONSTER”).
-- **Drunk Daniel** watches dialogue: he can dim the narration so only the speech stands out, and tracks how much of any page or book you pick is spoken.
+- **Drunk Daniel** watches dialogue: his meter runs from Sober to Drunk with how much of the open page is spoken, and his Drunk Check dims the narration so only the speech stands out.
 - **Spicy Sally** checks style, and rates the page on a spice meter from Mild to Inferno. The meter follows the page's grade level (the Automated Readability Index, as Hemingway uses): most published fiction sits around grades 5 to 9, so grades 5 to 7 are Medium, 4 and under Mild, 8 to 9 Hot, 10 to 12 Extra hot, and 13 and up Inferno.
 
-Each remark comes with the words around it, a Fix button for the suggested change and a Show button that finds it on the page. ✕ removes a remark for good; right-click it to remove it everywhere. Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
+Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are off is saved in `book.json`. A slip is fixed from its underline, or with F7 to step through them.
+
+**Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Research › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
+
+Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
 Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in Settings; it is saved in `book.json`). A word is only underlined once you have moved past it.
 

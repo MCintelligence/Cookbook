@@ -134,7 +134,6 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 /* Top bar */
 .topbar { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bar); position: relative; z-index: 3; }
 .brand-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.logo { flex: none; color: var(--accent); }
 .brand { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 19px; color: var(--accent); }
 .crumb { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .crumb-book { display: inline-flex; align-items: center; gap: 4px; border: none; background: transparent; padding: 4px 6px; margin: 0 -2px; border-radius: 8px; color: inherit; font-size: inherit; }
@@ -146,6 +145,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .panel-btn svg { flex: none; width: 24px; height: 24px; }
 .panel-btn:hover:not(:disabled) { color: var(--accent); }
 .panel-btn[aria-pressed='true'] { color: var(--accent); }
+/* How many seasonings have something to say; the accent colour suits every theme, and it keeps its size when the button's label is hidden. */
+.panel-btn .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; margin-left: 2px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 11px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 
 /* Search, under its button */
 .find { position: relative; flex: none; }
@@ -361,20 +362,12 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .shelf-empty { padding: 12px; font-size: 13px; color: var(--muted); }
 .shelf-preview { flex: 1; min-width: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 
-/* The whole manuscript, to read */
-.ms-bar { width: 816px; max-width: 100%; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
-.ms-bar strong { color: var(--text); }
-.manuscript { min-height: 0; }
-/* The book itself takes the keyboard for reading; its items show the focus ring as Tab reaches them. */
-.manuscript:focus { outline: none; }
+/* Group headings between Items in Mise en Place */
 .ms-folder { margin: 48px 0 24px; text-align: center; font-family: 'Literata', Georgia, serif; font-weight: 600; color: var(--page-text); }
 .ms-folder:first-child { margin-top: 0; }
 .ms-depth-0 { font-size: 26px; }
 .ms-depth-1 { font-size: 20px; }
 .ms-depth-2 { font-size: 17px; }
-.ms-scene + .ms-scene { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--page-line); }
-.manuscript .cb-prose { min-height: 0; }
-.manuscript .cb-note { background: transparent; border-bottom: none; }
 
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
 .desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }

@@ -197,14 +197,18 @@ export function dialogueStats(doc: PMNode): DialogueStats {
 // Moving the cursor does not change the text, so the highlights are worked out once per edit.
 const dialogueCache = new WeakMap<PMNode, DecorationSet>();
 
-export const DialogueFocus = Extension.create({
+export const DialogueFocus = Extension.create<object, { on: boolean }>({
   name: 'dialogueFocus',
+  // Kept on the editor as well as in the page's state, so a page state made afresh (an Item's undo
+  // history replayed as it opens) starts as the Recipe's setting says, not switched off.
+  addStorage: () => ({ on: false }),
   addProseMirrorPlugins() {
+    const storage = this.storage;
     return [
       new Plugin<boolean>({
         key: dialogueKey,
         state: {
-          init: () => false,
+          init: () => storage.on,
           apply: (tr, on) => (tr.getMeta(dialogueKey) as boolean | undefined) ?? on,
         },
         props: {
@@ -234,8 +238,11 @@ export function isDialogueFocus(state: EditorState): boolean {
   return dialogueKey.getState(state) ?? false;
 }
 
+/** Daniel's Check: dims the narration, or stops; does nothing when that is already so. */
 export function setDialogueFocus(editor: Editor, on: boolean): void {
-  editor.view.dispatch(editor.state.tr.setMeta(dialogueKey, on));
+  (editor.storage as unknown as { dialogueFocus: { on: boolean } }).dialogueFocus.on = on;
+  if (isDialogueFocus(editor.state) === on) return;
+  editor.view.dispatch(editor.state.tr.setMeta(dialogueKey, on).setMeta('addToHistory', false));
 }
 
 // ---------- checks ----------
@@ -249,14 +256,17 @@ export function setDialogueFocus(editor: Editor, on: boolean): void {
 export const checksKey = new PluginKey<ReadonlySet<string>>('seasoningChecks');
 const ALL_ON: ReadonlySet<string> = new Set();
 
-export const SeasoningChecks = Extension.create({
+export const SeasoningChecks = Extension.create<object, { off: ReadonlySet<string> }>({
   name: 'seasoningChecks',
+  // Kept on the editor too, for the same reason as Daniel's: a page state made afresh keeps the Checks.
+  addStorage: () => ({ off: ALL_ON }),
   addProseMirrorPlugins() {
+    const storage = this.storage;
     return [
       new Plugin<ReadonlySet<string>>({
         key: checksKey,
         state: {
-          init: () => ALL_ON,
+          init: () => storage.off,
           apply: (tr, off) => (tr.getMeta(checksKey) as ReadonlySet<string> | undefined) ?? off,
         },
         props: {
@@ -278,6 +288,7 @@ export function checkedOff(state: EditorState): ReadonlySet<string> {
 /** Turns off the Checks for these issue kinds and on for the rest; does nothing when that is already so. */
 export function setChecksOff(editor: Editor, kinds: Iterable<string>): void {
   const next = new Set(kinds);
+  (editor.storage as unknown as { seasoningChecks: { off: ReadonlySet<string> } }).seasoningChecks.off = next;
   const now = checkedOff(editor.state);
   if (next.size === now.size && [...next].every((k) => now.has(k))) return;
   editor.view.dispatch(editor.state.tr.setMeta(checksKey, next).setMeta('addToHistory', false));

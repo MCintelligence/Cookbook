@@ -141,6 +141,7 @@ import { Seasonings } from './ui/Seasonings';
 import { Logo } from './ui/Logo';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
+import { OvenEdges, useSlideAway } from './ui/OvenEdges';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
@@ -271,7 +272,21 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const seasoningsOpen = panel === 'seasonings';
-  const togglePanel = (p: Panel) => setPanel((open) => (open === p ? null : p));
+  /** In Oven Mode the Shelf (sideOpen) and the right-hand panel (ovenSide) stay tucked away until asked for. */
+  const [sideOpen, setSideOpen] = useState(false);
+  const [ovenSide, setOvenSide] = useState(false);
+  const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
+  panelNow.current = { panel, ovenSide };
+  const togglePanel = (p: Panel) => {
+    if (!getSettings().focus) return setPanel((open) => (open === p ? null : p));
+    // Oven Mode: the panel slides in over the page, or back out if it is the one showing.
+    setSideOpen(false);
+    if (panelNow.current.ovenSide && panelNow.current.panel === p) return setOvenSide(false);
+    setPanel(p);
+    setOvenSide(true);
+  };
+  /** A panel's own close button: in Oven Mode it only slides away, so Stove Mode keeps it. */
+  const closePanel = () => (getSettings().focus ? setOvenSide(false) : setPanel(null));
   const docRef = useRef<CookbookDocument | null>(null);
   /**
    * Set when the editor's text has changed since docRef.current.body was last brought up to
@@ -347,8 +362,7 @@ export function App() {
   /** The sidebar folder files are being dragged over, for the drop highlight. */
   const [fileDrop, setFileDrop] = useState<string | null>(null);
   const settings = useSettings();
-  /** On a phone, the sidebar slides out over the page. */
-  const [sideOpen, setSideOpen] = useState(false);
+  // On a phone (and in Oven Mode) the sidebar slides out over the page: sideOpen, above.
   const [shelfWidth, setShelfWidth] = useShelfWidth();
   const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
@@ -1586,6 +1600,7 @@ export function App() {
   /** Shows the Pantry cards whose names or notes match. */
   const lookUp = (query: string) => {
     setPanel('pantry');
+    setOvenSide(true);
     setPantryQuery(query);
   };
 
@@ -2315,16 +2330,22 @@ export function App() {
       const blank = editor ? null : document.querySelector<HTMLElement>('.mise-blank');
       if (!editor && !blank) return;
       setSideOpen(false);
+      setOvenSide(false);
       if (editor) editor.commands.focus();
       else blank!.focus();
       return;
     }
     if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
+    // Oven Mode keeps its quiet: the Shelf and panels slide in over the page. Only the toolbar needs Stove Mode.
     const oven = getSettings().focus;
-    if (oven) setSettings({ focus: false });
+    if (oven && area === 'toolbar') setSettings({ focus: false });
     if (area === 'pantry' && panel !== 'pantry') setPanel('pantry');
     if (area === 'seasonings' && panel !== 'seasonings') setPanel('seasonings');
-    // On a narrow window the Shelf slides in. (In Oven Mode it's hidden for that reason alone.)
+    if (oven && area !== 'toolbar') {
+      setSideOpen(area === 'shelf');
+      setOvenSide(area !== 'shelf');
+    }
+    // On a narrow window the Shelf slides in.
     if (area === 'shelf' && !oven && !areaShown('shelf')) setSideOpen(true);
     // After React has drawn what was just opened.
     requestAnimationFrame(() => {
@@ -2415,14 +2436,17 @@ export function App() {
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
       const from = areaOf(document.activeElement);
-      const to = nextArea(from, dir, (a) => (a === 'page' ? !manuscript && ((!!editor && !!doc) || !!document.querySelector('.mise-blank')) : areaShown(a)));
+      // In Oven Mode the Shelf and panels wait off screen, so F6 slides each in as it gets there.
+      const oven = getSettings().focus;
+      const shown = (a: Area) => {
+        if (a === 'page') return !manuscript && ((!!editor && !!doc) || !!document.querySelector('.mise-blank'));
+        if (!oven) return areaShown(a);
+        return a === 'shelf' || (a === 'pantry' && (panel === 'pantry' || panel === null)) || (a === 'seasonings' && !!doc && panel === 'seasonings');
+      };
+      const to = nextArea(from, dir, shown);
       if (to) goToArea(to);
     };
-    // Oven Mode hides everything but the page, so F6 brings the panels back first.
-    if (getSettings().focus) {
-      setSettings({ focus: false });
-      requestAnimationFrame(go);
-    } else go();
+    go();
   };
   /** The app's own shortcuts (Settings › Keyboard shortcuts); the page's are in the editor. */
   const onAppKey = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -2519,11 +2543,22 @@ export function App() {
       // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
       const handled = e.defaultPrevented && !(e.target instanceof Element && e.target.closest('.ProseMirror'));
       if (e.key !== 'Escape' || handled || document.querySelector('.menu, .shelf, .settings, .palette, .goals-pop, .issue-card')) return;
+      // A panel slid in over the page goes first; the next Escape leaves Oven Mode.
+      if (sideOpen || ovenSide) {
+        setSideOpen(false);
+        setOvenSide(false);
+        return;
+      }
       setSettings({ focus: false });
       say('Stove Mode.');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [settings.focus, sideOpen, ovenSide]);
+  useEffect(() => {
+    // Oven Mode starts with everything tucked away, and Stove Mode has its own columns.
+    setSideOpen(false);
+    setOvenSide(false);
   }, [settings.focus]);
   useEffect(() => {
     // The page redraws its fading when focus mode or what it keeps bright changes.
@@ -2670,6 +2705,17 @@ export function App() {
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
   const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
+  // What the Pantry and Seasonings buttons show as on: in Oven Mode, only a panel slid in counts.
+  const pantryShown = panel === 'pantry' && (!settings.focus || ovenSide);
+  /** In Oven Mode a slid-in panel slides away once the pointer leaves it; the keyboard goes back to the page if it was in there. */
+  const tuckAway = () => {
+    if (areaOf(document.activeElement) && areaOf(document.activeElement) !== 'page') goToArea('page');
+    setSideOpen(false);
+    setOvenSide(false);
+  };
+  const shelfAway = useSlideAway(settings.focus && sideOpen, tuckAway);
+  const sideAway = useSlideAway(settings.focus && ovenSide, tuckAway);
+  const seasoningsShown = seasoningsOpen && (!settings.focus || ovenSide);
   const saveEverything = useCallback(async () => {
     await flushSave();
     await saveUndoNow();
@@ -2950,8 +2996,8 @@ export function App() {
             items: (['system', 'light', 'dark', 'sepia'] as const).map((t) => ({ label: `${t[0]!.toUpperCase()}${t.slice(1)}`, checked: settings.theme === t, onPick: () => setSettings({ theme: t }) })),
           },
           { separator: true },
-          { label: 'Pantry', checked: panel === 'pantry', onPick: () => togglePanel('pantry') },
-          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsOpen, disabled: !doc, onPick: () => togglePanel('seasonings') },
+          { label: 'Pantry', checked: pantryShown, onPick: () => togglePanel('pantry') },
+          { label: 'Seasonings', hint: keysFor('seasonings'), binding: binding('seasonings'), checked: seasoningsShown, disabled: !doc, onPick: () => togglePanel('seasonings') },
           { separator: true },
           { label: manuscript ? 'Back to writing' : 'Read the recipe', hint: keysFor('bookread'), binding: binding('bookread'), disabled: !fs, onPick: () => (manuscript ? setManuscript(null) : void readManuscript()) },
         ];
@@ -3020,7 +3066,7 @@ export function App() {
   // On a Mac the menus go in the system's own menu bar at the top of the screen, rebuilt when what they show changes.
   const menusNow = useRef(topMenus);
   menusNow.current = topMenus;
-  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, !!doc, !!editor, !!fs, !!book, !!manuscript, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
+  const menuKey = JSON.stringify([settings.focus, settings.typewriter, settings.theme, panel, ovenSide, !!doc, !!editor, !!fs, !!book, !!manuscript, pageOf(book?.page), path, settings.shortcuts, settings.shortcutStyle]);
   useEffect(() => {
     if (!MAC_APP) return;
     const t = window.setTimeout(() => {
@@ -3053,13 +3099,16 @@ export function App() {
 
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
         <div className="brand-wrap">
-          <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => setSideOpen(!sideOpen)}>
+          <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => {
+            setSideOpen(!sideOpen);
+            setOvenSide(false);
+          }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
@@ -3094,13 +3143,13 @@ export function App() {
           </span>
         </div>
         <div className="top-actions">
-          <button className="panel-btn" aria-pressed={panel === 'pantry'} aria-expanded={panel === 'pantry'} onClick={() => togglePanel('pantry')}>
+          <button className="panel-btn" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
             </svg>
             Pantry
           </button>
-          <button className="panel-btn" aria-pressed={seasoningsOpen} aria-expanded={seasoningsOpen} disabled={!doc} onClick={() => togglePanel('seasonings')}>
+          <button className="panel-btn" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
               <path d="M5 19 13 11" />
@@ -3120,6 +3169,7 @@ export function App() {
         ref={shelfRef}
         className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
         aria-label="Shelf"
+        {...shelfAway}
         onDragOver={(e) => {
           if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
@@ -3167,7 +3217,16 @@ export function App() {
         {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
-      {sideOpen && <div className="side-backdrop" onClick={() => setSideOpen(false)} />}
+      {(sideOpen || (settings.focus && ovenSide)) && (
+        <div
+          className="side-backdrop"
+          onClick={() => {
+            setSideOpen(false);
+            setOvenSide(false);
+          }}
+        />
+      )}
+      {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
       <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         <UpdateBanner beforeRestart={saveEverything} />
@@ -3241,7 +3300,7 @@ export function App() {
       </main>
 
       {drawerOpen && (
-        <div className="drawer">
+        <div className="drawer" {...sideAway}>
           {pins.length > 0 && (
             <PinnedCards
               paths={pins}
@@ -3262,7 +3321,7 @@ export function App() {
               hits={pantryHits}
               selected={path}
               onOpen={(p) => void select(p)}
-              onClose={() => setPanel(null)}
+              onClose={closePanel}
               onMenu={pantryMenu}
               onHitMenu={(p, x, y) => rowMenu({ name: baseName(p), path: p, kind: 'file' }, x, y)}
               bar={pantryBar()}
@@ -3295,7 +3354,7 @@ export function App() {
               onChosen={(next) => setSeasonings({ chosen: next })}
               unchecked={unchecked}
               onUnchecked={(next) => setSeasonings({ unchecked: next.length > 0 ? next : undefined })}
-              onClose={() => setPanel(null)}
+              onClose={closePanel}
               paused={paused}
               onPaused={(on) => setSeasonings({ paused: on || undefined })}
               onMenu={showMenu}

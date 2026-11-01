@@ -274,6 +274,8 @@ Which checks run, and American or British spelling, are in Settings › Proofrea
 
 Cookbook has two modes. **Stove Mode** is the normal view, with the Shelf and panels around you. **Oven Mode** is for focus: it hides everything but the page and fades all but where you are writing. Turn it on from the View menu${k('focus') ? ` or with ${k('focus')}` : ''}, and the same way off again.
 
+Nothing is gone in Oven Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape goes back to Stove Mode.
+
 Also in the View menu:
 
 - **Typewriter scrolling** keeps the line you’re typing in the middle of the window.

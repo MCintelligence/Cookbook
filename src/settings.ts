@@ -239,8 +239,9 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   root.dataset.page = darkPage(s, systemDark) ? 'dark' : 'light';
   root.dataset.size = s.size;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
-  root.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
-  const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#EAD9BB' }[theme];
+  // Sepia frames a light page in dark chrome, so its scrollbars and controls are dark.
+  root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+  const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#28221D' }[theme];
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) meta.content = bar;
 }
 

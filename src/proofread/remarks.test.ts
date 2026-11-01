@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Issue } from './check';
-import { METERS, SPICE, fixText, meterRemark, ownerOf, perThousand, remark, rulesOff, spiceOf, tasteOf, waitingRemark } from './remarks';
+import { METERS, SPICE, fixText, meterRemark, ownerOf, needsReview, perThousand, remark, rulesOff, spiceOf, tasteOf, waitingRemark } from './remarks';
 import { strayCapitals, unclosedQuote } from './style';
 
 const issue = (kind: Issue['kind'], rule: string, message = ''): Issue => ({ from: 0, to: 1, kind, rule, message, suggestions: [] });
@@ -23,6 +23,16 @@ describe('seasonings', () => {
     expect(off).not.toContain('grammar');
     expect(off).not.toContain('stray-capitals');
     expect(rulesOff(['sam', 'pete', 'daniel', 'sally'])).toEqual([]);
+  });
+
+  it('keeps checking grammar and style with Seasonings closed, only when something would be underlined', () => {
+    expect(needsReview([], [], false, true)).toBe(true);
+    expect(needsReview(['pete'], [], false, false)).toBe(true);
+    expect(needsReview(['sam', 'sally'], [], false, false)).toBe(true);
+    expect(needsReview(['sam', 'daniel'], [], false, false)).toBe(false);
+    expect(needsReview(['pete', 'sally'], ['pete', 'sally'], false, false)).toBe(false);
+    expect(needsReview(['pete', 'sally'], ['pete'], false, false)).toBe(true);
+    expect(needsReview(['pete'], [], true, false)).toBe(false);
   });
 
   it('says the same thing each time for the same words', () => {

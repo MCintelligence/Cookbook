@@ -8,7 +8,7 @@ import { isSentenceRule, styleIssues } from './style';
 
 /**
  * The proofreader's background worker: it holds the Hunspell dictionary and,
- * once the writer starts reviewing, Harper's grammar engine and the style
+ * once grammar or style is first wanted, Harper's grammar engine and the style
  * checks, so loading them
  * and checking text never stalls typing.
  */

@@ -257,6 +257,8 @@ She very quickly and really suddenly ran, and at the end of the day the end resu
 
 Each seasoning's card has a meter for this page, a Check that shows or hides its underlines, and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Research › Seasoning Reports.
 
+Close Seasonings and keep writing: the underlines stay, and every picked seasoning with its Check on keeps tasting the page.
+
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
 Which checks run, and American or British spelling, are in Settings › Proofreader.

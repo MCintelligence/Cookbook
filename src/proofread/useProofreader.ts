@@ -41,7 +41,7 @@ interface Options {
   docId: string | null;
   /** Every character's and setting's names, never flagged and checked for near misses. */
   names: string[];
-  /** Reviewing (Seasonings is open): grammar and style are checked too. */
+  /** Grammar and style are checked too (see needsReview): with Seasonings open, or closed with Pete or Sally checking. */
   review: boolean;
   /** Every page's text, whose words count for more in suggestions; read only when one is wanted. */
   bookTexts?: () => string[];

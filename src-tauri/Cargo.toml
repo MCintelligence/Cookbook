@@ -2,7 +2,10 @@
 name = "cookbook"
 version = "0.4.0"
 description = "An offline writing app with an on-device proofreader"
+authors = ["SlopLVI"]
 license = "Apache-2.0"
+homepage = "https://github.com/MCintelligence/Cookbook"
+repository = "https://github.com/MCintelligence/Cookbook"
 edition = "2021"
 rust-version = "1.77.2"
 

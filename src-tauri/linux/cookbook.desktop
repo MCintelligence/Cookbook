@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+GenericName=Writing App
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}}
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}WordProcessor;
+Keywords=writing;writer;novel;book;manuscript;story;proofreader;grammar;spelling;editor;offline;
+StartupWMClass={{exec}}
+StartupNotify=true
+{{#if mime_type}}
+MimeType={{mime_type}}
+{{/if}}

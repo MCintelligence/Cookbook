@@ -5,7 +5,7 @@ import { type Issue, words } from './check';
  * Style and readability: Hemingway-style highlights (adverbs, simpler words,
  * passive voice, grade level) and ProWritingAid-style ones
  * (crutch words, sticky sentences, echoes, clichés, redundancies). All are
- * suggestions, never mistakes, and are only shown while reviewing.
+ * suggestions, never mistakes, and are only shown while Spicy Sally is checking.
  */
 
 export const STYLE_RULES: { id: string; label: string; why: string }[] = [

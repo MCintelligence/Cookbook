@@ -279,7 +279,7 @@ Also in the View menu:
 - **Typewriter scrolling** keeps the line you’re typing in the middle of the window.
 - **Paper** shows the page as a sheet; **Draft** is a plain column of text.
 - **Zoom** and **Theme**: Light, Dark, Sepia, or follow your computer.
-- **Read the recipe** shows the whole thing from start to finish, as a reader will see it${k('bookread') ? ` (${k('bookread')})` : ''}.
+- **Mise en Place** shows a whole Group as one page; click **The Shelf** to read the whole thing from start to finish.
 
 To read one Item while writing another, right-click it on the Shelf and choose **Open beside this one**.
 `,

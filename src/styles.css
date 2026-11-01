@@ -361,20 +361,12 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .shelf-empty { padding: 12px; font-size: 13px; color: var(--muted); }
 .shelf-preview { flex: 1; min-width: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 
-/* The whole manuscript, to read */
-.ms-bar { width: 816px; max-width: 100%; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
-.ms-bar strong { color: var(--text); }
-.manuscript { min-height: 0; }
-/* The book itself takes the keyboard for reading; its items show the focus ring as Tab reaches them. */
-.manuscript:focus { outline: none; }
+/* Group headings between Items in Mise en Place */
 .ms-folder { margin: 48px 0 24px; text-align: center; font-family: 'Literata', Georgia, serif; font-weight: 600; color: var(--page-text); }
 .ms-folder:first-child { margin-top: 0; }
 .ms-depth-0 { font-size: 26px; }
 .ms-depth-1 { font-size: 20px; }
 .ms-depth-2 { font-size: 17px; }
-.ms-scene + .ms-scene { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--page-line); }
-.manuscript .cb-prose { min-height: 0; }
-.manuscript .cb-note { background: transparent; border-bottom: none; }
 
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
 .desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }

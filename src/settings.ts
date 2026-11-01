@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { type BookLocation } from './storage/platform';
+import { type English, isEnglish } from './proofread/english';
+import { type WriterKind, isWriterKind } from './writers';
 
 /**
  * Settings for the app on this device, kept in the browser's storage (or the
@@ -11,6 +13,16 @@ export type Theme = 'system' | 'light' | 'dark' | 'sepia';
 export type Fade = 'paragraph' | 'sentence' | 'off';
 
 export interface AppSettings {
+  /** What Cookbook calls the writer, and the author new recipes are plated under. Optional. */
+  writerName: string;
+  /** The English they write in; 'auto' follows the system. Recipes that never chose a spelling follow it. */
+  english: English | 'auto';
+  /** What they mostly write, chosen in Set the Table; '' if they skipped it. Picks the starting points below. */
+  writer: WriterKind | '';
+  /** Words a day for recipes that don't set their own goal. */
+  dailyGoal: number;
+  /** The Seasonings a new recipe starts with; none means the Seasonings panel asks. */
+  newSeasonings: string[];
   /** Opens the last book at the scene that was open, rather than at the Bookshelf. */
   reopenLast: boolean;
   /** How shortcuts are written: as this computer does, or always ⌘ or always Ctrl. */
@@ -86,6 +98,12 @@ export function markdownOn(rule: MarkdownRule, s: AppSettings = current): boolea
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  writerName: '',
+  english: 'auto',
+  writer: '',
+  // The same as DEFAULT_DAILY_GOAL in storage/book.ts, which recipes used before this setting.
+  dailyGoal: 1000,
+  newSeasonings: [],
   reopenLast: true,
   shortcutStyle: 'auto',
   theme: 'system',
@@ -114,6 +132,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 const KEY = 'cookbook.settings';
+/** The Seasonings' ids, as in proofread/remarks.ts; repeated here so settings load without the proofreader. */
+const SEASONING_IDS = ['sam', 'pete', 'daniel', 'sally'];
 const LINE_STARTERS: MarkdownRule[] = ['bullets', 'numbers', 'checklist', 'sceneBreak'];
 const TYPED_MARKS: MarkdownRule[] = ['bold', 'italic', 'underline', 'strike', 'code', 'heading', 'quote', 'codeBlock'];
 const CHOICES: { [K in keyof AppSettings]?: readonly unknown[] } = {
@@ -154,6 +174,10 @@ export function parseSettings(raw: string | null): AppSettings {
       for (const id of TYPED_MARKS) migrated[id] = false;
     }
   }
+  if (!(saved.english === 'auto' || isEnglish(saved.english))) out.english = DEFAULT_SETTINGS.english;
+  out.writer = isWriterKind(saved.writer) ? saved.writer : '';
+  if (!((out.dailyGoal as number) > 0)) out.dailyGoal = DEFAULT_SETTINGS.dailyGoal;
+  out.newSeasonings = Array.isArray(saved.newSeasonings) ? saved.newSeasonings.filter((id): id is string => SEASONING_IDS.includes(id as string)) : [];
   out.shortcuts = Object.fromEntries(Object.entries(out.shortcuts as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
   return out as unknown as AppSettings;
 }

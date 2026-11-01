@@ -33,6 +33,7 @@ export const SHORTCUTS: Shortcut[] = [
   // Between the open Item on its own and its whole Group as one page, keeping the cursor where it is.
   { id: 'mise', label: 'Mise en Place (the whole group)', key: 'Mod-Shift-G' },
   { id: 'settings', label: 'App Settings', key: 'Mod-,' },
+  { id: 'manual', label: 'Manual', key: 'F1' },
   // Cookbook saves as you type; this saves anything still waiting straight away and says so.
   { id: 'save', label: 'Save now', key: 'Mod-S' },
   // Moving around the window: F6 goes round the toolbar, Shelf, page and panels; Mod+1 to 5 jump to one.

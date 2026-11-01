@@ -22,7 +22,10 @@ describe('proofreader storage', () => {
 
   it('picks British spelling for Commonwealth English', () => {
     expect(defaultDialect(['en-GB', 'en'])).toBe('en-GB');
-    expect(defaultDialect(['fr-FR', 'en-AU'])).toBe('en-GB');
+    expect(defaultDialect(['fr-FR', 'en-AU'])).toBe('en-AU');
+    expect(defaultDialect(['en-CA'])).toBe('en-CA');
+    expect(defaultDialect(['en-NZ'])).toBe('en-AU');
+    expect(defaultDialect(['en-IE'])).toBe('en-GB');
     expect(defaultDialect(['en-US'])).toBe('en-US');
     expect(defaultDialect([])).toBe('en-US');
   });

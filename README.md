@@ -131,9 +131,17 @@ Press ⌘J (Name from the Pantry) or type @ while writing for a quick search ove
 
 Pinned cards stay in the right-hand drawer, above the Pantry or Seasonings, until you unpin them. They're remembered for each recipe on this device. A name's peek can pin its card too.
 
+## Set the Table
+
+The very first time Cookbook starts, **Set the Table** asks a few questions before Learn to Cook: what to call you (it goes on the title page of the recipes you start), which English you write (American, British, Canadian, Australian, New Zealand, Irish, Indian or South African), what you mostly write, the theme and text size, a daily word goal, and which Seasonings new recipes start with. What you write sets sensible starting points: the template New Recipe offers first, a goal, the Seasonings, and Markdown rules that get in the way (poets lose the typed lists, nonfiction and scripts lose drop caps). Every question can be skipped, the answers stay on this device, and App Settings › General changes any of them, or runs Set the Table again (also Help › Set the Table…).
+
+## The manual
+
+Help › **Manual** (F1) opens the manual: a chapter for each part of Cookbook, a search over all of it, and the keyboard shortcuts as you have set them. It ships with the app, so it works offline. Its text is in `src/manual/chapters.ts`; change it in the same pull request as the feature it describes.
+
 ## Learn to Cook
 
-The first time Cookbook starts, it opens **Learn to Cook**, a recipe made for trying things out: one group for each part of Cookbook (the Shelf, writing, the Pantry, Seasonings, Stove and Oven, goals, keeping it safe, finding your way), an example Pantry, and pages full of things to try. Its shortcuts are your own, so it says ⌘O on a Mac and Ctrl+O elsewhere, or the menu way if you've taken a shortcut off. It is an ordinary recipe: change it, or delete it from Your Recipes when you're done. Help › Learn to Cook opens it again, or makes a fresh copy if it was deleted.
+After Set the Table, Cookbook opens **Learn to Cook**, a recipe made for trying things out: one group for each part of Cookbook (the Shelf, writing, the Pantry, Seasonings, Stove and Oven, goals, keeping it safe, finding your way), an example Pantry, and pages full of things to try. Its shortcuts are your own, so it says ⌘O on a Mac and Ctrl+O elsewhere, or the menu way if you've taken a shortcut off. It is an ordinary recipe: change it, or delete it from Your Recipes when you're done. Help › Learn to Cook opens it again, or makes a fresh copy if it was deleted.
 
 ## Starting points and goals
 
@@ -192,7 +200,7 @@ A number beside the Seasonings button says how many picked seasonings with their
 
 Spelling has a red wavy underline and grammar a blue one; Sally marks style in chili red, with 『 』 around a single word and 「 」 around a longer passage.
 
-Spelling is checked on the device, in a background worker, with the Hunspell word lists for American or British English (pick one in App Settings › Seasonings; it is saved in `book.json`). A word is only underlined once you have moved past it.
+Spelling is checked on the device, in a background worker, with the Hunspell word lists for American, British, Canadian or Australian English. A recipe uses your English from App Settings › General until it picks its own in Recipe Settings › Seasonings (saved in `book.json`); New Zealand English uses the Australian list, and Irish, Indian and South African English the British one. A word is only underlined once you have moved past it.
 
 - A real word with a common prefix or suffix counts too (un-, re-, non-, pre-, mis-, over-, under-, out-, anti-, semi-, multi-, sub-, super-, counter-, -less, -like, -ness), so “untextured” and “textureless” pass while “untexturred” doesn't. So do hyphenated words whose parts are real.
 - Every character's and setting's name and nickname counts as a word, so names are never flagged. Near misses are: “Mamma Lou” for Mama Lou is caught even though both words are real ones.

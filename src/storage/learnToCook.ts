@@ -91,6 +91,7 @@ Try these as you go:
 - [ ] Open **Seasonings** and let Salty Sam find a spelling mistake.
 - [ ] Turn on **Oven Mode** to write without distractions.
 - [ ] Start a recipe of your own from File › New Recipe.
+- [ ] Look anything up in the **Manual**: ${press(k, 'manual', 'open it from Help › Manual')}.
 
 Tick a box by clicking it. Cookbook saves as you type, so there is no Save button to remember.
 

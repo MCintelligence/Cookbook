@@ -8,7 +8,7 @@ import { cookbookExtensions } from '../editor/extensions';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from '../editor/markdown';
 import { type Issue, checkSpelling } from './check';
 import { type Checker } from './client';
-import { applySuggestion, drawnSet, forgetWord, issueAt, issuesOf, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
+import { applySuggestion, drawnSet, forgetWord, isTasting, issueAt, issuesOf, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
 
 const speller = nspell({ aff: readFileSync('public/dictionaries/en-US.aff'), dic: readFileSync('public/dictionaries/en-US.dic') });
 const names = ['Mama Lou'];
@@ -153,5 +153,31 @@ describe('proofreading in the editor', () => {
     await settle();
     setChecker(editor, null);
     expect(shown(editor)).toEqual([]);
+  });
+});
+
+describe('the first taste of a page', () => {
+  it('is still tasting until the checker has answered for the whole page, then stays tasted while typing', async () => {
+    const editor = make('Mamma Lou recieved the cornbread.\n\nIt was teh best.');
+    expect(isTasting(editor.state)).toBe(true);
+    setChecker(editor, checker().c);
+    expect(isTasting(editor.state)).toBe(true);
+    await settle();
+    expect(isTasting(editor.state)).toBe(false);
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+    type(editor, ' More');
+    // A paragraph waiting for its recheck doesn't send the meters back to "Tasting".
+    expect(isTasting(editor.state)).toBe(false);
+  });
+
+  it('tastes again when grammar starts being checked', async () => {
+    const editor = make('It was a apple.');
+    setChecker(editor, checker().c);
+    await settle();
+    expect(isTasting(editor.state)).toBe(false);
+    setReview(editor, true);
+    expect(isTasting(editor.state)).toBe(true);
+    await settle();
+    expect(isTasting(editor.state)).toBe(false);
   });
 });

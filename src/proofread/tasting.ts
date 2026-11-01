@@ -1,7 +1,7 @@
 import { type EditorState } from '@tiptap/pm/state';
 import { checkedOff, isDialogueFocus } from '../editor/seasonings';
 import { docReading, docTalk, docWords } from '../editor/docStats';
-import { type FoundIssue, issuesOf } from './plugin';
+import { type FoundIssue, isTasting, issuesOf } from './plugin';
 import { KIND_OF, METERS, type SeasoningId, ownerOf, perThousand, spiceOf, tasteOf } from './remarks';
 import { readingGrade } from './style';
 
@@ -24,6 +24,8 @@ export interface PageTaste {
   dim: boolean;
   /** The issue kinds whose Check is off, sorted and joined by spaces. */
   off: string;
+  /** The page is still being checked for the first time: no slips yet means nothing. */
+  tasting: boolean;
 }
 
 export function tastePage(state: EditorState): PageTaste {
@@ -41,6 +43,7 @@ export function tastePage(state: EditorState): PageTaste {
     spoken: talk.spoken,
     dim: isDialogueFocus(state),
     off: [...checkedOff(state)].sort().join(' '),
+    tasting: isTasting(state),
   };
 }
 
@@ -56,8 +59,17 @@ export interface Reading {
   turn: number;
 }
 
-/** Where a seasoning's meter stands on the page; null while there's too little page to read. */
+/**
+ * Whether a seasoning is still waiting for the checker's first answer on the page. Sam, Pete and Sally
+ * count underlines; Daniel reads the dialogue straight from the page, so he never waits.
+ */
+export function isTastingFor(id: SeasoningId, page: Pick<PageTaste, 'tasting' | 'words'>): boolean {
+  return page.tasting && id !== 'daniel' && page.words > 0;
+}
+
+/** Where a seasoning's meter stands on the page; null while there's too little page to read, or it is still being tasted. */
 export function readingOf(id: SeasoningId, page: PageTaste): Reading | null {
+  if (isTastingFor(id, page)) return null;
   if (id === 'daniel') {
     if (page.talkWords === 0) return null;
     const share = Math.round((page.spoken / page.talkWords) * 100);

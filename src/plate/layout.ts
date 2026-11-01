@@ -32,6 +32,57 @@ export interface Page {
   folio?: number;
 }
 
+/**
+ * Hands the main thread back to the browser until it has drawn a frame, so clicks, scrolling and Cancel
+ * still work and the footer's progress shows. A hidden window draws no frames, so a short timer stands in.
+ */
+export function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(fallback);
+      resolve();
+    };
+    const fallback = setTimeout(go, 50);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(go, 0));
+  });
+}
+
+/** Thrown when setting the pages is called off part way, for a newer layout or a closed Plate. */
+export class PaginateCancelled extends Error {
+  constructor() {
+    super('Setting the pages was called off.');
+    this.name = 'PaginateCancelled';
+  }
+}
+
+export interface PaginateOptions {
+  /** Checked whenever the work pauses; false calls it off. */
+  live?: () => boolean;
+  /** How many pages are set so far, told at each pause. */
+  progress?: (pages: number) => void;
+  /** How long to work, in ms, before letting the browser in. */
+  slice?: number;
+}
+
+/** Works in short slices, pausing for the browser between them. */
+class Slicer {
+  private until = 0;
+  constructor(private readonly o: PaginateOptions) {}
+  start() {
+    this.until = performance.now() + (this.o.slice ?? 12);
+  }
+  async check(pages: () => number) {
+    if (performance.now() < this.until) return;
+    this.o.progress?.(pages());
+    await yieldToBrowser();
+    if (this.o.live && !this.o.live()) throw new PaginateCancelled();
+    this.start();
+  }
+}
+
 export interface PlateBook {
   title: string;
   chapters: Chapter[];
@@ -137,7 +188,7 @@ export class Paginator {
   }
 
   /** The text, as pages of HTML. A first page can be pushed down, as chapter openers are. */
-  flow(html: string, firstTop = 0): string[] {
+  async flow(html: string, firstTop = 0, slicer?: Slicer, before = 0): Promise<string[]> {
     const tpl = document.createElement('template');
     tpl.innerHTML = html;
     const queue: Node[] = Array.from(tpl.content.childNodes).filter((n) => n.nodeType === 1);
@@ -157,6 +208,7 @@ export class Paginator {
       return carry;
     };
     while (queue.length > 0) {
+      if (slicer && this.box.childElementCount === 0) await slicer.check(() => before + pages.length);
       const el = queue.shift() as HTMLElement;
       this.box.appendChild(el);
       if (this.box.offsetHeight <= limit + 0.5) continue;
@@ -235,25 +287,27 @@ export class Paginator {
 }
 
 /** Whole pages for the printed book, in order, from the first (a right-hand page) to the last. */
-export function paginate(host: HTMLElement, s: PlateSettings, book: PlateBook): Page[] {
+export async function paginate(host: HTMLElement, s: PlateSettings, book: PlateBook, opts: PaginateOptions = {}): Promise<Page[]> {
   const g = geometry(s);
   const pg = new Paginator(host, g);
+  const slicer = new Slicer(opts);
+  slicer.start();
   try {
     const chapters = book.chapters;
     const body: Page[] = [];
     const starts = new Map<string, number>();
     const openerTop = Math.round(g.textHeight * 0.2);
-    chapters.forEach((ch, i) => {
+    for (const [i, ch] of chapters.entries()) {
       if (s.rectoStarts && body.length % 2 === 1) body.push({ kind: 'blank', html: '' });
       starts.set(ch.path, body.length + 1);
-      const pages = pg.flow(openerHtml(s, i + 1, ch.title) + markFirst(ch.html), openerTop);
+      const pages = await pg.flow(openerHtml(s, i + 1, ch.title) + markFirst(ch.html), openerTop, slicer, body.length);
       pages.forEach((html, j) => body.push({ kind: 'body', html, chapter: ch.path, ...(j === 0 && { opener: true }) }));
-    });
+    }
     for (const m of s.back) {
       if (!m.on) continue;
       const text = m.id === 'about' ? s.about : s.acknowledgements;
       const title = m.id === 'about' ? 'About the Author' : 'Acknowledgements';
-      for (const html of pg.flow(`<div class="matter-title">${escapeHtml(title)}</div><div class="matter">${textHtml(text) || '<p></p>'}</div>`, openerTop)) {
+      for (const html of await pg.flow(`<div class="matter-title">${escapeHtml(title)}</div><div class="matter">${textHtml(text) || '<p></p>'}</div>`, openerTop)) {
         body.push({ kind: 'matter', html });
       }
     }
@@ -283,7 +337,7 @@ export function paginate(host: HTMLElement, s: PlateSettings, book: PlateBook): 
       } else {
         toRecto();
         const lines = chapters.map((ch) => `<div class="toc-line"><span>${escapeHtml(ch.title)}</span>${s.pageNumbers ? `<span>${starts.get(ch.path)}</span>` : ''}</div>`).join('');
-        for (const html of pg.flow(`<div class="matter-title">Contents</div>${lines}`, openerTop)) front.push({ kind: 'contents', html });
+        for (const html of await pg.flow(`<div class="matter-title">Contents</div>${lines}`, openerTop)) front.push({ kind: 'contents', html });
       }
     }
     // The first chapter opens on a right-hand page.

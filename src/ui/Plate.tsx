@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState }
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode } from '../storage/book';
 import { type Chapter, readChapters } from '../plate/book';
-import { type Page, geometry, markFirst, openerHtml, pageCss, pageHtml, paginate, plateCss, printBookHtml } from '../plate/layout';
+import { type Page, PaginateCancelled, geometry, markFirst, openerHtml, pageCss, pageHtml, paginate, plateCss, printBookHtml } from '../plate/layout';
 import { plateEpub } from '../plate/epub';
 import {
   BACK_LABELS,
@@ -60,7 +60,10 @@ function moveTo<T>(list: T[], from: number, to: number): T[] {
 export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose, say, onError }: Props) {
   const [chapters, setChapters] = useState<Chapter[] | null>(null);
   const [pages, setPages] = useState<Page[] | null>(null);
-  const [setting, setSetting] = useState(false);
+  // Pages are being set from the start: first the chapters are gathered, then laid out.
+  const [setting, setSetting] = useState(true);
+  /** Pages set so far while the layout runs, for the footer. */
+  const [settingAt, setSettingAt] = useState(0);
   const [view, setView] = useState<'print' | 'ebook'>('print');
   const [spread, setSpread] = useState(0);
   const [picked, setPicked] = useState<Row | null>(null);
@@ -92,16 +95,21 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
     if (!chapters || !host.current) return;
     let live = true;
     setSetting(true);
+    setSettingAt(0);
     const timer = setTimeout(() => {
       const fonts = document.fonts;
       const ready = fonts
         ? Promise.all([fonts.load(`${s.size}pt "${s.font}"`), fonts.load(`italic ${s.size}pt "${s.font}"`)]).catch(() => [])
         : Promise.resolve([]);
-      void ready.then(() => {
+      void ready.then(async () => {
         if (!live || !host.current) return;
         try {
-          setPages(paginate(host.current, s, book));
+          // Set in short slices, so the window stays usable on a long book; a newer layout or closing Plate calls it off.
+          const next = await paginate(host.current, s, book, { live: () => live, progress: (n) => live && setSettingAt(n) });
+          if (!live) return;
+          setPages(next);
         } catch (e) {
+          if (e instanceof PaginateCancelled || !live) return;
           onError(`Couldn’t set the pages. ${e instanceof Error ? e.message : String(e)}`);
         }
         setSetting(false);
@@ -534,7 +542,7 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
           {pages ? `${pages.length} pages · ` : ''}
           {words.toLocaleString()} words · {TRIMS[s.trim].label} in · {TEMPLATES[s.template].label}
         </span>
-        <span>{setting ? 'Setting the pages…' : 'Preview up to date'}</span>
+        <span>{setting ? (settingAt > 0 ? `Setting page ${settingAt.toLocaleString()}…` : 'Setting the pages…') : 'Preview up to date'}</span>
       </footer>
       <div className="plate-measure" ref={host} aria-hidden="true" />
     </div>

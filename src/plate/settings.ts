@@ -49,7 +49,7 @@ export const TRIMS: Record<TrimId, { label: string; width: number; height: numbe
   '6x9': { label: '6 × 9', width: 6, height: 9 },
 };
 
-export const PLATE_FONTS = ['EB Garamond', 'Libre Baskerville', 'Literata'] as const;
+export const PLATE_FONTS = ['EB Garamond', 'Libre Baskerville', 'Crimson Pro'] as const;
 
 export const OPENERS: Record<OpenerId, string> = {
   words: 'Chapter One, then the title',
@@ -72,7 +72,7 @@ export const BACK_LABELS: Record<BackId, string> = { acknowledgements: 'Acknowle
 /** What each template sets; the controls can change any of it afterwards. */
 export const TEMPLATES: Record<TemplateId, { label: string; set: Pick<PlateSettings, 'font' | 'size' | 'lineHeight' | 'opener' | 'dropCap' | 'sceneBreak'> }> = {
   classic: { label: 'Classic', set: { font: 'EB Garamond', size: 11.5, lineHeight: 1.4, opener: 'words', dropCap: true, sceneBreak: '❧' } },
-  modern: { label: 'Modern', set: { font: 'Literata', size: 10, lineHeight: 1.5, opener: 'numeral', dropCap: false, sceneBreak: '* * *' } },
+  modern: { label: 'Modern', set: { font: 'Crimson Pro', size: 12, lineHeight: 1.25, opener: 'numeral', dropCap: false, sceneBreak: '* * *' } },
   literary: { label: 'Literary', set: { font: 'Libre Baskerville', size: 9.5, lineHeight: 1.55, opener: 'title', dropCap: false, sceneBreak: '' } },
   cozy: { label: 'Cozy', set: { font: 'EB Garamond', size: 12, lineHeight: 1.45, opener: 'ornament', dropCap: true, sceneBreak: '✿ ✿ ✿' } },
 };
@@ -126,7 +126,13 @@ function matter<T extends string>(v: unknown, fallback: Matter<T>[]): Matter<T>[
 
 /** Reads saved settings, falling back part by part to the defaults. */
 export function plateOf(raw: unknown): PlateSettings {
-  const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  let p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  // Literata was retired for Crimson Pro, a smaller face: 20% larger with the same line pitch looks the same.
+  if (p.font === 'Literata') {
+    const size = typeof p.size === 'number' ? p.size : 10;
+    const lineHeight = typeof p.lineHeight === 'number' ? p.lineHeight : 1.5;
+    p = { ...p, font: 'Crimson Pro', size: Math.min(16, Math.round(size * 2.4) / 2), lineHeight: Math.max(1.1, Math.round((lineHeight / 1.2) * 20) / 20) };
+  }
   const d = DEFAULT_PLATE;
   const num = (v: unknown, fallback: number, min: number, max: number) => (typeof v === 'number' && v >= min && v <= max ? v : fallback);
   return {

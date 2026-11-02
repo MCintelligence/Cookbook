@@ -1,28 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryAdapter } from '../storage/memory';
-import { defaultStyles, loadStyles, resolveParagraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
+import { defaultStyles, fontStack, loadStyles, resolveParagraphStyle, retireFonts, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
 
 describe('styles', () => {
   it('fills unset properties from the based-on chain', () => {
     const letter = resolveParagraphStyle(defaultStyles(), 'letter');
-    expect(letter).toMatchObject({ font: 'Literata', size: 12, italic: true, sideIndent: 0.5, firstLineIndent: 0 });
+    expect(letter).toMatchObject({ font: 'Crimson Pro', size: 14.5, italic: true, sideIndent: 0.5, firstLineIndent: 0 });
   });
 
   it('follows changes to Body into styles based on it', () => {
     const sheet = updateParagraphStyle(defaultStyles(), 'body', { font: 'EB Garamond', size: 13 });
     expect(resolveParagraphStyle(sheet, 'letter')).toMatchObject({ font: 'EB Garamond', size: 13 });
-    expect(resolveParagraphStyle(sheet, 'chapter-title')).toMatchObject({ font: 'Fraunces', size: 18 });
+    expect(resolveParagraphStyle(sheet, 'chapter-title')).toMatchObject({ font: 'Caudex', size: 18 });
   });
 
   it('survives a based-on loop', () => {
     const sheet = defaultStyles();
     sheet.paragraph.push({ id: 'a', name: 'A', basedOn: 'b' }, { id: 'b', name: 'B', basedOn: 'a' });
-    expect(resolveParagraphStyle(sheet, 'a').font).toBe('Literata');
+    expect(resolveParagraphStyle(sheet, 'a').font).toBe('Crimson Pro');
   });
 
   it('draws 12 pt as 16 px and inches at 96 px', () => {
-    const css = stylesToCss(defaultStyles());
-    expect(css).toContain("font-family: 'Literata', serif; font-size: 16px");
+    const css = stylesToCss(updateParagraphStyle(defaultStyles(), 'body', { size: 12, lineSpacing: 1.5 }));
+    expect(css).toContain("font-family: 'Crimson Pro', serif; font-size: 16px");
     // Quotes and letters are indented half an inch on both sides.
     expect(css).toContain('margin: 8px 48px 8px');
     // New books start every paragraph at the margin.
@@ -75,5 +75,31 @@ describe('text colours', () => {
     const css = stylesToCss(sheet);
     expect(css).toContain('color: #3B2A20');
     expect(css).not.toContain('data-page');
+  });
+
+  it('moves books off the retired fonts at the same visual size', () => {
+    const { paragraph, character } = retireFonts(
+      [
+        { id: 'body', name: 'Body', font: 'Literata', size: 12, lineSpacing: 1.5 },
+        { id: 'chapter-title', name: 'Chapter title', basedOn: 'body', font: 'Fraunces', size: 18 },
+        { id: 'epigraph', name: 'Epigraph', basedOn: 'body', size: 11 },
+        { id: 'quote', name: 'Quote', basedOn: 'body', italic: true },
+        { id: 'sub', name: 'Sub', basedOn: 'chapter-title' },
+      ],
+      [{ id: 'label', name: 'Label', font: 'Nunito', size: 10 }],
+    );
+    const sheet = { format: 1 as const, paragraph, character };
+    expect(resolveParagraphStyle(sheet, 'body')).toMatchObject({ font: 'Crimson Pro', size: 14.5, lineSpacing: 1.25 });
+    expect(resolveParagraphStyle(sheet, 'chapter-title')).toMatchObject({ font: 'Caudex', size: 18, lineSpacing: 1.5 });
+    expect(resolveParagraphStyle(sheet, 'sub')).toMatchObject({ font: 'Caudex', size: 18, lineSpacing: 1.5 });
+    expect(resolveParagraphStyle(sheet, 'epigraph')).toMatchObject({ font: 'Crimson Pro', size: 13 });
+    // Styles that only inherited still only inherit.
+    expect(paragraph.find((s) => s.id === 'quote')).toEqual({ id: 'quote', name: 'Quote', basedOn: 'body', italic: true });
+    expect(character[0]).toMatchObject({ font: 'Crimson Pro', size: 12 });
+  });
+
+  it('shows hand-formatted text in a retired font in its replacement', () => {
+    expect(fontStack('Literata')).toBe("'Crimson Pro', serif");
+    expect(fontStack('Fraunces')).toBe("'Caudex', serif");
   });
 });

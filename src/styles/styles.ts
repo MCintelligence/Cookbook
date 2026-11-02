@@ -73,7 +73,18 @@ const RETIRED = [RETIRED_BODY_FIRST.id];
 
 const sameStyle = (a: ParagraphStyle, b: ParagraphStyle) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 
-export const FONTS = ['Literata', 'EB Garamond', 'Libre Baskerville', 'Courier Prime', 'Fraunces', 'Nunito'] as const;
+export const FONTS = ['Crimson Pro', 'EB Garamond', 'Libre Baskerville', 'Courier Prime', 'Caudex'] as const;
+
+/** Fonts Cookbook used to bundle, and what took each one's place. */
+const RETIRED_FONTS: Record<string, string> = { Literata: 'Crimson Pro', Nunito: 'Crimson Pro', Fraunces: 'Caudex' };
+/**
+ * Crimson Pro is a small face: its lowercase is about 20% shorter and narrower than Literata's (and
+ * Nunito's). Text moved to it is set 20% larger, with the same distance between lines, so it looks the same.
+ * Caudex is about the size Fraunces was, so headings keep their sizes.
+ */
+const RETIRED_SCALE: Record<string, number> = { Literata: 1.2, Nunito: 1.2, Fraunces: 1 };
+const halfPoint = (n: number) => Math.round(n * 2) / 2;
+const twentieth = (n: number) => Math.round(n * 20) / 20;
 
 export function defaultStyles(): StyleSheet {
   return {
@@ -83,11 +94,11 @@ export function defaultStyles(): StyleSheet {
         id: BODY,
         name: 'Body',
         next: BODY,
-        font: 'Literata',
-        size: 12,
+        font: 'Crimson Pro',
+        size: 14.5,
         color: '#1C1C1B',
         align: 'justify',
-        lineSpacing: 1.5,
+        lineSpacing: 1.25,
         firstLineIndent: 0,
         sideIndent: 0,
         spaceBefore: 0,
@@ -102,7 +113,7 @@ export function defaultStyles(): StyleSheet {
         name: 'Chapter title',
         basedOn: BODY,
         next: BODY,
-        font: 'Fraunces',
+        font: 'Caudex',
         size: 18,
         align: 'center',
         firstLineIndent: 0,
@@ -113,7 +124,7 @@ export function defaultStyles(): StyleSheet {
       { id: 'heading-3', name: 'Heading 3', basedOn: 'chapter-title', next: BODY, size: 13, align: 'left', spaceBefore: 12, spaceAfter: 6 },
       { id: 'quote', name: 'Quote', basedOn: BODY, next: BODY, italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 6, spaceAfter: 6 },
       { id: 'letter', name: 'Letter', basedOn: BODY, next: 'letter', italic: true, sideIndent: 0.5, firstLineIndent: 0, spaceBefore: 9, spaceAfter: 9 },
-      { id: 'epigraph', name: 'Epigraph', basedOn: BODY, next: BODY, size: 11, italic: true, align: 'right', firstLineIndent: 0, spaceAfter: 18 },
+      { id: 'epigraph', name: 'Epigraph', basedOn: BODY, next: BODY, size: 13, italic: true, align: 'right', firstLineIndent: 0, spaceAfter: 18 },
     ],
     character: [
       { id: 'strong', name: 'Strong', bold: true },
@@ -134,7 +145,8 @@ export async function loadStyles(fs: StorageAdapter): Promise<StyleSheet> {
   if (retired && sameStyle(retired, RETIRED_BODY_FIRST)) {
     paragraph = paragraph.filter((s) => s !== retired).map((s) => (s.next === retired.id ? { ...s, next: BODY } : s));
   }
-  const character = Array.isArray(sheet.character) ? sheet.character : [];
+  let character = Array.isArray(sheet.character) ? sheet.character : [];
+  ({ paragraph, character } = retireFonts(paragraph, character));
   // Body must always exist, because every other style falls back to it.
   if (!paragraph.some((s) => s.id === BODY)) paragraph.unshift(defaults.paragraph[0]!);
   // Styles Markdown has syntax for (# headings, > quotes) are added to books made before they existed.
@@ -146,6 +158,37 @@ export async function loadStyles(fs: StorageAdapter): Promise<StyleSheet> {
     paragraph.splice(after === -1 ? paragraph.length : after + 1, 0, style);
   }
   return { format: 1, paragraph, character };
+}
+
+/**
+ * Moves styles off the fonts Cookbook no longer bundles (see RETIRED_FONTS), keeping how big
+ * the text looks. A style that inherited its size from a style whose font changed gets a size
+ * of its own when the two no longer match.
+ */
+export function retireFonts(paragraph: ParagraphStyle[], character: CharacterStyle[]): Pick<StyleSheet, 'paragraph' | 'character'> {
+  const retired = (font?: string) => font !== undefined && font in RETIRED_FONTS;
+  if (!paragraph.some((s) => retired(s.font)) && !character.some((c) => retired(c.font))) return { paragraph, character };
+  const old: StyleSheet = { format: 1, paragraph, character };
+  // Books from before this change fell back to the old Body, Literata 12 pt at 1.5.
+  const oldBody = { font: 'Literata', size: 12, lineSpacing: 1.5 };
+  const target = (id: string | undefined) => {
+    const r = id === undefined ? oldBody : resolveParagraphStyle(old, id);
+    const scale = RETIRED_SCALE[r.font] ?? 1;
+    return { size: halfPoint(r.size * scale), lineSpacing: twentieth(r.lineSpacing / scale) };
+  };
+  const moved = paragraph.map((s) => {
+    const own = target(s.id);
+    const inherited = target(s.basedOn);
+    const next: ParagraphStyle = { ...s, font: retired(s.font) ? RETIRED_FONTS[s.font!] : s.font };
+    if (next.font === undefined) delete next.font;
+    if (s.size !== undefined || own.size !== inherited.size) next.size = own.size;
+    if (s.lineSpacing !== undefined || own.lineSpacing !== inherited.lineSpacing) next.lineSpacing = own.lineSpacing;
+    return next;
+  });
+  const chars = character.map((c) =>
+    retired(c.font) ? { ...c, font: RETIRED_FONTS[c.font!], ...(c.size !== undefined && { size: halfPoint(c.size * RETIRED_SCALE[c.font!]!) }) } : c,
+  );
+  return { paragraph: moved, character: chars };
 }
 
 export async function saveStyles(fs: StorageAdapter, sheet: StyleSheet): Promise<void> {
@@ -209,8 +252,10 @@ export const PX_PER_PT = 4 / 3;
 const PX_PER_IN = 96;
 
 export function fontStack(font: string): string {
-  const fallback = font === 'Courier Prime' ? 'monospace' : font === 'Nunito' ? 'sans-serif' : 'serif';
-  return `'${font.replace(/'/g, '')}', ${fallback}`;
+  // Text formatted by hand in a retired font shows in the font that replaced it.
+  const name = RETIRED_FONTS[font] ?? font;
+  const fallback = name === 'Courier Prime' ? 'monospace' : 'serif';
+  return `'${name.replace(/'/g, '')}', ${fallback}`;
 }
 
 function cssValue(v: string): string {

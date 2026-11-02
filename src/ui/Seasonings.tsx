@@ -22,7 +22,8 @@ interface Props {
   paused: boolean;
   onPaused: (paused: boolean) => void;
   /** Shows a right-click menu. */
-  onMenu: (label: string, x: number, y: number, items: MenuItem[]) => void;
+  /** Opens a menu; `opener` is the button that opened it, so pressing it again closes it. */
+  onMenu: (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) => void;
   /** Opens a seasoning's report on the open Item. */
   onReport: (id: SeasoningId) => void;
 }
@@ -93,7 +94,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     openCardMenu(id, at, e.clientX, e.clientY);
   };
   /** The card's menu: moving it about the list, removing it, then the panel's own items. */
-  const openCardMenu = (id: SeasoningId, at: number, x: number, y: number) => {
+  const openCardMenu = (id: SeasoningId, at: number, x: number, y: number, opener?: HTMLElement) => {
     const who = SEASONINGS.find((s) => s.id === id)!;
     const several = picked.includes(id) && picked.length > 1;
     if (!picked.includes(id)) setMarked([id]);
@@ -109,13 +110,14 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
             { label: `Remove ${who.name}`, danger: true, onPick: () => removeAll([id]) },
           ]),
       { separator: true },
-      ...panelItems(),
-    ]);
+      ...panelItems(picked.includes(id) ? picked : [id]),
+    ], opener);
   };
-  const panelItems = (): MenuItem[] => [
+  /** `now` is what will be picked once the menu shows: opening a card's menu picks that card first. */
+  const panelItems = (now: SeasoningId[] = picked): MenuItem[] => [
     { label: 'Add a seasoning…', disabled: picking, onPick: () => setPicking(true) },
-    { label: 'Select all', disabled: chosen.length === 0 || everything, onPick: () => setMarked([...chosen]) },
-    { label: 'Deselect all', disabled: picked.length === 0, onPick: () => setMarked([]) },
+    { label: 'Select all', disabled: chosen.length === 0 || now.length === chosen.length, onPick: () => setMarked([...chosen]) },
+    { label: 'Deselect all', disabled: now.length === 0, onPick: () => setMarked([]) },
     { separator: true },
     turn,
   ];
@@ -276,7 +278,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                       label={`More for ${who.name}`}
                       onClick={(e) => {
                         const box = e.currentTarget.getBoundingClientRect();
-                        openCardMenu(id, at, box.left, box.bottom + 4);
+                        openCardMenu(id, at, box.left, box.bottom + 4, e.currentTarget);
                       }}
                       d="M12 5h.01M12 12h.01M12 19h.01"
                       wide

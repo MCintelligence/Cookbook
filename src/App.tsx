@@ -1631,7 +1631,12 @@ export function App() {
     });
   };
 
-  const showMenu = (label: string, x: number, y: number, items: MenuItem[]) => setMenu({ label, x, y, items });
+  /**
+   * Opens a menu. Given the button that opened it, a second press on that button
+   * closes the menu instead of opening it again, as the Recipe button does.
+   */
+  const showMenu = (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) =>
+    setMenu((open) => (opener && open?.opener === opener ? null : { label, x, y, items, opener }));
 
   /** Proofreader fixes and choices for an issue, for the underline's menu and the Seasonings card's. */
   const issueItems = async (issue: FoundIssue): Promise<MenuItem[]> => {

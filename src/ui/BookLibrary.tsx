@@ -170,7 +170,7 @@ export function BookLibrary(props: Props) {
   const [query, setQuery] = useState('');
   const [missing, setMissing] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ label: string; x: number; y: number; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<{ label: string; x: number; y: number; items: MenuItem[]; opener?: HTMLElement } | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [peek, setPeek] = useState<{ key: string; left: number; top: number } | null>(null);
   const [making, setMaking] = useState(!!props.startNew);
@@ -334,9 +334,10 @@ export function BookLibrary(props: Props) {
     ];
   };
 
-  const openMenu = (b: Shown, x: number, y: number) => {
+  const openMenu = (b: Shown, x: number, y: number, opener?: HTMLElement) => {
     setPeek(null);
-    setMenu({ label: b.title, x, y, items: itemsFor(b) });
+    // A second press on the button that opened the menu closes it.
+    setMenu((open) => (opener && open?.opener === opener ? null : { label: b.title, x, y, items: itemsFor(b), opener }));
   };
 
   const showPeek = (b: Shown, el: HTMLElement) => {
@@ -409,7 +410,7 @@ export function BookLibrary(props: Props) {
       onClick={(e) => {
         e.stopPropagation();
         const r = e.currentTarget.getBoundingClientRect();
-        openMenu(b, r.right - 210, r.bottom + 4);
+        openMenu(b, r.right - 210, r.bottom + 4, e.currentTarget);
       }}
     >
       {Icon.more}

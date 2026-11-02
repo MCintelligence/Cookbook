@@ -106,44 +106,55 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
         Search
       </button>
       {open && (
-        <section className="find-pop" aria-label="Search and replace">
-          <label className="find-field">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="6" />
-              <path d="m19.5 19.5-4-4" />
-            </svg>
-            <input
-              ref={input}
-              value={query}
-              placeholder="Search this recipe"
-              aria-label="Search"
-              autoFocus
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && editor) stepFind(editor, e.shiftKey ? -1 : 1);
-                if (e.key === 'Escape') close();
-              }}
-            />
-            {query && <span className="find-count">{find.count === 0 ? 'No matches' : `${find.current + 1} of ${find.count}`}</span>}
-          </label>
-          <div className="find-row">
-            <label className="find-replace">
-              <span>Replace with</span>
-              <input value={replacement} onChange={(e) => setReplacement(e.target.value)} aria-label="Replace with" />
+        <section className="find-pop" aria-label="Search and replace" onKeyDown={(e) => e.key === 'Escape' && close()}>
+          <div className="find-bar">
+            <label className="find-field">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="6" />
+                <path d="m19.5 19.5-4-4" />
+              </svg>
+              <input
+                ref={input}
+                value={query}
+                placeholder="Search this recipe"
+                aria-label="Search"
+                autoFocus
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && editor) stepFind(editor, e.shiftKey ? -1 : 1);
+                }}
+              />
+              {query && <span className="find-count">{find.count === 0 ? 'No matches' : `${find.current + 1} of ${find.count}`}</span>}
+              <button className="find-opt" aria-pressed={matchCase} aria-label="Match case" title="Match case" onClick={() => setMatchCase(!matchCase)}>
+                Aa
+              </button>
+              <button className="find-opt find-opt-word" aria-pressed={wholeWord} aria-label="Whole word" title="Whole word" onClick={() => setWholeWord(!wholeWord)}>
+                ab
+              </button>
+            </label>
+            <button className="icon-btn find-step" aria-label="Previous match" title="Previous match (Shift+Enter)" disabled={!editor || find.count === 0} onClick={() => editor && stepFind(editor, -1)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 15 6-6 6 6" />
+              </svg>
+            </button>
+            <button className="icon-btn find-step" aria-label="Next match" title="Next match (Enter)" disabled={!editor || find.count === 0} onClick={() => editor && stepFind(editor, 1)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+          <div className="find-bar">
+            <label className="find-field find-replace">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 7h13l-3-3M20 17H7l3 3" />
+              </svg>
+              <input value={replacement} placeholder="Replace with" onChange={(e) => setReplacement(e.target.value)} aria-label="Replace with" />
             </label>
             <button className="btn" disabled={!editor || find.count === 0} onClick={() => editor && replaceCurrent(editor, replacement)}>
               Replace
             </button>
             <button className="btn btn-primary" disabled={!editor || find.count === 0} onClick={() => editor && void (beforeReplaceAll?.() ?? Promise.resolve()).then(() => replaceAll(editor, replacement))}>
-              All {find.count || ''}
-            </button>
-          </div>
-          <div className="find-row">
-            <button className="btn btn-toggle" aria-pressed={wholeWord} onClick={() => setWholeWord(!wholeWord)}>
-              Whole word
-            </button>
-            <button className="btn btn-toggle" aria-pressed={matchCase} onClick={() => setMatchCase(!matchCase)}>
-              Match case
+              All{find.count ? ` ${find.count}` : ''}
             </button>
           </div>
           {query.trim() !== '' && (

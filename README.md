@@ -88,11 +88,11 @@ The open item's status sits in the footer and on the Shelf, never on the page, s
 
 ### Mise en Place
 
-Click a group's name (or press Enter on it) to see every item inside it as one page, in Shelf order, with the names of the groups inside it as dividers. Write anywhere: click into an item's text and the cursor lands where you clicked, and the arrow keys at the start or end of an item carry on into the one before or after. Each item is still its own file, saved, proofread and undone on its own. Long groups load as you scroll. The footer shows the group's items and words.
+Click a group's name (or press Enter on it) to see every item inside it as one page, in Shelf order, with a thin line between items. Group names aren't repeated on the page, since the Shelf already shows them. Write anywhere: click into an item's text and the cursor lands where you clicked, and the arrow keys at the start or end of an item carry on into the one before or after. Each item is still its own file, saved, proofread and undone on its own. Long groups load as you scroll. The footer shows the group's items and words.
 
 An empty group opens as an empty page. Start typing and a new item is made in it; Undo takes it away again. Clicking an item on the Shelf opens it on its own page.
 
-Groups picked together show together. Ctrl-click (⌘-click on a Mac) or Shift-click groups on the Shelf, or press ⌘A (Ctrl+A) there or use Select all, and every group picked is shown as one page in Shelf order, each under its own name. The page stays at the group you were on (the one you clicked, or the open item's group): picking Select all from the middle of the story shows everything, with the earlier groups above and the later ones below, and the page stays still as they load. If every group picked is empty, typing makes the first item in the group picked first, or the top one after Select all. In the page itself, ⌘A selects text as usual.
+Groups picked together show together. Ctrl-click (⌘-click on a Mac) or Shift-click groups on the Shelf, or press ⌘A (Ctrl+A) there or use Select all, and every group picked is shown as one page in Shelf order. The page stays at the group you were on (the one you clicked, or the open item's group): picking Select all from the middle of the story shows everything, with the earlier groups above and the later ones below, and the page stays still as they load. If every group picked is empty, typing makes the first item in the group picked first, or the top one after Select all. In the page itself, ⌘A selects text as usual.
 
 ⌘⇧G (Ctrl+Shift+G) switches between the open item on its own page and its whole group as one page, with the cursor where it was; it is also in the View menu and the command palette. Right-click a group for Show as one page, or find a group by name with ⌘O.
 
@@ -164,6 +164,12 @@ Recipe › **Plate and serve…** (or the command palette) shows the book as it 
 In the middle are the pages, as a two-page spread for print (← and → turn them) or as an e-book reader. On the right, the **Style** panel picks a template (Classic, Modern, Literary, Cozy), the trim size (5 × 8, 5.5 × 8.5 or 6 × 9 inches), the font, size and line spacing, the chapter opener and the scene break, and switches drop caps, running headers, page numbers and right-hand chapter starts on or off. Plate settings are kept in the recipe's book.json and save as you change them; Cancel goes back to writing.
 
 **Serve** makes an EPUB e-book, or a print-ready PDF through the print dialog's Save as PDF, page for page as the preview shows. Word is coming later.
+
+## Track changes
+
+Edit › Track changes › **Suggest changes** (⌘⇧E, Ctrl+Shift+E) turns every edit into a suggestion: new words are underlined in the accent colour and deleted words stay on the page, struck through. Right-click a change to accept or reject it, or use Edit › Track changes to step through them or settle the whole page at once. It is a setting of the recipe (`suggest` in `book.json`), and a **Suggesting** chip in the bottom bar turns it off.
+
+In the file a change is a span like any other: `[new words]{.ins}` and `[old words]{.del}`. Plate, Serve, exports and word counts read the text as if every change were accepted. Only words are tracked so far; splitting and joining paragraphs, formatting and styles go straight in.
 
 ## Undo, splitting and merging
 

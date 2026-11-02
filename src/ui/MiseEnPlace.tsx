@@ -443,7 +443,7 @@ export function MiseEnPlace(props: Props) {
       entries.map((entry) => {
         if (entry.type === 'group') {
           return (
-            <h2 key={entry.path} data-group={entry.path} className={`ms-folder ms-depth-${Math.min(entry.depth, 2)}`}>
+            <h2 key={entry.path} data-group={entry.path} className="ms-folder">
               {entry.name}
             </h2>
           );

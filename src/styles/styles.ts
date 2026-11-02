@@ -217,8 +217,20 @@ function cssValue(v: string): string {
   return v.replace(/[;{}<>]/g, '');
 }
 
-/** CSS for the page, scoped under `scope`. 12 pt text is 16 px at 100% zoom. */
-/** The page is white paper in every theme, so text colours are used just as they were picked. */
+/** The Body style's ink; the Sepia theme swaps it for its own (see onSepiaPage). */
+const DEFAULT_INK = '#1C1C1B';
+
+/** A selector list that only applies in the Sepia theme. */
+const onSepiaPage = (selector: string) =>
+  selector
+    .split(',')
+    .map((part) => `:root[data-theme="sepia"] ${part.trim()}`)
+    .join(', ');
+
+/**
+ * CSS for the page, scoped under `scope`. 12 pt text is 16 px at 100% zoom.
+ * The page is white paper in every theme, so text colours are used just as they were picked.
+ */
 export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
   const rules: string[] = [];
   for (const { id } of sheet.paragraph) {
@@ -241,6 +253,8 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
         ` font-style: ${s.italic ? 'italic' : 'normal'};` +
         ` }`,
     );
+    // Sepia's parchment page writes the default black ink in its own chocolate brown.
+    if (s.color.toUpperCase() === DEFAULT_INK) rules.push(`${onSepiaPage(selector)} { color: var(--page-text); }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];

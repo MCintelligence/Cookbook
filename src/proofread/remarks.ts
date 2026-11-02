@@ -288,6 +288,8 @@ export interface Meter {
   /** The step where the seasoning is happy with the page; anywhere else, it has something to say (see tasting.ts). */
   happy: number;
   waiting: readonly string[];
+  /** While the page is still being checked for the first time. */
+  tasting: readonly string[];
 }
 
 export const METERS: Record<SeasoningId, Meter> = {
@@ -360,6 +362,7 @@ export const METERS: Record<SeasoningId, Meter> = {
       },
     ],
     waiting: ['Empty deck, sailor. Write something I can holler at.', 'Nothing in the log yet. I’m waiting, and I’m not a patient man.', 'Calm seas and a blank page. Boring. Write.'],
+    tasting: ['Hold fast, I’m still reading the log. Tasting…', 'Give an old salt a minute. Tasting…', 'Still swabbing through it. Tasting…'],
   },
   pete: {
     measure: 'Pepperiness',
@@ -430,6 +433,7 @@ export const METERS: Record<SeasoningId, Meter> = {
       },
     ],
     waiting: ['Nothing to judge yet. Not that I judge. I assess.', 'An empty page. Hard to get anything wrong on that, I suppose.', 'Write a sentence. I’ll be here. Waiting. Patiently. Ish.'],
+    tasting: ['One moment. I’m still assessing. Tasting…', 'Don’t rush me. Proper checking takes time. Tasting…', 'Still going through it, line by line. Tasting…'],
   },
   daniel: {
     measure: 'Drunkenness',
@@ -500,6 +504,7 @@ export const METERS: Record<SeasoningId, Meter> = {
       },
     ],
     waiting: ['Nobody’s said a thing yet. Pour me a line.', 'Empty room, empty glass. Write someone talking.', 'Hellooo? Anyone in? Hic. Say something.'],
+    tasting: ['Hang on, still pouring. Tasting…', 'Just a sip more. Tasting…', 'Still tasting. Hic.'],
   },
   sally: {
     measure: 'Spice',
@@ -509,6 +514,7 @@ export const METERS: Record<SeasoningId, Meter> = {
     ends: ['Mild', 'Inferno'],
     steps: SPICE,
     waiting: ['A paragraph or two and I’ll tell you how hot you run.', 'Don’t be shy, darling. Write a little more for me.', 'I need more than this to get warmed up.'],
+    tasting: ['Patience, darling. I’m still tasting.', 'Let it simmer. Tasting…', 'Mm, still tasting. Don’t hover.'],
   },
 };
 
@@ -524,6 +530,11 @@ export function meterRemark(id: SeasoningId, at: number, seed = 0): string {
 /** What a seasoning says while there is too little page to read. */
 export function waitingRemark(id: SeasoningId, seed = 0): string {
   return pick(METERS[id].waiting, mix(seed, 99));
+}
+
+/** What a seasoning says while the page is still being checked for the first time. */
+export function tastingRemark(id: SeasoningId, seed = 0): string {
+  return pick(METERS[id].tasting, mix(seed, 77));
 }
 
 /** One line from a few, by seed; for report actions with several ways of saying the same thing. */

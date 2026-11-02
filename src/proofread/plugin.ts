@@ -30,6 +30,11 @@ interface ProofState {
   set: DecorationSet;
   /** The word the writer is typing, whose underline waits until they leave it. */
   fresh: { from: number; to: number } | null;
+  /**
+   * The whole page has been checked once since it opened or the checker changed. Until then a count
+   * of no slips means "not checked yet", not "no mistakes". Typing afterwards doesn't undo it.
+   */
+  tasted: boolean;
 }
 
 interface Meta {
@@ -203,7 +208,7 @@ export const Proofread = Extension.create({
       new Plugin<ProofState>({
         key: proofreadKey,
         state: {
-          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), hiding: { ignored: new Set(), off: new Set() }, set: DecorationSet.empty, fresh: null }),
+          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), hiding: { ignored: new Set(), off: new Set() }, set: DecorationSet.empty, fresh: null, tasted: false }),
           apply(tr, value, _old, state) {
             const meta = tr.getMeta(proofreadKey) as Meta | undefined;
             let next = value;
@@ -217,8 +222,8 @@ export const Proofread = Extension.create({
               next = { ...next, fresh: inside ? { from, to } : null };
             }
             if (meta) {
-              if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map() };
-              if (meta.review !== undefined && meta.review !== next.review) next = { ...next, review: meta.review, version: next.version + 1, cache: new Map() };
+              if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map(), tasted: false };
+              if (meta.review !== undefined && meta.review !== next.review) next = { ...next, review: meta.review, version: next.version + 1, cache: new Map(), tasted: false };
               if (meta.ignored) next = { ...next, hiding: { ...next.hiding, ignored: meta.ignored } };
               if (meta.off) next = { ...next, hiding: { ...next.hiding, off: meta.off } };
               if (meta.forget) {
@@ -230,6 +235,8 @@ export const Proofread = Extension.create({
                 const cache = new Map(next.cache);
                 for (const [text, issues] of meta.results.entries) cache.set(text, issues);
                 next = { ...next, cache: prune(state.doc, cache) };
+                // A paragraph typed in while the rest was checked doesn't keep the page waiting.
+                if (!next.tasted && uncheckedTexts(state.doc, next.cache, new Set()).length <= 1) next = { ...next, tasted: true };
               }
               if (!next.checker) return { ...next, set: DecorationSet.empty };
               // Leaving review takes grammar and style away at once; spelling stays until rechecked.
@@ -281,6 +288,16 @@ export function setIgnored(editor: Editor, ignored: Iterable<string>): void {
 
 export function forgetWord(editor: Editor, word: string): void {
   send(editor, { forget: word });
+}
+
+/**
+ * Whether the checker is still on its first pass over the page (or hasn't started), so the seasonings
+ * that count underlines have nothing true to say yet.
+ */
+export function isTasting(state: EditorState): boolean {
+  const ps = proofreadKey.getState(state);
+  if (!ps) return false;
+  return !ps.checker || !ps.tasted;
 }
 
 /** The issues themselves, not Sally's brackets around them. */

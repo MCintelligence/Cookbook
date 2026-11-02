@@ -112,7 +112,7 @@ Your writing is kept in **Items**, gathered into **Groups**. A Group can hold It
 
 Click an Item on the Shelf to open it on its own page. Click a Group’s **name** to see every Item in it as one page (more on that two pages down), and click the **arrow** beside the name to open or close the Group.
 
-To add one, use the buttons at the bottom of the Shelf, or File › **New item** and **New group**. A new Item goes beside the one you’re in.
+To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, or open the command palette and type **New item** or **New group**. A new Item goes beside the one you’re in.
 
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.
@@ -144,7 +144,7 @@ To join them again, open the first and right-click it on the Shelf: **Merge with
           synopsis: 'A whole Group as one page.',
           body: `# Mise en Place
 
-**Mise en Place** sets out a whole Group on one page. Click a Group’s name on the Shelf (or select it and press Enter) and every Item inside it appears in Shelf order, one after another, with the names of any Groups inside it as dividers. If you clicked **The Shelf** to get here, you are in it now: scroll up and the pages before this one are right there.
+**Mise en Place** sets out a whole Group on one page. Click a Group’s name on the Shelf (or select it and press Enter) and every Item inside it appears in Shelf order, one after another, with a thin line between them. If you clicked **The Shelf** to get here, you are in it now: scroll up and the pages before this one are right there.
 
 Write anywhere. Click into an Item’s text and the cursor lands where you clicked; the arrow keys at the start or end of an Item carry on into the one before or after. Each Item is still its own page on the Shelf, saved, proofread and undone on its own. The bar at the bottom shows the Group’s Items and words.
 
@@ -200,6 +200,20 @@ Character styles work the same way for words inside a paragraph: [Strong]{.stron
 Footnotes sit in the text like this one.^[Footnotes are edited at the foot of the page. Click the number to change this one.] Add one from Insert › **Footnote**${k('footnote') ? ` or with ${k('footnote')}` : ''}.
 
 The page itself, its size, margins and indents, is set in **Recipe › Configure this recipe**.
+`,
+        },
+        {
+          title: 'Suggesting changes',
+          synopsis: 'Track changes: edits marked to accept or reject later.',
+          body: `# Suggesting changes
+
+Turn on Edit › Track changes › **Suggest changes**${k('suggest') ? ` (${k('suggest')})` : ''} and every edit becomes a suggestion. New words are [underlined in colour]{.ins}, and words you delete stay on the page, [struck through]{.del}, until you decide.
+
+Try it on this sentence: the soup was [very ]{.del}[gloriously ]{.ins}hot.
+
+Right-click a change to **Accept** or **Reject** it, or use Edit › Track changes to step through them one by one, or accept or reject every change on the page at once. The word **Suggesting** sits in the bottom bar while it is on; click it to stop.
+
+Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don’t count towards your goals.
 `,
         },
       ],

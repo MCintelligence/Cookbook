@@ -137,10 +137,10 @@ import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
-import { checkForUpdates } from './ui/UpdateBanner';
+import { checkForUpdates } from './ui/UpdatePopup';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff, setDialogueFocus } from './editor/seasonings';
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
-import { UpdateBanner } from './ui/UpdateBanner';
+import { UpdatePopup } from './ui/UpdatePopup';
 import { Seasonings } from './ui/Seasonings';
 import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
@@ -153,6 +153,7 @@ import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
+import { UNTRACKED, changesAt, goToChange, hasChanges, setSuggesting, settleAll, settleAt } from './editor/trackChanges';
 import { shrinkPicture } from './ui/pictures';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
 
@@ -256,6 +257,13 @@ function folderName(location: BookLocation): string {
   if (location.kind === 'folder') return location.path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || DEFAULT_BOOK;
   return location.name;
 }
+
+interface AddOptions {
+  /** Open the new row's name box straight away. */
+  name?: boolean;
+}
+/** For the panel bars' New buttons, which would otherwise keep focus, so a typed name pressed them again. */
+const NAME_IT: AddOptions = { name: true };
 
 export function App() {
   const [fs, setFs] = useState<StorageAdapter | null>(null);
@@ -409,6 +417,14 @@ export function App() {
     bookRef.current = updated;
     setBook(updated);
     saveBookInfo(fs, updated).catch((e: unknown) => setError(friendlyError(e)));
+  };
+  // Suggest changes (track changes) is a Recipe setting: every page open follows it.
+  useEffect(() => setSuggesting(!!book?.suggest), [book?.suggest]);
+  const toggleSuggest = () => {
+    if (!bookRef.current) return;
+    const on = !bookRef.current.suggest;
+    updateBook({ suggest: on || undefined });
+    say(on ? 'Suggesting changes: what you type and delete is marked, to accept or reject later.' : 'Stopped suggesting changes. Edits go straight in again.');
   };
 
 
@@ -1050,20 +1066,21 @@ export function App() {
     }
   };
 
-  const addScene = (template?: DocTemplate) => {
+  const addScene = (template?: DocTemplate, opts?: AddOptions) => {
     // New pages go in the book of the one being written, so they land in the same chapter.
     const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder);
+    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, opts);
   };
 
   /** A new card in the Pantry group being shown, or in the folder of the open card if it is in that group. */
-  const addCard = () => {
+  const addCard = (opts?: AddOptions) => {
     const group = joinPath(PANTRY, pantryGroup);
     const folder = path && path.startsWith(group + '/') ? parentOf(path) : group;
-    return addFrom(CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!, folder);
+    return addFrom(CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!, folder, opts);
   };
 
-  const addFrom = async (template: DocTemplate, folder: string) => {
+  /** `name` opens the new row's name box, as New group does, so the name typed next goes to it. */
+  const addFrom = async (template: DocTemplate, folder: string, opts?: AddOptions) => {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
     const top = topOf(p);
@@ -1073,6 +1090,7 @@ export function App() {
     indexChanged();
     await refreshTree();
     await select(p);
+    if (opts?.name) setRenaming(p);
   };
 
   const next = path ? fileAfter(tree, path) : null;
@@ -1107,9 +1125,39 @@ export function App() {
     const scene = currentDoc();
     if (!fs || !scene || !editor) return;
     await storeSnapshot(fs, scene, 'Before rolling back');
-    editor.chain().focus().setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
+    editor.chain().focus().setMeta(UNTRACKED, true).setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
     setSnapshots(null);
     say(`Rolled “${scene.title}” back to ${snapshot.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. Undo puts it back.`);
+  };
+
+  /** Accepts or rejects the change at the cursor (or those in the selection), or every change on the page. */
+  const settleChanges = (accept: boolean, all: boolean) => {
+    const ed = editor;
+    if (!ed) return;
+    if (all) {
+      const n = settleAll(ed.view, accept);
+      say(n ? `${accept ? 'Accepted' : 'Rejected'} ${n === 1 ? 'the change' : `all ${n} changes`} on this page.` : 'There are no changes on this page.');
+    } else if (!settleAt(ed.view, accept)) say('Put the cursor in a change first, or use Next change to find one.');
+    ed.commands.focus();
+  };
+  const nextChange = (dir: 1 | -1) => {
+    if (editor && !goToChange(editor.view, dir)) say('There are no changes on this page.');
+  };
+  /** Track changes, for the Edit menu and the page's right-click menu. */
+  const trackItems = (ed: Editor | null): MenuItem[] => {
+    const any = !!ed && hasChanges(ed.state.doc);
+    const here = !!ed && changesAt(ed.state).length > 0;
+    return [
+      { label: 'Suggest changes', hint: keysFor('suggest'), binding: binding('suggest'), checked: !!book?.suggest, disabled: !book, onPick: toggleSuggest },
+      { separator: true },
+      { label: 'Next change', disabled: !any, onPick: () => nextChange(1) },
+      { label: 'Previous change', disabled: !any, onPick: () => nextChange(-1) },
+      { separator: true },
+      { label: 'Accept change', disabled: !here, onPick: () => settleChanges(true, false) },
+      { label: 'Reject change', disabled: !here, onPick: () => settleChanges(false, false) },
+      { label: 'Accept all on this page', disabled: !any, onPick: () => settleChanges(true, true) },
+      { label: 'Reject all on this page', disabled: !any, onPick: () => settleChanges(false, true) },
+    ];
   };
 
   /** The scene shown beside the one being written, if any. */
@@ -1596,7 +1644,18 @@ export function App() {
 
     const words = selectedWords(ed);
     const menuPaste = (plain: boolean) => pasteFromMenu(ed, plain);
+    // A suggested change under the mouse is accepted or rejected from the top of the menu.
+    const changeEl = target.closest('.cb-ins, .cb-del');
+    const changePos = changeEl ? ed.view.posAtDOM(changeEl, 0) : null;
+    const onChange = (accept: boolean) => () => {
+      if (changePos === null) return;
+      ed.commands.setTextSelection(changePos);
+      settleChanges(accept, false);
+    };
     const items: MenuItem[] = [
+      ...(changePos !== null
+        ? [{ label: 'Accept change', onPick: onChange(true) }, { label: 'Reject change', onPick: onChange(false) }, { separator: true as const }]
+        : []),
       { label: 'Cut', hint: keys('Mod-X'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'cut') },
       { label: 'Copy', hint: keys('Mod-C'), disabled: ed.state.selection.empty, onPick: () => clip(ed, 'copy') },
       { label: 'Paste', hint: keys('Mod-V'), onPick: () => menuPaste(getSettings().pastePlain) },
@@ -1886,7 +1945,7 @@ export function App() {
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => (everything ? setShelfMarked(new Set()) : onShelfMark(new Set(all), true)) },
           { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
-          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group) : addScene()) },
+          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
           { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
         ]}
       />
@@ -1904,7 +1963,7 @@ export function App() {
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => setPantryMarked(everything ? new Set() : new Set(all)) },
           { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void addFolderIn(group ?? joinPath(PANTRY, pantryGroup)) },
-          { label: `New ${template.name.toLowerCase()}`, icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(template, group) : addCard()) },
+          { label: `New ${template.name.toLowerCase()}`, icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(template, group, NAME_IT) : addCard(NAME_IT)) },
           { label: pantryMarked.size > 1 ? `Delete ${pantryMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: pantryMarked.size === 0, onClick: () => void trashPaths([...pantryMarked]) },
         ]}
       />
@@ -2122,20 +2181,27 @@ export function App() {
     setRenaming(created);
   };
 
-  const renameInTree = async (from: string, title: string | null) => {
+  /** Settles with the row's path afterwards, so the Shelf can put the keyboard back on it. */
+  const renameInTree = async (from: string, title: string | null): Promise<string> => {
     setRenaming(null);
-    if (!fs || title === null) return;
-    if (from.endsWith('.md')) return void retitle(from, title).catch((e: unknown) => setError(friendlyError(e)));
+    if (!fs || title === null) return from;
+    if (from.endsWith('.md')) {
+      await retitle(from, title).catch((e: unknown) => setError(friendlyError(e)));
+      return from;
+    }
     await flushSave();
     await saveUndoNow();
+    let landed = from;
     try {
       const renamed = await renameFolder(fs, order.current, treeOf(topOf(from)), topOf(from), from, title);
       order.current = renamed.order;
       followMove(from, renamed.path);
+      landed = renamed.path;
     } catch (e) {
       setError(friendlyError(e));
     }
     await refreshTree();
+    return landed;
   };
 
   const setCardField = (key: string, value: unknown) => {
@@ -2482,7 +2548,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2522,6 +2588,7 @@ export function App() {
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
     else if (id === 'mise') toggleMise();
+    else if (id === 'suggest') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
   };
   useEffect(() => {
@@ -2807,6 +2874,14 @@ export function App() {
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
+      ...(book ? [cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits')] : []),
+      ...(editor && hasChanges(editor.state.doc)
+        ? [
+            cmd('nextChange', 'Next change', () => nextChange(1), 'Edit', undefined, 'track changes review suggestion'),
+            cmd('acceptAll', 'Accept all changes on this page', () => settleChanges(true, true), 'Edit', undefined, 'track changes review suggestion'),
+            cmd('rejectAll', 'Reject all changes on this page', () => settleChanges(false, true), 'Edit', undefined, 'track changes review suggestion'),
+          ]
+        : []),
       ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
       ...(isTauri() && !IS_MAC ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
@@ -2957,10 +3032,7 @@ export function App() {
     {
       label: 'File',
       items: () => [
-        { label: 'New item', hint: keysFor('newScene'), binding: binding('newScene'), disabled: !fs, onPick: () => void addScene() },
-        { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
-        { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
-        { separator: true },
+        // Recipes lead the File menu. New Item, Group and Pantry card live on the Shelf and Pantry.
         { label: 'New Recipe…', onPick: () => (setLibraryNew(true), setLibraryOpen(true)) },
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
@@ -3003,6 +3075,8 @@ export function App() {
           { label: 'Paste', native: 'Paste', hint: keys('Mod-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, getSettings().pastePlain) },
           { label: 'Paste as plain text', hint: keys('Mod-Shift-V'), disabled: none, onPick: () => ed && pasteFromMenu(ed, true) },
           { label: 'Select all', native: 'SelectAll', hint: keys('Mod-A'), disabled: none, onPick: () => void ed?.chain().focus().selectAll().run() },
+          { separator: true },
+          { label: 'Track changes', items: trackItems(ed) },
           { separator: true },
           { label: 'Search', hint: keysFor('find'), binding: binding('find'), onPick: () => setFindRequest({ query: ed ? selectedWords(ed) : '', at: Date.now() }) },
           { label: 'Go to an item or card…', hint: keysFor('switcher'), binding: binding('switcher'), onPick: () => setPalette({ scenesOnly: true, at: Date.now() }) },
@@ -3123,7 +3197,7 @@ export function App() {
     if (picking) showPicked(next);
   });
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
-  const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
+  const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
   const onEditStyle = useStable(editStyle);
@@ -3260,7 +3334,6 @@ export function App() {
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
       <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
-        <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <div role="alert" className="error" title={error}>
             <span>{error.replace(/ \([^]*\)$/, '')}</span>
@@ -3584,6 +3657,14 @@ export function App() {
               </svg>
             </button>
           )}
+          {book?.suggest && (
+            <button className="suggest-chip" title={`Stop suggesting changes (${keysFor('suggest')})`} onClick={toggleSuggest}>
+              Suggesting
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          )}
           {doc && (
             <ZoomControl
               zoom={page.zoom}
@@ -3685,6 +3766,7 @@ export function App() {
           onClose={() => setSnapshots(null)}
         />
       )}
+      <UpdatePopup beforeRestart={saveEverything} />
     </div>
   );
 }

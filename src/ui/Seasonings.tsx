@@ -90,10 +90,14 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     // The Check and Report have buttons of their own.
     if ((e.target as HTMLElement).closest('.sc-foot')) return;
     e.preventDefault();
+    openCardMenu(id, at, e.clientX, e.clientY);
+  };
+  /** The card's menu: moving it about the list, removing it, then the panel's own items. */
+  const openCardMenu = (id: SeasoningId, at: number, x: number, y: number) => {
     const who = SEASONINGS.find((s) => s.id === id)!;
     const several = picked.includes(id) && picked.length > 1;
     if (!picked.includes(id)) setMarked([id]);
-    onMenu(who.name, e.clientX, e.clientY, [
+    onMenu(who.name, x, y, [
       ...(several
         ? [{ heading: `${picked.length} picked` }, { label: `Remove ${picked.length} picked`, danger: true, onPick: () => removeAll(picked) }]
         : [
@@ -267,10 +271,16 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                   <Face id={id} size={30} />
                   <span className="sub-h">{who.name}</span>
                   <span className="handles">
-                    <Handle label="Move to top" disabled={at === 0} onClick={() => move(id, 'top')} d="M5 4h14M12 20V9M7 13l5-5 5 5" />
-                    <Handle label="Move up" disabled={at === 0} onClick={() => move(id, 'up')} d="M12 19V6M6 11l6-6 6 6" />
-                    <Handle label="Move down" disabled={at === chosen.length - 1} onClick={() => move(id, 'down')} d="M12 5v13M6 13l6 6 6-6" />
-                    <Handle label="Move to bottom" disabled={at === chosen.length - 1} onClick={() => move(id, 'bottom')} d="M5 20h14M12 4v11M7 11l5 5 5-5" />
+                    {/* Moving lives in this menu (and on drag, Alt+arrows and right-click), so the name keeps its one row. */}
+                    <Handle
+                      label={`More for ${who.name}`}
+                      onClick={(e) => {
+                        const box = e.currentTarget.getBoundingClientRect();
+                        openCardMenu(id, at, box.left, box.bottom + 4);
+                      }}
+                      d="M12 5h.01M12 12h.01M12 19h.01"
+                      wide
+                    />
                     <Handle label={`Remove ${who.name}`} className="handle-remove" onClick={() => remove(id)} d="M6 6l12 12M18 6 6 18" />
                   </span>
                 </div>
@@ -310,10 +320,10 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   );
 }
 
-function Handle({ label, d, disabled = false, className, onClick }: { label: string; d: string; disabled?: boolean; className?: string; onClick: () => void }) {
+function Handle({ label, d, disabled = false, className, wide = false, onClick }: { label: string; d: string; disabled?: boolean; className?: string; wide?: boolean; onClick: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
   return (
-    <button className={className ? `handle ${className}` : 'handle'} aria-label={label} title={label} disabled={disabled} onClick={onClick}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <button className={className ? `handle ${className}` : 'handle'} aria-label={label} title={label} aria-haspopup={wide ? 'menu' : undefined} disabled={disabled} onClick={onClick}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={wide ? 3.6 : 2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d={d} />
       </svg>
     </button>

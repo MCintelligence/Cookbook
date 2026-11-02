@@ -171,6 +171,12 @@ Edit › Track changes › **Suggest changes** (⌘⇧E, Ctrl+Shift+E) turns eve
 
 In the file a change is a span like any other: `[new words]{.ins}` and `[old words]{.del}`. Plate, Serve, exports and word counts read the text as if every change were accepted. Only words are tracked so far; splitting and joining paragraphs, formatting and styles go straight in.
 
+## Coming from Scrivener
+
+File › **Import Scrivener project…** (also in the Recipe menu and the command palette) makes a new recipe from a Scrivener 2 or 3 project, from macOS or Windows. Pick the `.scriv` folder or the folder it is in; a zip of a project, such as a Scrivener backup, goes through **Import files…**. The open recipe is backed up first, and the project is only read.
+
+The Draft goes on the Shelf in Binder order (folders become Groups, documents Items; a document with children becomes a Group whose first Item holds its text). A top-level Characters folder goes to the Pantry's Characters, Places, Locations or Settings to Settings, and Research and other folders to Materials; the Trash is skipped. Titles, synopses, status, label colours, Include in Compile, and the text's bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks come through. PDFs, pictures and web pages, document notes, comments and snapshots stay in Scrivener for now. The reader is `src/storage/rtf.ts` and `src/storage/scrivener.ts`.
+
 ## Undo, splitting and merging
 
 Undo reaches back past closing an item or the app. Each item's changes are logged in `.cookbook/undo/`, and opening the item replays them, so ⌘Z picks up where you left off. If an item's file was changed in another app, its undo history starts fresh; your text is never touched.

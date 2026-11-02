@@ -358,6 +358,8 @@ For a plain copy, File › **Export** makes a Word document, an EPUB e-book or M
 Leave an Item out of every export by right-clicking it and unticking **Include in export**.
 
 To bring writing in, File › **Import files** takes Word, Markdown and plain text files and turns them into Items.
+
+Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, and Characters, Places and Research go to the Pantry. The Scrivener project itself is never changed.
 `,
         },
       ],

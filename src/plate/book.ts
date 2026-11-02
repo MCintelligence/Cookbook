@@ -1,3 +1,4 @@
+import { acceptedJSON } from '../editor/trackChanges';
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode, readDocument } from '../storage/book';
 import { includedInExport } from '../storage/document';
@@ -35,7 +36,7 @@ export async function readChapters(fs: StorageAdapter, shelf: TreeNode[]): Promi
       if (!includedInExport(doc.fields)) return;
       if (n === node) title = doc.title;
       if (blocks.length > 0) blocks.push(BREAK);
-      blocks.push(w.body(withoutNotes(parseMarkdown(doc.body))).replace(/<p class="scene-break">\* \* \*<\/p>/g, BREAK));
+      blocks.push(w.body(withoutNotes(acceptedJSON(parseMarkdown(doc.body)))).replace(/<p class="scene-break">\* \* \*<\/p>/g, BREAK));
       words += countWords(plainText(doc.body));
     };
     await walk(node);

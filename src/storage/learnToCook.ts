@@ -202,6 +202,20 @@ Footnotes sit in the text like this one.^[Footnotes are edited at the foot of th
 The page itself, its size, margins and indents, is set in **Recipe › Configure this recipe**.
 `,
         },
+        {
+          title: 'Suggesting changes',
+          synopsis: 'Track changes: edits marked to accept or reject later.',
+          body: `# Suggesting changes
+
+Turn on Edit › Track changes › **Suggest changes**${k('suggest') ? ` (${k('suggest')})` : ''} and every edit becomes a suggestion. New words are [underlined in colour]{.ins}, and words you delete stay on the page, [struck through]{.del}, until you decide.
+
+Try it on this sentence: the soup was [very ]{.del}[gloriously ]{.ins}hot.
+
+Right-click a change to **Accept** or **Reject** it, or use Edit › Track changes to step through them one by one, or accept or reject every change on the page at once. The word **Suggesting** sits in the bottom bar while it is on; click it to stop.
+
+Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don’t count towards your goals.
+`,
+        },
       ],
     },
     {

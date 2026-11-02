@@ -1,7 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { METERS, SEASONINGS, type SeasoningId, meterRemark, mix, waitingRemark } from '../proofread/remarks';
-import { isChecking, readingOf, tastePage } from '../proofread/tasting';
+import { METERS, SEASONINGS, type SeasoningId, meterRemark, mix, tastingRemark, waitingRemark } from '../proofread/remarks';
+import { isChecking, isTastingFor, readingOf, tastePage } from '../proofread/tasting';
 import { REPORTS } from '../proofread/reports';
 import { Face } from './Faces';
 import { Gauge } from './Gauge';
@@ -275,8 +275,8 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                   </span>
                 </div>
 
-                <Remark text={read ? meterRemark(id, read.at, mix(seed, read.turn)) : waitingRemark(id, seed)} />
-                <Gauge id={id} reading={read} />
+                <Remark text={read ? meterRemark(id, read.at, mix(seed, read.turn)) : isTastingFor(id, page) ? tastingRemark(id, seed) : waitingRemark(id, seed)} />
+                <Gauge id={id} reading={read} tasting={isTastingFor(id, page)} />
                 <div className="sc-foot">
                   <label className="sc-check">
                     <input type="checkbox" role="switch" className="switch" checked={checking(id)} onChange={(e) => setChecking(id, e.target.checked)} />

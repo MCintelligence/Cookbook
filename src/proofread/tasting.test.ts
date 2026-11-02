@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type PageTaste, hasSomethingToSay, isChecking, sayingCount } from './tasting';
+import { type PageTaste, hasSomethingToSay, isChecking, isTastingFor, readingOf, sayingCount } from './tasting';
 
 const page = (over: Partial<PageTaste> = {}): PageTaste => ({
   words: 200,
@@ -12,6 +12,7 @@ const page = (over: Partial<PageTaste> = {}): PageTaste => ({
   spoken: 80,
   dim: true,
   off: '',
+  tasting: false,
   ...over,
 });
 
@@ -40,5 +41,30 @@ describe('the badge beside Seasonings', () => {
     expect(hasSomethingToSay('sally', page({ grade: 14, gradeWords: 10 }))).toBe(false);
     expect(hasSomethingToSay('daniel', page({ talkWords: 0, spoken: 0 }))).toBe(false);
     expect(hasSomethingToSay('sam', page({ words: 0, sam: 0 }))).toBe(false);
+  });
+});
+
+describe('while the page is still being tasted', () => {
+  it('has no reading for the seasonings that count underlines, so nobody says "no mistakes" yet', () => {
+    const p = page({ tasting: true, words: 60000 });
+    for (const id of ['sam', 'pete', 'sally'] as const) {
+      expect(isTastingFor(id, p)).toBe(true);
+      expect(readingOf(id, p)).toBeNull();
+    }
+    expect(sayingCount(['sam', 'pete', 'sally'], false, page({ tasting: true, sam: 40 }))).toBe(0);
+  });
+
+  it('lets Daniel read the dialogue straight away', () => {
+    const p = page({ tasting: true });
+    expect(isTastingFor('daniel', p)).toBe(false);
+    expect(readingOf('daniel', p)).not.toBeNull();
+  });
+
+  it('shows the real meters once the first pass is done', () => {
+    expect(readingOf('sam', page({ sam: 3 }))?.detail).toContain('3 spelling slips');
+  });
+
+  it('says nothing is being tasted on an empty page', () => {
+    expect(isTastingFor('sam', page({ tasting: true, words: 0 }))).toBe(false);
   });
 });

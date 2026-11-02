@@ -257,6 +257,13 @@ function folderName(location: BookLocation): string {
   return location.name;
 }
 
+interface AddOptions {
+  /** Open the new row's name box straight away. */
+  name?: boolean;
+}
+/** For the panel bars' New buttons, which would otherwise keep focus, so a typed name pressed them again. */
+const NAME_IT: AddOptions = { name: true };
+
 export function App() {
   const [fs, setFs] = useState<StorageAdapter | null>(null);
   const [where, setWhere] = useState('');
@@ -1050,20 +1057,21 @@ export function App() {
     }
   };
 
-  const addScene = (template?: DocTemplate) => {
+  const addScene = (template?: DocTemplate, opts?: AddOptions) => {
     // New pages go in the book of the one being written, so they land in the same chapter.
     const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder);
+    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, opts);
   };
 
   /** A new card in the Pantry group being shown, or in the folder of the open card if it is in that group. */
-  const addCard = () => {
+  const addCard = (opts?: AddOptions) => {
     const group = joinPath(PANTRY, pantryGroup);
     const folder = path && path.startsWith(group + '/') ? parentOf(path) : group;
-    return addFrom(CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!, folder);
+    return addFrom(CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!, folder, opts);
   };
 
-  const addFrom = async (template: DocTemplate, folder: string) => {
+  /** `name` opens the new row's name box, as New group does, so the name typed next goes to it. */
+  const addFrom = async (template: DocTemplate, folder: string, opts?: AddOptions) => {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
     const top = topOf(p);
@@ -1073,6 +1081,7 @@ export function App() {
     indexChanged();
     await refreshTree();
     await select(p);
+    if (opts?.name) setRenaming(p);
   };
 
   const next = path ? fileAfter(tree, path) : null;
@@ -1886,7 +1895,7 @@ export function App() {
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => (everything ? setShelfMarked(new Set()) : onShelfMark(new Set(all), true)) },
           { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
-          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group) : addScene()) },
+          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
           { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
         ]}
       />
@@ -1904,7 +1913,7 @@ export function App() {
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => setPantryMarked(everything ? new Set() : new Set(all)) },
           { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void addFolderIn(group ?? joinPath(PANTRY, pantryGroup)) },
-          { label: `New ${template.name.toLowerCase()}`, icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(template, group) : addCard()) },
+          { label: `New ${template.name.toLowerCase()}`, icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(template, group, NAME_IT) : addCard(NAME_IT)) },
           { label: pantryMarked.size > 1 ? `Delete ${pantryMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: pantryMarked.size === 0, onClick: () => void trashPaths([...pantryMarked]) },
         ]}
       />
@@ -2122,20 +2131,27 @@ export function App() {
     setRenaming(created);
   };
 
-  const renameInTree = async (from: string, title: string | null) => {
+  /** Settles with the row's path afterwards, so the Shelf can put the keyboard back on it. */
+  const renameInTree = async (from: string, title: string | null): Promise<string> => {
     setRenaming(null);
-    if (!fs || title === null) return;
-    if (from.endsWith('.md')) return void retitle(from, title).catch((e: unknown) => setError(friendlyError(e)));
+    if (!fs || title === null) return from;
+    if (from.endsWith('.md')) {
+      await retitle(from, title).catch((e: unknown) => setError(friendlyError(e)));
+      return from;
+    }
     await flushSave();
     await saveUndoNow();
+    let landed = from;
     try {
       const renamed = await renameFolder(fs, order.current, treeOf(topOf(from)), topOf(from), from, title);
       order.current = renamed.order;
       followMove(from, renamed.path);
+      landed = renamed.path;
     } catch (e) {
       setError(friendlyError(e));
     }
     await refreshTree();
+    return landed;
   };
 
   const setCardField = (key: string, value: unknown) => {
@@ -3123,7 +3139,7 @@ export function App() {
     if (picking) showPicked(next);
   });
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
-  const onTreeRename = useStable((p: string, title: string | null) => void renameInTree(p, title));
+  const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
   const onEditStyle = useStable(editStyle);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Tree } from './Tree';
 import { type CardSummary } from '../storage/index';
@@ -115,5 +115,81 @@ describe('the Shelf', () => {
     act(() => group.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true })));
     expect(marks.map(([, picking]) => picking)).toEqual([false, true, true]);
     expect(marks[2]![0]).toEqual(['bookshelf/Part One', 'bookshelf/Part One/One.md', 'bookshelf/Part One/Two.md']);
+  });
+});
+
+describe('renaming on the Shelf', () => {
+  /** A Shelf whose rename box is open on `path`, renaming a Group to a new path as the app does. */
+  function renamingShelf(path: string) {
+    const host = document.body.appendChild(document.createElement('div'));
+    const root = createRoot(host);
+    roots.push(root);
+    const outside = document.body.appendChild(document.createElement('button'));
+    let setName: (n: string) => void = () => {};
+    let setRenaming: (p: string | null) => void = () => {};
+    function Harness() {
+      const [name, setN] = useState('Part One');
+      const [renaming, setR] = useState<string | null>(path);
+      setName = setN;
+      setRenaming = setR;
+      const group = `bookshelf/${name}`;
+      const nodes = [{ name, path: group, kind: 'folder' as const, children: [{ name: 'One.md', path: `${group}/One.md`, kind: 'file' as const }] }];
+      return (
+        <Tree
+          nodes={nodes}
+          root="bookshelf"
+          selected={null}
+          cards={new Map([[`${group}/One.md`, card('One', 10)]])}
+          live={null}
+          collapseKey="test.collapsed"
+          renaming={renaming}
+          onSelect={() => {}}
+          onMove={() => {}}
+          onStartRename={setRenaming}
+          onRename={async (p, title) => {
+            setRenaming(null);
+            if (title === null || p.endsWith('.md')) return p;
+            setName(title);
+            return `bookshelf/${title}`;
+          }}
+        />
+      );
+    }
+    act(() => root.render(<Harness />));
+    return { host, outside };
+  }
+  const frame = () => act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
+
+  it('puts the keyboard back on the renamed Group after Enter, at its new path', async () => {
+    const { host } = renamingShelf('bookshelf/Part One');
+    const box = host.querySelector<HTMLInputElement>('.tree-rename')!;
+    expect(document.activeElement).toBe(box);
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(box, 'Act One');
+      box.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    await frame();
+    expect((document.activeElement as HTMLElement).dataset.treePath).toBe('bookshelf/Act One');
+  });
+
+  it('puts the keyboard back on the row after Escape', async () => {
+    const { host } = renamingShelf('bookshelf/Part One/One.md');
+    const box = host.querySelector<HTMLInputElement>('.tree-rename')!;
+    await act(async () => {
+      box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await frame();
+    expect((document.activeElement as HTMLElement).dataset.treePath).toBe('bookshelf/Part One/One.md');
+  });
+
+  it('leaves focus where the writer clicked when the name box loses focus', async () => {
+    const { host, outside } = renamingShelf('bookshelf/Part One');
+    host.querySelector<HTMLInputElement>('.tree-rename')!;
+    await act(async () => outside.focus());
+    await frame();
+    expect(document.activeElement).toBe(outside);
   });
 });

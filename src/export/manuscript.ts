@@ -19,7 +19,8 @@ export interface Manuscript {
   parts: Part[];
 }
 
-export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode[]): Promise<Manuscript> {
+/** With `keepChanges`, suggested changes stay in, for a Word file to review them in; otherwise every one is read as accepted. */
+export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode[], keepChanges = false): Promise<Manuscript> {
   const parts: Part[] = [];
   const walk = async (list: TreeNode[], depth: number) => {
     let lastWasScene = false;
@@ -35,7 +36,7 @@ export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode
         const doc = await readDocument(fs, node.path);
         if (!includedInExport(doc.fields)) continue;
         if (lastWasScene) parts.push({ kind: 'break' });
-        parts.push({ kind: 'scene', title: doc.title, body: withoutNotes(acceptedJSON(parseMarkdown(doc.body))) });
+        parts.push({ kind: 'scene', title: doc.title, body: withoutNotes(keepChanges ? parseMarkdown(doc.body) : acceptedJSON(parseMarkdown(doc.body))) });
         lastWasScene = true;
       }
     }

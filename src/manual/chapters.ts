@@ -155,21 +155,26 @@ Long Groups load as you scroll. The bottom bar shows the Group's Items and words
     id: 'changes',
     title: 'Track changes',
     summary: 'Suggest edits, then accept or reject them.',
-    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} and every edit becomes a suggestion instead of going straight in:
+    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} (or {key:suggestAlt|the second key in App Settings › Keyboard}) and every edit becomes a suggestion instead of going straight in. Insert puts changes in without taking anything away; on a Mac, whose keyboard has no Insert key, ⌘⇧E does the same.
 
 - **New words** are underlined in the accent colour.
 - **Deleted words** stay on the page, struck through, until you decide. Backspace walks back over them, so you can keep deleting.
-- Deleting words you suggested yourself just takes them out.
+- **A new paragraph** (Enter) gets a ¶ in the margin. **Joining two** (Backspace at the start of one, or Delete at the end) keeps them apart, with the ¶ struck through.
+- **Formatting** such as bold, italics, character styles, font, size and colour gives the words a dotted underline. Rejecting it puts the old look back.
+- **A new paragraph style**, alignment or spacing puts a bar in the margin.
+- Deleting words or paragraphs you suggested yourself just takes them out.
 
-Suggest changes is set for the whole recipe, so every Item follows it, and the word **Suggesting** sits in the bottom bar while it is on. Click it to stop.
+Suggest changes is set for the whole recipe, so every Item follows it, and the word **Suggesting** sits in the bottom bar while it is on. Click it to stop. Lists and tables are tracked word by word; their items and rows change straight away.
 
 ## Accepting and rejecting
 
-Right-click a change for **Accept change** or **Reject change**. Edit › **Track changes** also has Next change and Previous change, and Accept all or Reject all on this page. With text selected, Accept and Reject work on every change inside it. Undo takes back any of them.
+Right-click a change for **Accept change** or **Reject change**. Edit › **Track changes** also has Next change and Previous change, Accept all or Reject all on this page, and **Accept all in the recipe** or **Reject all in the recipe**. With text selected, Accept and Reject work on every change inside it. Undo takes back any change on the page; settling the whole recipe takes a snapshot of every other Item it changes first.
 
-Only words are tracked for now. Enter and Backspace still split and join paragraphs, and formatting and styles change straight away.
+## Word files
 
-Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don't count towards your goals or word counts.`,
+**Export as Word** keeps your suggestions as Word's own tracked changes, with your name from App Settings as their author, so an editor can accept or reject them in Word. Accept all first for a clean copy. Importing a Word file brings its tracked changes in as suggestions: inserted and deleted words, new and joined paragraphs, formatting and paragraph styles.
+
+Plate, Serve and other exports show the text as if every change were accepted, and words waiting to be deleted don't count towards your goals or word counts.`,
   },
   {
     id: 'pantry',

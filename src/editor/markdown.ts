@@ -20,6 +20,8 @@
  *   ![a picture](pantry/pictures/lou.jpg)
  *   [any character style]{.thought}   [text a note is attached to]{.note #n1}
  *   [words suggested]{.ins}   [words suggested for deletion]{.del}     (track changes)
+ *   [words reformatted]{.fmt was="*i"}   what the words looked like before (track changes)
+ *   ::: {change=ins}  a paragraph break suggested (del: suggested for joining), was="body" a paragraph restyled
  *   [words set by hand]{font="EB Garamond" size=14 color=#7a2e1f}
  *   ::: {.letter align=center spacing=2}     a paragraph's own alignment and spacing (see format.ts)
  *   ^[an inline footnote]     a line ending in \ breaks the line there
@@ -31,7 +33,7 @@
  * need no editor, so they run in tests and on any platform.
  */
 
-import { type ParagraphFormat, type TextFormat, paragraphFormatOf, parseParagraphFormat, parseTextFormat, textFormatOf, writeParagraphFormat, writeTextFormat } from './format';
+import { type ParagraphChange, type ParagraphFormat, type TextFormat, paragraphChangeOf, paragraphFormatOf, parseParagraphChange, parseParagraphFormat, parseTextFormat, textFormatOf, writeParagraphChange, writeParagraphFormat, writeTextFormat } from './format';
 
 export type PlainMark = 'bold' | 'italic' | 'underline' | 'strike' | 'code';
 export type MarkJSON =
@@ -40,6 +42,7 @@ export type MarkJSON =
   | { type: 'note'; attrs: { id: string } }
   | { type: 'link'; attrs: { href: string } }
   | { type: 'insertion' | 'deletion'; attrs?: undefined }
+  | { type: 'formatChange'; attrs: { was: string } }
   | { type: PlainMark; attrs?: undefined };
 
 export interface NodeJSON {
@@ -65,7 +68,9 @@ const PLAIN_KEY: Record<PlainMark, string> = { bold: '*b', italic: '*i', underli
 /** Track changes: a suggested insertion and deletion, written as [..]{.ins} and [..]{.del}. */
 const INS_KEY = '*ins';
 const DEL_KEY = '*del';
-const isChangeKey = (key: string) => key === INS_KEY || key === DEL_KEY;
+/** A suggested change of formatting, and the formatting it had before: [..]{.fmt was="*b"}. */
+const FMT_PREFIX = '*fmt:';
+const isChangeKey = (key: string) => key === INS_KEY || key === DEL_KEY || key.startsWith(FMT_PREFIX);
 const KEY_PLAIN = Object.fromEntries(Object.entries(PLAIN_KEY).map(([k, v]) => [v, k])) as Record<string, PlainMark>;
 /** Outermost first: notes, links, character styles, then bold, italic, underline, strike, and code innermost. */
 const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*c': 5 };
@@ -75,16 +80,18 @@ export function markKey(m: MarkJSON): string {
   if (m.type === 'note') return NOTE_PREFIX + m.attrs.id;
   if (m.type === 'insertion') return INS_KEY;
   if (m.type === 'deletion') return DEL_KEY;
+  if (m.type === 'formatChange') return FMT_PREFIX + (m.attrs?.was ?? '');
   if (m.type === 'textStyle') return FORMAT_PREFIX + writeTextFormat(textFormatOf(m.attrs));
   if (m.type === 'charStyle') return m.attrs.style;
   if (m.type === 'link') return LINK_PREFIX + m.attrs.href;
   return PLAIN_KEY[m.type];
 }
 
-function keyToMark(key: string): MarkJSON {
+export function keyToMark(key: string): MarkJSON {
   if (key.startsWith(NOTE_PREFIX)) return { type: 'note', attrs: { id: key.slice(NOTE_PREFIX.length) } };
   if (key === INS_KEY) return { type: 'insertion' };
   if (key === DEL_KEY) return { type: 'deletion' };
+  if (key.startsWith(FMT_PREFIX)) return { type: 'formatChange', attrs: { was: key.slice(FMT_PREFIX.length) } };
   if (key.startsWith(LINK_PREFIX)) return { type: 'link', attrs: { href: key.slice(LINK_PREFIX.length) } };
   if (key.startsWith(FORMAT_PREFIX)) return { type: 'textStyle', attrs: parseTextFormat(key.slice(FORMAT_PREFIX.length)) ?? {} };
   if (KEY_PLAIN[key]) return { type: KEY_PLAIN[key]! };
@@ -113,7 +120,7 @@ export function parseMarkdown(markdown: string): NodeJSON {
   let style = BODY_STYLE;
   // Inside a ::: fence, and the alignment and spacing it gives its paragraphs.
   let fenced = false;
-  let format: ParagraphFormat = {};
+  let format: ParagraphFormat & ParagraphChange = {};
   let paragraph: string[] = [];
   let lists: OpenList[] = [];
   // Each list item's lines, made into its paragraph when the list ends.
@@ -281,12 +288,13 @@ export function parseMarkdown(markdown: string): NodeJSON {
 }
 
 /** `::: letter`, `::: {.letter}`, `::: {.letter align=center}` or `::: {align=center}` (Body). */
-function openFence(line: string): { style: string; format: ParagraphFormat } | null {
+function openFence(line: string): { style: string; format: ParagraphFormat & ParagraphChange } | null {
   const plain = /^:::\s*\.?([A-Za-z0-9_-]+)\s*$/.exec(line);
   if (plain) return { style: plain[1]!, format: {} };
   const braced = /^:::\s*\{\s*(?:\.([A-Za-z0-9_-]+))?\s*([^{}]*)\}\s*$/.exec(line);
   if (!braced || (!braced[1] && !braced[2]!.trim())) return null;
-  return { style: braced[1] ?? BODY_STYLE, format: parseParagraphFormat(braced[2]!.trim()) };
+  const pairs = braced[2]!.trim();
+  return { style: braced[1] ?? BODY_STYLE, format: { ...parseParagraphFormat(pairs), ...parseParagraphChange(pairs) } };
 }
 
 /** A table row's cells, split at unescaped pipes. */
@@ -314,7 +322,7 @@ function splitRow(row: string): string[] {
  * Joins a paragraph's lines. A line ending in a backslash (or two spaces)
  * breaks the line there; otherwise lines run together with a space.
  */
-function paragraphNode(lines: string[], style: string, withStyle = true, format: ParagraphFormat = {}): NodeJSON {
+function paragraphNode(lines: string[], style: string, withStyle = true, format: ParagraphFormat & ParagraphChange = {}): NodeJSON {
   let source = '';
   lines.forEach((raw, i) => {
     let line = raw.trim();
@@ -451,6 +459,13 @@ function tokenize(src: string): Token[] {
     }
     if (ch === ']') {
       const rest = src.slice(i);
+      const fmt = /^\]\{\.fmt(?: was="([^"\n]*)")?\}/.exec(rest);
+      if (fmt) {
+        pushText();
+        tokens.push({ kind: 'close', style: FMT_PREFIX + (fmt[1] ?? ''), raw: fmt[0] });
+        i += fmt[0].length;
+        continue;
+      }
       const m = /^\]\{\.([A-Za-z0-9_-]+)(?: #([A-Za-z0-9_-]+))?\}/.exec(rest);
       if (m && (m[2] === undefined || m[1] === 'note')) {
         pushText();
@@ -579,7 +594,7 @@ export function serializeMarkdown(doc: NodeJSON): string {
       const text = serializeInline(node.content ?? []);
       if (text.trim() === '') continue;
       const style = (node.attrs?.style as string | undefined) || BODY_STYLE;
-      const format = writeParagraphFormat(paragraphFormatOf(node.attrs));
+      const format = [writeParagraphFormat(paragraphFormatOf(node.attrs)), writeParagraphChange(paragraphChangeOf(node.attrs))].filter(Boolean).join(' ');
       const heading = HEADING_STYLES.indexOf(style as (typeof HEADING_STYLES)[number]);
       if (heading !== -1 && !format) {
         closeFence();
@@ -738,6 +753,10 @@ function serializeInline(nodes: NodeJSON[]): string {
     STAR[style] ??
     (style.startsWith(NOTE_PREFIX)
       ? `]{.note #${style.slice(NOTE_PREFIX.length)}}`
+      : style.startsWith(FMT_PREFIX)
+        ? style.length > FMT_PREFIX.length
+          ? `]{.fmt was="${style.slice(FMT_PREFIX.length)}"}`
+          : ']{.fmt}'
       : isChangeKey(style)
         ? `]{.${style.slice(1)}}`
         : style.startsWith(LINK_PREFIX)

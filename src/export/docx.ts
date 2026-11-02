@@ -5,13 +5,22 @@ import { type TextFormat, paragraphFormatOf, textFormatOf } from '../editor/form
 import { DEFAULT_PAGE, MARGINS, PAGE_SIZES, type PageSettings } from '../storage/page';
 import { type Manuscript, charStyles } from './manuscript';
 import { withDropCaps } from '../editor/dropCaps';
+import { formatMarksJSON, lookAttrs } from '../editor/trackChanges';
 
 /**
  * A Word document (.docx) written by hand: the book's paragraph and character
  * styles become real Word styles with the same names, so the writer (or an
  * editor) can restyle the whole manuscript in Word. Footnotes are real Word
- * footnotes. Notes to self are left out.
+ * footnotes. Notes to self are left out. Suggested changes, when the
+ * manuscript keeps them, become Word's own tracked changes, to accept or
+ * reject in Word.
  */
+
+/** Who Word says made the tracked changes, and when. */
+export interface ChangeAuthor {
+  name: string;
+  date: string;
+}
 
 const xml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const styleId = (id: string) => 'cb' + id.replace(/[^A-Za-z0-9]/g, '');
@@ -69,6 +78,9 @@ const PLAIN = new Set(['bold', 'italic', 'underline', 'strike', 'code']);
 
 class DocxBody {
   readonly notes: string[] = [];
+  /** Word wants every tracked change numbered, all in one series. */
+  private changeId = 0;
+  author: ChangeAuthor = { name: 'Cookbook', date: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
   readonly links: string[] = [];
   /** One Word numbering instance per numbered list, so each starts where it should. */
   readonly numbered: number[] = [];
@@ -95,10 +107,24 @@ class DocxBody {
         if (n.type === 'image') return n.attrs?.alt ? textRun(`[${String(n.attrs.alt)}]`, '<w:rPr><w:i/></w:rPr>') : '';
         if (n.type !== 'text') return '';
         const link = n.marks?.find((m) => m.type === 'link');
-        const plain = new Set((n.marks ?? []).map((m) => m.type).filter((t) => PLAIN.has(t)));
-        let format = textFormatOf(n.marks?.find((m) => m.type === 'textStyle')?.attrs);
-        if (n.dropCap) format = { ...format, size: Math.round((format.size ?? size) * RAISED) };
-        const run = textRun(n.text ?? '', runProps(this.sheet, { styles: charStyles(n), plain, link: !!link, format }));
+        const runOf = (marks: NodeJSON['marks']): Run => {
+          const plain = new Set((marks ?? []).map((m) => m.type).filter((t) => PLAIN.has(t)));
+          let format = textFormatOf(marks?.find((m) => m.type === 'textStyle')?.attrs);
+          if (n.dropCap) format = { ...format, size: Math.round((format.size ?? size) * RAISED) };
+          return { styles: charStyles({ type: 'text', marks }), plain, link: !!link, format };
+        };
+        let rPr = runProps(this.sheet, runOf(n.marks));
+        // Reformatted words carry their old look inside their properties, last of all.
+        const reformat = n.marks?.find((m) => m.type === 'formatChange');
+        if (reformat?.type === 'formatChange') {
+          const was = runProps(this.sheet, runOf(formatMarksJSON(reformat.attrs.was))) || '<w:rPr/>';
+          const change = `<w:rPrChange ${this.stamp()}>${was}</w:rPrChange>`;
+          rPr = rPr ? rPr.replace('</w:rPr>', `${change}</w:rPr>`) : `<w:rPr>${change}</w:rPr>`;
+        }
+        let run: string;
+        if (n.marks?.some((m) => m.type === 'deletion')) run = `<w:del ${this.stamp()}><w:r>${rPr}<w:delText xml:space="preserve">${xml(n.text ?? '')}</w:delText></w:r></w:del>`;
+        else if (n.marks?.some((m) => m.type === 'insertion')) run = `<w:ins ${this.stamp()}>${textRun(n.text ?? '', rPr)}</w:ins>`;
+        else run = textRun(n.text ?? '', rPr);
         if (!link || link.type !== 'link') return run;
         this.links.push(link.attrs.href);
         return `<w:hyperlink r:id="rLink${this.links.length}">${run}</w:hyperlink>`;
@@ -106,11 +132,26 @@ class DocxBody {
       .join('');
   }
 
-  block(n: NodeJSON): string {
+  /** A tracked change's id, author and date. */
+  private stamp(): string {
+    return `w:id="${++this.changeId}" w:author="${xml(this.author.name)}" w:date="${this.author.date}"`;
+  }
+
+  /** `next` is the block after, whose suggested break before it is this paragraph's end in Word. */
+  block(n: NodeJSON, next?: NodeJSON): string {
     if (n.type === 'paragraph') {
       // Alignment and spacing set by hand, in the order Word wants them.
-      const { align, lineSpacing } = paragraphFormatOf(n.attrs);
-      const extra = (lineSpacing ? `<w:spacing w:line="${Math.round(lineSpacing * 240)}" w:lineRule="auto"/>` : '') + (align ? `<w:jc w:val="${ALIGN[align]}"/>` : '');
+      const look = (attrs: Record<string, unknown> | undefined) => {
+        const { align, lineSpacing } = paragraphFormatOf(attrs);
+        return (lineSpacing ? `<w:spacing w:line="${Math.round(lineSpacing * 240)}" w:lineRule="auto"/>` : '') + (align ? `<w:jc w:val="${ALIGN[align]}"/>` : '');
+      };
+      let extra = look(n.attrs);
+      const breakAfter = next?.type === 'paragraph' ? next.attrs?.change : null;
+      if (breakAfter === 'ins' || breakAfter === 'del') extra += `<w:rPr><w:${breakAfter} ${this.stamp()}/></w:rPr>`;
+      if (typeof n.attrs?.was === 'string' && n.attrs.was) {
+        const was = lookAttrs(n.attrs.was);
+        extra += `<w:pPrChange ${this.stamp()}><w:pPr><w:pStyle w:val="${styleId(was.style)}"/>${look(was)}</w:pPr></w:pPrChange>`;
+      }
       const style = String(n.attrs?.style ?? BODY_STYLE);
       const size = resolveParagraphStyle(this.sheet, style).size;
       // A drop cap at the start is a real Word drop cap: the letter in a frame of its own, two lines deep.
@@ -250,16 +291,17 @@ function stylesXml(sheet: StyleSheet): string {
 
 const W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
 
-export function bookDocx(m: Manuscript, sheet: StyleSheet, page: PageSettings = DEFAULT_PAGE): Uint8Array {
+export function bookDocx(m: Manuscript, sheet: StyleSheet, page: PageSettings = DEFAULT_PAGE, author?: ChangeAuthor): Uint8Array {
   const twips = (inches: number) => Math.round(inches * 1440);
   const size = PAGE_SIZES[page.size];
   const margin = twips(MARGINS[page.margins].inches);
   const w = new DocxBody(sheet, twips(size.width) - 2 * margin);
+  if (author) w.author = author;
   const body: string[] = [w.paragraph('Title', textRun(m.title))];
   for (const part of m.parts) {
     if (part.kind === 'heading') body.push(w.paragraph(`Heading${Math.min(3, part.depth)}`, textRun(part.text)));
     else if (part.kind === 'break') body.push(w.paragraph('cbSceneBreak', textRun('* * *')));
-    else body.push(...(part.body.content ?? []).map((n) => w.block(n)));
+    else body.push(...(part.body.content ?? []).map((n, i, all) => w.block(n, all[i + 1])));
   }
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document ${W_NS}><w:body>${body.join('')}<w:sectPr><w:footnotePr><w:numFmt w:val="decimal"/></w:footnotePr><w:pgSz w:w="${twips(size.width)}" w:h="${twips(size.height)}"/><w:pgMar w:top="${margin}" w:right="${margin}" w:bottom="${margin}" w:left="${margin}" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;

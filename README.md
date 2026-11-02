@@ -167,9 +167,9 @@ In the middle are the pages, as a two-page spread for print (← and → turn th
 
 ## Track changes
 
-Edit › Track changes › **Suggest changes** (⌘⇧E, Ctrl+Shift+E) turns every edit into a suggestion: new words are underlined in the accent colour and deleted words stay on the page, struck through. Right-click a change to accept or reject it, or use Edit › Track changes to step through them or settle the whole page at once. It is a setting of the recipe (`suggest` in `book.json`), and a **Suggesting** chip in the bottom bar turns it off.
+Edit › Track changes › **Suggest changes** (Insert, or ⌘⇧E / Ctrl+Shift+E) turns every edit into a suggestion: new words are underlined in the accent colour, deleted words stay on the page struck through, a new or joined paragraph shows a ¶ in the margin, reformatted words get a dotted underline and a restyled paragraph a bar in the margin. Right-click a change to accept or reject it, or use Edit › Track changes to step through them or settle the whole page, or the whole recipe, at once. It is a setting of the recipe (`suggest` in `book.json`), and a **Suggesting** chip in the bottom bar turns it off.
 
-In the file a change is a span like any other: `[new words]{.ins}` and `[old words]{.del}`. Plate, Serve, exports and word counts read the text as if every change were accepted. Only words are tracked so far; splitting and joining paragraphs, formatting and styles go straight in.
+In the file a change is a span or fence like any other: `[new words]{.ins}`, `[old words]{.del}`, `[words]{.fmt was="*i"}` (with their look before) and `::: {change=ins was="body"}` on a paragraph whose break is new (`del`: to be joined) or whose style changed. Plate, Serve, EPUB, Markdown, print and word counts read the text as if every change were accepted. Word export keeps them as Word tracked changes (`w:ins`, `w:del`, `w:rPrChange`, `w:pPrChange`), and Word import brings Word's back as suggestions. Paragraph breaks and styles are tracked for top-level paragraphs; list items and table rows change straight away.
 
 ## Coming from Scrivener
 

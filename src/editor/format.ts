@@ -106,3 +106,38 @@ export function paragraphFormatOf(from: object | undefined): ParagraphFormat {
   if (typeof attrs?.lineSpacing === 'number' && attrs.lineSpacing) f.lineSpacing = attrs.lineSpacing;
   return f;
 }
+
+/**
+ * Track changes on a paragraph: `change=ins` when the break before it is a
+ * suggested new paragraph, `change=del` when it is suggested for joining onto
+ * the one before, and `was="body align=center"` for the style and format it
+ * had before a suggested restyle.
+ */
+export interface ParagraphChange {
+  change?: 'ins' | 'del';
+  was?: string;
+}
+
+export function parseParagraphChange(text: string): ParagraphChange {
+  const f: ParagraphChange = {};
+  for (const [k, v] of pairs(text) ?? []) {
+    if (k === 'change' && (v === 'ins' || v === 'del')) f.change = v;
+    else if (k === 'was' && /^[A-Za-z0-9_-]+( [a-z]+=[0-9a-z.]+)*$/.test(v)) f.was = v;
+  }
+  return f;
+}
+
+export function paragraphChangeOf(from: object | undefined): ParagraphChange {
+  const attrs = from as Record<string, unknown> | undefined;
+  const f: ParagraphChange = {};
+  if (attrs?.change === 'ins' || attrs?.change === 'del') f.change = attrs.change;
+  if (typeof attrs?.was === 'string' && attrs.was) f.was = attrs.was;
+  return f;
+}
+
+export function writeParagraphChange(f: ParagraphChange): string {
+  const out: string[] = [];
+  if (f.change) out.push(`change=${f.change}`);
+  if (f.was) out.push(`was="${f.was}"`);
+  return out.join(' ');
+}

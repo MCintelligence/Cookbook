@@ -156,7 +156,7 @@ import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
 import { ShelfSearch } from './ui/ShelfSearch';
-import { UNTRACKED, changesAt, goToChange, hasChanges, setSuggesting, settleAll, settleAt } from './editor/trackChanges';
+import { UNTRACKED, changesAt, goToChange, hasChanges, hasChangesJSON, setSuggesting, settleAll, settleAt, settledJSON } from './editor/trackChanges';
 import { shrinkPicture } from './ui/pictures';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
 
@@ -358,6 +358,8 @@ export function App() {
   const [plateShelf, setPlateShelf] = useState<TreeNode[] | null>(null);
   /** The Groups shown as Mise en Place, all their Items as one page, or null for a single Item. */
   const [mise, setMise] = useState<MiseView | null>(null);
+  /** Counts up when Items shown in Mise en Place were rewritten behind it, so it reads them again. */
+  const [miseRound, setMiseRound] = useState(0);
   /** Words for Search, from "Search everywhere" on a right-click. */
   const [findRequest, setFindRequest] = useState<{ query: string; at: number } | null>(null);
   /** Opens or closes every folder (or every one inside `under`), from a right-click. */
@@ -1156,6 +1158,45 @@ export function App() {
     } else if (!settleAt(ed.view, accept)) say('Put the cursor in a change first, or use Next change to find one.');
     ed.commands.focus();
   };
+  /**
+   * Accepts or rejects every change in the Recipe, Shelf and Pantry. The open Item is settled on
+   * the page, so Undo takes it back; every other Item with changes gets a snapshot first, then is
+   * rewritten. Run only when asked, so reading every file is fine.
+   */
+  const settleRecipe = async (accept: boolean) => {
+    if (!fs || !book) return;
+    await flushSave();
+    await saveUndoNow();
+    let items = 0;
+    if (editor && hasChanges(editor.state.doc)) {
+      settleAll(editor.view, accept);
+      items++;
+    }
+    const verb = accept ? 'accepting' : 'rejecting';
+    try {
+      for (const root of [BOOKSHELF, PANTRY]) {
+        for (const node of walkFiles(await readTree(fs, root, order.current))) {
+          if (node.path === path || !node.path.endsWith('.md')) continue;
+          const d = await readDocument(fs, node.path);
+          // Most Items have none; only those that might are parsed.
+          if (!/\{\.(ins|del|fmt)|change=|was="/.test(d.body)) continue;
+          const json = parseMarkdown(d.body);
+          if (!hasChangesJSON(json)) continue;
+          await storeSnapshot(fs, d, `Before ${verb} all changes`);
+          await writeDocument(fs, node.path, { ...d, body: serializeMarkdown(settledJSON(json, accept)) });
+          items++;
+        }
+      }
+    } catch (e) {
+      setError(`Couldn’t finish ${verb} every change. ${friendlyError(e)}`);
+    }
+    // Word counts follow the rewritten Items, and Mise en Place, which draws them from what it read, reads them again.
+    await reindex();
+    setMiseRound((n) => n + 1);
+    if (items === 0) say('There are no changes in this recipe.');
+    else say(`${accept ? 'Accepted' : 'Rejected'} the changes in ${items === 1 ? 'one item' : `${items} items`}. Items other than the open one have a snapshot from just before.`);
+    editor?.commands.focus();
+  };
   const nextChange = (dir: 1 | -1) => {
     if (editor && !goToChange(editor.view, dir)) say('There are no changes on this page.');
   };
@@ -1173,6 +1214,9 @@ export function App() {
       { label: 'Reject change', disabled: !here, onPick: () => settleChanges(false, false) },
       { label: 'Accept all on this page', disabled: !any, onPick: () => settleChanges(true, true) },
       { label: 'Reject all on this page', disabled: !any, onPick: () => settleChanges(false, true) },
+      { separator: true },
+      { label: 'Accept all in the recipe', disabled: !book, onPick: () => void settleRecipe(true) },
+      { label: 'Reject all in the recipe', disabled: !book, onPick: () => void settleRecipe(false) },
     ];
   };
 
@@ -1340,7 +1384,9 @@ export function App() {
     if (!fs || !book) return;
     await flushSave();
     try {
-      const m = await collect(fs, part?.title ?? book.title, part?.nodes ?? (await readTree(fs, BOOKSHELF, order.current)));
+      // A Word file keeps suggested changes as Word's own tracked changes, for an editor to review there.
+      const m = await collect(fs, part?.title ?? book.title, part?.nodes ?? (await readTree(fs, BOOKSHELF, order.current)), kind === 'docx');
+      const tracked = kind === 'docx' && m.parts.some((p) => p.kind === 'scene' && hasChangesJSON(p.body));
       if (kind === 'print') return await printHtml(bookHtml(m, sheet, pageOf(book.page)));
       let id = book.id;
       if (kind === 'epub' && !id) {
@@ -1349,9 +1395,11 @@ export function App() {
         setBook(updated);
         await saveBookInfo(fs, updated);
       }
-      const data = kind === 'docx' ? bookDocx(m, sheet, pageOf(book.page)) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
+      const author = { name: getSettings().writerName.trim() || 'Cookbook', date: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
+      const data = kind === 'docx' ? bookDocx(m, sheet, pageOf(book.page), author) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
       const title = part?.title ?? book.title;
-      if (await saveFile(fileNameFor(title), data, KINDS[kind])) say(`Exported “${title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.`);
+      if (await saveFile(fileNameFor(title), data, KINDS[kind]))
+        say(`Exported “${title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.${tracked ? ' Your suggested changes are in it as Word tracked changes; accept all first for a clean copy.' : ''}`);
     } catch (e) {
       setError(`Couldn’t export “${part?.title ?? book.title}”. ${friendlyError(e)}`);
     }
@@ -1724,7 +1772,8 @@ export function App() {
     const words = selectedWords(ed);
     const menuPaste = (plain: boolean) => pasteFromMenu(ed, plain);
     // A suggested change under the mouse is accepted or rejected from the top of the menu.
-    const changeEl = target.closest('.cb-ins, .cb-del');
+    // A reformatted word, or a paragraph whose break or style is a suggestion (the cursor goes to its start).
+    const changeEl = target.closest('.cb-ins, .cb-del, .cb-fmt') ?? target.closest('.cb-prose p[data-change], .cb-prose p[data-was]');
     const changePos = changeEl ? ed.view.posAtDOM(changeEl, 0) : null;
     const onChange = (accept: boolean) => () => {
       if (changePos === null) return;
@@ -2627,7 +2676,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2667,7 +2716,7 @@ export function App() {
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
     else if (id === 'mise') toggleMise();
-    else if (id === 'suggest') toggleSuggest();
+    else if (id === 'suggest' || id === 'suggestAlt') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
   };
   useEffect(() => {
@@ -2953,7 +3002,13 @@ export function App() {
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
-      ...(book ? [cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits')] : []),
+      ...(book
+        ? [
+            cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits insert'),
+            cmd('acceptRecipe', 'Accept all changes in the recipe', () => void settleRecipe(true), 'Edit', undefined, 'track changes review suggestion every item'),
+            cmd('rejectRecipe', 'Reject all changes in the recipe', () => void settleRecipe(false), 'Edit', undefined, 'track changes review suggestion every item'),
+          ]
+        : []),
       ...(editor && hasChanges(editor.state.doc)
         ? [
             cmd('nextChange', 'Next change', () => nextChange(1), 'Edit', undefined, 'track changes review suggestion'),
@@ -3436,7 +3491,7 @@ export function App() {
         {miseShown && fs ? (
           <div className="page-row">
             <MiseEnPlace
-              key={miseShown.anchor}
+              key={`${miseShown.anchor}:${miseRound}`}
               fs={fs}
               roots={miseShown.nodes}
               anchor={miseShown.anchor}
@@ -3759,7 +3814,7 @@ export function App() {
             </button>
           )}
           {book?.suggest && (
-            <button className="suggest-chip" title={`Stop suggesting changes (${keysFor('suggest')})`} onClick={toggleSuggest}>
+            <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>
               Suggesting
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
                 <path d="M6 6l12 12M18 6 6 18" />

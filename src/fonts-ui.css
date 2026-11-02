@@ -1,0 +1,54 @@
+/*
+ * The interface's text and small capital labels use Crimson Pro under its own name, drawn 20% larger.
+ * Crimson Pro is a small face: at the same font-size its lowercase is about 20% shorter and narrower
+ * than Literata's, the font it replaced. Scaling the glyphs here keeps every px size, line height and
+ * width in styles.css as it was. Books use plain 'Crimson Pro', true to the point size picked.
+ */
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-700-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Crimson Pro UI';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  size-adjust: 120%;
+  src: url('../node_modules/@fontsource/crimson-pro/files/crimson-pro-latin-800-normal.woff2') format('woff2');
+}

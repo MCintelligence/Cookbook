@@ -127,7 +127,7 @@ const PLAIN_TAGS: Record<string, string> = { bold: 'strong', italic: 'em', under
 export function bookCss(sheet: StyleSheet, scope: string): string {
   return `${stylesToCss(sheet, scope)}
 ${scope} { color: #000; background: #fff; }
-${scope} h1, ${scope} h2, ${scope} h3 { font-family: 'Literata', Georgia, serif; font-weight: 600; text-align: center; margin: 1.5em 0 1em; }
+${scope} h1, ${scope} h2, ${scope} h3 { font-family: 'Crimson Pro', Georgia, serif; font-weight: 600; text-align: center; margin: 1.5em 0 1em; }
 ${scope} h1.book-title { font-size: 2em; margin-top: 30vh; }
 ${scope} .scene-break { text-align: center; text-indent: 0; margin: 1em 0; }
 ${scope} .footnotes { font-size: 0.85em; margin-top: 2em; }

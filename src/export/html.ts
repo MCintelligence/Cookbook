@@ -125,7 +125,7 @@ const PLAIN_TAGS: Record<string, string> = { bold: 'strong', italic: 'em', under
 
 /** Page-independent CSS for exported and printed books, on top of the book's styles. */
 export function bookCss(sheet: StyleSheet, scope: string): string {
-  return `${stylesToCss(sheet, scope, false)}
+  return `${stylesToCss(sheet, scope)}
 ${scope} { color: #000; background: #fff; }
 ${scope} h1, ${scope} h2, ${scope} h3 { font-family: 'Literata', Georgia, serif; font-weight: 600; text-align: center; margin: 1.5em 0 1em; }
 ${scope} h1.book-title { font-size: 2em; margin-top: 30vh; }

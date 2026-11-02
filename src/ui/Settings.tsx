@@ -157,7 +157,7 @@ function NumberField({ label, value, placeholder, required, onCommit }: { label:
 export const THEMES: { id: Theme; label: string; bg: string; side: string; page: string }[] = [
   { id: 'system', label: 'System', bg: 'linear-gradient(90deg, #f4f4f2 50%, #121212 50%)', side: '#a3a39e', page: '#fdfdfc' },
   { id: 'light', label: 'Light', bg: '#f4f4f2', side: '#f1f1ef', page: '#fdfdfc' },
-  { id: 'dark', label: 'Dark', bg: '#121212', side: '#161616', page: '#1f1f1f' },
+  { id: 'dark', label: 'Dark', bg: '#121212', side: '#161616', page: '#fdfdfc' },
   { id: 'sepia', label: 'Sepia', bg: '#201b17', side: '#231e19', page: '#efe6d6' },
 ];
 
@@ -386,18 +386,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
               </div>
             )}
           </div>
-          <Group title="The page">
-            <Row title="Page colour" help="Match the theme, or keep a paper-white page in dark mode.">
-              <Seg
-                label="Page colour"
-                value={s.paper}
-                options={[
-                  ['theme', 'Match theme'],
-                  ['paper', 'Always paper'],
-                ]}
-                onChange={(paper) => set({ paper })}
-              />
-            </Row>
+          <Group title="Interface">
             <Row title="Interface size" help="Menus, sidebar and buttons. The page has its own zoom, in Layout.">
               <Seg
                 label="Interface size"

@@ -1,6 +1,6 @@
 import { useEditorState, type Editor } from '@tiptap/react';
 import { memo, type CSSProperties, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, darkPageColor, resolveParagraphStyle } from '../styles/styles';
+import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
 import { dropTakenFormat, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
@@ -189,7 +189,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         button={
           <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title="Text colour" disabled={textDisabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
             <span className="tb-wheel" aria-hidden="true" />
-            <span className="tb-ink" style={{ '--ink': color, '--ink-dark': darkPageColor(color) } as CSSProperties} aria-hidden="true" />
+            <span className="tb-ink" style={{ '--ink': color } as CSSProperties} aria-hidden="true" />
             <Chevron />
           </button>
         }

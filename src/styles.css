@@ -1,4 +1,4 @@
-/* Neutral off-whites by default, off-blacks in dark mode, page included, with one warm accent. Every colour is a token below. */
+/* Neutral off-whites by default, off-blacks in dark mode (the page stays white), with one warm accent. Every colour is a token below. */
 :root {
   --bg: #f4f4f2;
   --bar: #fafaf9;
@@ -66,6 +66,7 @@
   --find-current: #7d5e22;
   --card: #1f1f1f;
   --surface: #242423;
+  --chosen: #1f1f1f;
   --disabled-bg: #242423;
   --disabled-text: #5f5f5b;
   --danger-bg: #4a2620;
@@ -74,18 +75,34 @@
   color-scheme: dark;
 }
 
-/* The page follows the theme unless the writer keeps it paper-coloured (data-page). */
-:root[data-page='dark'] {
-  --paper: #1f1f1f;
-  --page-text: #ececea;
-  --page-line: #2c2c2b;
-  --page-muted: #7c7c78;
-  --note: #4a3d1c;
-  --note-line: #b8902e;
-  --spelling: #f28b82;
-  --grammar: #8ab4f8;
-  --style: #f0805f;
+/* In dark mode only the frame goes dark: the page stays white paper, so picked text colours show as they are.
+   Whatever sits on the page or a Pantry card's details (marks, highlights, little controls) takes the light theme's colours. */
+:root[data-theme='dark'] :is(.cb-page, .pantry-card) {
+  --text: #1c1c1b;
+  --muted: #6b6b67;
+  --faint: #8e8e89;
+  --field: #ffffff;
+  --line: #e4e4e1;
+  --line-strong: #d4d4d0;
+  --sidebar: #f1f1ef;
+  --card: #fdfdfc;
+  --surface: #fdfdfc;
+  --accent: #e8692f;
+  --on-accent: #ffffff;
+  --green: #6f8f4e;
+  --amber: #d08a2c;
+  --amber-soft: #d9a05a;
+  --find: #fbe3a6;
+  --find-current: #f5c057;
+  --focus: #f5c057;
+  --disabled-bg: #efefed;
+  --disabled-text: #b3b3ae;
+  --danger-bg: #fbe7e2;
+  --danger-text: #a3271b;
+  color-scheme: light;
 }
+/* Draft has no sheet of its own, so in dark mode it gets a white one to keep dark text readable. */
+:root[data-theme='dark'] .cb-page.draft { background: var(--paper); border-radius: 6px; }
 
 :root[data-theme='sepia'] {
   /* Portrait: a chocolate-brown frame around a lit parchment page, like a sepia oil painting on a gallery wall. */
@@ -260,8 +277,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .tb-tag { font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .tb-wheel { width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(#e25a4b, #e9b949, #6f8f4e, #2f6fb5, #7d4fb0, #e25a4b); }
 .tb-ink { width: 14px; height: 4px; border-radius: 2px; background: var(--ink); }
-/* The bar under the wheel shows the ink as it looks on the page, which is light on a dark page. */
-:root[data-page='dark'] .tb-ink { background: var(--ink-dark); }
+/* The page is white in every theme, so the bar shows the ink exactly as picked; on a dark toolbar it gets a paper rim. */
+:root[data-theme='dark'] .tb-ink { box-shadow: 0 0 0 1px var(--paper); }
 .tb-sep { flex: none; width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 .tb-pop { position: relative; flex: none; }
 .tb-popover { position: fixed; z-index: 20; margin-top: 6px; padding: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius-pop); box-shadow: 0 12px 32px rgba(var(--shadow), 0.2); white-space: normal; }
@@ -1082,7 +1099,6 @@ button.seas-quote:hover { color: var(--accent); }
 .menu button > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 /* Colours set on words by hand (see editor/format.ts), redone for the dark page like the styles' colours. */
 .cb-page span[data-format][data-color] { color: var(--ink); }
-:root[data-page='dark'] .cb-page span[data-format][data-color] { color: var(--ink-dark); }
 
 /* ---------- Accent trim ----------
    The signature orange runs as thin, solid trim: a line under the top bar, a cap
@@ -1091,6 +1107,7 @@ button.seas-quote:hover { color: var(--accent); }
 :root { accent-color: var(--accent); caret-color: var(--accent); --trim: 2px; }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 :root[data-theme='dark'] ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+:root[data-theme='dark'] .cb-page ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
 /* The top bar's lower edge, in the writing view and in Settings, is the accent instead of a grey line. */
 .topbar, .set-top { border-bottom: var(--trim) solid var(--accent); }

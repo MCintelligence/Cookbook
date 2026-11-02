@@ -28,8 +28,6 @@ export interface AppSettings {
   /** How shortcuts are written: as this computer does, or always ⌘ or always Ctrl. */
   shortcutStyle: 'auto' | 'mac' | 'pc';
   theme: Theme;
-  /** In a dark theme, the page can stay light like paper. */
-  paper: 'theme' | 'paper';
   size: 'small' | 'medium' | 'large';
   reduceMotion: boolean;
   curlyQuotes: boolean;
@@ -107,7 +105,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reopenLast: true,
   shortcutStyle: 'auto',
   theme: 'system',
-  paper: 'theme',
   size: 'medium',
   reduceMotion: false,
   curlyQuotes: true,
@@ -139,7 +136,6 @@ const TYPED_MARKS: MarkdownRule[] = ['bold', 'italic', 'underline', 'strike', 'c
 const CHOICES: { [K in keyof AppSettings]?: readonly unknown[] } = {
   shortcutStyle: ['auto', 'mac', 'pc'],
   theme: ['system', 'light', 'dark', 'sepia'],
-  paper: ['theme', 'paper'],
   size: ['small', 'medium', 'large'],
   fade: ['paragraph', 'sentence'],
   saveDelay: [600, 1000, 5000],
@@ -226,17 +222,11 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** Whether the page is drawn dark, for the theme and the system's choice. */
-export function darkPage(s: AppSettings, systemDark: boolean): boolean {
-  return s.paper === 'theme' && (s.theme === 'dark' || (s.theme === 'system' && systemDark));
-}
-
 /** Puts the theme, size and motion settings on the page, where the CSS picks them up. */
 export function applyLook(s: AppSettings, root: HTMLElement = document.documentElement): void {
   const systemDark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
   const theme = s.theme === 'system' ? (systemDark ? 'dark' : 'light') : s.theme;
   root.dataset.theme = theme;
-  root.dataset.page = darkPage(s, systemDark) ? 'dark' : 'light';
   root.dataset.size = s.size;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   // Sepia frames a light page in dark chrome, so its scrollbars and controls are dark.

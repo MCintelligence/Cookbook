@@ -18,7 +18,9 @@ export function sectionOf(path: string): PantrySection | null {
   return root === PANTRY && (PANTRY_SECTIONS as readonly string[]).includes(section ?? '') ? (section as PantrySection) : null;
 }
 
-const EXTENSIONS: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+const EXTENSIONS: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg', 'image/bmp': 'bmp', 'image/avif': 'avif',
+};
 
 /** Saves a picture for a card under pictures/, named after the card, and returns its path. */
 export async function savePicture(fs: StorageAdapter, title: string, bytes: Uint8Array, type: string): Promise<string> {

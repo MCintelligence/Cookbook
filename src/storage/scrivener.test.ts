@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { strToU8, zipSync } from 'fflate';
+import { strFromU8, strToU8, zipSync } from 'fflate';
 import { MemoryAdapter } from './memory';
 import { openBook, readDocument, readTree } from './book';
 import { loadOrder } from './order';
-import { decodeRtf, rtfToContent } from './rtf';
-import { filesSource, findProject, importScrivener, isScrivenerZip, nearestLabel, parseScrivx, statusFrom, zipSource } from './scrivener';
+import { decodeRtf, rtfToContent, rtfToPage } from './rtf';
+import { filesSource, findProject, importScrivener, isScrivenerZip, nearestLabel, parseComments, parseScrivx, snapshotDate, statusFrom, zipSource } from './scrivener';
+import { listSnapshots } from './snapshots';
 import { serializeMarkdown } from '../editor/markdown';
 
 // Only the XML parser is borrowed from jsdom; a whole jsdom window gives zips a second, foreign Uint8Array.
@@ -44,7 +45,6 @@ describe('reading RTF', () => {
   it('brings footnotes and links, and leaves the font table and pictures out', () => {
     const rtf = '{\\rtf1\\ansi{\\fonttbl{\\f0 Times;}}{\\*\\generator Scrivener;}Salt{\\super \\chftn}{\\footnote \\pard\\plain \\chftn Kosher, coarse.} matters. {\\field{\\*\\fldinst{HYPERLINK "https://example.com"}}{\\fldrslt the site}}.{\\pict\\pngblip 89504e47}\\par}';
     expect(md(rtf)).toBe('Salt^[Kosher, coarse.] matters. [the site](https://example.com).\n');
-    expect(md('{\\rtf1\\ansi Before{\\Scrv_annot \\color={0.6,0.6,0.6} \\text="a note to self" \\end_Scrv_annot} after.}')).toBe('Before after.\n');
   });
 
   it('brings headings and quotes back from their style names', () => {
@@ -54,6 +54,69 @@ describe('reading RTF', () => {
 
   it('reads bytes as Latin-1 so escapes are left for the parser', () => {
     expect(decodeRtf(strToU8("{\\rtf1 a\\'92b}"))).toBe("{\\rtf1 a\\'92b}");
+  });
+});
+
+/** A page and its notes, with the notes' ids numbered in order so they can be compared. */
+function page(rtf: string, linked = new Map<string, { text: string; footnote: boolean }>()) {
+  const { content, notes } = rtfToPage(rtf, linked);
+  let body = serializeMarkdown({ type: 'doc', content });
+  const said: string[] = [];
+  Object.entries(notes).forEach(([id, text]) => {
+    body = body.split(id).join(`n${said.length + 1}`);
+    said.push(text);
+  });
+  return { body, said };
+}
+
+describe('Scrivener notes in the text', () => {
+  it('makes an inline annotation a note to self on the word before it', () => {
+    expect(page('{\\rtf1\\ansi Before{\\Scrv_annot \\color={0.6,0.6,0.6} \\text="a note to self" \\end_Scrv_annot} after.}')).toEqual({
+      body: '[Before]{.note #n1} after.\n',
+      said: ['a note to self'],
+    });
+    // As older Scrivener wrote it, in capitals and with the colour as a group.
+    expect(page('{\\rtf1\\ansi Salt it {\\SCRV_ANNOT \\COLOR={\\R=1.0\\G=0.0\\B=0.0} \\TEXT=Too much?\\END_SCRV_ANNOT}well.}').said).toEqual(['Too much?']);
+  });
+
+  it('puts an annotation at the start of a paragraph on the word after it, and one with no words at all becomes the page', () => {
+    expect(page('{\\rtf1\\ansi {\\Scrv_annot \\text=Check this\\end_Scrv_annot}June arrived.\\par}').body).toBe('[June]{.note #n1} arrived.\n');
+    expect(page('{\\rtf1\\ansi First.\\par{\\Scrv_annot \\text=Last word\\end_Scrv_annot}\\par}').body).toBe('[First.]{.note #n1}\n');
+    expect(page('{\\rtf1\\ansi {\\Scrv_annot \\text=Only a thought\\end_Scrv_annot}}')).toEqual({ body: 'Only a thought\n', said: [] });
+  });
+
+  it('makes an inline footnote a footnote', () => {
+    expect(page('{\\rtf1\\ansi Salt{\\Scrv_fn=Kosher, coarse.\\end_Scrv_fn} matters.}').body).toBe('Salt^[Kosher, coarse.] matters.\n');
+  });
+
+  it('anchors linked comments on the words they cover, and puts linked footnotes after them', () => {
+    const linked = parseComments(`<?xml version="1.0" encoding="UTF-8"?><Comments>
+      <Comment ID="C-1" Footnote="No" Author="Lou" Color="1 0.8 0.4"><![CDATA[{\\rtf1\\ansi Is this {\\i right}?\\par Ask Mum.}]]></Comment>
+      <Comment ID="F-1" Footnote="Yes"><![CDATA[{\\rtf1\\ansi From 1890.}]]></Comment>
+    </Comments>`);
+    const rtf = '{\\rtf1\\ansi The {\\field{\\*\\fldinst{HYPERLINK "scrivcmt://C-1"}}{\\fldrslt cornbread recipe}} came from {\\field{\\*\\fldinst{HYPERLINK "scrivcmt://F-1"}}{\\fldrslt Gran}}. {\\field{\\*\\fldinst{HYPERLINK "scrivcmt://GONE"}}{\\fldrslt Lost}} one.}';
+    expect(page(rtf, linked)).toEqual({ body: 'The [cornbread recipe]{.note #n1} came from Gran^[From 1890.]. Lost one.\n', said: ['Is this right?\nAsk Mum.'] });
+  });
+
+  it('reads RTF comments as Word and Scrivener 2 write them', () => {
+    const rtf = '{\\rtf1\\ansi The pie{\\*\\atnid LM}{\\*\\atnauthor Lou}\\chatn{\\*\\annotation{\\*\\atnref 1}{\\*\\atndate 12345}\\pard Less sugar.} cooled.}';
+    expect(page(rtf)).toEqual({ body: 'The [pie]{.note #n1} cooled.\n', said: ['Less sugar.'] });
+  });
+
+  it('keeps tracked changes as suggestions', () => {
+    expect(md('{\\rtf1\\ansi A {\\revised new} and {\\deleted old} word.}')).toBe('A [new]{.ins} and [old]{.del} word.\n');
+  });
+
+  it('never stops on damaged RTF', () => {
+    for (const bad of ['', '{', '}}}{', '{\\rtf1 \\', '{\\rtf1 {\\Scrv_annot \\text=open', '\u0000\u0001binaryÿ', '{\\rtf1\\bin99 ab']) expect(() => rtfToPage(bad)).not.toThrow();
+    expect(parseComments('<Comments><Comment ID="x">')).toEqual(new Map());
+  });
+
+  it('reads snapshot dates', () => {
+    expect(snapshotDate('2018-01-01-10-00-00-0000.rtf')?.toISOString()).toBe('2018-01-01T10:00:00.000Z');
+    expect(snapshotDate('2026-06-15-091400.rtf')?.toISOString()).toBe('2026-06-15T09:14:00.000Z');
+    expect(snapshotDate('2024-03-02 08:30:00 +0100')?.toISOString()).toBe('2024-03-02T07:30:00.000Z');
+    expect(snapshotDate('Untitled.rtf')).toBeNull();
   });
 });
 
@@ -224,5 +287,141 @@ describe('importing a Scrivener project', () => {
     const fs = new MemoryAdapter();
     const result = await importScrivener(zipSource(zip)!, fs);
     expect(result.items).toBe(4);
+  });
+});
+
+describe('importing notes, comments, files and snapshots', () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ScrivenerProject Version="2.0">
+  <Binder>
+    <BinderItem UUID="DRAFT" Type="DraftFolder"><Title>Draft</Title><Children>
+      <BinderItem UUID="CH" Type="Folder"><Title>Part One</Title><Children>
+        <BinderItem UUID="S1" Type="Text"><Title>Arrival</Title></BinderItem>
+        <BinderItem UUID="S2" Type="Text"><Title>Empty scene</Title></BinderItem>
+      </Children></BinderItem>
+      <BinderItem UUID="PIC0" Type="Image"><Title>Map in the draft</Title><MetaData><FileExtension>png</FileExtension></MetaData></BinderItem>
+    </Children></BinderItem>
+    <BinderItem UUID="RES" Type="ResearchFolder"><Title>Research</Title><Children>
+      <BinderItem UUID="PDF1" Type="PDF"><Title>Old menu</Title><MetaData><FileExtension>pdf</FileExtension></MetaData></BinderItem>
+      <BinderItem UUID="IMG1" Type="Image"><Title>Farmhouse</Title></BinderItem>
+      <BinderItem UUID="WEB1" Type="WebArchive"><Title>Cornbread article</Title></BinderItem>
+      <BinderItem UUID="WEB2" Type="WebArchive"><Title>Saved page</Title><MetaData><FileExtension>html</FileExtension></MetaData></BinderItem>
+      <BinderItem UUID="GONE" Type="PDF"><Title>Missing scan</Title><MetaData><FileExtension>pdf</FileExtension></MetaData></BinderItem>
+    </Children></BinderItem>
+    <BinderItem UUID="CHARS" Type="Folder"><Title>Characters</Title><Children>
+      <BinderItem UUID="J" Type="Text"><Title>June</Title></BinderItem>
+      <BinderItem UUID="JP" Type="Image"><Title>June's photo</Title><MetaData><FileExtension>jpg</FileExtension></MetaData></BinderItem>
+    </Children></BinderItem>
+  </Binder>
+</ScrivenerProject>`;
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+  const files = (): Map<string, () => Promise<Uint8Array>> => {
+    const f: Record<string, string | Uint8Array> = {
+      'Farm.scriv/Farm.scrivx': xml,
+      'Farm.scriv/Files/Data/S1/content.rtf': cocoa('The {\\field{\\*\\fldinst{HYPERLINK "scrivcmt://K1"}}{\\fldrslt bus}} was late.'),
+      'Farm.scriv/Files/Data/S1/content.comments': '<?xml version="1.0"?><Comments><Comment ID="K1" Footnote="No"><![CDATA[{\\rtf1\\ansi Train instead?}]]></Comment></Comments>',
+      'Farm.scriv/Files/Data/S1/notes.rtf': cocoa('Set in June.\\\nRain all day.'),
+      'Farm.scriv/Files/Data/S1/snapshots/2024-05-01-12-00-00-0000.rtf': cocoa('The bus was early.'),
+      'Farm.scriv/Files/Data/S1/snapshots/index.xml': '<SnapshotIndexes><Snapshot Date="2024-05-01 12:00:00 +0000"><Title>First go</Title><File>2024-05-01-12-00-00-0000.rtf</File></Snapshot></SnapshotIndexes>',
+      'Farm.scriv/Snapshots/S1.snapshots/undated.rtf': cocoa('The bus never came.'),
+      'Farm.scriv/Snapshots/Data/S1/2023-01-02-03-04-05 Before the rewrite.rtf': cocoa('No bus.'),
+      'Farm.scriv/Files/Data/S2/notes.rtf': cocoa('Write the storm here.'),
+      'Farm.scriv/Files/Data/CH/notes.rtf': cocoa('Part one is summer.'),
+      'Farm.scriv/Files/Data/PIC0/content.png': PNG,
+      'Farm.scriv/Files/Data/PDF1/content.pdf': '%PDF-1.4 menu',
+      'Farm.scriv/Files/Data/PDF1/synopsis.txt': 'Prices in 1952',
+      'Farm.scriv/Files/Data/PDF1/notes.rtf': cocoa('Check the year.'),
+      'Farm.scriv/Files/Data/IMG1/content.jpeg': PNG,
+      'Farm.scriv/Files/Data/WEB1/content.webarchive': 'bplist00\u0000WebResourceURL_\u0010https://example.com/cornbread\u0000',
+      'Farm.scriv/Files/Data/WEB2/content.html': '<html><head><style>p{}</style></head><body><h1>Corn</h1><p>Grind it  fine.</p><script>x()</script></body></html>',
+      'Farm.scriv/Files/Data/GONE/notes.rtf': cocoa('Ask the library.'),
+      'Farm.scriv/Files/Data/J/notes.rtf': cocoa('Hates thunder.'),
+      'Farm.scriv/Files/Data/JP/content.jpg': PNG,
+    };
+    return new Map(Object.entries(f).map(([name, body]) => [name, async () => (typeof body === 'string' ? strToU8(body) : body)]));
+  };
+
+  it('brings comments as notes to self, document notes as Materials, and snapshots with their Items', async () => {
+    const fs = new MemoryAdapter();
+    const result = await importScrivener(filesSource(files()), fs);
+    const arrival = await readDocument(fs, 'bookshelf/Part One/Arrival.md');
+    const notes = arrival.fields.notes as Record<string, string>;
+    expect(Object.values(notes)).toEqual(['Train instead?']);
+    expect(arrival.body).toMatch(/^The \[bus\]\{\.note #[\w-]+\} was late\.\n$/);
+
+    const snaps = await listSnapshots(fs, arrival.id);
+    expect(snaps.map((s) => [s.reason, s.body])).toEqual([
+      ['From Scrivener', 'The bus never came.\n'],
+      ['From Scrivener: First go', 'The bus was early.\n'],
+      ['From Scrivener: Before the rewrite', 'No bus.\n'],
+    ]);
+    expect(snaps[1]!.date.toISOString()).toBe('2024-05-01T12:00:00.000Z');
+    expect(snaps[2]!.date.toISOString()).toBe('2023-01-02T03:04:05.000Z');
+
+    // Notes with no page to sit on are kept together in Materials.
+    const kept = await readTree(fs, 'pantry/research/Notes from Scrivener', await loadOrder(fs));
+    expect(kept.map((n) => n.name)).toEqual(['Part One.md', 'Arrival.md', 'Empty scene.md']);
+    expect((await readDocument(fs, 'pantry/research/Notes from Scrivener/Arrival.md')).body).toBe('Set in June.\n\nRain all day.\n');
+    expect((await readDocument(fs, 'pantry/research/Notes from Scrivener/Part One.md')).body).toBe('Part one is summer.\n');
+    // A card with no words takes its notes as its page.
+    expect((await readDocument(fs, 'pantry/characters/June.md')).body).toBe('Hates thunder.\n');
+    expect(result).toMatchObject({ notes: 1, snapshots: 3, files: 6, skipped: ['Missing scan'] });
+  });
+
+  it('keeps pictures in pictures/ and other files in files/, each on a card', async () => {
+    const fs = new MemoryAdapter();
+    await importScrivener(filesSource(files()), fs);
+    const menu = await readDocument(fs, 'pantry/research/Old menu.md');
+    expect(menu).toMatchObject({ kind: 'research', fields: { synopsis: 'Prices in 1952' } });
+    // A card's document notes follow its own words.
+    expect(menu.body).toBe('*A PDF brought from Scrivener, kept with this recipe as* `files/Old menu.pdf`*.*\n\n### Notes\n\nCheck the year.\n');
+    expect(strFromU8(await fs.readBytes('files/Old menu.pdf'))).toBe('%PDF-1.4 menu');
+
+    // A picture with no FileExtension is still found, and shown on its card.
+    expect((await readDocument(fs, 'pantry/research/Farmhouse.md')).body).toBe('![Farmhouse](pictures/Farmhouse.jpeg)\n');
+    expect(await fs.readBytes('pictures/Farmhouse.jpeg')).toEqual(PNG);
+    // In Characters it becomes the card's portrait.
+    expect((await readDocument(fs, "pantry/characters/June's photo.md")).fields).toEqual({ portrait: "pictures/June's photo.jpg" });
+    // A picture in the Draft goes to Materials, not the Shelf.
+    expect(await fs.exists('pantry/research/Map in the draft.md')).toBe(true);
+    expect((await readTree(fs, 'bookshelf')).map((n) => n.name)).toEqual(['Part One']);
+
+    expect((await readDocument(fs, 'pantry/research/Cornbread article.md')).body).toContain('Saved from [https://example.com/cornbread](https://example.com/cornbread)');
+    expect((await readDocument(fs, 'pantry/research/Saved page.md')).body).toContain('Corn\n\nGrind it fine.\n');
+    // A file that isn't in the project keeps its card for its notes, and is named in the message.
+    expect((await readDocument(fs, 'pantry/research/Missing scan.md')).body).toBe('Ask the library.\n');
+  });
+
+  it('finds Scrivener 2 pictures and notes beside the text in Files/Docs', async () => {
+    const v2 = `<?xml version="1.0"?><ScrivenerProject><Binder>
+      <BinderItem ID="0" Type="DraftFolder"><Title>Draft</Title><Children><BinderItem ID="3" Type="Text"><Title>One</Title></BinderItem></Children></BinderItem>
+      <BinderItem ID="1" Type="ResearchFolder"><Title>Research</Title><Children><BinderItem ID="9" Type="Image"><Title>Barn</Title></BinderItem></Children></BinderItem>
+    </Binder></ScrivenerProject>`;
+    const f = new Map<string, () => Promise<Uint8Array>>([
+      ['Old.scriv/Old.scrivx', async () => strToU8(v2)],
+      ['Old.scriv/Files/Docs/3.rtf', async () => strToU8('{\\rtf1\\ansi Hello there.}')],
+      ['Old.scriv/Files/Docs/3_notes.rtf', async () => strToU8('{\\rtf1\\ansi Say it louder.}')],
+      ['Old.scriv/Files/Docs/9.png', async () => PNG],
+      ['Old.scriv/Snapshots/3.snapshots/2010-02-03-04-05-06-0000.rtf', async () => strToU8('{\\rtf1\\ansi Hi.}')],
+    ]);
+    const fs = new MemoryAdapter();
+    const result = await importScrivener(filesSource(f), fs);
+    const one = await readDocument(fs, 'bookshelf/One.md');
+    expect((await readDocument(fs, 'pantry/research/Notes from Scrivener/One.md')).body).toBe('Say it louder.\n');
+    expect((await readDocument(fs, 'pantry/research/Barn.md')).body).toBe('![Barn](pictures/Barn.png)\n');
+    expect((await listSnapshots(fs, one.id))[0]).toMatchObject({ body: 'Hi.\n', reason: 'From Scrivener' });
+    expect(result).toMatchObject({ files: 1, snapshots: 1, skipped: [] });
+  });
+
+  it('carries on past files that fail to read', async () => {
+    const f = files();
+    f.set('Farm.scriv/Files/Data/S1/content.comments', async () => strToU8('<Comments><oops'));
+    f.set('Farm.scriv/Files/Data/PDF1/content.pdf', async () => {
+      throw new Error('disk error');
+    });
+    const fs = new MemoryAdapter();
+    const result = await importScrivener(filesSource(f), fs);
+    expect((await readDocument(fs, 'bookshelf/Part One/Arrival.md')).body).toBe('The bus was late.\n');
+    expect(result.skipped).toEqual(['Old menu', 'Missing scan']);
   });
 });

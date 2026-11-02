@@ -173,6 +173,39 @@ mod durable {
 #[cfg(desktop)]
 mod fonts;
 
+/// A Scrivener project picked as a file: on a Mac the .scriv folder is a package, which the
+/// folder picker won't choose, so it is picked as a file instead, or the .scrivx inside it is.
+/// The picker lets the page read only what was picked, so this lets it read the whole project
+/// too: only for a path the picker already gave it, and only for a folder holding a .scrivx.
+/// Returns the project folder.
+#[tauri::command]
+fn open_scrivener(app: tauri::AppHandle, picked: String) -> Result<String, String> {
+    use std::path::Path;
+    use tauri_plugin_fs::FsExt;
+    let scope = app.fs_scope();
+    let picked = Path::new(&picked);
+    if !scope.is_allowed(picked) {
+        return Err("That wasn’t picked in Cookbook.".into());
+    }
+    let has_ext = |p: &Path, ext: &str| p.extension().is_some_and(|e| e.eq_ignore_ascii_case(ext));
+    let folder = if picked.is_dir() && has_ext(picked, "scriv") {
+        picked
+    } else if picked.is_file() && has_ext(picked, "scrivx") {
+        picked.parent().ok_or("That .scrivx isn’t in a folder.")?
+    } else {
+        return Err("That isn’t a Scrivener project.".into());
+    };
+    let holds_project = std::fs::read_dir(folder)
+        .map_err(|e| e.to_string())?
+        .filter_map(Result::ok)
+        .any(|entry| has_ext(&entry.path(), "scrivx"));
+    if !holds_project {
+        return Err("That folder has no Scrivener project in it.".into());
+    }
+    scope.allow_directory(folder, true).map_err(|e| e.to_string())?;
+    Ok(folder.to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -180,7 +213,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts, commit_write])
+        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts, commit_write, open_scrivener])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;

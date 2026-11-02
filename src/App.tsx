@@ -1503,9 +1503,15 @@ export function App() {
       const result = done as Awaited<ReturnType<typeof importScrivener>> | null;
       if (!result) return;
       const count = (n: number, one: string, many: string) => (n === 1 ? `one ${one}` : `${n} ${many}`);
+      const also = [
+        result.files > 0 && count(result.files, 'file', 'files'),
+        result.notes > 0 && count(result.notes, 'note', 'notes'),
+        result.snapshots > 0 && count(result.snapshots, 'snapshot', 'snapshots'),
+      ].filter(Boolean);
+      const brought = also.length > 0 ? ` It also brought ${also.length > 1 ? `${also.slice(0, -1).join(', ')} and ${also[also.length - 1]}` : also[0]}.` : '';
       const n = result.skipped.length;
-      const left = n === 0 ? '' : n === 1 ? ' One PDF, picture or web page was left in Scrivener.' : ` ${n} PDFs, pictures and web pages were left in Scrivener.`;
-      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf and ${count(result.cards, 'card', 'cards')} in the Pantry.${left}`);
+      const missing = n === 0 ? '' : n === 1 ? ` One file (“${result.skipped[0]}”) wasn’t in the project, so only its card came.` : ` ${n} files weren’t in the project, so only their cards came.`;
+      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf and ${count(result.cards, 'card', 'cards')} in the Pantry.${brought}${missing}`);
     } catch (e) {
       setError(`Couldn’t import the Scrivener project. ${friendlyError(e)}`);
     }
@@ -1756,7 +1762,13 @@ export function App() {
     const noteEl = target.closest<HTMLElement>('.cb-note');
     if (noteEl?.dataset.note) {
       const id = noteEl.dataset.note;
+      // The note's words, such as a comment brought from Scrivener, are read here.
+      const said = (readNotes(currentDoc())[id] ?? '').trim();
+      const lines = said.split('\n').filter(Boolean).map((l) => (l.length > 90 ? `${l.slice(0, 89)}…` : l));
+      const shown = lines.length > 6 ? [...lines.slice(0, 5), '…'] : lines;
       return showMenu('Note', x, y, [
+        ...shown.map((line) => ({ label: line, disabled: true, onPick: () => {} })),
+        ...(said ? [{ label: 'Copy note', onPick: () => void navigator.clipboard?.writeText(said).catch(() => {}) }, { separator: true as const }] : []),
         {
           label: 'Delete note',
           danger: true,

@@ -365,7 +365,7 @@ Leave an Item out of every export by right-clicking it and unticking **Include i
 
 To bring writing in, File › **Import files** takes Word, Markdown and plain text files and turns them into Items.
 
-Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, and Characters, Places and Research go to the Pantry. The Scrivener project itself is never changed.
+Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, and Characters, Places and Research go to the Pantry. Comments stay on the words they were on (right-click to read one), document notes go to the Pantry, snapshots come with their Items, and pictures and PDFs become Materials cards. The Scrivener project itself is never changed.
 `,
         },
       ],

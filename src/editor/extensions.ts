@@ -81,6 +81,20 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         parseHTML: (el) => Number(el.getAttribute('data-spacing')) || null,
         renderHTML: (attrs) => (attrs.lineSpacing ? { 'data-spacing': attrs.lineSpacing, style: `line-height: ${attrs.lineSpacing}` } : {}),
       },
+      // Track changes: the break before this paragraph suggested (ins) or suggested for joining (del); see trackChanges.ts.
+      change: {
+        default: null,
+        keepOnSplit: false,
+        parseHTML: (el) => el.getAttribute('data-change') || null,
+        renderHTML: (attrs) => (attrs.change ? { 'data-change': attrs.change } : {}),
+      },
+      // Track changes: the style and format this paragraph had before a suggested restyle.
+      was: {
+        default: null,
+        keepOnSplit: false,
+        parseHTML: (el) => el.getAttribute('data-was') || null,
+        renderHTML: (attrs) => (attrs.was ? { 'data-was': attrs.was } : {}),
+      },
     };
   },
   parseHTML() {

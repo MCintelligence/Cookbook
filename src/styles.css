@@ -490,6 +490,12 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* Track changes: suggested words underlined in the accent colour, words suggested for deletion struck through and faded. */
 .cb-prose ins.cb-ins { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; color: var(--accent); }
 .cb-prose del.cb-del { text-decoration: line-through; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; opacity: 0.6; }
+/* A formatting change: a dotted line under the words. A suggested paragraph break: a pilcrow in the margin, struck when the break is to go. A restyled paragraph: a bar in the margin. */
+.cb-prose .cb-fmt { text-decoration: underline dotted; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 4px; }
+.cb-prose p:is([data-change], [data-was]) { position: relative; }
+.cb-prose p[data-change]::before { content: '¶'; position: absolute; left: -1.6em; top: 0; text-indent: 0; font-style: normal; font-weight: 400; color: var(--accent); pointer-events: none; }
+.cb-prose p[data-change='del']::before { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.7; }
+.cb-prose p[data-was]::after { content: ''; position: absolute; left: -0.7em; top: 0.25em; bottom: 0.25em; width: 2px; border-radius: 1px; background: var(--accent); pointer-events: none; }
 .cb-prose .cb-footnote { counter-increment: footnote; color: var(--accent); font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 12px; line-height: 0; cursor: pointer; padding: 0 1px; }
 .cb-prose .cb-footnote::after { content: counter(footnote); }
 .cb-prose .cb-footnote.ProseMirror-selectednode { outline: 2px solid var(--focus); border-radius: 3px; }

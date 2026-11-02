@@ -25,8 +25,10 @@ export const SHORTCUTS: Shortcut[] = [
   // A Mac has it already as Window › Enter Full Screen (⌃⌘F), and a browser keeps F11 for itself.
   ...(isTauri() && !IS_MAC ? [{ id: 'fullscreen', label: 'Full screen', key: 'F11' }] : []),
   { id: 'footnote', label: 'Footnote', key: 'Mod-Alt-F' },
-  // Word's shortcut for Track Changes.
-  { id: 'suggest', label: 'Suggest changes (track changes)', key: 'Mod-Shift-E' },
+  // Insert puts changes in without taking anything away; Word's Track Changes key stays as a second one,
+  // and comes first on a Mac, whose keyboards mostly have no Insert key.
+  { id: 'suggest', label: 'Suggest changes (track changes)', key: IS_MAC ? 'Mod-Shift-E' : 'Insert' },
+  { id: 'suggestAlt', label: 'Suggest changes (second key)', key: IS_MAC ? 'Insert' : 'Mod-Shift-E' },
   { id: 'strong', label: 'Strong', key: 'Mod-B' },
   { id: 'emphasis', label: 'Emphasis', key: 'Mod-I' },
   { id: 'underline', label: 'Underline', key: 'Mod-U' },

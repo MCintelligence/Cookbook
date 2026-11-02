@@ -1,6 +1,7 @@
 import { unzipSync, strFromU8 } from 'fflate';
 import { type MarkJSON, type NodeJSON, BODY_STYLE, HEADING_STYLES, QUOTE_STYLE, parseMarkdown, serializeMarkdown } from '../editor/markdown';
 import { parseDocument } from './document';
+import { formatOfJSON } from '../editor/trackChanges';
 
 /**
  * Turns a file from another app into a scene: its title (from the file name)
@@ -8,6 +9,8 @@ import { parseDocument } from './document';
  * are understood. From Word come bold, italic, underline and strikethrough,
  * links, headings, quotes, numbered and bulleted lists (nested), tables,
  * footnotes and line breaks; a file Cookbook wrote brings its styles back by name.
+ * Word's tracked changes come in as suggestions: inserted and deleted words,
+ * new and joined paragraphs, reformatted words and restyled paragraphs.
  */
 export interface Imported {
   title: string;
@@ -130,18 +133,18 @@ export function importDocx(name: string, data: Uint8Array): Imported {
       if (prev?.type === 'text' && JSON.stringify(prev.marks ?? []) === JSON.stringify(marks)) prev.text += t;
       else nodes.push(text(t, marks));
     };
-    const runs = (el: Element, link: string | null) => {
+    // Word's tracked changes come in as Cookbook's: inserted and deleted words, and words reformatted.
+    const runs = (el: Element, link: string | null, change: MarkJSON | null) => {
       for (const c of Array.from(el.children)) {
         if (c.namespaceURI !== W) continue;
-        // Deleted tracked changes aren't part of the text.
-        if (c.localName === 'del' || c.localName === 'moveFrom') continue;
-        if (c.localName === 'hyperlink') runs(c, safeLink(links.get(attr(c, 'id', R) ?? '') ?? null) ?? link);
-        else if (c.localName === 'ins' || c.localName === 'smartTag' || c.localName === 'sdt' || c.localName === 'sdtContent' || c.localName === 'fldSimple' || c.localName === 'moveTo') runs(c, link);
-        else if (c.localName === 'r') run(c, link);
+        if (c.localName === 'del' || c.localName === 'moveFrom') runs(c, link, { type: 'deletion' });
+        else if (c.localName === 'ins' || c.localName === 'moveTo') runs(c, link, change ?? { type: 'insertion' });
+        else if (c.localName === 'hyperlink') runs(c, safeLink(links.get(attr(c, 'id', R) ?? '') ?? null) ?? link, change);
+        else if (c.localName === 'smartTag' || c.localName === 'sdt' || c.localName === 'sdtContent' || c.localName === 'fldSimple') runs(c, link, change);
+        else if (c.localName === 'r') run(c, link, change);
       }
     };
-    const run = (r: Element, link: string | null) => {
-      const rPr = childrenNamed(r, 'rPr')[0] ?? null;
+    const marksOf = (rPr: Element | null, link: string | null): MarkJSON[] => {
       const rStyleId = attr(rPr ? childrenNamed(rPr, 'rStyle')[0] : null, 'val') ?? '';
       const rStyle = styles.get(rStyleId);
       const marks: MarkJSON[] = [];
@@ -155,9 +158,21 @@ export function importDocx(name: string, data: Uint8Array): Imported {
       if (has('strike') || has('dstrike')) marks.push({ type: 'strike' });
       const font = attr(rPr ? childrenNamed(rPr, 'rFonts')[0] : null, 'ascii') ?? '';
       if (/courier|consolas|mono/i.test(font)) marks.push({ type: 'code' });
+      return marks;
+    };
+    const run = (r: Element, link: string | null, change: MarkJSON | null) => {
+      const rPr = childrenNamed(r, 'rPr')[0] ?? null;
+      const marks = marksOf(rPr, link);
+      // Reformatted while Word tracked changes: the run's properties before are kept inside it.
+      const before = rPr ? childrenNamed(rPr, 'rPrChange')[0] : undefined;
+      if (before && change?.type !== 'insertion') {
+        const was = formatOfJSON(marksOf(childrenNamed(before, 'rPr')[0] ?? null, link));
+        if (was !== formatOfJSON(marks)) marks.unshift({ type: 'formatChange', attrs: { was } });
+      }
+      if (change) marks.unshift(change);
       for (const c of Array.from(r.children)) {
         if (c.namespaceURI !== W) continue;
-        if (c.localName === 't') push(c.textContent ?? '', marks);
+        if (c.localName === 't' || c.localName === 'delText') push(c.textContent ?? '', marks);
         else if (c.localName === 'tab') push(' ', marks);
         else if ((c.localName === 'br' && attr(c, 'type') !== 'page') || c.localName === 'cr') nodes.push({ type: 'hardBreak' });
         else if (c.localName === 'noBreakHyphen') push('-', marks);
@@ -167,7 +182,7 @@ export function importDocx(name: string, data: Uint8Array): Imported {
         }
       }
     };
-    runs(p, null);
+    runs(p, null, null);
     // Leading and trailing spaces in a paragraph don't survive the file format anyway.
     while (nodes[0]?.type === 'hardBreak') nodes.shift();
     while (nodes[nodes.length - 1]?.type === 'hardBreak') nodes.pop();
@@ -209,8 +224,15 @@ export function importDocx(name: string, data: Uint8Array): Imported {
 
   // Word keeps a drop cap in a little paragraph of its own; it comes back as !Word on the paragraph after it.
   let dropCap: string | null = null;
+  // Word marks a paragraph's own end as inserted or deleted; Cookbook marks the paragraph after the break.
+  let breakAfter: 'ins' | 'del' | null = null;
   const paragraph = (p: Element) => {
     const pPr = childrenNamed(p, 'pPr')[0] ?? null;
+    const markProps = pPr ? childrenNamed(pPr, 'rPr')[0] : undefined;
+    const breakBefore = breakAfter;
+    const mine = markProps && childrenNamed(markProps, 'ins').length > 0 ? 'ins' : markProps && childrenNamed(markProps, 'del').length > 0 ? 'del' : null;
+    // Only a paragraph that comes in passes its break on; an empty one or a list item doesn't.
+    breakAfter = null;
     const styleId = attr(pPr ? childrenNamed(pPr, 'pStyle')[0] : null, 'val') ?? '';
     const nodes = inline(p);
     const plain = nodes.map((n) => (n.type === 'text' ? n.text : n.type === 'hardBreak' ? '\n' : '')).join('');
@@ -251,7 +273,17 @@ export function importDocx(name: string, data: Uint8Array): Imported {
       return;
     }
     endLists();
-    content.push(para(nodes, paragraphStyle(styleId)));
+    const node = para(nodes, paragraphStyle(styleId));
+    if (breakBefore && content[content.length - 1]?.type === 'paragraph') node.attrs!.change = breakBefore;
+    // Restyled while Word tracked changes: the style before is kept in the paragraph's properties.
+    const restyle = pPr ? childrenNamed(pPr, 'pPrChange')[0] : undefined;
+    if (restyle) {
+      const oldPPr = childrenNamed(restyle, 'pPr')[0];
+      const was = paragraphStyle(attr(oldPPr ? childrenNamed(oldPPr, 'pStyle')[0] : null, 'val') ?? '');
+      if (was !== node.attrs!.style) node.attrs!.was = was;
+    }
+    content.push(node);
+    breakAfter = mine;
   };
 
   const table = (tbl: Element) => {

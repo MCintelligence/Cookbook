@@ -6,7 +6,7 @@ import { undo } from '@tiptap/pm/history';
 import { cookbookExtensions } from './extensions';
 import { parseMarkdown, plainText, serializeMarkdown, type NodeJSON } from './markdown';
 import { docWords } from './docStats';
-import { UNTRACKED, acceptedJSON, changesIn, goToChange, hasChanges, setSuggesting, settleAll, settleAt } from './trackChanges';
+import { UNTRACKED, acceptedJSON, changesIn, goToChange, hasChanges, hasChangesJSON, setSuggesting, settleAll, settleAt, settledJSON } from './trackChanges';
 import { UndoRecorder } from './undoLog';
 
 const editors: Editor[] = [];
@@ -119,15 +119,126 @@ describe('Suggest changes on', () => {
     expect(serializeMarkdown(parseMarkdown(saved))).toBe(saved);
   });
 
-  it('lets Enter and Backspace split and join paragraphs as usual', () => {
+  it('marks a new paragraph as a suggested break', () => {
+    setSuggesting(true);
+    const editor = make('First. Second.');
+    // Before "Second."
+    select(editor, 8);
+    press(editor, 'Enter');
+    expect(md(editor)).toBe('First. \n\n::: {change=ins}\nSecond.\n:::\n');
+    expect(changesIn(editor.state.doc)).toHaveLength(1);
+  });
+
+  it('keeps joined paragraphs apart, with the break struck', () => {
     setSuggesting(true);
     const editor = make('First.\n\nSecond.');
     // Start of "Second."
     select(editor, 9);
     press(editor, 'Backspace');
-    expect(md(editor)).toBe('First.Second.\n');
+    expect(md(editor)).toBe('First.\n\n::: {change=del}\nSecond.\n:::\n');
+    // The cursor is at the end of "First.", so the next Backspace strikes its full stop.
+    expect(editor.state.selection.from).toBe(7);
+    backspace(editor);
+    expect(md(editor)).toBe('First[.]{.del}\n\n::: {change=del}\nSecond.\n:::\n');
+  });
+
+  it('Delete at the end of a paragraph strikes the break after it', () => {
+    setSuggesting(true);
+    const editor = make('First.\n\nSecond.');
+    select(editor, 7);
+    press(editor, 'Delete');
+    expect(md(editor)).toBe('First.\n\n::: {change=del}\nSecond.\n:::\n');
+  });
+
+  it('joining back a paragraph you split yourself just joins it', () => {
+    setSuggesting(true);
+    const editor = make('First. Second.');
+    select(editor, 8);
     press(editor, 'Enter');
-    expect(md(editor)).toBe('First.\n\nSecond.\n');
+    press(editor, 'Backspace');
+    expect(md(editor)).toBe('First. Second.\n');
+    expect(hasChanges(editor.state.doc)).toBe(false);
+  });
+
+  it('deleting across two paragraphs strikes the words and the break', () => {
+    setSuggesting(true);
+    const editor = make('First.\n\nSecond.');
+    // "st." and "Sec"
+    select(editor, 4, 12);
+    backspace(editor);
+    expect(md(editor)).toBe('Fir[st.]{.del}\n\n::: {change=del}\n[Sec]{.del}ond.\n:::\n');
+    const accepted = make(md(editor));
+    settleAll(accepted.view, true);
+    expect(md(accepted)).toBe('Firond.\n');
+    const rejected = make(md(editor));
+    settleAll(rejected.view, false);
+    expect(md(rejected)).toBe('First.\n\nSecond.\n');
+  });
+
+  it('a new paragraph typed in comes out whole when rejected', () => {
+    setSuggesting(true);
+    const editor = make('First.');
+    press(editor, 'Enter');
+    type(editor, 'More.');
+    expect(md(editor)).toBe('First.\n\n::: {change=ins}\n[More.]{.ins}\n:::\n');
+    const saved = md(editor);
+    expect(serializeMarkdown(parseMarkdown(saved))).toBe(saved);
+    const rejected = make(saved);
+    settleAll(rejected.view, false);
+    expect(md(rejected)).toBe('First.\n');
+    const accepted = make(saved);
+    settleAll(accepted.view, true);
+    expect(md(accepted)).toBe('First.\n\nMore.\n');
+  });
+
+  it('marks bold and italic as a formatting change, remembering the old look', () => {
+    setSuggesting(true);
+    const editor = make('Salt the *soup*.');
+    select(editor, 10, 14);
+    editor.commands.toggleMark('bold');
+    expect(md(editor)).toBe('Salt the [***soup***]{.fmt was="*i"}.\n');
+    // Taking the bold off again leaves nothing to review.
+    editor.commands.toggleMark('bold');
+    expect(md(editor)).toBe('Salt the *soup*.\n');
+    expect(hasChanges(editor.state.doc)).toBe(false);
+  });
+
+  it('accepts and rejects a formatting change', () => {
+    const doc = 'Salt the [**soup**]{.fmt}.';
+    const accepted = make(doc);
+    expect(settleAll(accepted.view, true)).toBe(1);
+    expect(md(accepted)).toBe('Salt the **soup**.\n');
+    const rejected = make(doc);
+    settleAll(rejected.view, false);
+    expect(md(rejected)).toBe('Salt the soup.\n');
+    const back = make('Salt the [**soup**]{.fmt was="*i"}.');
+    settleAll(back.view, false);
+    expect(md(back)).toBe('Salt the *soup*.\n');
+  });
+
+  it('formatting your own new words is not a change of its own', () => {
+    setSuggesting(true);
+    const editor = make('Salt.');
+    type(editor, ' Stir');
+    select(editor, 6, 11);
+    editor.commands.toggleMark('italic');
+    expect(md(editor)).toBe('Salt.[ *Stir*]{.ins}\n');
+  });
+
+  it('marks a new paragraph style and puts the old one back on reject', () => {
+    setSuggesting(true);
+    const editor = make('A title');
+    select(editor, 2);
+    editor.commands.updateAttributes('paragraph', { style: 'chapter-title' });
+    const saved = md(editor);
+    expect(saved).toBe('::: {.chapter-title was="body"}\nA title\n:::\n');
+    expect(serializeMarkdown(parseMarkdown(saved))).toBe(saved);
+    const rejected = make(saved);
+    settleAll(rejected.view, false);
+    expect(md(rejected)).toBe('A title\n');
+    const accepted = make(saved);
+    settleAll(accepted.view, true);
+    expect(md(accepted)).toBe('# A title\n');
   });
 
   it('one undo takes back the change and its marks together', () => {
@@ -206,6 +317,17 @@ describe('counts and exports', () => {
     const editor = make('one [two three]{.del} four [five]{.ins}');
     expect(docWords(editor.state.doc)).toBe(3);
     expect(plainText('one [two three]{.del} four')).toBe('one  four');
+  });
+
+  it('settles breaks, formatting and styles without an editor, the same as on the page', () => {
+    const doc = 'Fir[st.]{.del}\n\n::: {.chapter-title change=del was="body"}\n[Sec]{.del}ond [**now**]{.fmt}.\n:::\n\n::: {change=ins}\n[More.]{.ins}\n:::';
+    for (const accept of [true, false]) {
+      const editor = make(doc);
+      settleAll(editor.view, accept);
+      expect(serializeMarkdown(settledJSON(parseMarkdown(doc), accept))).toBe(md(editor));
+    }
+    expect(hasChangesJSON(parseMarkdown(doc))).toBe(true);
+    expect(hasChangesJSON(settledJSON(parseMarkdown(doc), true))).toBe(false);
   });
 
   it('exports the text as if every change were accepted', () => {

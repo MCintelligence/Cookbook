@@ -254,7 +254,7 @@ describe('import', () => {
     expect(got).toEqual({ title: 'Porch', body: '# Part One\n\nHot *night*.\n' });
   });
 
-  it('reads Word files from other apps: tracked deletions, tables and empty paragraphs', () => {
+  it('reads Word files from other apps: tracked deletions (kept as suggestions), tables and empty paragraphs', () => {
     const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
     const doc = `<?xml version="1.0"?><w:document ${W}><w:body>
 <w:p><w:r><w:rPr><w:i/></w:rPr><w:t>Kept</w:t></w:r><w:del><w:r><w:t>gone</w:t></w:r></w:del><w:r><w:rPr><w:b w:val="0"/></w:rPr><w:t xml:space="preserve"> words</w:t></w:r></w:p>
@@ -262,11 +262,44 @@ describe('import', () => {
 <w:tbl><w:tr><w:tc><w:p><w:r><w:t>Cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
 </w:body></w:document>`;
     const data = zipSync({ 'word/document.xml': strToU8(doc) });
-    expect(importFile('Draft.DOCX', data)).toEqual({ title: 'Draft', body: '*Kept* words\n\n| Cell |\n| --- |\n' });
+    expect(importFile('Draft.DOCX', data)).toEqual({ title: 'Draft', body: '*Kept*[gone]{.del} words\n\n| Cell |\n| --- |\n' });
   });
 
   it('says plainly what it cannot read', () => {
     expect(() => importFile('cover.png', new Uint8Array())).toThrow(/Word \(\.docx\), Markdown \(\.md\) and plain text/);
     expect(() => importDocx('bad.docx', zipSync({ 'x.txt': strToU8('') }))).toThrow(/no document/);
+  });
+});
+
+describe('tracked changes in Word', () => {
+  const body = 'Salt the [soup]{.del}[stew]{.ins} and [**stir**]{.fmt was="*i"}.\n\n::: {change=del}\nThen serve.\n:::\n\n::: {.chapter-title change=ins was="body"}\nAfter\n:::\n';
+
+  async function changedBook() {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Edits');
+    const p = await createDocument(fs, 'bookshelf', 'Soup');
+    await writeDocument(fs, p, { ...(await readDocument(fs, p)), body });
+    return fs;
+  }
+
+  it('reads as accepted everywhere but Word', async () => {
+    const fs = await changedBook();
+    const m = await collect(fs, 'Edits', await readTree(fs, 'bookshelf'));
+    expect(bookMarkdown(m)).toContain('Salt the stew and **stir**.Then serve.\n\n# After');
+  });
+
+  it('becomes Word tracked changes, and comes back from Word as suggestions', async () => {
+    const fs = await changedBook();
+    const m = await collect(fs, 'Edits', await readTree(fs, 'bookshelf'), true);
+    const docx = bookDocx(m, defaultStyles(), undefined, { name: 'June', date: '2026-11-02T09:00:00Z' });
+    const xml = strFromU8(unzipSync(docx)['word/document.xml']!);
+    expect(new DOMParser().parseFromString(xml, 'application/xml').getElementsByTagName('parsererror')).toHaveLength(0);
+    expect(xml).toContain('<w:del w:id="');
+    expect(xml).toContain('w:author="June" w:date="2026-11-02T09:00:00Z"><w:r><w:delText xml:space="preserve">soup</w:delText>');
+    expect(xml).toContain('<w:ins w:id="');
+    expect(xml).toContain('<w:rPrChange ');
+    expect(xml).toContain('<w:pPrChange ');
+    // The book's title comes first, as a heading.
+    expect(importDocx('Soup.docx', docx).body).toBe('# Edits\n\n' + body);
   });
 });

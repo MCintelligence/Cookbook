@@ -207,11 +207,17 @@ The page itself, its size, margins and indents, is set in **Recipe › Configure
           synopsis: 'Track changes: edits marked to accept or reject later.',
           body: `# Suggesting changes
 
-Turn on Edit › Track changes › **Suggest changes**${k('suggest') ? ` (${k('suggest')})` : ''} and every edit becomes a suggestion. New words are [underlined in colour]{.ins}, and words you delete stay on the page, [struck through]{.del}, until you decide.
+Turn on Edit › Track changes › **Suggest changes**${k('suggest') ? ` (${k('suggest')}${k('suggestAlt') ? ` or ${k('suggestAlt')}` : ''})` : ''} and every edit becomes a suggestion. New words are [underlined in colour]{.ins}, and words you delete stay on the page, [struck through]{.del}, until you decide.
 
-Try it on this sentence: the soup was [very ]{.del}[gloriously ]{.ins}hot.
+Try it on this sentence: the soup was [very ]{.del}[gloriously ]{.ins}hot, and [*thick*]{.fmt}.
 
-Right-click a change to **Accept** or **Reject** it, or use Edit › Track changes to step through them one by one, or accept or reject every change on the page at once. The word **Suggesting** sits in the bottom bar while it is on; click it to stop.
+::: {change=ins}
+Press Enter and the new paragraph gets a ¶ in the margin, like this one. Join two paragraphs with Backspace and they stay apart, with the ¶ struck through. Bold, italics and other formatting get a dotted line, and a new paragraph style a bar in the margin.
+:::
+
+Right-click a change to **Accept** or **Reject** it, or use Edit › Track changes to step through them one by one, or accept or reject every change on the page, or in the whole recipe, at once. The word **Suggesting** sits in the bottom bar while it is on; click it to stop.
+
+Exporting as Word keeps your suggestions as Word’s own tracked changes, and a Word file with tracked changes comes in with them as suggestions.
 
 Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don’t count towards your goals.
 `,

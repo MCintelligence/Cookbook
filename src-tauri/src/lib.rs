@@ -108,36 +108,22 @@ fn read_clipboard() -> Result<ClipboardContents, String> {
     Err("not on this device".into())
 }
 
-/// The font families installed on this computer, by name, for the font menus.
-/// Read straight from the system's font folders, so it works offline and asks nothing.
-/// Names starting with a dot are the system's own hidden fonts on a Mac.
+/// The font families installed on this computer, for the font menus (see fonts.rs).
+/// With `changed_only`, answers nothing when no font was added or removed since
+/// the last ask; `force` reads every font again regardless. Runs off the main thread.
 #[cfg(desktop)]
 #[tauri::command]
-async fn system_fonts() -> Vec<String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let mut db = fontdb::Database::new();
-        db.load_system_fonts();
-        let mut names: Vec<String> = db
-            .faces()
-            .filter_map(|face| {
-                let english = face.families.iter().find(|(_, lang)| *lang == fontdb::Language::English_UnitedStates);
-                english.or(face.families.first()).map(|(name, _)| name.trim().to_string())
-            })
-            .filter(|name| !name.is_empty() && !name.starts_with('.'))
-            .collect();
-        names.sort_by_key(|name| name.to_lowercase());
-        names.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
-        names
-    })
-    .await
-    .unwrap_or_default()
+async fn system_fonts(changed_only: Option<bool>, force: Option<bool>) -> Option<Vec<String>> {
+    let (changed_only, force) = (changed_only.unwrap_or(false), force.unwrap_or(false));
+    tauri::async_runtime::spawn_blocking(move || fonts::installed(changed_only, force)).await.unwrap_or_default()
 }
 
 /// The phone apps keep to Cookbook's own fonts.
 #[cfg(not(desktop))]
 #[tauri::command]
-async fn system_fonts() -> Vec<String> {
-    Vec::new()
+async fn system_fonts(changed_only: Option<bool>, force: Option<bool>) -> Option<Vec<String>> {
+    let _ = (changed_only, force);
+    Some(Vec::new())
 }
 
 /// Puts a save onto the disk itself, then swaps it in: the page has written
@@ -183,6 +169,9 @@ mod durable {
     #[cfg(not(unix))]
     fn sync_folder(_folder: Option<&Path>) {}
 }
+
+#[cfg(desktop)]
+mod fonts;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

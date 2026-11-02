@@ -122,6 +122,10 @@ Put **!** before a word, as in \`!Dragon\`, and its first letter becomes a drop 
 
 Every paragraph has a **paragraph style** (Body, Chapter title, Letter, and any you add), and words inside it can have a **character style** (Strong, Emphasis, Thought…). Pick one from the Format menu, the insert menu or the right-click menu. Change how a style looks once in Recipe Settings › Styles and everything in that style follows. Format › Clear formatting takes direct formatting off.
 
+## Fonts
+
+The Font menu lists Cookbook's own fonts, then the ones installed on your computer. A font you install while Cookbook is open shows up the next time you come back to Cookbook or open a font menu, with no restart. If one is still missing, pick **Refresh fonts** at the bottom of the menu.
+
 ## Footnotes
 
 Insert › Footnote ({key:footnote|no shortcut}) puts a footnote number at the cursor. Footnotes are written at the foot of the page; click a number to change its note.
@@ -305,6 +309,7 @@ Backups go to Cookbook's own folder, on the same disk as your recipes, unless yo
     body: `- **Command palette**: {key:palette|Help › Command palette} and type what you want, such as "oven", "export" or "manual".
 - **Go to an Item, Group or card**: {key:switcher|Edit › Go to an item or card} and type part of its name. A Group opens as one page.
 - **Search**: {key:find|Edit › Search} finds and replaces in the open Item, and lists every other Item and Pantry card that matches. Words match from their start and by stem, so "corn" finds "cornbread" and "run" finds "running".
+- **Search the Shelf**: the field under the Shelf's heading lists the Items whose name or text matches, like the Pantry's search does for cards. Escape empties it.
 - **Parts of the window**: F6 and Shift+F6 go round the toolbar, Shelf, page and panels. {key:goPage|no shortcut} goes to the page, {key:goShelf|no shortcut} the Shelf, {key:goPantry|no shortcut} the Pantry, {key:goSeasonings|no shortcut} Seasonings and {key:goToolbar|no shortcut} the toolbar. Escape in the Shelf or a panel goes back to the page.
 
 Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help. Right-click almost anything for what you can do with it.`,

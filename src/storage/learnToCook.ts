@@ -382,6 +382,7 @@ The fastest way to anything is the **command palette**: ${press(k, 'palette', 'o
 
 - **Go to an Item, a Group or a card**: ${press(k, 'switcher', 'Edit › Go to an item or card')} and type part of its name. A Group opens as one page.
 - **Search** the whole recipe: ${press(k, 'find', 'Edit › Search')}. Replace is there too.
+- **Find an Item on the Shelf** by typing in the search field under its heading.
 - **Move between parts of the window** with F6 and Shift+F6.
 
 Every shortcut is listed, and can be changed, in Help › Keyboard shortcuts.

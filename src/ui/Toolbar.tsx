@@ -5,7 +5,7 @@ import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
 import { dropTakenFormat, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
 import { ColourWheel } from './ColourWheel';
-import { askForSystemFonts, useFontList } from '../systemFonts';
+import { askForSystemFonts, refreshSystemFonts, useFontList } from '../systemFonts';
 import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
 interface Props {
@@ -161,10 +161,11 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         items={fonts}
         current={font}
         disabled={textDisabled}
-        actions={installed.canAsk ? [{ id: 'system', label: 'Show all fonts on this computer…' }] : []}
+        actions={[...(installed.canAsk ? [{ id: 'system', label: 'Show all fonts on this computer…' }] : []), { id: 'refresh', label: 'Refresh fonts' }]}
         missing={(typed) => (installed.complete ? `No font called “${typed}” is on this computer.` : `Cookbook has no font called “${typed}”.`)}
         onPick={(font, keepFocus) => words({ font }, keepFocus)}
-        onAction={() => void askForSystemFonts()}
+        onAction={(id) => void (id === 'refresh' ? refreshSystemFonts(true) : askForSystemFonts())}
+        onOpen={() => void refreshSystemFonts()}
         onCancel={() => editor?.view.focus()}
       />
       <NumberBox
@@ -403,6 +404,7 @@ function NameBox({
   onAction,
   onCreate,
   onCancel,
+  onOpen,
 }: {
   tag?: string;
   label: string;
@@ -420,6 +422,8 @@ function NameBox({
   onAction?: (id: string) => void;
   onCreate?: (name: string) => void;
   onCancel: () => void;
+  /** Called each time the list opens. */
+  onOpen?: () => void;
 }) {
   const currentName = items.find((s) => s.id === current)?.name ?? current;
   const [text, setText] = useState(currentName);
@@ -433,6 +437,12 @@ function NameBox({
   useEffect(() => {
     if (typed === null) setText(currentName);
   }, [currentName, typed]);
+
+  const opened = useRef(onOpen);
+  opened.current = onOpen;
+  useEffect(() => {
+    if (open) opened.current?.();
+  }, [open]);
 
   // Keeps the filled-in part of the name selected, so typing on replaces it.
   useLayoutEffect(() => {

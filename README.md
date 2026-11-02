@@ -244,6 +244,8 @@ Click the recipe's title in the top bar for Your recipes…, to start a new one 
 
 Search in the top bar finds and replaces in the open item, and lists every other item and Pantry card that matches. Words match from their start and by stem, so “corn” finds “cornbread” and “run” finds “running”. The index is SQLite with full-text search, kept in `.cookbook/index.sqlite`; opening a recipe only rereads the files that changed since last time.
 
+The Shelf has a search field under its heading, like the Pantry's: it lists the Shelf's Items whose name or text matches, and the Pantry's search does the same for cards.
+
 ## Project layout
 
 ```

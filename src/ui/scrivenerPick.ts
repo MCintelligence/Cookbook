@@ -1,5 +1,6 @@
 import { isTauri } from '../storage/platform';
-import { type ScrivenerSource, filesSource, folderSource } from '../storage/scrivener';
+import { IS_MAC } from '../shortcuts';
+import { type ScrivenerSource, filesSource, folderSource, zipSource } from '../storage/scrivener';
 
 /**
  * Asks the writer for a Scrivener project. The desktop app and browsers that
@@ -11,10 +12,25 @@ export async function pickScrivener(): Promise<ScrivenerSource | 'files' | null>
   const title = 'Choose the Scrivener project (the .scriv folder, or the folder it’s in)';
   if (isTauri()) {
     const { open } = await import('@tauri-apps/plugin-dialog');
+    const { TauriAdapter } = await import('../storage/tauri');
+    if (IS_MAC) {
+      // On a Mac a .scriv is a package, which looks like a file, and a folder picker greys it out.
+      // So it is picked as a file: the .scriv itself, the .scrivx inside one (where Scrivener isn't
+      // installed, a .scriv is an ordinary folder), or a zipped project.
+      const path = await open({ title: 'Choose the Scrivener project (.scriv), or a zipped one', filters: [{ name: 'Scrivener project', extensions: ['scriv', 'scrivx', 'zip'] }] });
+      if (typeof path !== 'string') return null;
+      if (/\.zip$/i.test(path)) {
+        const { readFile } = await import('@tauri-apps/plugin-fs');
+        const source = zipSource(await readFile(path));
+        if (!source) throw new Error('That zip has no Scrivener project in it.');
+        return source;
+      }
+      const { invoke } = await import('@tauri-apps/api/core');
+      return folderSource(new TauriAdapter(await invoke<string>('open_scrivener', { picked: path })));
+    }
     // Recursive, so the documents inside the project may be read too.
     const path = await open({ directory: true, recursive: true, title });
     if (typeof path !== 'string') return null;
-    const { TauriAdapter } = await import('../storage/tauri');
     return folderSource(new TauriAdapter(path));
   }
   if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {

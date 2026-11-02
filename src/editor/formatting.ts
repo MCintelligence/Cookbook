@@ -1,4 +1,4 @@
-import { Extension, InputRule, Mark, Node, mergeAttributes, textblockTypeInputRule } from '@tiptap/core';
+import { type Editor, Extension, InputRule, Mark, Node, mergeAttributes, textblockTypeInputRule } from '@tiptap/core';
 import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
 import { HEADING_STYLES, QUOTE_STYLE } from './markdown';
@@ -143,6 +143,21 @@ export const PlainMarkRules = Extension.create({
   },
 });
 
+/**
+ * The writer's formatting at the caret (font, size, colour, bold and the rest), to go on with
+ * the next words after a new line, as in Scrivener and Word. A step that changes the page drops
+ * what the caret was holding, so a new paragraph or line break would otherwise start plain.
+ * Marks that end where they are (links, suggested changes) aren't carried, nor anything from
+ * the start of a line, where the words after the caret have their own.
+ */
+export function carriedMarks(editor: Editor): readonly PMMark[] {
+  const { state } = editor;
+  const { $from } = state.selection;
+  const marks = state.storedMarks ?? ($from.parentOffset > 0 ? $from.marks() : []);
+  const keep = new Set(editor.extensionManager.splittableMarks);
+  return marks.filter((m) => keep.has(m.type.name));
+}
+
 export const HardBreak = Node.create({
   name: 'hardBreak',
   inline: true,
@@ -159,7 +174,14 @@ export const HardBreak = Node.create({
     return '\n';
   },
   addKeyboardShortcuts() {
-    const insert = () => this.editor.chain().insertContent({ type: this.name }).run();
+    const insert = () => {
+      const carried = carriedMarks(this.editor);
+      return this.editor
+        .chain()
+        .insertContent({ type: this.name })
+        .command(({ tr }) => (carried.length > 0 && tr.setStoredMarks(carried), true))
+        .run();
+    };
     return { 'Shift-Enter': insert, 'Mod-Enter': insert };
   },
 });

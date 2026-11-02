@@ -13,7 +13,7 @@ import { type AppSettings, type MarkdownRule, getSettings, markdownOn } from '..
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, fontStack } from '../styles/styles';
-import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { DropCaps } from './dropCaps';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
@@ -123,7 +123,13 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const next = this.options.nextStyle(style);
         // A new paragraph in the same style keeps its alignment and spacing, as in Word; a heading's don't carry into Body.
         const reset = next === style ? {} : { align: null, lineSpacing: null };
-        return editor.chain().splitBlock().updateAttributes(this.name, { style: next, ...reset }).run();
+        const carried = carriedMarks(editor);
+        return editor
+          .chain()
+          .splitBlock()
+          .updateAttributes(this.name, { style: next, ...reset })
+          .command(({ tr }) => (carried.length > 0 && tr.setStoredMarks(carried), true))
+          .run();
       },
     };
   },

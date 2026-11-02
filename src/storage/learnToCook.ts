@@ -144,7 +144,7 @@ To join them again, open the first and right-click it on the Shelf: **Merge with
           synopsis: 'A whole Group as one page.',
           body: `# Mise en Place
 
-**Mise en Place** sets out a whole Group on one page. Click a Group’s name on the Shelf (or select it and press Enter) and every Item inside it appears in Shelf order, one after another, with the names of any Groups inside it as dividers. If you clicked **The Shelf** to get here, you are in it now: scroll up and the pages before this one are right there.
+**Mise en Place** sets out a whole Group on one page. Click a Group’s name on the Shelf (or select it and press Enter) and every Item inside it appears in Shelf order, one after another, with a thin line between them. If you clicked **The Shelf** to get here, you are in it now: scroll up and the pages before this one are right there.
 
 Write anywhere. Click into an Item’s text and the cursor lands where you clicked; the arrow keys at the start or end of an Item carry on into the one before or after. Each Item is still its own page on the Shelf, saved, proofread and undone on its own. The bar at the bottom shows the Group’s Items and words.
 

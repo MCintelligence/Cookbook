@@ -138,7 +138,7 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
     id: 'mise',
     title: 'Mise en Place',
     summary: 'A whole Group, or several, as one page.',
-    body: `**Mise en Place** sets out a whole Group on one page. Click a Group's name on the Shelf, or select it and press Enter, and every Item inside it appears in Shelf order, with the names of the Groups inside it as dividers.
+    body: `**Mise en Place** sets out a whole Group on one page. Click a Group's name on the Shelf, or select it and press Enter, and every Item inside it appears in Shelf order, one after another, with a thin line between them.
 
 - **Write anywhere.** Click into an Item's text and the cursor lands where you clicked; the arrow keys at the start or end of an Item carry on into the next. Each Item is still its own file, saved, proofread and undone on its own.
 - **Switch** between the Item you're in on its own page and its whole Group with {key:mise|View › Mise en Place}. The cursor stays where it was.

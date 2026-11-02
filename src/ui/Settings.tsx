@@ -9,7 +9,7 @@ import { ZoomSlider } from './ZoomControl';
 import { type Proofreader } from '../proofread/useProofreader';
 import { RULE_GROUPS } from '../proofread/rules';
 import { DIALECTS, ENGLISHES } from '../proofread/english';
-import { FontOptions, pickFont } from './FontOptions';
+import { FontOptions, lookForNewFonts, pickFont } from './FontOptions';
 import { BODY, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 
 export type SettingsSection = 'general' | 'appearance' | 'writing' | 'saving' | 'shortcuts' | 'updates' | 'page' | 'styles' | 'proofreader' | 'goals';
@@ -768,7 +768,7 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
               </label>
               <label>
                 <span className="set-row-help">Font</span>
-                <select className="set-sel" value={r.font} onChange={(e) => pickFont(e.target.value, (font) => edit({ font }))}>
+                <select className="set-sel" value={r.font} onFocus={lookForNewFonts} onChange={(e) => pickFont(e.target.value, (font) => edit({ font }))}>
                   <FontOptions current={r.font} />
                 </select>
               </label>

@@ -14,3 +14,17 @@ describe('probeFonts', () => {
     expect(probeFonts(['Georgia'], null)).toEqual([]);
   });
 });
+
+describe('refreshSystemFonts', () => {
+  it('does nothing before the fonts were first looked for', async () => {
+    const { refreshSystemFonts } = await import('./systemFonts');
+    await expect(refreshSystemFonts()).resolves.toBeUndefined();
+  });
+
+  it('compares lists name by name', async () => {
+    const { sameNames } = await import('./systemFonts');
+    expect(sameNames(['A', 'B'], ['A', 'B'])).toBe(true);
+    expect(sameNames(['A', 'B'], ['A', 'C'])).toBe(false);
+    expect(sameNames(['A'], ['A', 'B'])).toBe(false);
+  });
+});

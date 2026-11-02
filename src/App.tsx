@@ -2784,7 +2784,7 @@ export function App() {
     const cmd = (id: string, label: string, run: () => void, group = 'Actions', hint?: string, words?: string): PaletteItem => ({ id, label, run, group, hint, words });
     const sections: [SettingsSection, string, string][] = [
       ['general', 'General', 'reopen startup shortcuts mac ctrl'],
-      ['appearance', 'Appearance', 'theme dark light sepia size motion page colour'],
+      ['appearance', 'Appearance', 'theme dark light sepia size motion'],
       ['writing', 'Writing', 'quotes dash markdown drop cap typewriter focus paste @'],
       ['saving', 'Saving and backups', 'backup restore snapshot autosave'],
       ['shortcuts', 'Keyboard shortcuts', 'keys'],

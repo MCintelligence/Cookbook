@@ -284,7 +284,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 **App Settings** stay on this device:
 
 - **General**: About you (your name, your English, what you write, your daily goal and the Seasonings new recipes start with, and Set the Table again), starting up, and how shortcuts are shown.
-- **Appearance**: theme (System, Light, Dark, Sepia), the page colour, text size and motion.
+- **Appearance**: theme (System, Light, Dark, Sepia), text size and motion. The page stays white paper in every theme, so text colours look the same in dark mode as they were picked.
 - **Writing**: curly quotes and dashes, Markdown and each of its rules, @ and / menus, Oven Mode's fade, typewriter scrolling and pasting.
 - **Saving and backups**: how soon a change is saved, backups and where they go, snapshots.
 - **Keyboard shortcuts**: every shortcut, and changing it.

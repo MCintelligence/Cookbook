@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryAdapter } from '../storage/memory';
-import { darkPageColor, defaultStyles, loadStyles, resolveParagraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
+import { defaultStyles, loadStyles, resolveParagraphStyle, saveStyles, stylesToCss, updateParagraphStyle } from './styles';
 
 describe('styles', () => {
   it('fills unset properties from the based-on chain', () => {
@@ -68,17 +68,12 @@ describe('styles', () => {
   });
 });
 
-describe('darkPageColor', () => {
-  it('turns dark ink light and keeps its hue', () => {
-    expect(darkPageColor('#3B2A20')).toBe('#dfcec4');
-    expect(darkPageColor('#111111')).toBe('#e6e6e6');
-  });
-  it('keeps light colours and anything that is not a hex colour', () => {
-    expect(darkPageColor('#f2c46b')).toBe('#f2c46b');
-    expect(darkPageColor('rebeccapurple')).toBe('rebeccapurple');
-  });
-  it('is added for the dark page by stylesToCss', () => {
-    expect(stylesToCss(defaultStyles())).toContain(':root[data-page="dark"] .cb-page p:not([data-style])');
-    expect(stylesToCss(defaultStyles(), '.x', false)).not.toContain('data-page');
+describe('text colours', () => {
+  it('are used as picked, with no dark-page version', () => {
+    const sheet = defaultStyles();
+    sheet.paragraph = sheet.paragraph.map((p) => (p.id === 'body' ? { ...p, color: '#3B2A20' } : p));
+    const css = stylesToCss(sheet);
+    expect(css).toContain('color: #3B2A20');
+    expect(css).not.toContain('data-page');
   });
 });

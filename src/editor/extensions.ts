@@ -12,7 +12,7 @@ import { commandFor } from '../shortcuts';
 import { type AppSettings, type MarkdownRule, getSettings, markdownOn } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
-import { PX_PER_PT, darkPageColor, fontStack } from '../styles/styles';
+import { PX_PER_PT, fontStack } from '../styles/styles';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { DropCaps } from './dropCaps';
 import { FindExtension } from './findPlugin';
@@ -179,7 +179,7 @@ export const TextStyle = Mark.create({
     }
     if (color) {
       // The page's stylesheet picks between these, so the colour reads on a dark page too.
-      css.push(`--ink: ${color}; --ink-dark: ${darkPageColor(color)}`);
+      css.push(`--ink: ${color}`);
       data['data-color'] = color;
     }
     return ['span', { ...data, style: css.join('; ') }, 0];

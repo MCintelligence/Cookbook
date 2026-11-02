@@ -47,44 +47,9 @@ export function PantryPanel({ group, onGroup, query, onQuery, hits, selected, on
           </button>
         </span>
       </div>
-      <label className="panel-search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="6" />
-          <path d="m19.5 19.5-4-4" />
-        </svg>
-        <input
-          type="search"
-          aria-label="Search the Pantry"
-          placeholder="Search names, settings, notes"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && onQuery('')}
-        />
-      </label>
+      <PanelSearch label="Search the Pantry" placeholder="Search names, settings, notes" query={query} onQuery={onQuery} />
       {hits ? (
-        hits.length === 0 ? (
-          <p className="panel-quiet">Nothing in the Pantry matches.</p>
-        ) : (
-          <ul className="tree pantry-results">
-            {hits.map((h) => (
-              <li key={h.path} role="treeitem" aria-selected={selected === h.path}>
-                <button
-                  className="tree-card"
-                  onClick={() => onOpen(h.path)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    onHitMenu(h.path, e.clientX, e.clientY);
-                  }}
-                >
-                  <span className="tree-card-top">
-                    <span className="tree-card-title">{h.title}</span>
-                  </span>
-                  <Snippet text={h.snippet} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )
+        <SearchResults hits={hits} selected={selected} empty="Nothing in the Pantry matches." onOpen={onOpen} onMenu={onHitMenu} />
       ) : (
         <>
           <div className="segmented" role="tablist" aria-label="Pantry groups">
@@ -99,5 +64,65 @@ export function PantryPanel({ group, onGroup, query, onQuery, hits, selected, on
       )}
       {bar}
     </aside>
+  );
+}
+
+/** The search field under a panel's heading; Escape empties it. */
+export function PanelSearch({ label, placeholder, query, onQuery }: { label: string; placeholder: string; query: string; onQuery: (query: string) => void }) {
+  return (
+    <label className="panel-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="6" />
+        <path d="m19.5 19.5-4-4" />
+      </svg>
+      <input
+        type="search"
+        aria-label={label}
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => onQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape' || !query) return;
+          // Only an emptied field keeps Escape; an empty one lets it through to close or go back to the page.
+          e.stopPropagation();
+          onQuery('');
+        }}
+      />
+    </label>
+  );
+}
+
+interface ResultsProps {
+  hits: SearchHit[];
+  selected: string | null;
+  /** Shown when nothing matches. */
+  empty: string;
+  onOpen: (path: string) => void;
+  onMenu: (path: string, x: number, y: number) => void;
+}
+
+/** What a panel's search found: each Item's name and the words around the match. */
+export function SearchResults({ hits, selected, empty, onOpen, onMenu }: ResultsProps) {
+  if (hits.length === 0) return <p className="panel-quiet">{empty}</p>;
+  return (
+    <ul className="tree pantry-results">
+      {hits.map((h) => (
+        <li key={h.path} role="treeitem" aria-selected={selected === h.path}>
+          <button
+            className="tree-card"
+            onClick={() => onOpen(h.path)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onMenu(h.path, e.clientX, e.clientY);
+            }}
+          >
+            <span className="tree-card-top">
+              <span className="tree-card-title">{h.title}</span>
+            </span>
+            <Snippet text={h.snippet} />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

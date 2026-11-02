@@ -185,12 +185,16 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
   display: grid;
   grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr);
   grid-template-rows: 52px auto minmax(0, 1fr) 36px;
-  grid-template-areas: 'top top' 'tools tools' 'side desk' 'foot foot';
+  grid-template-areas: 'top top' 'side tools' 'side desk' 'foot foot';
 }
-/* A side panel takes a column of its own, so the page centres in the space that is left. */
+/*
+ * A side panel takes a column of its own, so the page centres in the space that is left.
+ * The Shelf, the Pantry and Seasonings rise to the top bar's accent line, over the toolbar's row, so
+ * their headings sit level with the toolbar and the toolbar begins where the Shelf ends.
+ */
 .app.drawer-open {
   grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr) 320px;
-  grid-template-areas: 'top top top' 'tools tools tools' 'side desk drawer' 'foot foot foot';
+  grid-template-areas: 'top top top' 'side tools drawer' 'side desk drawer' 'foot foot foot';
 }
 
 /* Top bar */
@@ -247,7 +251,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .chip[aria-pressed='true'] { border-color: transparent; background: var(--accent); color: var(--on-accent); }
 
 /* One-row toolbar: style, font and size, colour, alignment, line spacing */
-.toolbar { grid-area: tools; display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bar); white-space: nowrap; overflow-x: auto; overflow-y: visible; }
+/* Left-aligned, starting where the Shelf ends, so it reads as the editor's own bar and moves with the Shelf's edge. */
+.toolbar { grid-area: tools; display: flex; align-items: center; justify-content: flex-start; gap: 6px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bar); white-space: nowrap; overflow-x: auto; overflow-y: visible; }
 .tb-select { flex: none; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 4px 0 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--field); color: var(--text); font-family: 'Literata', Georgia, serif; font-size: 13px; }
 .tb-select select { height: 26px; border: none; background: transparent; outline: none; font-family: inherit; font-size: 13px; padding-right: 2px; }
 /* The Style and Size boxes take typing, with a list under them like a select's. */
@@ -841,7 +846,7 @@ button.seas-quote:hover { color: var(--accent); }
   .side-toggle { display: inline-flex; }
   .app.side-open .sidebar { display: block; position: fixed; z-index: 8; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); box-shadow: 12px 0 32px rgba(var(--shadow), 0.25); }
   .side-backdrop { display: block; position: fixed; inset: 0; z-index: 7; background: rgba(var(--shadow), 0.25); }
-  .toolbar { justify-content: flex-start; padding: 0 12px; }
+  .toolbar { padding: 0 12px; }
   .topbar { padding: 0 12px; gap: 8px; }
   .brand { display: none; }
   .desk { padding: 16px 8px 48px; }
@@ -869,9 +874,11 @@ button.seas-quote:hover { color: var(--accent); }
 /* ---------- Panels: the Shelf on the left; the Pantry and Seasonings on the right ---------- */
 .panel-h { margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 20px; line-height: 28px; height: 28px; color: var(--text); }
 .sub-h { font-family: 'Nunito', sans-serif; font-weight: 800; font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
-.sidebar { padding: 16px 8px; }
-.shelf-h { padding: 0 8px; margin-bottom: 8px; }
-.panel-head { display: flex; align-items: center; justify-content: space-between; height: 28px; flex: none; }
+.sidebar { padding: 8px 8px 16px; }
+.shelf-h { padding: 0 8px; margin-bottom: 18px; flex: none; }
+/* The Shelf's search lines up with its heading, like the Pantry's. */
+.sidebar > .panel-search { flex: none; margin: 0 8px 10px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; height: 28px; flex: none; margin-bottom: 8px; }
 .panel-tools { display: flex; gap: 2px; }
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 6px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; }
 .icon-btn:hover { color: var(--accent); }
@@ -880,7 +887,7 @@ button.seas-quote:hover { color: var(--accent); }
 
 /* The right panel has its own column (see .app.drawer-open); on a phone it slides over the page. */
 .drawer { grid-area: drawer; align-self: stretch; width: 100%; z-index: 2; display: flex; flex-direction: column; min-height: 0; overflow: auto; background: var(--bar); border-left: 1px solid var(--line); }
-.panel { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.panel { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .panel-list { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .panel-quiet { margin: 4px 2px; font-size: 13px; color: var(--muted); }
 .panel-search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--field); color: var(--faint); }
@@ -1484,3 +1491,8 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 .manual-hit:hover, .manual-hit:focus-visible { background: var(--sidebar); }
 .manual-hit-title { font-weight: 700; font-size: 13px; }
 .manual-hit-text { font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+/* On a narrow window the Shelf waits off screen until its button slides it in (the flex rule above would otherwise show it). */
+@media (max-width: 900px) {
+  .app:not(.focus):not(.side-open) .sidebar { display: none; }
+}

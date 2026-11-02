@@ -276,7 +276,11 @@ File › **Import Scrivener project…** turns a whole Scrivener 2 or 3 project 
 - The **Draft** (Manuscript) goes on the Shelf in Binder order: folders become Groups and documents become Items. A document with documents inside it becomes a Group whose first Item holds its own text.
 - A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Materials. The Trash is left behind.
 - Titles, synopses, status, label colours and Include in Compile come with each document, and so do bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks. Fonts and sizes take your recipe’s look.
-- PDFs, pictures and web pages stay in Scrivener, and Cookbook says how many there were. Document notes, comments and snapshots aren’t brought in yet.`,
+- **Comments** and inline annotations are kept on the words they were on, which are highlighted; right-click one to read it. Linked and inline footnotes become footnotes.
+- Each document’s **notes** from the Inspector go at the end of its Pantry card. A Shelf Item’s or folder’s notes become a card in Materials › Notes from Scrivener, so they never print with your book.
+- **Snapshots** come with their Items, ready to compare or go back to.
+- **Pictures** go on a Materials card, or become the portrait of a Character or Setting. **PDFs**, web pages and other files are kept with the recipe in its files folder, each with a Materials card that names it. Cookbook can’t open a PDF itself yet.
+- Keywords, custom metadata, collections and project notes stay in Scrivener.`,
   },
   {
     id: 'safe',

@@ -155,6 +155,7 @@ import { allPaths, stillThere, topmost } from './ui/selection';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
+import { ShelfSearch } from './ui/ShelfSearch';
 import { UNTRACKED, changesAt, goToChange, hasChanges, setSuggesting, settleAll, settleAt } from './editor/trackChanges';
 import { shrinkPicture } from './ui/pictures';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
@@ -3283,6 +3284,12 @@ export function App() {
   const onEditStyle = useStable(editStyle);
   const onAddStyle = useStable(addStyle);
   const onRenameStyle = useStable((id: string, name: string) => changeSheet(renameParagraphStyle(sheet, id, name)));
+  const onHitMenu = useStable((p: string, x: number, y: number) => rowMenu({ name: baseName(p), path: p, kind: 'file' }, x, y));
+  // The Shelf's search looks only at its own Items; the Pantry has a search of its own.
+  const searchShelf = useCallback(
+    (query: string): SearchHit[] => (index.current?.index.search(query, { limit: 120 }) ?? []).filter((h) => h.path.startsWith(`${BOOKSHELF}/`)).slice(0, 40),
+    [indexVersion],
+  );
   const shelfLive = useMemo(() => (doc && path ? { path, editor } : null), [!!doc, path, editor]);
 
   return (
@@ -3365,7 +3372,7 @@ export function App() {
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
         onContextMenu={(e) => {
           // Rows have their own menu; this one is for the space around them.
-          if ((e.target as Element).closest('[data-tree-path], input, .menu')) return;
+          if ((e.target as Element).closest('[data-tree-path], .pantry-results button, input, .menu')) return;
           e.preventDefault();
           shelfMenu(e.clientX, e.clientY);
         }}
@@ -3377,6 +3384,7 @@ export function App() {
         }}
       >
         <h2 className="panel-h shelf-h">Shelf</h2>
+        <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
         <Tree
           nodes={tree}
           root={BOOKSHELF}
@@ -3399,6 +3407,7 @@ export function App() {
           onOpenGroup={onOpenGroup}
           shownGroups={miseShown?.groups}
         />
+        </ShelfSearch>
         {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
@@ -3505,7 +3514,7 @@ export function App() {
               onOpen={(p) => void select(p)}
               onClose={closePanel}
               onMenu={pantryMenu}
-              onHitMenu={(p, x, y) => rowMenu({ name: baseName(p), path: p, kind: 'file' }, x, y)}
+              onHitMenu={onHitMenu}
               bar={pantryBar()}
             >
               <Tree

@@ -112,7 +112,7 @@ Your writing is kept in **Items**, gathered into **Groups**. A Group can hold It
 
 Click an Item on the Shelf to open it on its own page. Click a Group’s **name** to see every Item in it as one page (more on that two pages down), and click the **arrow** beside the name to open or close the Group.
 
-To add one, use the buttons at the bottom of the Shelf, or File › **New item** and **New group**. A new Item goes beside the one you’re in.
+To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, or open the command palette and type **New item** or **New group**. A new Item goes beside the one you’re in.
 
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.

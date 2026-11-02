@@ -78,7 +78,7 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
     body: `The Shelf on the left holds the recipe's writing: **Items** you write on, gathered into **Groups** that nest as deep as you like (Part One › Chapter 3 › the kitchen scene).
 
 - **Open** an Item by clicking it. Click a Group's **name** to see all of it as one page (see **Mise en Place**), and the arrow beside it to open or close it.
-- **Add** with the buttons at the foot of the Shelf, File › New item ({key:newScene|no shortcut}) or New group. Right-click the Shelf for New item from template: a blank Item, a chapter opener or a letter.
+- **Add** with the buttons at the foot of the Shelf, its right-click menu, or New item ({key:newScene|no shortcut}) and New group in the command palette. Right-click the Shelf for New item from template: a blank Item, a chapter opener or a letter.
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.

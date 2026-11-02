@@ -448,9 +448,19 @@ button.seas-quote:hover { color: var(--accent); }
 .lib-adopt p { margin: 0 0 12px; font-size: 13px; line-height: 1.5; }
 .lib-adopt code { font-size: 12px; background: var(--sidebar); padding: 1px 4px; border-radius: 4px; }
 
-.update { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 auto 14px; max-width: 760px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--card); box-shadow: 0 4px 14px rgba(var(--shadow), 0.12); font-size: 14px; }
-.update-text { flex: 1 1 260px; }
-.update-notes { flex-basis: 100%; margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; color: var(--muted); }
+.update-backdrop { z-index: 70; }
+.update-popup { width: min(560px, 100%); }
+.update-notes { overflow-y: auto; max-height: min(52vh, 480px); padding: 4px 14px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; line-height: 1.55; }
+.update-notes h3 { margin: 14px 0 4px; font-family: 'Fraunces', Georgia, serif; font-size: 16px; font-weight: 600; }
+.update-notes h4, .update-notes h5, .update-notes h6 { margin: 12px 0 2px; font-size: 14px; font-weight: 600; }
+.update-notes p, .update-notes ul, .update-notes ol { margin: 4px 0 8px; }
+.update-notes ul, .update-notes ol { padding-left: 20px; }
+.update-notes li + li { margin-top: 2px; }
+.update-notes hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
+.update-notes code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.update-notes a { color: var(--accent); }
+.update-status { margin: 0; font-size: 13px; color: var(--muted); }
+.update-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .empty { color: var(--muted); }
 .error { position: sticky; top: 0; z-index: 6; flex-shrink: 0; display: flex; align-items: flex-start; gap: 10px; margin: 0 auto 14px; max-width: 760px; padding: 10px 10px 10px 14px; border-radius: 12px; border: 1px solid var(--spelling); background: var(--card); color: var(--text); font-size: 14px; box-shadow: 0 4px 14px rgba(var(--shadow), 0.12); }
 .error > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }

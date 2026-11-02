@@ -137,10 +137,10 @@ import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
-import { checkForUpdates } from './ui/UpdateBanner';
+import { checkForUpdates } from './ui/UpdatePopup';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff, setDialogueFocus } from './editor/seasonings';
 import { type BasicStyle, clearFormatting, isFormatted, toggleCharStyle, toggleFormat } from './editor/extensions';
-import { UpdateBanner } from './ui/UpdateBanner';
+import { UpdatePopup } from './ui/UpdatePopup';
 import { Seasonings } from './ui/Seasonings';
 import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
@@ -3260,7 +3260,6 @@ export function App() {
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
       <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
-        <UpdateBanner beforeRestart={saveEverything} />
         {error && (
           <div role="alert" className="error" title={error}>
             <span>{error.replace(/ \([^]*\)$/, '')}</span>
@@ -3685,6 +3684,7 @@ export function App() {
           onClose={() => setSnapshots(null)}
         />
       )}
+      <UpdatePopup beforeRestart={saveEverything} />
     </div>
   );
 }

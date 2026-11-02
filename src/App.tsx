@@ -2973,10 +2973,7 @@ export function App() {
     {
       label: 'File',
       items: () => [
-        { label: 'New item', hint: keysFor('newScene'), binding: binding('newScene'), disabled: !fs, onPick: () => void addScene() },
-        { label: 'New group', disabled: !fs, onPick: () => void addFolder() },
-        { label: 'New Pantry card', disabled: !fs, onPick: () => void addCard() },
-        { separator: true },
+        // Recipes lead the File menu. New Item, Group and Pantry card live on the Shelf and Pantry.
         { label: 'New Recipe…', onPick: () => (setLibraryNew(true), setLibraryOpen(true)) },
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },

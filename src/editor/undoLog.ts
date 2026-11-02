@@ -5,6 +5,7 @@ import { Step } from '@tiptap/pm/transform';
 import { type StorageAdapter, joinPath } from '../storage/adapter';
 import { HIDDEN_FOLDER } from '../storage/book';
 import { type NodeJSON, parseMarkdown, serializeMarkdown } from './markdown';
+import { trackKey } from './trackChanges';
 
 /**
  * Undo that survives closing a scene or the app.
@@ -98,8 +99,18 @@ export class UndoRecorder {
     this.selectionBefore = this.editor.state.selection.toJSON();
   };
 
-  private after = ({ transaction: tr }: { transaction: Transaction }) => {
+  private after = ({ transaction: tr, appendedTransactions = [] }: { transaction: Transaction; appendedTransactions?: readonly Transaction[] }) => {
     if (this.replaying || !tr.docChanged) return;
+    this.log(tr);
+    // Suggest changes' marks are logged as changes of their own, since whether it was on can't be known on replay.
+    // Other plugins' additions are made again as the log is replayed.
+    for (const extra of appendedTransactions) {
+      if (!extra.docChanged || !extra.getMeta(trackKey)) continue;
+      this.entries.push({ t: extra.time, s: extra.steps.map((s) => s.toJSON()), sel: tr.selection.toJSON(), a: 1 });
+    }
+  };
+
+  private log(tr: Transaction): void {
     const history = tr.getMeta(HISTORY_META) as { redo: boolean } | undefined;
     if (history) this.entries.push(history.redo ? { r: 1 } : { u: 1 });
     else {
@@ -112,7 +123,7 @@ export class UndoRecorder {
       this.entries.push(entry);
     }
     this.version++;
-  };
+  }
 
   /**
    * Starts the editor from a saved log and replays it. `expected` is the
@@ -182,6 +193,8 @@ export class UndoRecorder {
 /** The plugins a replay needs: the undo history, and any that add changes of their own, so the text comes out the same. */
 function replayed(plugin: Plugin): boolean {
   const key = (plugin as unknown as { key: string }).key;
+  // Suggest changes' own additions are in the log already, as changes of their own.
+  if (plugin.spec.key === trackKey) return false;
   return key === HISTORY_META || !!plugin.spec.appendTransaction || !!plugin.spec.filterTransaction;
 }
 

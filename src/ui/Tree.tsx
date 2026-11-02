@@ -29,8 +29,8 @@ interface Props {
   /** Moves `from` to `index` among what `folder` holds now; may settle with where it landed. */
   onMove: (from: string, folder: string, index: number) => void | Promise<string | undefined>;
   onStartRename: (path: string) => void;
-  /** null when the writer cancels. */
-  onRename: (path: string, title: string | null) => void;
+  /** null when the writer cancels. May settle with the row's path after the rename, if it moved. */
+  onRename: (path: string, title: string | null) => void | Promise<string | undefined | void>;
   /** A right-click (or the menu key) on a row, with where to show the menu. */
   onMenu?: (node: TreeNode, x: number, y: number) => void;
   /** Delete or Backspace on a row. */
@@ -157,6 +157,7 @@ export const Tree = memo(function Tree(props: Props) {
   }, [places]);
 
   const rowEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-tree-path="${CSS.escape(p)}"]`) ?? null;
+  const recipeEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-recipe-path="${CSS.escape(p)}"]`) ?? null;
   const rows = () => [...(list.current?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path]') ?? [])];
   const moveTo = (node: TreeNode, to: { folder: string; index: number }) => {
     // Where the row should land; the move itself says for certain, since a name taken in the new Group gets a number.
@@ -169,6 +170,12 @@ export const Tree = memo(function Tree(props: Props) {
     }
     // Once the tree is drawn again with the row in its new place, the keyboard follows it there.
     void Promise.resolve(onMove(node.path, to.folder, to.index)).then((landed) => requestAnimationFrame(() => rowEl(landed ?? guess)?.focus()));
+  };
+
+  const renamed = (p: string, title: string | null, byKey: boolean) => {
+    const settled = Promise.resolve(props.onRename(p, title));
+    // Enter or Escape would otherwise leave focus on nothing once the name box goes; a click elsewhere keeps its own focus.
+    if (byKey) void settled.then((landed) => requestAnimationFrame(() => (rowEl(landed || p) ?? recipeEl(p))?.focus()));
   };
 
   /** The tree's own keys on a row; true when one was used. */
@@ -352,7 +359,7 @@ export const Tree = memo(function Tree(props: Props) {
     return false;
   };
 
-  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged, mark, markKeys, tabStop, cut, setCursor, navigate };
+  const shared: Shared = { ...props, collapsed, toggle, words, drop, dragging: drag?.path ?? null, begin, justDragged, mark, markKeys, tabStop, cut, setCursor, navigate, renamed };
   return (
     <>
       <ul className={`tree${drop?.row === null ? ' drop-end' : ''}${(props.marked?.size ?? 0) > 1 ? ' has-many' : ''}`} role="tree" ref={list} aria-multiselectable={props.onMark ? true : undefined}>
@@ -370,6 +377,8 @@ export const Tree = memo(function Tree(props: Props) {
 });
 
 interface Shared extends Props {
+  /** Ends a rename; from the keyboard, focus goes back to the row so the arrows keep working. */
+  renamed: (path: string, title: string | null, byKey: boolean) => void;
   collapsed: Set<string>;
   toggle: (path: string) => void;
   words: Map<string, number>;
@@ -386,7 +395,7 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; depth: number }) {
-  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate } = shared;
+  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate, renamed } = shared;
   const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
@@ -443,7 +452,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         {renaming === node.path ? (
-          <FolderName name={label} onDone={(title) => onRename(node.path, title)} />
+          <FolderName name={label} onDone={(title, byKey) => renamed(node.path, title, byKey)} />
         ) : (
         <button
           {...rowProps}
@@ -466,7 +475,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
             {own.map((r) => (
               <li role="treeitem" aria-selected={selected === r.path} key={r.path}>
                 {renaming === r.path ? (
-                  <FolderName name={cards.get(r.path)?.title ?? r.title} onDone={(title) => onRename(r.path, title)} />
+                  <FolderName name={cards.get(r.path)?.title ?? r.title} onDone={(title, byKey) => renamed(r.path, title, byKey)} />
                 ) : (
                   <button
                     className="tree-recipe"
@@ -504,7 +513,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
   return (
     <li role="treeitem" aria-expanded={open} aria-selected={shared.onOpenGroup ? shown : undefined} className={dragging === node.path ? 'is-dragging' : undefined}>
       {renaming === node.path ? (
-        <FolderName name={node.name} onDone={(title) => onRename(node.path, title)} />
+        <FolderName name={node.name} onDone={(title, byKey) => renamed(node.path, title, byKey)} />
       ) : (
         <button
           {...rowProps}
@@ -548,13 +557,13 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
   );
 }
 
-function FolderName({ name, onDone }: { name: string; onDone: (title: string | null) => void }) {
+function FolderName({ name, onDone }: { name: string; onDone: (title: string | null, byKey: boolean) => void }) {
   const [text, setText] = useState(name);
   const done = useRef(false);
-  const finish = (title: string | null) => {
+  const finish = (title: string | null, byKey = false) => {
     if (done.current) return;
     done.current = true;
-    onDone(title && title.trim() ? title.trim() : null);
+    onDone(title && title.trim() ? title.trim() : null, byKey);
   };
   return (
     <input
@@ -566,8 +575,15 @@ function FolderName({ name, onDone }: { name: string; onDone: (title: string | n
       onChange={(e) => setText(e.target.value)}
       onBlur={() => finish(text)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') finish(text);
-        else if (e.key === 'Escape') finish(null);
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish(text, true);
+        } else if (e.key === 'Escape') {
+          // Escape only cancels the rename, not the panel or mode around it.
+          e.preventDefault();
+          e.stopPropagation();
+          finish(null, true);
+        }
       }}
     />
   );

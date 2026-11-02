@@ -65,6 +65,8 @@ export interface BookInfo {
   seasonings?: SeasoningsInfo;
   /** Plate mode: how the finished book is set; read with plateOf in plate/settings.ts. */
   plate?: Record<string, unknown>;
+  /** Track changes: what is typed and deleted is marked as a suggestion, to accept or reject later. */
+  suggest?: boolean;
 }
 
 export interface SeasoningsInfo {

@@ -242,6 +242,16 @@ export function darkPageColor(color: string): string {
   return `#${to(r1)}${to(g1)}${to(b1)}`;
 }
 
+/** The Body style's ink; the Sepia theme swaps it for its own (see onSepiaPage). */
+const DEFAULT_INK = '#1C1C1B';
+
+/** A selector list that only applies in the Sepia theme. */
+const onSepiaPage = (selector: string) =>
+  selector
+    .split(',')
+    .map((part) => `:root[data-theme="sepia"] ${part.trim()}`)
+    .join(', ');
+
 /** A selector list that only applies while the page is drawn dark (see settings.ts). */
 const onDarkPage = (selector: string) =>
   selector
@@ -276,6 +286,8 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page', dark = true):
         ` }`,
     );
     darkRules.push(`${onDarkPage(selector)} { color: ${cssValue(darkPageColor(s.color))}; }`);
+    // Sepia's parchment page writes the default black ink in its own chocolate brown.
+    if (s.color.toUpperCase() === DEFAULT_INK) darkRules.push(`${onSepiaPage(selector)} { color: var(--page-text); }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];

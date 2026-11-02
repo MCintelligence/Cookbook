@@ -1,3 +1,4 @@
+import { acceptedJSON } from '../editor/trackChanges';
 import { type StorageAdapter } from '../storage/adapter';
 import { type TreeNode, readDocument } from '../storage/book';
 import { includedInExport } from '../storage/document';
@@ -34,7 +35,7 @@ export async function collect(fs: StorageAdapter, title: string, nodes: TreeNode
         const doc = await readDocument(fs, node.path);
         if (!includedInExport(doc.fields)) continue;
         if (lastWasScene) parts.push({ kind: 'break' });
-        parts.push({ kind: 'scene', title: doc.title, body: withoutNotes(parseMarkdown(doc.body)) });
+        parts.push({ kind: 'scene', title: doc.title, body: withoutNotes(acceptedJSON(parseMarkdown(doc.body))) });
         lastWasScene = true;
       }
     }

@@ -78,7 +78,7 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
     body: `The Shelf on the left holds the recipe's writing: **Items** you write on, gathered into **Groups** that nest as deep as you like (Part One › Chapter 3 › the kitchen scene).
 
 - **Open** an Item by clicking it. Click a Group's **name** to see all of it as one page (see **Mise en Place**), and the arrow beside it to open or close it.
-- **Add** with the buttons at the foot of the Shelf, File › New item ({key:newScene|no shortcut}) or New group. Right-click the Shelf for New item from template: a blank Item, a chapter opener or a letter.
+- **Add** with the buttons at the foot of the Shelf, its right-click menu, or New item ({key:newScene|no shortcut}) and New group in the command palette. Right-click the Shelf for New item from template: a blank Item, a chapter opener or a letter.
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
@@ -138,7 +138,7 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
     id: 'mise',
     title: 'Mise en Place',
     summary: 'A whole Group, or several, as one page.',
-    body: `**Mise en Place** sets out a whole Group on one page. Click a Group's name on the Shelf, or select it and press Enter, and every Item inside it appears in Shelf order, with the names of the Groups inside it as dividers.
+    body: `**Mise en Place** sets out a whole Group on one page. Click a Group's name on the Shelf, or select it and press Enter, and every Item inside it appears in Shelf order, one after another, with a thin line between them.
 
 - **Write anywhere.** Click into an Item's text and the cursor lands where you clicked; the arrow keys at the start or end of an Item carry on into the next. Each Item is still its own file, saved, proofread and undone on its own.
 - **Switch** between the Item you're in on its own page and its whole Group with {key:mise|View › Mise en Place}. The cursor stays where it was.
@@ -146,6 +146,26 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 - **An empty Group** opens as an empty page. Start typing and a new Item is made in it; Undo takes it away again.
 
 Long Groups load as you scroll. The bottom bar shows the Group's Items and words. To go back to one Item, click it on the Shelf.`,
+  },
+  {
+    id: 'changes',
+    title: 'Track changes',
+    summary: 'Suggest edits, then accept or reject them.',
+    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} and every edit becomes a suggestion instead of going straight in:
+
+- **New words** are underlined in the accent colour.
+- **Deleted words** stay on the page, struck through, until you decide. Backspace walks back over them, so you can keep deleting.
+- Deleting words you suggested yourself just takes them out.
+
+Suggest changes is set for the whole recipe, so every Item follows it, and the word **Suggesting** sits in the bottom bar while it is on. Click it to stop.
+
+## Accepting and rejecting
+
+Right-click a change for **Accept change** or **Reject change**. Edit › **Track changes** also has Next change and Previous change, and Accept all or Reject all on this page. With text selected, Accept and Reject work on every change inside it. Undo takes back any of them.
+
+Only words are tracked for now. Enter and Backspace still split and join paragraphs, and formatting and styles change straight away.
+
+Plate, Serve and exports show the text as if every change were accepted, and words waiting to be deleted don't count towards your goals or word counts.`,
   },
   {
     id: 'pantry',

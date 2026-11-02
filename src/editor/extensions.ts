@@ -21,6 +21,7 @@ import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
 import { Brainstorm } from './brainstorm';
+import { TrackChanges } from './trackChanges';
 import { DialogueFocus, Footnote, Note, SeasoningChecks, type SeasoningsRequest, insertFootnote } from './seasonings';
 
 /** Where Enter goes next: each paragraph style names its follower. */
@@ -488,6 +489,8 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Code,
     Link,
     PlainMarkRules,
+    // Its marks read Cookbook's own <ins> and <del> before Strike reads <del>.
+    TrackChanges,
     HardBreak,
     whenOn(CodeBlock, 'codeBlock'),
     Image,

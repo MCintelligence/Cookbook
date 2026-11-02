@@ -158,7 +158,7 @@ export const THEMES: { id: Theme; label: string; bg: string; side: string; page:
   { id: 'system', label: 'System', bg: 'linear-gradient(90deg, #f4f4f2 50%, #121212 50%)', side: '#a3a39e', page: '#fdfdfc' },
   { id: 'light', label: 'Light', bg: '#f4f4f2', side: '#f1f1ef', page: '#fdfdfc' },
   { id: 'dark', label: 'Dark', bg: '#121212', side: '#161616', page: '#1f1f1f' },
-  { id: 'sepia', label: 'Sepia', bg: '#ead9bb', side: '#e4d0ad', page: '#f5e8cf' },
+  { id: 'sepia', label: 'Sepia', bg: '#201b17', side: '#231e19', page: '#efe6d6' },
 ];
 
 const CHECK_HELP: Record<string, string> = {

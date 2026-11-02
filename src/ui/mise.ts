@@ -1,8 +1,8 @@
 import { type TreeNode } from '../storage/book';
 
 /**
- * Mise en Place: a Group's Items joined into one page, in Shelf order, with the
- * names of the Groups inside it as dividers. These are the parts that need no screen.
+ * Mise en Place: a Group's Items joined into one page, in Shelf order. Group names are
+ * kept as entries (read out by screen readers, used to open at a Group) but not drawn. These are the parts that need no screen.
  */
 export type MiseEntry =
   | { type: 'group'; path: string; name: string; depth: number }

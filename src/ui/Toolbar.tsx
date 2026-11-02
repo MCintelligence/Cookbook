@@ -224,7 +224,6 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         <StyleName initial={naming === 'rename' ? named : `${named} 2`} label={naming === 'rename' ? `Rename ${named}` : `New style based on ${named}`} onDone={finishNaming} />
       ) : (
         <NameBox
-          tag="Style"
           label="Paragraph style"
           listLabel="Styles"
           className="tb-style"
@@ -427,7 +426,6 @@ type Choice = { kind: 'item'; id: string; name: string; heading?: string } | { k
  * mouse wheel over the box moves to the name above or below.
  */
 function NameBox({
-  tag,
   label,
   listLabel,
   className,
@@ -443,7 +441,6 @@ function NameBox({
   onCancel,
   onOpen,
 }: {
-  tag?: string;
   label: string;
   listLabel: string;
   className: string;
@@ -535,7 +532,6 @@ function NameBox({
   return (
     <div className="tb-pop">
       <div ref={box} className={`tb-select ${className} tb-combo${open && typed !== null && !matches.length ? ' tb-invalid' : ''}`} title={title}>
-        {tag && <span className="tb-tag">{tag}</span>}
         <input
           ref={input}
           role="combobox"

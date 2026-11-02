@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, setSettings } from '../settings';
 import { Editor } from '@tiptap/core';
-import { cookbookExtensions, toggleCharStyle } from './extensions';
+import { cookbookExtensions, setTextFormat, textFormatAt, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
 import { EditorState } from '@tiptap/pm/state';
@@ -310,5 +310,65 @@ describe('tables', () => {
     editor.commands.setTextSelection(1);
     editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
     expect(editor.state.doc.childCount).toBe(3);
+  });
+});
+
+describe('the writer’s own font, size and colour', () => {
+  /** The font of each paragraph's words, in order ('' for none). */
+  const fonts = (editor: Editor) => {
+    const out: string[] = [];
+    editor.state.doc.forEach((block) => {
+      let font = '';
+      block.descendants((n) => {
+        const m = n.marks.find((k) => k.type.name === 'textStyle');
+        if (n.isText) font = (m?.attrs.font as string | null) ?? '';
+      });
+      out.push(font);
+    });
+    return out;
+  };
+
+  it('carries on into the next paragraph after Enter', () => {
+    const editor = make('');
+    setTextFormat(editor, { font: 'Caudex', size: 14 });
+    type(editor, 'One');
+    press(editor, 'Enter');
+    type(editor, 'Two');
+    expect(fonts(editor)).toEqual(['Caudex', 'Caudex']);
+    expect(textFormatAt(editor)).toMatchObject({ font: 'Caudex', size: 14 });
+  });
+
+  it('is kept when Enter is pressed before typing anything, and across blank lines', () => {
+    const editor = make('Plain');
+    setTextFormat(editor, { font: 'Caudex' });
+    press(editor, 'Enter');
+    press(editor, 'Enter');
+    type(editor, 'Fancy');
+    expect(fonts(editor)).toEqual(['', '', 'Caudex']);
+  });
+
+  it('follows a heading into the Body paragraph after it', () => {
+    const editor = make('# Chapter');
+    setTextFormat(editor, { color: '#aa3300' });
+    press(editor, 'Enter');
+    type(editor, 'Text');
+    const last = editor.state.doc.lastChild!;
+    expect(last.attrs.style).not.toBe('chapter-title');
+    expect(last.firstChild!.marks.find((m) => m.type.name === 'textStyle')?.attrs.color).toBe('#aa3300');
+  });
+
+  it('carries on in a list and after Shift+Enter', () => {
+    const editor = make('- item');
+    setTextFormat(editor, { font: 'Caudex' });
+    type(editor, 'x');
+    press(editor, 'Enter');
+    type(editor, 'y');
+    press(editor, 'Shift-Enter');
+    type(editor, 'z');
+    const texts: string[] = [];
+    editor.state.doc.descendants((n) => {
+      if (n.isText && n.text !== 'item') texts.push(`${n.text}:${n.marks.find((m) => m.type.name === 'textStyle')?.attrs.font ?? ''}`);
+    });
+    expect(texts).toEqual(['x:Caudex', 'y:Caudex', 'z:Caudex']);
   });
 });

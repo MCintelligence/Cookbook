@@ -61,6 +61,8 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
   // Naming a new style, or renaming the current one, takes the Style menu's place.
   const [naming, setNaming] = useState<'new' | 'rename' | null>(null);
   const [open, setOpen] = useState<'colour' | 'align' | null>(null);
+  const [openTucked, setOpenTucked] = useState(false);
+  const [more, setMore] = useState(false);
 
   // A paragraph in a style the book no longer has is edited as Body, which is how it looks.
   const styleId = current && sheet.paragraph.some((s) => s.id === current) ? current : BODY_STYLE;
@@ -126,6 +128,96 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
     editor?.view.focus();
   };
 
+  // Colour, alignment and line spacing: in the bar when there is room, else under the More button.
+  // `tucked` is the copy under More; only one of the two is ever on screen.
+  const paragraphTools = (tucked: boolean) => {
+    // Each copy opens its own pop-ups, so the hidden copy never closes the other's on a click.
+    const shown = (pop: 'colour' | 'align') => open === pop && openTucked === tucked;
+    const toggle = (pop: 'colour' | 'align') => {
+      setOpenTucked(tucked);
+      setOpen(shown(pop) ? null : pop);
+    };
+    return (
+      <>
+        <Pop
+          open={shown('colour')}
+          onClose={close}
+          button={
+            <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={shown('colour')} title="Text colour" disabled={textDisabled} onClick={() => toggle('colour')}>
+              <span className="tb-wheel" aria-hidden="true" />
+              <span className="tb-ink" style={{ '--ink': color } as CSSProperties} aria-hidden="true" />
+              <Chevron />
+            </button>
+          }
+        >
+          <div className="tb-popover tb-colour" role="dialog" aria-label="Text colour">
+            <ColourWheel
+              value={color}
+              onPick={(color) => words({ color }, true)}
+              onAutomatic={() => {
+                // Back to the style's colour.
+                words({ color: null }, true);
+                close();
+              }}
+            />
+          </div>
+        </Pop>
+        <Pop
+          open={shown('align')}
+          onClose={close}
+          button={
+            <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={shown('align')} title="Alignment" disabled={disabled} onClick={() => toggle('align')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d={alignment.lines} />
+              </svg>
+              <Chevron />
+            </button>
+          }
+        >
+          <div className="tb-popover tb-menu" role="menu" aria-label="Alignment">
+            {ALIGNMENTS.map((a) => (
+              <button
+                key={a.value}
+                role="menuitemradio"
+                aria-checked={align === a.value}
+                onClick={() => {
+                  // Picking the style's own alignment takes the paragraph's off, so it follows the style again.
+                  paragraphs({ align: a.value === style.align ? null : a.value });
+                  setOpen(null);
+                  if (tucked) setMore(false);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d={a.lines} />
+                </svg>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </Pop>
+        <NumberBox
+          label="Line spacing"
+          listLabel="Line spacings"
+          className="tb-spacing"
+          title="Line spacing"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />
+            </svg>
+          }
+          value={lineSpacing}
+          presets={SPACINGS}
+          disabled={disabled}
+          parse={parseSpacing}
+          step={stepSpacing}
+          invalid={`Type a spacing from ${MIN_SPACING} to ${MAX_SPACING}.`}
+          onValue={(spacing, keepFocus) => paragraphs({ lineSpacing: spacing === style.lineSpacing ? null : spacing }, keepFocus)}
+          onCancel={() => editor?.view.focus()}
+        />
+      </>
+    );
+  };
+
   return (
     <div role="toolbar" aria-label="Paragraph style" className="toolbar">
       {naming ? (
@@ -183,81 +275,26 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
         onValue={(size, keepFocus) => words({ size }, keepFocus)}
         onCancel={() => editor?.view.focus()}
       />
-      <span className="tb-sep" />
+      <span className="tb-sep tb-para-sep" />
+      <div className="tb-para">{paragraphTools(false)}</div>
+      {/* When the panels leave the bar too little room, colour, alignment and spacing wait under one button. */}
       <Pop
-        open={open === 'colour'}
-        onClose={close}
+        open={more}
+        onClose={() => setMore(false)}
         button={
-          <button className="tb-select tb-button" aria-label="Text colour" aria-haspopup="dialog" aria-expanded={open === 'colour'} title="Text colour" disabled={textDisabled} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
-            <span className="tb-wheel" aria-hidden="true" />
-            <span className="tb-ink" style={{ '--ink': color } as CSSProperties} aria-hidden="true" />
-            <Chevron />
-          </button>
-        }
-      >
-        <div className="tb-popover tb-colour" role="dialog" aria-label="Text colour">
-          <ColourWheel
-            value={color}
-            onPick={(color) => words({ color }, true)}
-            onAutomatic={() => {
-              // Back to the style's colour.
-              words({ color: null }, true);
-              close();
-            }}
-          />
-        </div>
-      </Pop>
-      <Pop
-        open={open === 'align'}
-        onClose={close}
-        button={
-          <button className="tb-select tb-button" aria-label={`Alignment: ${alignment.label}`} aria-haspopup="menu" aria-expanded={open === 'align'} title="Alignment" disabled={disabled} onClick={() => setOpen(open === 'align' ? null : 'align')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d={alignment.lines} />
+          <button className="tb-select tb-button tb-more" aria-label="More formatting" aria-haspopup="dialog" aria-expanded={more} title="Colour, alignment and spacing" onClick={() => setMore(!more)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
             </svg>
-            <Chevron />
           </button>
         }
       >
-        <div className="tb-popover tb-menu" role="menu" aria-label="Alignment">
-          {ALIGNMENTS.map((a) => (
-            <button
-              key={a.value}
-              role="menuitemradio"
-              aria-checked={align === a.value}
-              onClick={() => {
-                // Picking the style's own alignment takes the paragraph's off, so it follows the style again.
-                paragraphs({ align: a.value === style.align ? null : a.value });
-                setOpen(null);
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d={a.lines} />
-              </svg>
-              {a.label}
-            </button>
-          ))}
+        <div className="tb-popover tb-more-pop" role="dialog" aria-label="More formatting">
+          {paragraphTools(true)}
         </div>
       </Pop>
-      <NumberBox
-        label="Line spacing"
-        listLabel="Line spacings"
-        className="tb-spacing"
-        title="Line spacing"
-        icon={
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M10 6h10M10 12h10M10 18h10M4 8l2-3 2 3M4 16l2 3 2-3" />
-          </svg>
-        }
-        value={lineSpacing}
-        presets={SPACINGS}
-        disabled={disabled}
-        parse={parseSpacing}
-        step={stepSpacing}
-        invalid={`Type a spacing from ${MIN_SPACING} to ${MAX_SPACING}.`}
-        onValue={(spacing, keepFocus) => paragraphs({ lineSpacing: spacing === style.lineSpacing ? null : spacing }, keepFocus)}
-        onCancel={() => editor?.view.focus()}
-      />
     </div>
   );
 });

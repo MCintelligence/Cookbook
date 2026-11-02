@@ -191,9 +191,12 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
  * A side panel takes a column of its own, so the page centres in the space that is left.
  * The Shelf, the Pantry and Seasonings rise to the top bar's accent line, over the toolbar's row, so
  * their headings sit level with the toolbar and the toolbar begins where the Shelf ends.
+ * The right panel's column grows with the window, from 280px to 320px, so on a laptop it leaves the
+ * page and the toolbar their room; App.tsx's drawerWidth() matches it.
  */
+.app { --drawer-w: clamp(280px, 24vw, 320px); }
 .app.drawer-open {
-  grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr) 320px;
+  grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr) var(--drawer-w);
   grid-template-areas: 'top top top' 'side tools drawer' 'side desk drawer' 'foot foot foot';
 }
 
@@ -264,6 +267,28 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .tb-font input { width: 112px; }
 .tb-size input { width: 34px; }
 .tb-spacing input { width: 34px; }
+.tb-para { flex: none; display: flex; align-items: center; gap: 6px; }
+.tb-more { display: none; }
+.tb-more-pop { display: flex; align-items: center; gap: 6px; padding: 6px; }
+/*
+ * When the Shelf and a right panel leave the bar less room, it tightens in steps rather than
+ * scrolling: first the Style tag goes and the boxes narrow, then colour, alignment and spacing
+ * wait under a More button. The widths are what each step needs, at 13px.
+ */
+.toolbar { container: toolbar / inline-size; }
+@container toolbar (max-width: 780px) {
+  .tb-style:not(.tb-naming) .tb-tag { display: none; }
+  .tb-style input { width: 136px; }
+  .tb-font input { width: 96px; }
+}
+@container toolbar (max-width: 660px) {
+  .tb-para, .tb-para-sep { display: none; }
+  .tb-more { display: flex; }
+}
+@container toolbar (max-width: 470px) {
+  .tb-style input { width: 104px; }
+  .tb-font input { width: 80px; }
+}
 .tb-combo-open { display: flex; align-items: center; justify-content: center; width: 18px; height: 24px; padding: 0; border: none; border-radius: 4px; background: transparent; }
 .tb-combo-open:hover:not(:disabled) { background: var(--sidebar); }
 .tb-combo input:disabled { opacity: 0.5; }

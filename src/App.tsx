@@ -177,8 +177,8 @@ const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Se
 const SetTheTable = lazy(() => import('./ui/SetTheTable').then((m) => ({ default: m.SetTheTable })));
 const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.Manual })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
-/** The right-hand panel's column; matches .app.drawer-open in styles.css. */
-const DRAWER_WIDTH = 320;
+/** The right-hand panel's column; matches --drawer-w in styles.css. */
+const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
 /** The desktop app on a Mac, whose menus go in the system's menu bar at the top of the screen. */
@@ -3127,7 +3127,7 @@ export function App() {
   const pageSize = PAGE_SIZES[page.size];
   // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft. A side panel takes
   // its own column beside the desk, but opening one shouldn't switch the page between views.
-  const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? DRAWER_WIDTH : 0;
+  const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? drawerWidth() : 0;
   const small = deskWidth > 0 && deskWidth + panelColumn < 640;
   const asDraft = page.view === 'draft' || small;
   const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];

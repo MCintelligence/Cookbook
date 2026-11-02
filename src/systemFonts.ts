@@ -12,6 +12,13 @@ import { isTauri } from './storage/platform';
  * - Firefox and Safari: the browser doesn't share the list, so common fonts are
  *   tried one by one and the ones that draw are offered. Safari only answers for
  *   the fonts that come with macOS.
+ *
+ * Fonts installed while Cookbook is open show up without a restart: the list is
+ * looked at again when the window comes back into focus (as it does after
+ * installing a font elsewhere) and when a font menu opens, at most every few
+ * seconds and never twice at once. The desktop app only reads the font files
+ * again when a font folder changed, so most looks cost a few `stat` calls, and
+ * the menus only redraw when the list actually changed.
  */
 export interface FontList {
   /** Installed font names, sorted, without Cookbook's own. */
@@ -51,8 +58,14 @@ function publish(names: string[], complete: boolean, canAsk: boolean): void {
   const system = [...new Set(names.map((n) => n.trim()).filter((n) => n && !n.startsWith('.') && !own.has(n.toLowerCase())))].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: 'base' }),
   );
+  // Same list as before: keep the old object so nothing redraws.
+  if (complete === list.complete && canAsk === list.canAsk && sameNames(system, list.system)) return;
   list = { system, complete, canAsk };
   for (const l of listeners) l();
+}
+
+export function sameNames(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((n, i) => n === b[i]);
 }
 
 /** True when a font draws differently from the browser's own fallbacks, so it is installed. */
@@ -79,14 +92,18 @@ async function fromBrowser(): Promise<string[]> {
   return fonts.map((f) => f.family);
 }
 
-/** Looks for installed fonts once, without asking the writer anything. */
+type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;
+const tauriInvoke = (): Promise<Invoke> => import('@tauri-apps/api/core').then(({ invoke }) => invoke as Invoke);
+
+/** Looks for installed fonts once, without asking the writer anything, and looks again on focus. */
 export function loadSystemFonts(): void {
   if (started || typeof window === 'undefined') return;
   started = true;
+  window.addEventListener('focus', () => void refreshSystemFonts());
   if (isTauri()) {
-    void import('@tauri-apps/api/core')
-      .then(({ invoke }) => invoke<string[]>('system_fonts'))
-      .then((names) => publish(names, true, false))
+    void tauriInvoke()
+      .then((invoke) => invoke<string[] | null>('system_fonts'))
+      .then((names) => publish(names ?? [], true, false))
       .catch(() => publish(probeFonts(COMMON_FONTS), false, false));
     return;
   }
@@ -98,6 +115,45 @@ export function loadSystemFonts(): void {
     ?.query({ name: 'local-fonts' as PermissionName })
     .then((p) => (p.state === 'granted' ? fromBrowser().then((names) => publish(names, true, false)) : undefined))
     .catch(() => {});
+}
+
+/** How long a look at the fonts counts as fresh, so focus and menu opens don't pile up. */
+const FRESH_MS = 3000;
+let lastLook = 0;
+let looking: Promise<void> | null = null;
+
+/**
+ * Looks for fonts installed or removed since the last look, without blocking
+ * anything. Cheap enough to call whenever a font menu opens; repeated calls
+ * within a few seconds share one look. `force` (the "Refresh fonts" item) skips
+ * that wait and, on the desktop, reads every font file again.
+ */
+export function refreshSystemFonts(force = false): Promise<void> {
+  if (typeof window === 'undefined' || !started) return Promise.resolve();
+  if (looking) return looking;
+  if (!force && Date.now() - lastLook < FRESH_MS) return Promise.resolve();
+  lastLook = Date.now();
+  looking = look(force)
+    .catch(() => {})
+    .finally(() => {
+      looking = null;
+    });
+  return looking;
+}
+
+async function look(force: boolean): Promise<void> {
+  if (isTauri()) {
+    const invoke = await tauriInvoke();
+    const names = await invoke<string[] | null>('system_fonts', { changedOnly: true, force });
+    if (names) publish(names, true, false);
+    return;
+  }
+  // The browser said yes before: ask again (it doesn't ask the writer twice).
+  if (list.complete && typeof window.queryLocalFonts === 'function') {
+    publish(await fromBrowser(), true, false);
+    return;
+  }
+  publish(probeFonts(COMMON_FONTS), false, list.canAsk);
 }
 
 /**

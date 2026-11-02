@@ -1,7 +1,8 @@
 import { FONTS } from '../styles/styles';
-import { askForSystemFonts, useFontList } from '../systemFonts';
+import { askForSystemFonts, refreshSystemFonts, useFontList } from '../systemFonts';
 
 const ASK = '\u0000system-fonts';
+const REFRESH = '\u0000refresh-fonts';
 
 /**
  * The options of a font menu: Cookbook's own fonts, then the ones installed on
@@ -31,12 +32,17 @@ export function FontOptions({ current }: { current: string }) {
         </optgroup>
       )}
       {canAsk && <option value={ASK}>Show all fonts on this computer…</option>}
+      <option value={REFRESH}>Refresh fonts</option>
     </>
   );
 }
 
-/** Applies a pick from `FontOptions`, or asks the browser for every installed font. */
+/** Applies a pick from `FontOptions`, or asks the browser for every installed font, or looks again. */
 export function pickFont(value: string, apply: (font: string) => void): void {
   if (value === ASK) void askForSystemFonts();
+  else if (value === REFRESH) void refreshSystemFonts(true);
   else apply(value);
 }
+
+/** Give to a font `<select>` as `onFocus`, so fonts installed since show when it opens. */
+export const lookForNewFonts = () => void refreshSystemFonts();

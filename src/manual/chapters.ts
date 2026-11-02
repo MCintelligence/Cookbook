@@ -122,6 +122,10 @@ Put **!** before a word, as in \`!Dragon\`, and its first letter becomes a drop 
 
 Every paragraph has a **paragraph style** (Body, Chapter title, Letter, and any you add), and words inside it can have a **character style** (Strong, Emphasis, Thought…). Pick one from the Format menu, the insert menu or the right-click menu. Change how a style looks once in Recipe Settings › Styles and everything in that style follows. Format › Clear formatting takes direct formatting off.
 
+## Fonts
+
+The Font menu lists Cookbook's own fonts, then the ones installed on your computer. A font you install while Cookbook is open shows up the next time you come back to Cookbook or open a font menu, with no restart. If one is still missing, pick **Refresh fonts** at the bottom of the menu.
+
 ## Footnotes
 
 Insert › Footnote ({key:footnote|no shortcut}) puts a footnote number at the cursor. Footnotes are written at the foot of the page; click a number to change its note.

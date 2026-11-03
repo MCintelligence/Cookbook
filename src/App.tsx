@@ -815,9 +815,8 @@ export function App() {
     };
   }, [currentDoc, flushSave, saveIndexNow, saveUndoNow]);
 
-  // Whether the desktop window fills the screen, for View › Full screen. It starts full screen on
-  // Windows and Linux (src-tauri/src/lib.rs; a Mac opens zoomed, keeping its title bar), and a Mac's
-  // own Window menu or a double-click on Linux can change it too.
+  // Whether the desktop window fills the screen, for View › Full screen. It starts full screen
+  // (src-tauri/tauri.conf.json), and a Mac's own Window menu or a double-click on Linux can change it too.
   const [fullScreen, setFullScreen] = useState(false);
   useEffect(() => {
     if (!isTauri()) return;

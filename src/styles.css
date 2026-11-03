@@ -902,6 +902,9 @@ button.seas-quote:hover { color: var(--accent); }
   .side-toggle { display: inline-flex; }
   .app.side-open .sidebar { display: flex; position: fixed; z-index: 8; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); box-shadow: 12px 0 32px rgba(var(--shadow), 0.25); }
   .side-backdrop { display: block; position: fixed; inset: 0; z-index: 7; background: rgba(var(--shadow), 0.25); }
+  /* While the Shelf is slid out, the top bar stays above the dimmed page, so a press on Pantry or Seasonings opens it straight away instead of only closing the Shelf. */
+  .app.side-open:not(.focus) .topbar { z-index: 8; }
+  .app.side-open:not(.focus) .sidebar { z-index: 9; }
   .toolbar { padding: 0 12px; }
   .topbar { padding: 0 12px; gap: 8px; }
   .brand { display: none; }

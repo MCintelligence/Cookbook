@@ -485,7 +485,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .mise-item ~ .ms-folder + .mise-item { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--page-line); }
 
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
-.desk { grid-area: desk; overflow: auto; scrollbar-gutter: stable both-edges; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
+.desk { grid-area: desk; overflow: auto; scrollbar-gutter: stable; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: var(--page-text); border: 1px solid var(--page-line); border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 var(--line), 0 12px 28px rgba(var(--shadow), 0.08); }
 .cb-page { position: relative; }
 /* Zooming eases, except under Fit width, which follows the window as it's dragged. */
@@ -899,6 +899,9 @@ button.seas-quote:hover { color: var(--accent); }
   .goals-pop { position: fixed; left: 8px; right: 8px; bottom: 52px; width: auto; }
 }
 @media (max-width: 900px) {
+  /* On a small window, as on a phone, the page scrolls without a scrollbar beside it (trackpad, wheel or keys). */
+  .desk { scrollbar-width: none; scrollbar-gutter: auto; }
+  .desk::-webkit-scrollbar { display: none; }
   /* On a small window or a phone the panel buttons keep their icons and drop their labels, and a long title shortens. */
   .panel-btn { font-size: 0; gap: 0; padding: 0 4px; }
   .crumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

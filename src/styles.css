@@ -174,6 +174,14 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+/*
+ * The window itself never scrolls: only the Shelf, the page and the panels do. On a Mac the app is
+ * drawn under the title bar and pushed down below it, so if the window scrolled even a few pixels
+ * (a hard trackpad scroll on a small window, or the caret being kept in view while typing), the top
+ * bar slid up under the close, minimise and zoom buttons. The app is pinned to the window, and
+ * main.tsx puts back any scroll that still gets through.
+ */
+html, body { overflow: hidden; overscroll-behavior: none; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -185,7 +193,8 @@ button { cursor: pointer; }
 button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 
 .app {
-  height: 100%;
+  position: fixed;
+  inset: 0;
   display: grid;
   grid-template-columns: min(var(--shelf-w, 232px), 50vw) minmax(0, 1fr);
   grid-template-rows: 52px auto minmax(0, 1fr) 36px;
@@ -293,6 +302,13 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
   .tb-style input { width: 104px; }
   .tb-font input { width: 80px; }
 }
+@container toolbar (max-width: 430px) {
+  .tb-style input { width: 84px; }
+  .tb-font input { width: 66px; }
+}
+/* Past the last step the bar still scrolls with a wheel or trackpad, but never shows a scrollbar under the boxes. */
+.toolbar { scrollbar-width: none; }
+.toolbar::-webkit-scrollbar { display: none; }
 .tb-combo-open { display: flex; align-items: center; justify-content: center; width: 18px; height: 24px; padding: 0; border: none; border-radius: 4px; background: transparent; }
 .tb-combo-open:hover:not(:disabled) { background: var(--sidebar); }
 .tb-combo input:disabled { opacity: 0.5; }
@@ -347,7 +363,7 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 .ghost { border: none; background: transparent; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 /* The section label is also the Bookshelf / Pantry / Journal switch. Only the text colour changes. */
 .tree { list-style: none; margin: 0; padding: 0 0 0 12px; }
-.sidebar > .tree { padding-left: 0; padding-bottom: 24px; }
+.sidebar > .tree { padding-left: 0; padding-bottom: 8px; }
 .tree button { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 6px 8px; border-radius: 8px; min-height: 32px; position: relative; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 .tree-folder { flex-direction: row !important; align-items: center; gap: 6px !important; font-weight: 700; }
 .chevron { width: 1em; color: var(--muted); flex: none; }
@@ -478,7 +494,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .mise-item ~ .ms-folder + .mise-item { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--page-line); }
 
 /* The desk and a true-scale page: US Letter at 100% is 816 x 1056 px, 1 in = 96 px, 12 pt = 16 px. */
-.desk { grid-area: desk; overflow: auto; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
+.desk { grid-area: desk; overflow: auto; scrollbar-gutter: stable; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: var(--page-text); border: 1px solid var(--page-line); border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 var(--line), 0 12px 28px rgba(var(--shadow), 0.08); }
 .cb-page { position: relative; }
 /* Zooming eases, except under Fit width, which follows the window as it's dragged. */
@@ -866,6 +882,8 @@ button.seas-quote:hover { color: var(--accent); }
   .app.focus .sidebar, .app.focus .drawer, .app.focus.side-open .sidebar, .app.focus.oven-side .drawer, .app.focus .side-backdrop { transition: none; animation: none; }
 }
 .app.focus { grid-template-columns: 0 1fr !important; }
+/* A small window has one column already (the phone layout); Oven Mode's empty Shelf column would squeeze the top bar, page and footer into nothing and stack them down the window. */
+@media (max-width: 900px) { .app.focus { grid-template-columns: minmax(0, 1fr) !important; } }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
 .oven-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }
 .oven-exit:hover { background: var(--accent); color: var(--on-accent, #fff); }
@@ -882,8 +900,11 @@ button.seas-quote:hover { color: var(--accent); }
 .side-backdrop { display: none; }
 @media (max-width: 900px) {
   .side-toggle { display: inline-flex; }
-  .app.side-open .sidebar { display: block; position: fixed; z-index: 8; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); box-shadow: 12px 0 32px rgba(var(--shadow), 0.25); }
+  .app.side-open .sidebar { display: flex; position: fixed; z-index: 8; top: 0; bottom: 0; left: 0; width: min(320px, 86vw); box-shadow: 12px 0 32px rgba(var(--shadow), 0.25); }
   .side-backdrop { display: block; position: fixed; inset: 0; z-index: 7; background: rgba(var(--shadow), 0.25); }
+  /* While the Shelf is slid out, the top bar stays above the dimmed page, so a press on Pantry or Seasonings opens it straight away instead of only closing the Shelf. */
+  .app.side-open:not(.focus) .topbar { z-index: 8; }
+  .app.side-open:not(.focus) .sidebar { z-index: 9; }
   .toolbar { padding: 0 12px; }
   .topbar { padding: 0 12px; gap: 8px; }
   .brand { display: none; }
@@ -891,9 +912,16 @@ button.seas-quote:hover { color: var(--accent); }
   .footer { padding: 6px 12px; gap: 4px 12px; }
   .goals-pop { position: fixed; left: 8px; right: 8px; bottom: 52px; width: auto; }
 }
-@media (max-width: 600px) {
-  /* On a phone the three panel buttons keep their icons and drop their labels. */
+@media (max-width: 900px) {
+  /* On a small window, as on a phone, the page scrolls without a scrollbar beside it (trackpad, wheel or keys). */
+  .desk { scrollbar-width: none; scrollbar-gutter: auto; }
+  .desk::-webkit-scrollbar { display: none; }
+  /* On a small window or a phone the panel buttons keep their icons and drop their labels, and a long title shortens. */
   .panel-btn { font-size: 0; gap: 0; padding: 0 4px; }
+  .crumb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar > :first-child { min-width: 0; }
+}
+@media (max-width: 600px) {
   .find { position: static; }
   .find-pop { position: fixed; left: 8px; right: 8px; top: 56px; width: auto; }
   .find-bar .btn { height: 32px; }

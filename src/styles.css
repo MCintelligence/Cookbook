@@ -882,6 +882,8 @@ button.seas-quote:hover { color: var(--accent); }
   .app.focus .sidebar, .app.focus .drawer, .app.focus.side-open .sidebar, .app.focus.oven-side .drawer, .app.focus .side-backdrop { transition: none; animation: none; }
 }
 .app.focus { grid-template-columns: 0 1fr !important; }
+/* A small window has one column already (the phone layout); Oven Mode's empty Shelf column would squeeze the top bar, page and footer into nothing and stack them down the window. */
+@media (max-width: 900px) { .app.focus { grid-template-columns: minmax(0, 1fr) !important; } }
 .app.focus .topbar, .app.focus .footer { opacity: 0.35; transition: opacity 0.2s; }
 .oven-exit { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 12px; font-weight: 600; }
 .oven-exit:hover { background: var(--accent); color: var(--on-accent, #fff); }

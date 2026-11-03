@@ -180,6 +180,12 @@ const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
 const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+/** A window narrow enough for the phone layout, where side panels slide over the page (styles.css, 900px). */
+const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches;
+/** Fit width's zoom: the page, plus the desk's 24px sides, fills the desk. */
+const fitZoom = (deskWidth: number, pageInches: number) => Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageInches * 96)));
+/** Below this the page is shown as Draft, since a whole sheet of paper won't fit. */
+const isSmallDesk = (deskWidth: number, panelColumn: number) => deskWidth > 0 && deskWidth + panelColumn < 640;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
 /** The desktop app on a Mac, whose menus go in the system's menu bar at the top of the screen. */
 const MAC_APP = isTauri() && IS_MAC;
@@ -297,7 +303,11 @@ export function App() {
   const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
   panelNow.current = { panel, ovenSide };
   const togglePanel = (p: Panel) => {
-    if (!getSettings().focus) return setPanel((open) => (open === p ? null : p));
+    if (!getSettings().focus) {
+      // On a small window the panels slide over the page, so only one shows at a time.
+      if (narrowWindow()) setSideOpen(false);
+      return setPanel((open) => (open === p ? null : p));
+    }
     // Oven Mode: the panel slides in over the page, or back out if it is the one showing.
     setSideOpen(false);
     if (panelNow.current.ovenSide && panelNow.current.panel === p) return setOvenSide(false);
@@ -805,8 +815,9 @@ export function App() {
     };
   }, [currentDoc, flushSave, saveIndexNow, saveUndoNow]);
 
-  // Whether the desktop window fills the screen, for View › Full screen. It starts full screen
-  // (src-tauri/tauri.conf.json), and a Mac's own Window menu or a double-click on Linux can change it too.
+  // Whether the desktop window fills the screen, for View › Full screen. It starts full screen on
+  // Windows and Linux (src-tauri/src/lib.rs; a Mac opens zoomed, keeping its title bar), and a Mac's
+  // own Window menu or a double-click on Linux can change it too.
   const [fullScreen, setFullScreen] = useState(false);
   useEffect(() => {
     if (!isTauri()) return;
@@ -2588,6 +2599,11 @@ export function App() {
     }
     // On a narrow window the Shelf slides in.
     if (area === 'shelf' && !oven && !areaShown('shelf')) setSideOpen(true);
+    // There, only one side panel shows at a time.
+    if (!oven && narrowWindow()) {
+      if (area === 'shelf') setPanel(null);
+      if (area === 'pantry' || area === 'seasonings') setSideOpen(false);
+    }
     // After React has drawn what was just opened.
     requestAnimationFrame(() => {
       const root = areaRoot(area);
@@ -3121,29 +3137,58 @@ export function App() {
     void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history.get()), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
   // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
   const desk = useRef<HTMLElement>(null);
-  const [deskWidth, setDeskWidth] = useState(0);
-  useEffect(() => {
-    const el = desk.current;
-    if (!el) return;
-    const watch = new ResizeObserver(() => setDeskWidth(el.clientWidth));
-    watch.observe(el);
-    return () => watch.disconnect();
-  }, []);
   const pageSize = PAGE_SIZES[page.size];
   // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft. A side panel takes
   // its own column beside the desk, but opening one shouldn't switch the page between views.
   const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? drawerWidth() : 0;
-  const small = deskWidth > 0 && deskWidth + panelColumn < 640;
+  /*
+   * While the window is being resized, the page keeps up in the same frame: the desk's width goes
+   * straight into the --fit variable that Fit width zooms by, with no re-render of the app. The app
+   * only re-renders when the page switches between Page and Draft, and once the resizing stops
+   * (for the Fit width percentage in the footer). Re-rendering on every frame made the page lag a
+   * frame or more behind the window, most of all on Linux.
+   */
+  const [deskWidth, setDeskWidth] = useState(0);
+  const deskNow = useRef({ pageWidth: pageSize.width, panel: panelColumn, width: 0 });
+  deskNow.current.pageWidth = pageSize.width;
+  deskNow.current.panel = panelColumn;
+  useEffect(() => {
+    const el = desk.current;
+    if (!el) return;
+    let settle: number | undefined;
+    const watch = new ResizeObserver(() => {
+      const now = deskNow.current;
+      const width = el.clientWidth;
+      el.style.setProperty('--fit', String(fitZoom(width, now.pageWidth)));
+      const was = now.width;
+      now.width = width;
+      window.clearTimeout(settle);
+      if (was === 0 || isSmallDesk(was, now.panel) !== isSmallDesk(width, now.panel)) setDeskWidth(width);
+      else settle = window.setTimeout(() => setDeskWidth(el.clientWidth), 120);
+    });
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      window.clearTimeout(settle);
+    };
+  }, []);
+  // A new paper size changes the fit at once, without waiting for the desk to resize.
+  useLayoutEffect(() => {
+    const el = desk.current;
+    if (el && el.clientWidth > 0) el.style.setProperty('--fit', String(fitZoom(el.clientWidth, pageSize.width)));
+  }, [pageSize.width]);
+  const small = isSmallDesk(deskWidth, panelColumn);
   const asDraft = page.view === 'draft' || small;
-  const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) : page.zoom / 100 / UI_ZOOM[settings.size];
-  const fittedZoom = Math.round(Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageSize.width * 96))) * 100);
-  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || fittedZoom, dir) } });
-  const pageStyle =
+  const fitWidth = page.zoom === 0 && !asDraft;
+  const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? fitZoom(deskWidth, pageSize.width) : page.zoom / 100 / UI_ZOOM[settings.size];
+  const fittedZoom = Math.round(fitZoom(deskWidth, pageSize.width) * 100);
+  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || Math.round(fitZoom(desk.current?.clientWidth ?? deskWidth, pageSize.width) * 100), dir) } });
+  const pageStyle: CSSProperties =
     asDraft
       ? { zoom: pageZoom }
-      : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
+      : { zoom: fitWidth ? 'var(--fit)' : pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
   // The cards above the page are as wide as the page itself, at any size and zoom.
-  const cardStyle = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
+  const cardStyle: CSSProperties = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: fitWidth ? `calc(${pageSize.width * 96}px * var(--fit))` : pageSize.width * 96 * pageZoom };
 
   /** The open Item's editor and what goes with it: on its own page, or in its place in Mise en Place. */
   const pageBody = () => {
@@ -3375,6 +3420,8 @@ export function App() {
           <button className="side-toggle" aria-label="Shelf" aria-expanded={sideOpen} onClick={() => {
             setSideOpen(!sideOpen);
             setOvenSide(false);
+            // On a small window the Shelf slides over the page, so the right-hand panel makes way.
+            if (!sideOpen && !settings.focus && narrowWindow()) setPanel(null);
           }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M4 6h16M4 12h16M4 18h16" />
@@ -3409,13 +3456,13 @@ export function App() {
           </span>
         </div>
         <div className="top-actions">
-          <button className="panel-btn" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
+          <button className="panel-btn" title="Pantry" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
             </svg>
             Pantry
           </button>
-          <button className="panel-btn" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
+          <button className="panel-btn" title="Seasonings" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
               <path d="M5 19 13 11" />

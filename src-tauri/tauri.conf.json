@@ -17,7 +17,6 @@
         "height": 820,
         "minWidth": 720,
         "minHeight": 480,
-        "fullscreen": true,
         "dragDropEnabled": false
       }
     ],

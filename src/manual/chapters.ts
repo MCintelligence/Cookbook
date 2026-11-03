@@ -246,7 +246,7 @@ Also in the View menu:
 - **Paper** shows the page as a sheet; **Draft** is a plain column of text. The page's size, margins and indents are in Recipe Settings › Layout.
 - **Zoom**: the percentage in the bottom bar opens a slider; ⌘= and ⌘− (Ctrl+= and Ctrl+−) zoom, ⌘0 (Ctrl+0) goes back to 100%.
 - **Open beside this one** (right-click an Item) shows another Item next to the one you're writing.
-- **Full screen**: the desktop app starts full screen. On Windows and Linux, F11 or View › Full screen switches it; on a Mac, use Window › Enter Full Screen.`,
+- **Full screen**: the desktop app starts full screen on Windows and Linux; on a Mac it fills the screen in a normal window, keeping its title bar. On Windows and Linux, F11 or View › Full screen switches it; on a Mac, use Window › Enter Full Screen.`,
   },
   {
     id: 'goals',

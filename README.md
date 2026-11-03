@@ -153,7 +153,7 @@ The footer also has the zoom (click the percentage for a slider), whether the it
 
 Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
 
-The desktop app opens full screen. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
+The desktop app opens full screen on Windows and Linux, and fills the screen in a normal window on a Mac, so the close, minimise and zoom buttons stay in view. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
 
 Nothing is out of reach in Oven Mode: the Shelf, the Pantry, Seasonings and pinned cards start tucked away and slide in over the page when you want them, without moving the text. Rest the pointer on the left edge of the window (or click it) for the Shelf, or the right edge for the Pantry (Seasonings, if that was the last one open). The Shelf button and the Pantry and Seasonings buttons in the top bar, View › Pantry and Seasonings, ⌘2 to ⌘4 (Ctrl+2 to Ctrl+4) and F6 slide them in too. Click the page, pick an item on the Shelf, or press Escape to tuck them away again; the next Escape leaves Oven Mode. Settings › Appearance › Reduce motion (or your computer's reduce-motion setting) shows them without the slide.
 

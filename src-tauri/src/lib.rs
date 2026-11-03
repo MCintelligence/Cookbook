@@ -217,6 +217,17 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;
+            // The window fills the screen. On a Mac it is zoomed rather than put in full screen, so it
+            // keeps its title bar with the close, minimise and zoom buttons: a Mac full-screen window
+            // hides that bar and slides it down over the app's own top bar when the pointer nears it.
+            // Elsewhere it opens full screen (F11 or View > Full screen leaves it).
+            #[cfg(desktop)]
+            if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
+                #[cfg(target_os = "macos")]
+                window.maximize()?;
+                #[cfg(not(target_os = "macos"))]
+                window.set_fullscreen(true)?;
+            }
             // Signed updates from the project's GitHub releases, on the desktop only;
             // the phone apps update through their stores.
             #[cfg(desktop)]

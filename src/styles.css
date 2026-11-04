@@ -503,8 +503,14 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions { position: absolute; right: 84px; display: flex; gap: 4px; font-family: var(--font-label); z-index: 1; }
 .break-actions button { min-height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(var(--shadow), 0.12); }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.cb-prose { outline: none; -webkit-hyphens: auto; hyphens: auto; min-height: 600px; caret-color: var(--accent); }
+.cb-prose { outline: none; -webkit-hyphens: manual; hyphens: manual; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
+/* Line breaking, as in Scrivener: words wrap whole unless the writer turns hyphenation on in App Settings › Writing,
+   and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
+   Even lines (text-wrap: pretty) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
+   that under ProseMirror's white-space: break-spaces, so it sets pre-wrap, which only lets a space typed at a line's end hang. */
+:root[data-hyphenate] .cb-prose { -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 7 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; -webkit-hyphenate-limit-lines: 2; }
+:root[data-even-lines] .cb-prose { white-space: pre-wrap; text-wrap: pretty; }
 /* !Word: the ! is hidden and the letter is a drop cap at the start of a paragraph, a raised initial anywhere else (see dropCaps.ts). */
 .cb-dropmark { display: none; }
 .cb-dropcap { font-size: 1.6em; line-height: 0; }

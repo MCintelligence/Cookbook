@@ -93,7 +93,7 @@ export function plateCss(s: PlateSettings, scope = '.plate-text'): string {
   const glyph = s.sceneBreak ? JSON.stringify(s.sceneBreak) : '"\\00a0"';
   const cap = (s.lineHeight * 2 + 0.95).toFixed(2);
   return `
-${scope} { font-family: '${s.font}', Georgia, serif; font-size: ${s.size}pt; line-height: ${s.lineHeight}; color: #111; text-align: justify; hyphens: auto; -webkit-hyphens: auto; font-kerning: normal; font-variant-ligatures: common-ligatures; overflow-wrap: break-word; }
+${scope} { font-family: '${s.font}', Georgia, serif; font-size: ${s.size}pt; line-height: ${s.lineHeight}; color: #111; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 7 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; -webkit-hyphenate-limit-lines: 2; text-wrap: pretty; font-kerning: normal; font-variant-ligatures: common-ligatures; overflow-wrap: break-word; }
 ${scope} p { margin: 0; text-indent: 1.5em; }
 ${scope} p.first, ${scope} .scene-break + p, ${scope} p.cont, ${scope} .matter p:first-child { text-indent: 0; }
 ${scope} p.split-end { text-align-last: justify; }
@@ -164,6 +164,35 @@ export function markFirst(html: string): string {
     .replace(/<p class="first"(?=[^>]*>\s*<span class="cb-dropcap cb-dropcap-start">)/, '<p class="first own-cap"');
 }
 
+/** Lines of a paragraph kept together at a page break, at the foot of one page and at the top of the next. */
+const MIN_LINES = 2;
+
+/** Set at the foot of a page with nothing after it, these move over to the next page. */
+function keepWithNext(el: Element): boolean {
+  return el.classList.contains('scene-break') || /^(chapter-title|heading-2|heading-3)$/.test(el.getAttribute('data-style') ?? '');
+}
+
+/**
+ * The bottom of each line of a paragraph as laid out, top to bottom. A raised or dropped capital taller than
+ * the line is left out, so it doesn't count as lines of its own.
+ */
+export function lineBoxes(p: HTMLElement): number[] {
+  const range = document.createRange();
+  range.selectNodeContents(p);
+  const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
+  if (rects.length === 0) return [];
+  const heights = rects.map((r) => r.height).sort((a, b) => a - b);
+  const usual = heights[Math.floor(heights.length / 2)]!;
+  const bands: { top: number; bottom: number }[] = [];
+  for (const r of rects.filter((r) => r.height <= usual * 1.8).sort((a, b) => a.top - b.top)) {
+    const last = bands[bands.length - 1];
+    const overlap = last ? Math.min(last.bottom, r.bottom) - Math.max(last.top, r.top) : 0;
+    if (last && overlap > Math.min(last.bottom - last.top, r.height) / 2) last.bottom = Math.max(last.bottom, r.bottom);
+    else bands.push({ top: r.top, bottom: r.bottom });
+  }
+  return bands.map((b) => b.bottom);
+}
+
 /**
  * Splits text into pages by setting it, block by block, into a box the size of
  * the page's text area inside `host`, and cutting a paragraph at the last line
@@ -198,9 +227,9 @@ export class Paginator {
     this.box.innerHTML = '';
     this.box.style.paddingTop = `${top}px`;
     const finish = () => {
-      // A scene break never ends a page; it moves over to start the next one.
+      // A scene break or a heading never ends a page; it moves over to start the next one, with its text.
       const carry: Node[] = [];
-      while (this.box.lastElementChild?.classList.contains('scene-break') && this.box.childElementCount > 1) carry.unshift(this.box.removeChild(this.box.lastElementChild));
+      while (this.box.lastElementChild && keepWithNext(this.box.lastElementChild) && this.box.childElementCount > 1) carry.unshift(this.box.removeChild(this.box.lastElementChild));
       pages.push(this.box.innerHTML);
       this.box.innerHTML = '';
       top = 0;
@@ -213,7 +242,11 @@ export class Paginator {
       this.box.appendChild(el);
       if (this.box.offsetHeight <= limit + 0.5) continue;
       const alone = this.box.childElementCount === 1 && top === 0;
-      const rest = el.tagName === 'P' && !el.classList.contains('scene-break') ? this.split(el, this.box.getBoundingClientRect().top + limit) : null;
+      const cuttable = el.tagName === 'P' && !el.classList.contains('scene-break');
+      const bottom = this.box.getBoundingClientRect().top + limit;
+      // Widows and orphans: a paragraph is cut so at least two of its lines sit on each page. On a page
+      // of its own, where that can't be done, it is cut wherever it has to be.
+      const rest = cuttable ? (this.split(el, bottom, true) ?? (alone ? this.split(el, bottom, false) : null)) : null;
       if (rest) {
         const carry = finish();
         queue.unshift(...carry, rest);
@@ -231,8 +264,20 @@ export class Paginator {
     return pages;
   }
 
-  /** Cuts a paragraph after its last line above `bottom`, returning the rest as a new paragraph, or null if no line fits. */
-  private split(p: HTMLElement, bottom: number): HTMLElement | null {
+  /**
+   * Cuts a paragraph after its last line above `bottom`, returning the rest as a new paragraph, or null if no line fits.
+   * With `lines` kept, it leaves no lone first line at the foot of the page (an orphan) and no lone last line at the top
+   * of the next (a widow): it cuts a line higher, or returns null so the whole paragraph moves on.
+   */
+  private split(p: HTMLElement, bottom: number, lines: boolean): HTMLElement | null {
+    if (lines) {
+      const boxes = lineBoxes(p);
+      const fit = boxes.filter((b) => b <= bottom + 0.5).length;
+      if (boxes.length === 0) return null;
+      const keep = Math.min(fit, boxes.length - MIN_LINES);
+      if (keep < MIN_LINES) return null;
+      bottom = boxes[keep - 1]!;
+    }
     const texts: Text[] = [];
     const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) texts.push(n as Text);

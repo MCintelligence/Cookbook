@@ -32,6 +32,10 @@ export interface AppSettings {
   reduceMotion: boolean;
   curlyQuotes: boolean;
   emDash: boolean;
+  /** Breaks long words at line ends with a hyphen. Off, as in Scrivener and Word, words wrap whole. */
+  hyphenate: boolean;
+  /** Evens out where lines break so a paragraph doesn't end on a lone word. */
+  evenLines: boolean;
   /** Markdown as a whole: when off, no rule below works, whatever its own switch says. */
   markdown: boolean;
   /** Each Markdown rule on its own (see MARKDOWN_RULES). */
@@ -109,6 +113,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   curlyQuotes: true,
   emDash: true,
+  hyphenate: false,
+  evenLines: true,
   markdown: true,
   markdownRules: allRules(true),
   atShelf: true,
@@ -222,13 +228,15 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** Puts the theme, size and motion settings on the page, where the CSS picks them up. */
+/** Puts the theme, size, motion and line-breaking settings on the page, where the CSS picks them up. */
 export function applyLook(s: AppSettings, root: HTMLElement = document.documentElement): void {
   const systemDark = typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches;
   const theme = s.theme === 'system' ? (systemDark ? 'dark' : 'light') : s.theme;
   root.dataset.theme = theme;
   root.dataset.size = s.size;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
+  root.toggleAttribute('data-hyphenate', s.hyphenate);
+  root.toggleAttribute('data-even-lines', s.evenLines);
   // Sepia frames a light page in dark chrome, so its scrollbars and controls are dark.
   root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#28221D' }[theme];

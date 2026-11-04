@@ -422,6 +422,14 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
               <Switch label="Typing / opens the insert menu" on={s.slashMenu} onChange={(slashMenu) => set({ slashMenu })} />
             </Row>
           </Group>
+          <Group title="Line breaks">
+            <Row title="Hyphenate long words" help="Off, words wrap whole, as in Scrivener. On, only words of 7 letters or more break, with 3 letters either side of the hyphen." words="hyphenation hyphens line breaks">
+              <Switch label="Hyphenate long words" on={s.hyphenate} onChange={(hyphenate) => set({ hyphenate })} />
+            </Row>
+            <Row title="Even out line endings" help="A paragraph doesn’t end on a lone word when a better break is nearby. Plate always keeps lone lines off the top and bottom of a printed page." words="widows orphans short last line wrap">
+              <Switch label="Even out line endings" on={s.evenLines} onChange={(evenLines) => set({ evenLines })} />
+            </Row>
+          </Group>
           <Group title="Markdown">
             <Row
               title="Markdown"

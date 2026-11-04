@@ -21,6 +21,7 @@ import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
 import { Brainstorm } from './brainstorm';
+import { Ghost } from './ghost';
 import { TrackChanges } from './trackChanges';
 import { DialogueFocus, Footnote, Note, SeasoningChecks, type SeasoningsRequest, insertFootnote } from './seasonings';
 
@@ -491,6 +492,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
   return [
     Document,
     Brainstorm.configure({ kind: cardKind }),
+    Ghost,
     Text,
     StyledParagraph.configure({ nextStyle }),
     SceneBreak,

@@ -116,7 +116,7 @@ To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, o
 
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.
-- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, and Move to trash.
+- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, and Move to trash.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
 
 Each Item can carry a **status**: Not started, Simmering or Done. This page is Simmering; Welcome is Done.
@@ -124,6 +124,20 @@ Each Item can carry a **status**: Not started, Simmering or Done. This page is S
 Hover over a Group to see how many words it holds.
 `,
           status: 'simmering',
+        },
+        {
+          title: 'Drafts',
+          synopsis: 'Writing an Item again, with the old version showing through.',
+          body: `# Drafts
+
+Want to write a scene again from scratch? Right-click the Item on the Shelf and choose **Draft this item** (or Recipe › Draft this item, or type **Draft** in the command palette).
+
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: the ghost keeps pace a paragraph at a time, always showing the next paragraph of the old one.
+
+- Draft again and you get **Draft 2**, and so on. Click a draft to have it show through instead.
+- Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
+- Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
+`,
         },
         {
           title: 'Split and merge',
@@ -347,6 +361,7 @@ You can also give an Item a goal of its own; the bottom bar then shows how close
 Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so it opens in any text editor and nothing is locked inside Cookbook.
 
 - **Snapshots** keep earlier versions of one Item. Take one from Recipe › Snapshots of this item, then compare and roll back whenever you like.
+- **Drafts** set an Item’s text aside to write it again, with the old version showing through (see Drafts, under The Shelf).
 - **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. App Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
 - **Trash** keeps whatever you delete until you empty it: File › Trash.
 - **Undo** reaches back past closing the app.

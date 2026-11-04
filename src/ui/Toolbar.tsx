@@ -3,7 +3,7 @@ import { memo, type CSSProperties, type ReactNode, useEffect, useId, useLayoutEf
 import { type Alignment, FONTS, type ParagraphStyle, type StyleSheet, resolveParagraphStyle } from '../styles/styles';
 import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
-import { dropTakenFormat, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
+import { dropTakenFormat, selectedParagraphs, selectionBlock, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
 import { ColourWheel } from './ColourWheel';
 import { askForSystemFonts, refreshSystemFonts, useFontList } from '../systemFonts';
 import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
@@ -45,15 +45,17 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
       editor,
       selector: ({ editor }) => {
         if (!editor) return null;
-        const { $from } = editor.state.selection;
-        const block = $from.parent;
-        const top = block.type.name === 'paragraph' && $from.depth === 1;
+        // After Select all the selection starts outside any paragraph; the toolbar then shows the
+        // first one's Style and works on everything selected, as Word does.
+        const found = selectionBlock(editor);
+        const block = found?.node;
+        const top = !!found?.top;
         return {
           // The paragraph style, only for top-level paragraphs (lists and tables have their own look).
-          style: top ? (block.attrs.style as string) || BODY_STYLE : null,
-          inText: block.isTextblock,
+          style: top ? (block!.attrs.style as string) || BODY_STYLE : null,
+          inText: !!block,
           text: textFormatAt(editor),
-          paragraph: top ? paragraphFormatOf(block.attrs) : {},
+          paragraph: top ? paragraphFormatOf(block!.attrs) : {},
         };
       },
     }) ?? null;
@@ -110,7 +112,9 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
     if (text.size && text.size !== 'mixed') changes.size = text.size;
     if (text.color && text.color !== 'mixed') changes.color = text.color;
     onEditStyle(styleId, changes);
-    dropTakenFormat(editor, editor.state.selection.$from.before(1), changes);
+    // Every selected paragraph in this style follows it again, not just the first.
+    const inStyle = selectedParagraphs(editor).filter((p) => ((p.attrs.style as string) || BODY_STYLE) === styleId);
+    dropTakenFormat(editor, inStyle.length ? inStyle.map((p) => p.pos) : (selectionBlock(editor)?.pos ?? []), changes);
     editor.view.focus();
   };
   const words = (changes: Parameters<typeof setTextFormat>[1], keepFocus = false) => {
@@ -118,9 +122,20 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
     setTextFormat(editor, changes);
     if (!keepFocus) editor.view.focus();
   };
-  const paragraphs = (changes: Parameters<typeof setParagraphFormat>[1], keepFocus = false) => {
+  /**
+   * Sets alignment or spacing. A paragraph whose own style already has that value takes its
+   * hand-set one off instead, so it follows the style again; with Select all, each paragraph
+   * is checked against its own style, not the first one's.
+   */
+  const paragraphs = (changes: { align?: ParagraphStyle['align']; lineSpacing?: number }, keepFocus = false) => {
     if (!editor) return;
-    setParagraphFormat(editor, changes);
+    setParagraphFormat(editor, (attrs) => {
+      const own = resolveParagraphStyle(sheet, (attrs.style as string) || BODY_STYLE);
+      const out: Parameters<typeof setParagraphFormat>[1] = {};
+      if (changes.align !== undefined) out.align = changes.align === own.align ? null : changes.align;
+      if (changes.lineSpacing !== undefined) out.lineSpacing = changes.lineSpacing === own.lineSpacing ? null : changes.lineSpacing;
+      return out;
+    });
     if (!keepFocus) editor.view.focus();
   };
   const close = () => {
@@ -182,7 +197,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
                 aria-checked={align === a.value}
                 onClick={() => {
                   // Picking the style's own alignment takes the paragraph's off, so it follows the style again.
-                  paragraphs({ align: a.value === style.align ? null : a.value });
+                  paragraphs({ align: a.value });
                   setOpen(null);
                   if (tucked) setMore(false);
                 }}
@@ -211,7 +226,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
           parse={parseSpacing}
           step={stepSpacing}
           invalid={`Type a spacing from ${MIN_SPACING} to ${MAX_SPACING}.`}
-          onValue={(spacing, keepFocus) => paragraphs({ lineSpacing: spacing === style.lineSpacing ? null : spacing }, keepFocus)}
+          onValue={(spacing, keepFocus) => paragraphs({ lineSpacing: spacing }, keepFocus)}
           onCancel={() => editor?.view.focus()}
         />
       </>

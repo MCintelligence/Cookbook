@@ -5,7 +5,7 @@ import { Typography } from '@tiptap/extension-typography';
 import { Dropcursor, Gapcursor, UndoRedo } from '@tiptap/extensions';
 import Document from '@tiptap/extension-document';
 import Text from '@tiptap/extension-text';
-import { type Mark as PMMark, type NodeType } from '@tiptap/pm/model';
+import { type Mark as PMMark, type Node as PMNode, type NodeType } from '@tiptap/pm/model';
 import { liftListItem } from '@tiptap/pm/schema-list';
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
@@ -240,22 +240,49 @@ export function setTextFormat(editor: Editor, changes: Unset<TextFormat>): void 
   editor.view.dispatch(tr);
 }
 
-/** The top-level paragraphs the selection touches, with their positions. */
-function selectedParagraphs(editor: Editor): { pos: number; attrs: Record<string, unknown> }[] {
+/**
+ * The top-level paragraphs the selection touches, with their positions. Select all puts the
+ * ends of the selection outside any paragraph, so then it is every paragraph between them.
+ */
+export function selectedParagraphs(editor: Editor): { pos: number; attrs: Record<string, unknown> }[] {
   const { doc, selection } = editor.state;
   const out: { pos: number; attrs: Record<string, unknown> }[] = [];
-  const first = selection.$from.depth >= 1 ? selection.$from.before(1) : 0;
-  const last = selection.$to.depth >= 1 ? selection.$to.before(1) : first;
+  const first = selection.$from.depth >= 1 ? selection.$from.before(1) : selection.from;
+  const last = selection.$to.depth >= 1 ? selection.$to.before(1) : Math.max(first, selection.to - 1);
   doc.forEach((node, pos) => {
     if (pos >= first && pos <= last && node.type.name === 'paragraph') out.push({ pos, attrs: node.attrs });
   });
   return out;
 }
 
-/** Sets alignment or spacing on the paragraphs the selection touches. Null goes back to the style's. */
-export function setParagraphFormat(editor: Editor, changes: Unset<ParagraphFormat>): void {
+/**
+ * The block the toolbar reads its Style, alignment and spacing from: the one the selection starts
+ * in, or, when the selection starts outside any (as after Select all), the first one inside it.
+ * `top` says whether it is a top-level paragraph, which is what paragraph styles apply to.
+ */
+export function selectionBlock(editor: Editor): { node: PMNode; pos: number; top: boolean } | null {
+  const { doc, selection } = editor.state;
+  const { $from } = selection;
+  if ($from.parent.isTextblock) {
+    return { node: $from.parent, pos: $from.depth >= 1 ? $from.before() : 0, top: $from.parent.type.name === 'paragraph' && $from.depth === 1 };
+  }
+  let found: { node: PMNode; pos: number; top: boolean } | null = null;
+  doc.nodesBetween(selection.from, selection.to, (node, pos) => {
+    if (found) return false;
+    if (!node.isTextblock) return true;
+    found = { node, pos, top: node.type.name === 'paragraph' && doc.resolve(pos).depth === 0 };
+    return false;
+  });
+  return found as { node: PMNode; pos: number; top: boolean } | null;
+}
+
+/**
+ * Sets alignment or spacing on the paragraphs the selection touches. Null goes back to the style's.
+ * `changes` can be worked out for each paragraph, since they may be in different styles.
+ */
+export function setParagraphFormat(editor: Editor, changes: Unset<ParagraphFormat> | ((attrs: Record<string, unknown>) => Unset<ParagraphFormat>)): void {
   const tr = editor.state.tr;
-  for (const { pos, attrs } of selectedParagraphs(editor)) tr.setNodeMarkup(pos, undefined, { ...attrs, ...changes });
+  for (const { pos, attrs } of selectedParagraphs(editor)) tr.setNodeMarkup(pos, undefined, { ...attrs, ...(typeof changes === 'function' ? changes(attrs) : changes) });
   if (tr.docChanged) editor.view.dispatch(tr);
 }
 
@@ -263,26 +290,29 @@ export function setParagraphFormat(editor: Editor, changes: Unset<ParagraphForma
  * After a style has taken in what was set by hand in a paragraph, takes those
  * values off the paragraph, so it follows the style again. Other words keep theirs.
  */
-export function dropTakenFormat(editor: Editor, pos: number, taken: TextFormat & ParagraphFormat): void {
+export function dropTakenFormat(editor: Editor, positions: number | number[], taken: TextFormat & ParagraphFormat): void {
   const { state } = editor;
   const type = state.schema.marks.textStyle!;
-  const node = state.doc.nodeAt(pos);
-  if (!node) return;
   const tr = state.tr;
-  const attrs = { ...node.attrs };
-  if (taken.align) attrs.align = null;
-  if (taken.lineSpacing) attrs.lineSpacing = null;
-  tr.setNodeMarkup(pos, undefined, attrs);
-  node.descendants((child, offset) => {
-    const mark = child.isText ? child.marks.find((m) => m.type === type) : undefined;
-    if (!mark) return;
-    const next = { ...mark.attrs };
-    for (const key of ['font', 'size', 'color'] as const) if (taken[key] && next[key] === taken[key]) next[key] = null;
-    const from = pos + 1 + offset;
-    if (next.font || next.size || next.color) tr.addMark(from, from + child.nodeSize, type.create(next));
-    else tr.removeMark(from, from + child.nodeSize, type);
-  });
-  editor.view.dispatch(tr);
+  // Only attributes and marks change, so the positions stay good through the whole transaction.
+  for (const pos of Array.isArray(positions) ? positions : [positions]) {
+    const node = tr.doc.nodeAt(pos);
+    if (!node) continue;
+    const attrs = { ...node.attrs };
+    if (taken.align) attrs.align = null;
+    if (taken.lineSpacing) attrs.lineSpacing = null;
+    tr.setNodeMarkup(pos, undefined, attrs);
+    node.descendants((child, offset) => {
+      const mark = child.isText ? child.marks.find((m) => m.type === type) : undefined;
+      if (!mark) return;
+      const next = { ...mark.attrs };
+      for (const key of ['font', 'size', 'color'] as const) if (taken[key] && next[key] === taken[key]) next[key] = null;
+      const from = pos + 1 + offset;
+      if (next.font || next.size || next.color) tr.addMark(from, from + child.nodeSize, type.create(next));
+      else tr.removeMark(from, from + child.nodeSize, type);
+    });
+  }
+  if (tr.docChanged) editor.view.dispatch(tr);
 }
 
 /** Takes off everything set by hand in the selection, leaving the styles. */

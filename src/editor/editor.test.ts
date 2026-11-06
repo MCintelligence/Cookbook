@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, setSettings } from '../settings';
 import { Editor } from '@tiptap/core';
-import { cookbookExtensions, setTextFormat, textFormatAt, toggleCharStyle } from './extensions';
+import { cookbookExtensions, dropTakenFormat, selectedParagraphs, selectionBlock, setParagraphFormat, setTextFormat, textFormatAt, toggleCharStyle } from './extensions';
 import { getFind, replaceAll, setFindQuery, stepFind } from './findPlugin';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
 import { EditorState } from '@tiptap/pm/state';
@@ -370,5 +370,64 @@ describe('the writer’s own font, size and colour', () => {
       if (n.isText && n.text !== 'item') texts.push(`${n.text}:${n.marks.find((m) => m.type.name === 'textStyle')?.attrs.font ?? ''}`);
     });
     expect(texts).toEqual(['x:Caudex', 'y:Caudex', 'z:Caudex']);
+  });
+});
+
+describe('the toolbar after Select all', () => {
+  const md = '# Chapter\n\nOne\n\n> Quote\n\nTwo';
+  const textFonts = (editor: Editor) => {
+    const out: string[] = [];
+    editor.state.doc.descendants((n) => {
+      if (n.isText) out.push(n.marks.find((m) => m.type.name === 'textStyle')?.attrs.font ?? '');
+    });
+    return out;
+  };
+
+  it('finds a paragraph to show, though the selection starts outside any', () => {
+    const editor = make(md);
+    editor.commands.selectAll();
+    expect(editor.state.selection.$from.depth).toBe(0);
+    const block = selectionBlock(editor);
+    expect(block?.top).toBe(true);
+    expect(block?.node.textContent).toBe('Chapter');
+  });
+
+  it('sets font, size and colour on every word', () => {
+    const editor = make(md);
+    editor.commands.selectAll();
+    setTextFormat(editor, { font: 'Caudex', size: 14 });
+    expect(textFonts(editor).every((f) => f === 'Caudex')).toBe(true);
+    expect(textFormatAt(editor)).toMatchObject({ font: 'Caudex', size: 14 });
+  });
+
+  it('sets alignment on every top-level paragraph, not just the first', () => {
+    const editor = make(md);
+    editor.commands.selectAll();
+    const all = selectedParagraphs(editor);
+    expect(all.length).toBe(editor.state.doc.childCount);
+    expect(all.length).toBeGreaterThan(1);
+    setParagraphFormat(editor, { align: 'center' });
+    const aligns: unknown[] = [];
+    editor.state.doc.forEach((n) => n.type.name === 'paragraph' && aligns.push(n.attrs.align));
+    expect(aligns.every((a) => a === 'center')).toBe(true);
+  });
+
+  it('gives every paragraph the Style picked', () => {
+    const editor = make(md);
+    editor.commands.selectAll();
+    editor.chain().updateAttributes('paragraph', { style: 'body', align: null, lineSpacing: null }).run();
+    const styles: unknown[] = [];
+    editor.state.doc.forEach((n) => n.type.name === 'paragraph' && styles.push(n.attrs.style));
+    expect(styles.every((s) => s === 'body')).toBe(true);
+  });
+
+  it('lets several paragraphs follow their style again at once', () => {
+    const editor = make('One\n\nTwo');
+    editor.commands.selectAll();
+    setParagraphFormat(editor, { align: 'center' });
+    setTextFormat(editor, { font: 'Caudex' });
+    dropTakenFormat(editor, selectedParagraphs(editor).map((p) => p.pos), { align: 'center', font: 'Caudex' });
+    editor.state.doc.forEach((n) => expect(n.attrs.align).toBeNull());
+    expect(textFonts(editor)).toEqual(['', '']);
   });
 });

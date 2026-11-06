@@ -1,7 +1,7 @@
 {
   "name": "cookbook",
   "private": true,
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "An offline writing app with an on-device proofreader. No accounts.",
   "license": "Apache-2.0",
   "type": "module",

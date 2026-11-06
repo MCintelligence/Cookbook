@@ -1,6 +1,7 @@
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, BOOK_FILE, HIDDEN_FOLDER, PANTRY, type BookInfo, type TreeNode, fileNameFor, makeBookOrUndo, openBook, readDocument, readTree, saveBookInfo, walkFiles, writeDocument } from './book';
 import { newId } from './document';
+import { DRAFTS } from './drafts';
 import { type BookLocation, deleteBrowserBook, forgetBook, openLocation, templateLocation } from './platform';
 import { type BookTemplateId } from './templates';
 
@@ -31,8 +32,9 @@ export async function renameCopy(fs: StorageAdapter, changes: Partial<BookInfo>,
   return info;
 }
 
-/** Empties the text of every Item on the Shelf, keeping their titles, order and notes fields. */
+/** Empties the text of every Item on the Shelf, keeping their titles, order and notes fields. Their drafts go too. */
 export async function blankShelf(fs: StorageAdapter): Promise<void> {
+  if (await fs.exists(DRAFTS)) await fs.remove(DRAFTS);
   if (!(await fs.exists(BOOKSHELF))) return;
   for (const node of walkFiles(await readTree(fs, BOOKSHELF))) {
     if (!node.path.endsWith('.md')) continue;

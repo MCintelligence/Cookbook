@@ -82,7 +82,7 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
-- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, open beside this one, and Move to trash.
+- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, and Move to trash.
 
 Each Item has a **status**, Not started, Simmering or Done, shown as a dot on the Shelf and in the bottom bar, never on the page. Hover over a Group to see the words inside it.
 
@@ -136,7 +136,13 @@ Paste from Word, Scrivener or the web and bold, italic, headings and tables come
 
 ## Splitting and merging
 
-Click a section break (\`* * *\`) to **split** the Item there: everything after it becomes a new Item just below. Right-click an Item on the Shelf for **Merge with next**. Cookbook takes a snapshot before either, and the words moved don't count towards today's goal.`,
+Click a section break (\`* * *\`) to **split** the Item there: everything after it becomes a new Item just below. Right-click an Item on the Shelf for **Merge with next**. Cookbook takes a snapshot before either, and the words moved don't count towards today's goal.
+
+## Drafts
+
+To write an Item again from scratch, right-click it on the Shelf and choose **Draft this item** (also in the Recipe menu and the command palette). The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on, and keeps pace a paragraph at a time as you write the new version.
+
+Draft again for Draft 2, and so on; click a draft to have it show through instead. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',
@@ -356,6 +362,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 | \`bookshelf/\` | the Shelf: Items in nested Groups |
 | \`pantry/\` | Characters, Settings and Materials |
 | \`pictures/\` | portraits for Pantry cards |
+| \`drafts/\` | earlier drafts of Items, one folder per Item |
 | \`.cookbook/\` | hidden: the search index, undo history, snapshots and the trash |
 
 Every Item and card is a Markdown file with a short header for its title, status and fields. Anything \`order.json\` doesn't list, such as a file added in another app, comes after the listed ones in natural order, so nothing is ever hidden. Deleting \`.cookbook/\` is safe for your writing: the index is rebuilt, and only undo history and the trash are lost.`,

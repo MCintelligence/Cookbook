@@ -23,6 +23,7 @@ My Recipe/
     settings/      shown as Settings
     research/      shown as Materials
   pictures/        portraits for Pantry cards
+  drafts/          earlier drafts of items, one folder per item (by its id)
   .cookbook/       hidden: search index, undo history, snapshots and trash (see below)
 ```
 
@@ -80,7 +81,9 @@ Pressing Backspace straight after a shortcut turns it back into exactly what you
 
 ## The Shelf
 
-Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import, Expand all and Collapse all; right-click an item to put it in a new group, into a new group, take a snapshot or set its status.
+Items sit on the Shelf with a status dot (not started, simmering or done) and their word count. Groups nest to any depth and open or close with the arrow beside their name; hover over a group to see the total words inside. Double-click a group to rename it. Right-click the Shelf for New item, New group, New item from template, Import, Expand all and Collapse all; right-click an item to put it in a new group, into a new group, take a snapshot, draft it or set its status.
+
+**Drafts.** Right-click an item and choose *Draft this item* to write it again from scratch: its text moves into *Draft 1*, listed under it in italics, and the empty item shows the draft through as faded ghost text that keeps pace a paragraph at a time. Draft again for Draft 2. Right-click a draft to hide the ghost, put it back (the item's current text becomes a new draft) or delete it. Drafts live in `drafts/<item id>/Draft N.md`, go into backups, and never count towards word counts, Mise en Place, search, Plate or export.
 
 Drag an item or group to reorder it, or drop it onto a group to move it inside. On a touch screen, press and hold first. With the keyboard, Alt+↑ and Alt+↓ move the focused row. Moving never renames a file unless the new group already has one with the same name.
 

@@ -54,6 +54,14 @@ interface Props {
   onOpenGroup?: (path: string) => void;
   /** The Groups shown as Mise en Place, highlighted like the open Item. */
   shownGroups?: Set<string>;
+  /** Each Item's drafts by number, by the Item's path: listed under it, in italics. */
+  drafts?: Map<string, number[]>;
+  /** The draft showing through the open Item as ghost text. */
+  ghost?: { path: string; n: number } | null;
+  /** A click on a draft: opens its Item with that draft as the ghost text. */
+  onDraft?: (path: string, n: number) => void;
+  /** A right-click (or the menu key) on a draft. */
+  onDraftMenu?: (path: string, n: number, x: number, y: number) => void;
 }
 
 export interface Recipe {
@@ -158,7 +166,7 @@ export const Tree = memo(function Tree(props: Props) {
 
   const rowEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-tree-path="${CSS.escape(p)}"]`) ?? null;
   const recipeEl = (p: string) => list.current?.querySelector<HTMLElement>(`[data-recipe-path="${CSS.escape(p)}"]`) ?? null;
-  const rows = () => [...(list.current?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path]') ?? [])];
+  const rows = () => [...(list.current?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path], button[data-draft-of]') ?? [])];
   const moveTo = (node: TreeNode, to: { folder: string; index: number }) => {
     // Where the row should land; the move itself says for certain, since a name taken in the new Group gets a number.
     const guess = to.folder === places.get(node.path)?.parent ? node.path : `${to.folder}/${node.name}`;
@@ -395,7 +403,7 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; depth: number }) {
-  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate, renamed } = shared;
+  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate, renamed, drafts, ghost, onDraft, onDraftMenu } = shared;
   const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
@@ -449,6 +457,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
     const colour = LABELS.find((l) => l.id === card?.label);
     const own = recipes?.get(node.path) ?? [];
+    const versions = drafts?.get(node.path) ?? [];
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         {renaming === node.path ? (
@@ -501,6 +510,45 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
                     {cards.get(r.path)?.title ?? r.title}
                   </button>
                 )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {versions.length > 0 && (
+          <ul className="tree tree-recipes" role="group" aria-label={`Drafts of ${label}`}>
+            {versions.map((n) => (
+              <li role="treeitem" aria-selected={ghost?.path === node.path && ghost.n === n} key={n}>
+                <button
+                  className="tree-recipe tree-draft"
+                  tabIndex={-1}
+                  data-draft-of={node.path}
+                  title={ghost?.path === node.path && ghost.n === n ? `Draft ${n}, showing through as ghost text` : `Open “${label}” with Draft ${n} showing through`}
+                  onClick={() => onDraft?.(node.path, n)}
+                  onContextMenu={(e) => {
+                    if (!onDraftMenu) return;
+                    e.preventDefault();
+                    // The Shelf's own menu mustn't open on top of the draft's.
+                    e.stopPropagation();
+                    onDraftMenu(node.path, n, e.clientX, e.clientY);
+                  }}
+                  onKeyDown={(e) => {
+                    const all = [...(e.currentTarget.closest('ul.tree[role="tree"]')?.querySelectorAll<HTMLElement>('button[data-tree-path], button[data-recipe-path], button[data-draft-of]') ?? [])];
+                    const here = all.indexOf(e.currentTarget);
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      all[here + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+                    } else if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      all.find((el) => el.dataset.treePath === node.path)?.focus();
+                    } else if ((e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) && onDraftMenu) {
+                      e.preventDefault();
+                      const r = e.currentTarget.getBoundingClientRect();
+                      onDraftMenu(node.path, n, r.left + 24, r.bottom - 4);
+                    }
+                  }}
+                >
+                  Draft {n}
+                </button>
               </li>
             ))}
           </ul>

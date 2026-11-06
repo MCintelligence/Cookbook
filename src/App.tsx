@@ -64,7 +64,7 @@ import { ownerOf, useBackups } from './storage/useBackups';
 import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
 import { TextSelection } from '@tiptap/pm/state';
-import { type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, shownOf, toIndexed } from './storage/index';
+import { type CardSummary, type SceneMention, type SearchHit, countWords, loadIndex, refreshIndex, shownOf, toIndexed } from './storage/index';
 import { type NamedCard, castIn, countNames, nameMatcher, nameMatcherOf, setNameMatcher } from './editor/names';
 import { NamePeek } from './ui/NamePeek';
 import { PantryShelf, type ShelfCard } from './ui/PantryShelf';
@@ -138,6 +138,8 @@ import { historyCsv } from './storage/goals';
 import { focusKey } from './editor/focusMode';
 import { type Snapshot, listSnapshots, takeSnapshot as storeSnapshot, deleteSnapshot } from './storage/snapshots';
 import { SnapshotsDialog } from './ui/SnapshotsDialog';
+import { type DraftText, deleteDraft, draftsOf, ghostParagraphs, listDrafts, readDraft, saveDraft, writeDraft } from './storage/drafts';
+import { setGhost } from './editor/ghost';
 const Beside = lazy(() => import('./ui/Beside').then((m) => ({ default: m.Beside })));
 import { checkForUpdates } from './ui/UpdatePopup';
 import { deleteFootnote, footnotes, insertFootnote, removeNoteAnchor, setChecksOff, setDialogueFocus } from './editor/seasonings';
@@ -291,6 +293,8 @@ export function App() {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [pantryTree, setPantryTree] = useState<TreeNode[]>([]);
   const [recipes, setRecipes] = useState<Map<string, Recipe[]>>(new Map());
+  /** Each Item's drafts by number, by Item id; read from folder names when the Shelf is read. */
+  const [draftIds, setDraftIds] = useState<Map<string, number[]>>(new Map());
   const [path, setPath] = useState<string | null>(null);
   const [doc, setDoc] = useState<CookbookDocument | null>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -712,6 +716,7 @@ export function App() {
       }
     }
     setRecipes(byPage);
+    setDraftIds(await listDrafts(fs).catch(() => new Map<string, number[]>()));
   }, [fs]);
 
   useEffect(() => {
@@ -1156,6 +1161,159 @@ export function App() {
     editor.chain().focus().setMeta(UNTRACKED, true).setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
     setSnapshots(null);
     say(`Rolled “${scene.title}” back to ${snapshot.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. Undo puts it back.`);
+  };
+
+  /**
+   * Which draft shows through each Item as ghost text, by Item id: a draft's number, or 0 for none.
+   * Without a choice, the newest draft shows. Kept in this browser only, as a way of looking.
+   */
+  const [ghostPrefs, setGhostPrefs] = useState<Record<string, number>>(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem('cookbook.ghost') ?? '{}');
+      return saved && typeof saved === 'object' ? (saved as Record<string, number>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const pickGhost = (id: string, n: number) =>
+    setGhostPrefs((was) => {
+      const next = { ...was, [id]: n };
+      try {
+        localStorage.setItem('cookbook.ghost', JSON.stringify(next));
+      } catch {
+        // The newest draft simply shows next time.
+      }
+      return next;
+    });
+  /** The draft showing through the open Item, if any. Only Shelf Items have drafts. */
+  const ghostN = useMemo(() => {
+    if (!doc || doc.kind !== 'scene') return null;
+    const list = draftsOf(draftIds, doc.id);
+    const pref = ghostPrefs[doc.id];
+    if (pref === 0) return null;
+    return pref !== undefined && list.includes(pref) ? pref : (list[list.length - 1] ?? null);
+  }, [doc?.id, doc?.kind, draftIds, ghostPrefs]);
+  // The ghost is read when the Item opens or another draft is picked, never as the writer types.
+  useEffect(() => {
+    if (!editor || !fs || !doc) return;
+    if (ghostN === null) return setGhost(editor, null);
+    let live = true;
+    readDraft(fs, doc.id, ghostN).then(
+      (d) => live && setGhost(editor, ghostParagraphs(plainText(d.body))),
+      () => live && setGhost(editor, null),
+    );
+    return () => {
+      live = false;
+    };
+  }, [editor, fs, doc?.id, ghostN]);
+
+  /** Replaces the open Item's text from outside the editor's typing, as moving words: Undo still works, and nothing counts as written. */
+  const replaceOpenText = async (body: string, notes: Record<string, string>) => {
+    if (!editor) return;
+    editor.chain().focus('start').setMeta(UNTRACKED, true).setContent(parseMarkdown(body), { emitUpdate: true }).run();
+    setNotes(notes);
+    movingWords.current = true;
+    await flushSave().finally(() => (movingWords.current = false));
+  };
+  /** Gives an Item that isn't open new text, straight in its file. */
+  const replaceFileText = async (p: string, item: CookbookDocument, body: string, notes: Record<string, string>) => {
+    if (!fs) return;
+    const { notes: _old, ...fields } = item.fields;
+    const updated = { ...item, body, fields: Object.keys(notes).length > 0 ? { ...fields, notes } : fields };
+    await writeDocument(fs, p, updated);
+    index.current?.index.upsert(toIndexed(p, updated, await fs.stamp(p)));
+    indexChanged();
+  };
+  /** The Item at `p` as it is now: the open one from the editor (saved first), any other from its file. */
+  const itemNow = async (p: string): Promise<CookbookDocument | null> => {
+    if (!fs) return null;
+    if (p === path) {
+      await flushSave();
+      return currentDoc();
+    }
+    return readDocument(fs, p).catch(() => null);
+  };
+
+  /**
+   * Drafts an Item: its text moves into a new draft listed under it on the Shelf, and the Item is
+   * left empty, with the draft showing through as ghost text to write it again from.
+   */
+  const draftItem = async (p: string) => {
+    const item = await itemNow(p);
+    if (!fs || !item) return;
+    if (!plainText(item.body).trim()) return say(`There’s nothing in “${item.title}” to draft yet.`);
+    try {
+      const notes = readNotes(item);
+      const n = await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes });
+      if (p === path) await replaceOpenText('', {});
+      else {
+        await replaceFileText(p, item, '', {});
+        await select(p);
+      }
+      pickGhost(item.id, n);
+      setDraftIds(await listDrafts(fs));
+      say(`Drafted “${item.title}” as Draft ${n}. It shows through as ghost text while you write the Item again.`);
+    } catch (e) {
+      setError(`Couldn’t draft “${item.title}”. ${friendlyError(e)}`);
+    }
+  };
+
+  /** Puts a draft's text back in its Item. Any text the Item has now becomes a new draft first, so nothing is lost. */
+  const restoreDraft = async (p: string, n: number) => {
+    const item = await itemNow(p);
+    if (!fs || !item) return;
+    try {
+      const draft = await readDraft(fs, item.id, n);
+      const keep = plainText(item.body).trim() ? await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes: readNotes(item) }) : null;
+      if (p === path) await replaceOpenText(draft.body, draft.notes ?? {});
+      else {
+        await replaceFileText(p, item, draft.body, draft.notes ?? {});
+        await select(p);
+      }
+      await deleteDraft(fs, item.id, n);
+      pickGhost(item.id, 0);
+      setDraftIds(await listDrafts(fs));
+      say(`Put Draft ${n} back into “${item.title}”.${keep ? ` The text it replaced is kept as Draft ${keep}.` : ''}`);
+    } catch (e) {
+      setError(`Couldn’t put Draft ${n} back. ${friendlyError(e)}`);
+    }
+  };
+
+  /** Deletes a draft, with Undo in the notice to bring it back. */
+  const removeDraft = async (p: string, n: number) => {
+    const id = cards.get(p)?.id;
+    const title = cards.get(p)?.title ?? '';
+    if (!fs || !id) return;
+    let gone: DraftText;
+    try {
+      gone = await readDraft(fs, id, n);
+      await deleteDraft(fs, id, n);
+    } catch (e) {
+      return setError(`Couldn’t delete Draft ${n}. ${friendlyError(e)}`);
+    }
+    setDraftIds(await listDrafts(fs));
+    say(`Deleted Draft ${n} of “${title}”.`, () => void writeDraft(fs, id, title, gone).then(async () => setDraftIds(await listDrafts(fs))));
+  };
+
+  /** Shows a draft through its Item, opening the Item if it isn't open. */
+  const showDraft = async (p: string, n: number) => {
+    const id = cards.get(p)?.id;
+    if (!id) return;
+    pickGhost(id, n);
+    if (p !== path) await select(p);
+  };
+
+  const draftMenu = (p: string, n: number, x: number, y: number) => {
+    const id = cards.get(p)?.id;
+    const showing = p === path && ghostN === n;
+    showMenu(`Draft ${n}`, x, y, [
+      showing
+        ? { label: 'Hide ghost text', onPick: () => id && pickGhost(id, 0) }
+        : { label: 'Show as ghost text', onPick: () => void showDraft(p, n) },
+      { label: 'Put back in the item', onPick: () => void restoreDraft(p, n) },
+      { separator: true },
+      { label: 'Delete draft', onPick: () => void removeDraft(p, n) },
+    ]);
   };
 
   /** Accepts or rejects the change at the cursor (or those in the selection), or every change on the page. */
@@ -1990,6 +2148,7 @@ export function App() {
       common.duplicate,
       common.label,
       { label: 'Include in export', checked: !card?.skipExport, onPick: () => void setFieldOf(p, 'export', card?.skipExport ? undefined : false) },
+      { label: 'Draft this item', onPick: () => void draftItem(p) },
       {
         label: 'Snapshots',
         items: [
@@ -2400,6 +2559,16 @@ export function App() {
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
+  /** The drafts listed under each Shelf Item, by its path. Worked out when the Shelf or the drafts change, not as the writer types. */
+  const draftRows = useMemo(() => {
+    const rows = new Map<string, number[]>();
+    if (draftIds.size === 0) return rows;
+    for (const [p, c] of cards as Map<string, CardSummary>) {
+      const list = c.kind === 'scene' ? draftsOf(draftIds, c.id) : [];
+      if (list.length > 0) rows.set(p, list);
+    }
+    return rows;
+  }, [cards, draftIds]);
   const pantryHits = useMemo(() => {
     if (!pantryQuery.trim()) return null;
     return index.current?.index.search(pantryQuery, { kinds: PANTRY_SECTIONS.map((s) => SECTION_KIND[s]), limit: 40 }) ?? [];
@@ -3032,6 +3201,14 @@ export function App() {
       cmd('shelf', 'Name from the Pantry', () => setShelf({ at: null }), 'Actions', keysFor('shelf'), 'cards characters insert'),
       cmd('pantry', panel === 'pantry' ? 'Close the Pantry' : 'Open the Pantry', () => togglePanel('pantry'), 'Actions', undefined, 'cards characters places materials research'),
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
+      ...(doc?.kind === 'scene' && path
+        ? [
+            cmd('draft', 'Draft this item', () => void draftItem(path), 'Actions', undefined, 'version rewrite redraft ghost placeholder'),
+            ...(draftsOf(draftIds, doc.id).length > 0
+              ? [cmd('ghost', ghostN !== null ? 'Hide the draft’s ghost text' : 'Show the newest draft as ghost text', () => pickGhost(doc.id, ghostN !== null ? 0 : draftsOf(draftIds, doc.id).at(-1)!), 'View', undefined, 'draft version placeholder faded')]
+              : []),
+          ]
+        : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
       ...(book
@@ -3339,6 +3516,7 @@ export function App() {
         { label: 'Goals…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
         { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
         { separator: true },
+        { label: 'Draft this item', disabled: !doc || !path || doc.kind !== 'scene', onPick: () => path && void draftItem(path) },
         {
           label: 'Snapshots of this item',
           disabled: !doc || !path,
@@ -3383,6 +3561,8 @@ export function App() {
   // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
   // their identity; anything else that re-renders the app then leaves them be.
   // An Item picked on the Shelf opens on its own page, even from inside the Group shown.
+  const onDraftRow = useStable((p: string, n: number) => void showDraft(p, n));
+  const onDraftMenuRow = useStable((p: string, n: number, x: number, y: number) => draftMenu(p, n, x, y));
   const onSelect = useStable((p: string) => {
     setMise(null);
     void select(p);
@@ -3490,7 +3670,7 @@ export function App() {
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
         onContextMenu={(e) => {
           // Rows have their own menu; this one is for the space around them.
-          if ((e.target as Element).closest('[data-tree-path], .pantry-results button, input, .menu')) return;
+          if ((e.target as Element).closest('[data-tree-path], [data-draft-of], .pantry-results button, input, .menu')) return;
           e.preventDefault();
           shelfMenu(e.clientX, e.clientY);
         }}
@@ -3524,6 +3704,10 @@ export function App() {
           onMark={onShelfMark}
           onOpenGroup={onOpenGroup}
           shownGroups={miseShown?.groups}
+          drafts={draftRows}
+          ghost={path && ghostN !== null ? { path, n: ghostN } : null}
+          onDraft={onDraftRow}
+          onDraftMenu={onDraftMenuRow}
         />
         </ShelfSearch>
         {shelfBar()}

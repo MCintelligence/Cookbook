@@ -176,6 +176,8 @@ Markdown works too, if you know it. Try each on an empty line below:
 
 Don't want some of these? App Settings › Writing turns Markdown off, or any one rule on its own.
 
+Words wrap whole, as in Scrivener, and a paragraph won't end on one lonely word when a better break is close by. App Settings › Writing › **Line breaks** turns hyphenation on, for long words only, or lets lines break wherever they fall. Plate keeps at least two lines of a paragraph together at the foot and top of every printed page.
+
 Type **/** at the start of a line for the **insert menu**: styles, lists, a table, a section break or a footnote. Or use the Insert and Format menus at the top.
 
 Paste from Word, Scrivener or the web and the bold, italic, headings and tables come with it. Edit › **Paste as plain text** leaves them behind.

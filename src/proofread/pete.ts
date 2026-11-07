@@ -50,6 +50,12 @@ const S_SINGULARS = new Set(
 );
 /** Groups that British English treats as many and American as one, so neither is wrong. */
 const COLLECTIVE = new Set('team family crew staff police government couple group majority minority audience committee jury class band crowd company army navy council public faculty board'.split(' '));
+/** Nouns spelt the same for one and many ("the fish were", "the fish was"), and plurals used both ways ("the data are"). */
+const EITHER_NUMBER = new Set('fish deer sheep moose salmon trout cod swine bison aircraft spacecraft offspring series species data media'.split(' '));
+/** Describing words that stand for people after "the": "the old were", "the dead walk". */
+const PEOPLE_ADJECTIVES = new Set('old young rich poor dead living wounded sick blind deaf elderly homeless unemployed wealthy weak strong brave faithful innocent guilty righteous wicked hungry'.split(' '));
+/** Amounts read as one sum: "ten pounds is too much", "three inches is a wretched height". */
+const UNITS = new Set('pounds dollars euros pence cents shillings guineas years months weeks days hours minutes seconds miles inches feet yards metres meters kilometres kilometers ounces grams kilos kilograms litres liters gallons pints acres degrees percent'.split(' '));
 
 const SINGULAR_DET = new Set(['a', 'an', 'this', 'that', 'each', 'every', 'another', 'one']);
 const PLURAL_DET = new Set(['these', 'those', 'many', 'several', 'few', 'both', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'twenty', 'hundred', 'dozen']);
@@ -65,7 +71,7 @@ const ALONG = [['along', 'with'], ['together', 'with'], ['as', 'well', 'as'], ['
 
 /** Words that can't sit inside a simple subject, so a run with one in it isn't a subject we understand. */
 const NOT_IN_SUBJECT = new Set(
-  'i you he she it we they me him us them who whom whose which that what where when why how and or but nor so if then than because while although though since until unless as not never is are was were be been being am has have had do does did will would shall should can could may might must to'.split(
+  'there here i you he she it we they me him us them who whom whose which that what where when why how and or but nor so if then than because while although though since until unless as not never is are was were be been being am has have had do does did will would shall should can could may might must to'.split(
     ' ',
   ),
 );
@@ -124,7 +130,7 @@ function pairCount(counts: Counts[], a: string, b: string): number {
 
 /** One thing or many, or null when the word alone can't say. */
 function nounNumber(lower: string, isWord: IsWord): 'one' | 'many' | null {
-  if (COLLECTIVE.has(lower) || NOT_IN_SUBJECT.has(lower)) return null;
+  if (COLLECTIVE.has(lower) || NOT_IN_SUBJECT.has(lower) || EITHER_NUMBER.has(lower) || PEOPLE_ADJECTIVES.has(lower)) return null;
   if (IRREGULAR_PLURALS.has(lower)) return 'many';
   if (S_SINGULARS.has(lower)) return null;
   if (/s$/.test(lower) && !/(?:ss|us|is|'s)$/.test(lower)) {
@@ -191,12 +197,15 @@ function subjectAt(ts: Token[], i: number, isWord: IsWord): Subject | null {
   else if (PLURAL_DET.has(t.lower)) detNumber = 'many';
   else if (!OPEN_DET.has(t.lower) && !/'s$/.test(t.lower)) return null;
   j++;
+  // "No, there were": a comma after the first word means it wasn't a determiner.
+  if (/,/.test(ts[j]?.gap ?? '')) return null;
   const end = phraseEnd(ts, j, 4);
   if (end === j) return null;
   const phrase: [number, number] = [j, end];
   const head = ts[end - 1]!;
   const number = nounNumber(head.lower, isWord);
   if (!number) return null;
+  if (detNumber === 'many' && UNITS.has(head.lower)) return null;
   if (detNumber && detNumber !== number) return null;
   // "of the onions", "in the jar", "near the window": skip to the verb.
   let next = end;
@@ -254,7 +263,8 @@ function agreement(ts: Token[], isWord: IsWord, counts: Counts[], out: Issue[]) 
         out.push(issue(verb.from, verb.to, 'agreement', `With “${t.word.toLowerCase()}”, it’s “${fix}”.`, [matchCase(verb.word, fix)]));
         continue;
       }
-      if (['he', 'she', 'it'].includes(t.lower) && (verb.lower === 'were' || verb.lower === "weren't") && !before.some((w) => SUBJUNCTIVE.has(w)) && prev?.lower !== 'as' && ts[i + 2]?.lower !== 'to') {
+      // "The roses on it were": after a preposition, "it" isn't the subject.
+      if (['he', 'she', 'it'].includes(t.lower) && (verb.lower === 'were' || verb.lower === "weren't") && !before.some((w) => SUBJUNCTIVE.has(w)) && prev?.lower !== 'as' && !PREPOSITIONS.has(prev?.lower ?? '') && ts[i + 2]?.lower !== 'to') {
         const fix = verb.lower === 'were' ? 'was' : "wasn't";
         out.push(issue(verb.from, verb.to, 'agreement', `With “${t.word.toLowerCase()}”, it’s “${fix}”.`, [matchCase(verb.word, fix)]));
         continue;
@@ -332,7 +342,8 @@ function mixups(ts: Token[], isWord: IsWord, out: Issue[]) {
     if (t.lower === 'your' || t.lower === 'their') {
       const fix = t.lower === 'your' ? 'you’re' : 'they’re';
       const ending = !after || after.start || /,/.test(after.gap);
-      const going = /ing$/.test(next.lower) && !ING_NOUNS.has(next.lower) && after?.lower === 'to' && !after.start;
+      // "of their happening to be guests" belongs to them; "your going to love it" doesn't.
+      const going = /ing$/.test(next.lower) && !ING_NOUNS.has(next.lower) && after?.lower === 'to' && !after.start && !PREPOSITIONS.has(prev?.lower ?? '');
       const plain = ['not', 'so', 'too', 'a', 'an', 'the', 'gonna'].includes(next.lower) || (['welcome', 'kidding', 'joking', 'right', 'wrong'].includes(next.lower) && ending);
       if (going || plain) out.push(issue(t.from, t.to, 'word-mixup', `“${t.word.toLowerCase()}” means belonging to ${t.lower === 'your' ? 'you' : 'them'}. Here it’s “${fix}”.`, [matchCase(t.word, fix)]));
       continue;

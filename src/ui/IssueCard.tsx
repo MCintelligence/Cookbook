@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type Editor } from '@tiptap/core';
-import { type FoundIssue, applySuggestion, aroundIssue, issueAt, selectIssue } from '../proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt, likelyNames, selectIssue } from '../proofread/plugin';
 import { SEASONINGS, fixText, ownerOf, remark } from '../proofread/remarks';
 import { type Proofreader } from '../proofread/useProofreader';
 import { Face } from './Faces';
@@ -92,6 +92,8 @@ export function IssueCard({ editor, proof, request }: { editor: Editor | null; p
 /** What the card says: whose issue it is, their remark, the fix as text, and the same buttons every time. */
 function IssueBody({ editor, issue, proof, box, pos, keyboard, onDone }: { editor: Editor; issue: FoundIssue; proof: Proofreader; box: React.RefObject<HTMLDivElement | null>; pos: { left: number; top: number } | null; keyboard: boolean; onDone: () => void }) {
   const suggestions = useSuggestions(editor, issue, proof);
+  // Only a name-like word offers the rest of the page's names; worked out when the card opens.
+  const names = issue.issue.name ? likelyNames(editor.state) : [];
   const owner = ownerOf(issue.issue);
   const [fix, ...others] = suggestions ?? [];
   // Opened from the keyboard: Fix takes the keyboard once there is a fix (spelling ones arrive a moment later),
@@ -136,6 +138,11 @@ function IssueBody({ editor, issue, proof, box, pos, keyboard, onDone }: { edito
           {issue.issue.rule === 'spelling' && (
             <button className="text-link" onClick={done(() => proof.addWord(issue.word))}>
               Add to dictionary
+            </button>
+          )}
+          {names.length > 1 && (
+            <button className="text-link" onClick={done(() => proof.addWords(names))}>
+              Add all {names.length} likely names
             </button>
           )}
         </div>

@@ -79,6 +79,12 @@ const SAM_NAME = [
   (n: string) => `${n} would make you walk the plank for that spelling.`,
   (n: string) => `You’ve sailed with ${n} this long and still can’t spell them?`,
 ];
+/** An unknown word with a capital in mid-sentence: more likely a new shipmate than a mistake. */
+const SAM_NEW_NAME = [
+  (w: string) => `“${w}”? Not in my charts. A new hand aboard? Add them.`,
+  (w: string) => `Never heard of “${w}”. If that’s a name, sign them on.`,
+  (w: string) => `“${w}” isn’t in my book. A name, is it? Then write it in.`,
+];
 const SAM_APOSTROPHE = ['No apostrophe? Bold. Wrong, but bold.', 'Lost your apostrophe overboard, sailor. Hook it back on.', 'An apostrophe’s gone missing. Check the bilges.'];
 
 /** Peppery Pete, sweetly passive-aggressive, after the plain fact of what is wrong. */
@@ -161,6 +167,7 @@ export function remark(issue: Issue, word: string): string {
   if (owner === 'sam') {
     if (issue.rule === 'name') return pick(SAM_NAME, word)(issue.suggestions[0] ?? 'they');
     if (/apostrophe|doesn’t/.test(issue.message)) return pick(SAM_APOSTROPHE, word);
+    if (issue.name) return pick(SAM_NEW_NAME, word)(word);
     return pick(SAM_WORD, word)(word);
   }
   if (owner === 'pete') {

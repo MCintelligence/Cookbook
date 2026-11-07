@@ -95,8 +95,9 @@ function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Dec
   const space = word.trim() === '' ? ' cb-issue-space' : '';
   // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
   const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
+  const name = issue.name ? ' cb-issue-name' : '';
   const spec = { issue, word, ...keys };
-  const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, spec);
+  const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}${name}`, 'data-rule': issue.rule }, spec);
   if (issue.kind !== 'style') return [mark];
   const [open, close] = bracketsFor(word);
   return [bracket(from, true, open, spec), mark, bracket(to, false, close, spec)];
@@ -321,6 +322,11 @@ export function issuesOf(state: EditorState): FoundIssue[] {
   return list;
 }
 const issueLists = new WeakMap<DecorationSet, FoundIssue[]>();
+
+/** The unknown words on the page that look like names, each once, for “Add all likely names”. */
+export function likelyNames(state: EditorState): string[] {
+  return [...new Set(issuesOf(state).filter((f) => f.issue.name).map((f) => f.word))];
+}
 
 /**
  * The issue F7 (or Shift+F7) goes to: the next one after the cursor, or the one before it,

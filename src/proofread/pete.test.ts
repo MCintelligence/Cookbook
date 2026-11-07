@@ -36,6 +36,14 @@ describe('Peppery Pete', () => {
     expect(said('He asked where are you going?')).toEqual([['where are you going?', 'where you are going.']]);
   });
 
+  it('leaves nouns that are one or many, amounts and "the old" alone', () => {
+    for (const text of ['The fish were jumping.', 'The deer were gone.', 'The sheep was lost.', 'The data are clear.', 'The old were so hospitable.', 'Ten pounds is too much for a loaf.', 'Three inches is such a wretched height.', 'No, there were no tears.', 'This time there were TWO little shrieks.', 'The roses growing on it were white.', 'They spoke of their happening to be guests.']) {
+      expect(said(text), text).toEqual([]);
+    }
+    expect(said('The dogs was barking.')).toEqual([['was', 'were']]);
+    expect(said('It were a long day.')).toEqual([['were', 'was']]);
+  });
+
   it('leaves good English alone', () => {
     for (const text of [
       'If he were here, he would know what to do.',

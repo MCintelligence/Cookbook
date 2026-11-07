@@ -1,5 +1,5 @@
 import { type Issue, ignoreKey } from './check';
-import { PETE_RULES } from './pete';
+import { OPT_IN_RULES, PETE_RULES } from './pete';
 import { STYLE_RULES } from './style';
 
 /**
@@ -61,3 +61,23 @@ export function keysOf(issue: Issue, text: string): IssueKeys {
 }
 
 export const isHidden = (keys: IssueKeys, hiding: Hiding) => hiding.off.has(keys.group) || hiding.ignored.has(keys.key) || hiding.ignored.has(keys.once);
+
+/**
+ * The rule groups switched off, from what book.json keeps. A check that starts off (see
+ * OPT_IN_RULES) is kept there as "+rule" once the writer turns it on, so a recipe saved before
+ * the check existed doesn't get it switched on by surprise.
+ */
+export function effectiveOff(stored: readonly string[]): string[] {
+  const off = stored.filter((r) => !r.startsWith('+'));
+  for (const rule of OPT_IN_RULES) if (!stored.includes(`+${rule}`) && !off.includes(rule)) off.push(rule);
+  return off;
+}
+
+/** What book.json keeps after the writer switches a rule on or off. */
+export function storedOff(stored: readonly string[], rule: string, on: boolean): string[] {
+  if (OPT_IN_RULES.includes(rule)) {
+    const rest = stored.filter((r) => r !== rule && r !== `+${rule}`);
+    return on ? [...rest, `+${rule}`] : rest;
+  }
+  return on ? stored.filter((r) => r !== rule) : [...new Set([...stored, rule])];
+}

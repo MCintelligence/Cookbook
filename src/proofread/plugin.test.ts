@@ -147,6 +147,48 @@ describe('proofreading in the editor', () => {
     expect(shown(editor)).toEqual(['a', 'a']);
   });
 
+  it('shows spelling at once while grammar is still on its way', async () => {
+    const editor = make('Teh cook ate a apple.');
+    let finish: () => void = () => {};
+    const slow = checker();
+    const c: Checker = {
+      ...slow.c,
+      check: (texts, review) => (review ? new Promise((r) => (finish = () => r(slow.c.check(texts, true)))) : slow.c.check(texts, false)),
+    };
+    setChecker(editor, c);
+    setReview(editor, true);
+    await settle();
+    expect(shown(editor)).toEqual(['Teh']);
+    expect(isTasting(editor.state)).toBe(true);
+    finish();
+    await settle();
+    expect(shown(editor)).toEqual(['Teh', 'a']);
+    expect(isTasting(editor.state)).toBe(false);
+  });
+
+  it('reviews a long page a part at a time, starting where the cursor is', async () => {
+    const paragraphs = Array.from({ length: 50 }, (_, i) => `Paragraph ${i} ate a apple.`);
+    const editor = make(paragraphs.join('\n\n'));
+    const batches: string[][] = [];
+    const base = checker();
+    const c: Checker = {
+      ...base.c,
+      check: (texts, review) => {
+        if (review) batches.push(texts);
+        return base.c.check(texts, review);
+      },
+    };
+    editor.commands.setTextSelection(editor.state.doc.content.size - 1);
+    setChecker(editor, c);
+    setReview(editor, true);
+    await settle();
+    await settle();
+    expect(batches.length).toBe(3);
+    expect(batches[0]![0]).toBe('Paragraph 49 ate a apple.');
+    expect(new Set(batches.flat()).size).toBe(50);
+    expect(issuesOf(editor.state).length).toBe(50);
+  });
+
   it('stops underlining when switched off', async () => {
     const editor = make('Teh end.');
     setChecker(editor, checker().c);

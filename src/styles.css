@@ -1190,6 +1190,9 @@ button.seas-quote:hover { color: var(--accent); }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 :root[data-theme='dark'] ::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 :root[data-theme='dark'] .cb-page ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+/* While a menu or the toolbar has the keyboard, the page draws its own selection (see keptSelection.ts), so the browser's is hidden to avoid painting it twice. */
+.cb-keeps-selection ::selection { background: transparent; }
+.cb-kept-selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
 /* The top bar's lower edge, in the writing view and in Settings, is the accent instead of a grey line. */
 .topbar, .set-top { border-bottom: var(--trim) solid var(--accent); }

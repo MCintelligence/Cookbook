@@ -429,6 +429,8 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 /* Proofreader underlines: spelling crimson, grammar blue, style purple. The page is always paper, so the colours are fixed. */
 .cb-issue { --issue: var(--spelling); text-decoration: underline wavy var(--issue); text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-skip-ink: none; cursor: pointer; }
 .cb-issue-grammar { --issue: var(--grammar); }
+/* An unknown word that looks like a name is marked softly: dotted and paler, so a page of new names isn't a sea of red. */
+.cb-issue-name { text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, var(--issue) 60%, transparent); text-decoration-thickness: 2px; }
 .cb-issue-sentence { cursor: text; }
 .cb-issue-space { background: color-mix(in srgb, var(--issue) 22%, transparent); border-radius: 2px; }
 .cb-issue-style { text-decoration: none; }

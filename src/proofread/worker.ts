@@ -5,6 +5,7 @@ import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './chec
 import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
 import { combine, peteIssues } from './pete';
 import { isSentenceRule, styleIssues } from './style';
+import { supplementEntries } from './supplement';
 
 /**
  * The proofreader's background worker: it holds the Hunspell dictionary and,
@@ -77,6 +78,7 @@ async function handle(req: Request): Promise<unknown> {
     config = { dialect: req.dialect, words };
     ready = files(req.dialect).then(({ aff, dic }) => {
       const speller = nspell(aff, dic);
+      for (const [word, model] of supplementEntries()) speller.add(word, model);
       for (const word of words) speller.add(word);
       return { speller, names: req.names };
     });

@@ -275,7 +275,7 @@ Right-click any words on the page and choose **Make it a Pantry card** to start 
 
 Cookbook checks your writing on this device, with no account and nothing sent anywhere, using four **Seasonings**. Each recipe picks its own. Open them from View › Seasonings${k('seasonings') ? ` or with ${k('seasonings')}` : ''}.
 
-- **Salty Sam** checks spelling, and near misses of names in the Pantry.
+- **Salty Sam** checks spelling, and near misses of names in the Pantry. A new word with a capital in mid-sentence is probably a name, so he marks it with a soft dotted line instead.
 - **Peppery Pete** checks grammar and punctuation.
 - **Drunk Daniel** measures how much of the open page is dialogue.
 - **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness.
@@ -298,7 +298,7 @@ A Check is one switch for the whole recipe: turn it on or off once and every Ite
 
 Close Seasonings and keep writing: the underlines stay, and every picked seasoning with its Check on keeps tasting the page. The number beside the **Seasonings** button says how many of them have something to say; close the panel now and watch it go down as you fix the slips above.
 
-Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
+Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. On a dotted name, **Add all likely names** adds every name on the page at once. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
 Which checks run, and American or British spelling, are in App Settings › Seasonings.
 `,

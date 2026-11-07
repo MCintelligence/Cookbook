@@ -26,12 +26,13 @@ describe('proofreader switches', () => {
     expect(isHidden(other, { ignored: new Set(), off: new Set(['grammar']) })).toBe(true);
   });
 
-  it('starts run-ons off, and keeps a writer’s choice either way', () => {
-    expect(effectiveOff([])).toEqual(['run-on']);
-    expect(effectiveOff(['adverb'])).toEqual(['adverb', 'run-on']);
+  it('starts run-ons and the Oxford comma off, and keeps a writer’s choice either way', () => {
+    expect(effectiveOff([])).toEqual(['run-on', 'OxfordComma']);
+    expect(effectiveOff(['adverb'])).toEqual(['adverb', 'run-on', 'OxfordComma']);
     const on = storedOff([], 'run-on', true);
     expect(on).toEqual(['+run-on']);
-    expect(effectiveOff(on)).toEqual([]);
+    expect(effectiveOff(on)).toEqual(['OxfordComma']);
+    expect(ruleGroup({ kind: 'style', rule: 'OxfordComma' })).toBe('OxfordComma');
     expect(storedOff(on, 'run-on', false)).toEqual([]);
     expect(storedOff(['adverb'], 'adverb', true)).toEqual([]);
     expect(storedOff([], 'echo', false)).toEqual(['echo']);

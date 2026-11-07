@@ -278,7 +278,7 @@ Cookbook checks your writing on this device, with no account and nothing sent an
 - **Salty Sam** checks spelling, and near misses of names in the Pantry.
 - **Peppery Pete** checks grammar and punctuation, and right spellings of the wrong word, like "form" for "from".
 - **Drunk Daniel** measures how much of the open page is dialogue.
-- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness.
+- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness. Give her your own list in Recipe Settings › Seasonings: phrases to watch for, and with a - in front, ones she should never mark.
 
 Salty Sam is already picked for this recipe. Click the **+** at the bottom of Seasonings to add the other three, then watch what they find below:
 

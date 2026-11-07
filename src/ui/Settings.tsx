@@ -167,6 +167,17 @@ const CHECK_HELP: Record<string, string> = {
   grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'stray-capitals': 'Peppery Pete: “MOnster” or “mONSTER”, while Seasonings is open.',
+  agreement: 'Peppery Pete: “the children was”, while Seasonings is open.',
+  'word-mixup': 'Peppery Pete: “your going”, “less people”, while Seasonings is open.',
+  'pronoun-case': 'Peppery Pete: “me and him went”, while Seasonings is open.',
+  'verb-form': 'Peppery Pete: “I seen”, “was laying on the bed”, while Seasonings is open.',
+  'reported-question': 'Peppery Pete: “he asked where are you going?”, while Seasonings is open.',
+  'look-alike': 'Peppery Pete: “form” for “from”, “quite” for “quiet”, found from the words around them.',
+  apostrophe: 'Peppery Pete: “the apple’s were ripe”, “the Smith’s came”.',
+  'double-negative': 'Peppery Pete: “didn’t have no”, outside speech.',
+  'run-on': 'Peppery Pete: “it was late, she was tired”. Off at first, since novels use these on purpose.',
+  OxfordComma: 'Spicy Sally: asks for a comma in “bread, butter, and jam”. Off at first, since house styles differ.',
+  'own-pattern': 'Spicy Sally: the phrases on your own list, below.',
 };
 
 /**
@@ -911,12 +922,44 @@ function Proofreading({ proof }: { proof: Proofreader }) {
           </Row>
         ))}
       </Group>
+      <SallyList proof={proof} />
       <div className="set-end">
         <button className="set-btn" disabled={proof.ignoredCount === 0} onClick={proof.clearIgnored}>
           Bring back everything removed{proof.ignoredCount > 0 ? ` (${proof.ignoredCount})` : ''}
         </button>
       </div>
     </>
+  );
+}
+
+/** Spicy Sally's list from the writer: phrases to mark and phrases to leave alone, saved when the box loses focus. */
+function SallyList({ proof }: { proof: Proofreader }) {
+  const saved = proof.list.join('\n');
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const save = () => {
+    const lines = text.split('\n').map((l) => l.trimEnd());
+    while (lines.length > 0 && lines.at(-1) === '') lines.pop();
+    if (lines.join('\n') !== saved) proof.setList(lines);
+  };
+  return (
+    <Group title="Spicy Sally’s list">
+      <Row
+        title="Your own list"
+        help="One per line, kept with the recipe. Sally marks each phrase, and “=>” gives her a fix. A line starting with - is never marked by any of her checks. {a|b} stands for either word."
+        words="patterns custom words phrases exceptions style sally list"
+      />
+      <textarea
+        className="set-list"
+        aria-label="Spicy Sally’s list"
+        spellCheck={false}
+        rows={6}
+        value={text}
+        placeholder={'honestly\n{grinned|smirked} wryly\na myriad of => many\n-suddenly'}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+      />
+    </Group>
   );
 }
 

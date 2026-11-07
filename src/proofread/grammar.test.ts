@@ -48,6 +48,50 @@ describe('grammar', () => {
     expect(text.slice(issue!.from, issue!.to)).toBe('could of');
   });
 
+  it('reads curly apostrophes as Harper’s straight ones, and gives the fix back curly', async () => {
+    const text = 'The dog wagged it’s tail. She don’t know.';
+    const found = await check(text);
+    expect(found.map((i) => [text.slice(i.from, i.to), i.suggestions[0]])).toEqual([
+      ['it’s', 'its'],
+      ['don’t', 'doesn’t'],
+    ]);
+    // With straight quotes, the fix stays straight.
+    expect((await check("She don't know."))[0]!.suggestions[0]).toBe("doesn't");
+  });
+
+  it('leaves good fiction alone', async () => {
+    for (const text of [
+      'He strode across the room, and she hid the key.',
+      'She leapt out of the boat. He woke up again. She burst into tears.',
+      'He spun around, swore under his breath and dealt the cards.',
+      'With a sharp gesture he motioned them to silence.',
+      'She let out a long breath.',
+      'She sort of smiled at him.',
+      'The poor boy cried, and Dick laughed.',
+      'You fellows are late.',
+      'We left, for they were coming.',
+      'Nothing prevented their being seen, and the idea of its being offered was absurd.',
+      'Whom did you invite? One of whom was old.',
+      'He thought over all the things she said.',
+      'I am afraid of him. It was clear that he lied.',
+      'He was too frank to be understood.',
+      'Thus it was that he came home.',
+      'Their two friends took their earlier walk.',
+      'She drew back in a hurry.',
+      '‘It’s no use speaking to it,’ she said.',
+    ]) {
+      expect(await check(text), text).toEqual([]);
+    }
+  });
+
+  it('still catches the slips those rules are for', async () => {
+    const said = async (text: string) => (await check(text)).map((i) => text.slice(i.from, i.to));
+    expect(await said('She go to the store.')).toEqual(['go']);
+    expect(await said('Whom is at the door?')).toEqual(['Whom']);
+    expect(await said('It is to late.')).toEqual(['to']);
+    expect(await said('Its a lovely day.')).toEqual(['Its']);
+  });
+
   it('puts Harper’s code quotes into curly ones', () => {
     expect(quoteTicks('Use `have` rather than `of`.')).toBe('Use “have” rather than “of”.');
   });

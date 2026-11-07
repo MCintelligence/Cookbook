@@ -47,6 +47,8 @@ export interface BookInfo {
   dialect?: Dialect;
   /** Proofreader checks the writer switched off. */
   proofreadOff?: string[];
+  /** Spicy Sally's list from the writer, one entry a line (see ownPatterns.ts). */
+  sallyList?: string[];
   /** The book's own id: files its backups, and tells readers a new e-book is the same book. Given to every book when it opens. */
   id?: string;
   /** Page size, margins, view and zoom; see page.ts. */
@@ -141,6 +143,7 @@ export async function openBook(fs: StorageAdapter): Promise<BookInfo> {
     ...(typeof info.dailyGoal === 'number' && info.dailyGoal > 0 && { dailyGoal: info.dailyGoal }),
     ...(isDialect(info.dialect) && { dialect: info.dialect }),
     ...(Array.isArray(info.proofreadOff) && { proofreadOff: info.proofreadOff.filter((r): r is string => typeof r === 'string') }),
+    ...(Array.isArray(info.sallyList) && { sallyList: info.sallyList.filter((r): r is string => typeof r === 'string') }),
     ...(typeof info.id === 'string' && { id: info.id }),
     ...(info.page && typeof info.page === 'object' && { page: pageOf(info.page) }),
     ...(typeof info.bookTarget === 'number' && info.bookTarget > 0 && { bookTarget: info.bookTarget }),

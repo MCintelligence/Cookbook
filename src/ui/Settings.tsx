@@ -176,6 +176,11 @@ const CHECK_HELP: Record<string, string> = {
   apostrophe: 'Peppery Pete: “the apple’s were ripe”, “the Smith’s came”.',
   'double-negative': 'Peppery Pete: “didn’t have no”, outside speech.',
   'run-on': 'Peppery Pete: “it was late, she was tired”. Off at first, since novels use these on purpose.',
+  fragment: 'Peppery Pete: “Because the oven was cold.” standing alone. Fragments like “Half past nine.” are left alone, and so is speech.',
+  dangling: 'Peppery Pete: “Running down the stairs, the bread fell”, when what comes after the comma plainly can’t do the opening’s action.',
+  'tense-shift': 'Peppery Pete: “he went to the store and buys milk”, outside speech.',
+  capitals: 'Peppery Pete: “monday”, “english”, or a sentence that starts in lower case.',
+  usage: 'Peppery Pete: “irregardless”, and “alright” outside speech.',
   OxfordComma: 'Spicy Sally: asks for a comma in “bread, butter, and jam”. Off at first, since house styles differ.',
   'own-pattern': 'Spicy Sally: the phrases on your own list, below.',
 };

@@ -24,6 +24,11 @@ export const PETE_RULES: { id: string; label: string }[] = [
   { id: 'look-alike', label: 'Look-alike words (form/from, quite/quiet…)' },
   { id: 'apostrophe', label: 'Apostrophes in plurals (the apple’s were)' },
   { id: 'double-negative', label: 'Double negatives (didn’t see nothing)' },
+  { id: 'fragment', label: 'Sentence fragments (Because the oven was cold.)' },
+  { id: 'dangling', label: 'Dangling openers (Running down the stairs, the bread fell…)' },
+  { id: 'tense-shift', label: 'Tense slips (he went to the store and buys milk)' },
+  { id: 'capitals', label: 'Missing capitals (monday, english, a sentence’s first word)' },
+  { id: 'usage', label: 'Words to avoid (irregardless, alright)' },
   { id: 'run-on', label: 'Run-ons and comma splices (off at first: novelists use them on purpose)' },
 ];
 
@@ -586,6 +591,10 @@ const overlaps = (a: Issue, b: Issue) => a.from < b.to && a.to > b.from;
  */
 export function combine(spelling: Issue[], harper: Issue[], own: Issue[], style: Issue[], isSentenceRule: (rule: string) => boolean): Issue[] {
   const pete: Issue[] = [];
+  // “Irregardless”: when Pete names the right word for exactly what Sam flagged, Pete's note is the more useful one.
+  const same = (a: Issue, b: Issue) => a.from === b.from && a.to === b.to;
+  const replaced = own.filter((i) => i.suggestions.length > 0 && spelling.some((s) => same(s, i)));
+  spelling = spelling.filter((s) => !replaced.some((i) => same(s, i)));
   for (const i of [...own, ...style.filter((s) => s.kind === 'grammar')]) {
     if (!spelling.some((s) => overlaps(s, i)) && !pete.some((p) => overlaps(p, i))) pete.push(i);
   }

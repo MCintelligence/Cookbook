@@ -276,7 +276,7 @@ Right-click any words on the page and choose **Make it a Pantry card** to start 
 Cookbook checks your writing on this device, with no account and nothing sent anywhere, using four **Seasonings**. Each recipe picks its own. Open them from View › Seasonings${k('seasonings') ? ` or with ${k('seasonings')}` : ''}.
 
 - **Salty Sam** checks spelling, and near misses of names in the Pantry.
-- **Peppery Pete** checks grammar and punctuation, and right spellings of the wrong word, like "form" for "from".
+- **Peppery Pete** checks grammar and punctuation, and right spellings of the wrong word, like "form" for "from". He reads whole sentences too, for fragments, openers that dangle and slips from past to present.
 - **Drunk Daniel** measures how much of the open page is dialogue.
 - **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness. Give her your own list in Recipe Settings › Seasonings: phrases to watch for, and with a - in front, ones she should never mark.
 

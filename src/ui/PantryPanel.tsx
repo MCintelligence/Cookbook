@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { Icon } from './Icon';
 import { PANTRY_SECTIONS } from '../storage/book';
 import { type SearchHit } from '../storage/index';
 import { type PantrySection, SECTION_LABEL } from '../storage/pantry';
@@ -71,10 +72,7 @@ export function PantryPanel({ group, onGroup, query, onQuery, hits, selected, on
 export function PanelSearch({ label, placeholder, query, onQuery }: { label: string; placeholder: string; query: string; onQuery: (query: string) => void }) {
   return (
     <label className="panel-search">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="6" />
-        <path d="m19.5 19.5-4-4" />
-      </svg>
+      <Icon name="search" size={15} />
       <input
         type="search"
         aria-label={label}

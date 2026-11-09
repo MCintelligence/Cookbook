@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { type AppSettings, MARKDOWN_RULES, type Theme, getSettings, setSettings, useSettings } from '../settings';
 import { WRITERS } from '../writers';
 import { SEASONINGS } from '../proofread/remarks';
@@ -249,10 +250,7 @@ export function Settings(props: Props) {
         </div>
         <div className="set-top-actions">
           <label className="set-search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
+            <Icon name="search" size={16} />
             <input type="search" placeholder="Search settings" aria-label="Search settings" value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
           <button className="set-btn" onClick={onClose}>

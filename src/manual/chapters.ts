@@ -251,7 +251,7 @@ Also in the View menu:
 - **Typewriter scrolling** keeps the line you're typing in the middle of the window.
 - **Paper** shows the page as a sheet; **Draft** is a plain column of text. The page's size, margins and indents are in Recipe Settings › Layout.
 - **Zoom**: the percentage in the bottom bar opens a slider; ⌘= and ⌘− (Ctrl+= and Ctrl+−) zoom, ⌘0 (Ctrl+0) goes back to 100%.
-- **Open beside this one** (right-click an Item) shows another Item next to the one you're writing.
+- **Split view** shows another Item next to the one you're writing. Drag an Item from the Shelf to the left or right edge of the page area (or right-click it and choose **Open beside this one**). Drop it anywhere else and it opens in place of the page, as a click does. To close split view, double-click the page you want to keep (in its margin, if it's the one you're writing), or click **×** on the other.
 - **Full screen**: the desktop app starts full screen. On Windows and Linux, F11 or View › Full screen switches it; on a Mac, use Window › Enter Full Screen.`,
   },
   {

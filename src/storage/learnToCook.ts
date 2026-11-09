@@ -324,7 +324,7 @@ Also in the View menu:
 - **Zoom** and **Theme**: Light, Dark, Sepia, or follow your computer.
 - **Mise en Place** shows a whole Group as one page; click **The Shelf** to read the whole thing from start to finish.
 
-To read one Item while writing another, right-click it on the Shelf and choose **Open beside this one**.
+To read one Item while writing another, drag it from the Shelf to the left or right edge of the page area, and it opens beside this one. (Right-click it and choose **Open beside this one** works too.) Drop it in the middle instead and it simply opens. To go back to one page, double-click the one you want to keep: the other page anywhere, or this one in its margin.
 `,
         },
       ],

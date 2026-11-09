@@ -58,6 +58,8 @@ import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
 import { createStore } from './ui/store';
 import { useStable } from './ui/useStable';
+import { type DeskZone, deskZone } from './ui/deskDrop';
+import { DeskDropHint } from './ui/DeskDropHint';
 import { docWords } from './editor/docStats';
 import { useBookIndex } from './storage/useBookIndex';
 import { ownerOf, useBackups } from './storage/useBackups';
@@ -1390,10 +1392,17 @@ export function App() {
 
   /** The scene shown beside the one being written, if any. */
   const [beside, setBeside] = useState<string | null>(null);
+  /** The Item beside goes on the left of the page, when it was dropped on the left edge. */
+  const [besideLeft, setBesideLeft] = useState(false);
   const swapBeside = async (p: string) => {
     const writing = path;
     await select(p);
     setBeside(writing && writing !== p ? writing : null);
+  };
+  /** Ends split view, keeping `p` (either of the two) as the page being written. */
+  const keepOnly = async (p: string) => {
+    if (p !== path) await select(p);
+    setBeside(null);
   };
 
   /** Turns everything after a scene break into a new scene that comes right after this one. */
@@ -3574,6 +3583,35 @@ export function App() {
     if (picking) showPicked(next);
   });
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
+  /**
+   * A Shelf Item dragged onto the editor: near the left or right edge it opens beside the page,
+   * anywhere else it opens in place of it. Set only when the zone changes, so dragging never
+   * redraws the app on every move.
+   */
+  const [deskDrop, setDeskDrop] = useState<DeskZone | null>(null);
+  const zoneAt = (p: string, x: number, y: number): DeskZone | null => {
+    const box = desk.current?.getBoundingClientRect();
+    if (!box) return null;
+    const zone = deskZone(box, x, y, !!doc && !!path && !miseShown);
+    // The open Item dropped on itself goes nowhere.
+    return zone && p === path && !miseShown ? null : zone;
+  };
+  const deskOver = useStable((p: string | null, x: number, y: number) => {
+    const zone = p ? zoneAt(p, x, y) : null;
+    setDeskDrop(zone);
+    return zone !== null;
+  });
+  const deskLand = useStable((p: string, x: number, y: number) => {
+    const zone = zoneAt(p, x, y);
+    if (zone === 'open') {
+      if (p === beside) setBeside(null);
+      void select(p);
+    } else if (zone) {
+      setBeside(p);
+      setBesideLeft(zone === 'left');
+    }
+  });
+  const shelfOutside = useMemo(() => ({ over: deskOver, drop: deskLand }), [deskOver, deskLand]);
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
@@ -3708,6 +3746,7 @@ export function App() {
           ghost={path && ghostN !== null ? { path, n: ghostN } : null}
           onDraft={onDraftRow}
           onDraftMenu={onDraftMenuRow}
+          outside={shelfOutside}
         />
         </ShelfSearch>
         {shelfBar()}
@@ -3724,7 +3763,7 @@ export function App() {
       )}
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
-      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
+      <main className={`desk${beside && doc ? ' split' : ''}${deskDrop ? ' drop-' + deskDrop : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         {error && (
           <div role="alert" className="error" title={error}>
             <span>{error.replace(/ \([^]*\)$/, '')}</span>
@@ -3777,19 +3816,28 @@ export function App() {
               onOpen={(p) => void select(p)}
             />
           )}
-          <div className="page-row">
+          <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
           {doc && path ? (
-            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
+            <article
+              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              key={path}
+              style={pageStyle}
+              onContextMenu={pageMenu}
+              // In split view, a double-click in the page's margin keeps this page and closes the other.
+              // A double-click in the text still just picks a word.
+              onDoubleClick={beside ? (e) => !(e.target as HTMLElement).closest('.ProseMirror') && void keepOnly(path) : undefined}
+            >
               {pageBody()}
             </article>
           ) : null}
           {doc && path && beside && beside !== path ? (
-            <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onClose={() => setBeside(null)} /></Suspense>
+            <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onKeep={(p) => void keepOnly(p)} onClose={() => setBeside(null)} /></Suspense>
           ) : null}
           </div>
           {doc && path ? null : <p className="empty">Pick an item from the Shelf to start writing.</p>}
           </>
         )}
+        {deskDrop && <DeskDropHint zone={deskDrop} box={desk.current?.getBoundingClientRect() ?? null} />}
       </main>
 
       {drawerOpen && (

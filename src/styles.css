@@ -1579,3 +1579,10 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 @media (max-width: 900px) {
   .app:not(.focus):not(.side-open) .sidebar { display: none; }
 }
+
+/* A Shelf Item dragged onto the editor: the edges open it beside the page, the middle in place of it. */
+.desk-drop-hint { position: fixed; z-index: 40; pointer-events: none; display: flex; align-items: center; justify-content: center; padding: 12px; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 2px dashed color-mix(in srgb, var(--accent) 60%, transparent); border-radius: 8px; }
+.desk-drop-hint.open { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.desk-drop-hint span { padding: 4px 10px; border-radius: 999px; background: var(--bar); color: var(--text); font-size: 12px; font-weight: 700; box-shadow: 0 2px 8px rgba(var(--shadow), 0.15); }
+.page-row.beside-left > .beside { order: -1; }
+.beside-page { cursor: default; }

@@ -5,6 +5,8 @@
  * Every card is optional, and the writer adds them with the + on an empty line.
  */
 
+import { SKETCH_FIELD_HINTS, isSketchKind } from './sketch';
+
 export type BrainstormKind = 'character' | 'setting';
 
 export interface BrainstormCard {
@@ -106,5 +108,6 @@ export const FIELD_PLACEHOLDERS: Record<BrainstormKind, Record<string, string>> 
 
 /** The placeholder for a field by its name, or the plain one for a field the writer made. */
 export function fieldPlaceholder(kind: string, name: string): string {
-  return (isBrainstormKind(kind) ? FIELD_PLACEHOLDERS[kind][key(name)] : undefined) ?? 'Field value';
+  const sketch = isSketchKind(kind) ? SKETCH_FIELD_HINTS[key(name)]?.[kind] : undefined;
+  return sketch ?? (isBrainstormKind(kind) ? FIELD_PLACEHOLDERS[kind][key(name)] : undefined) ?? 'Field value';
 }

@@ -1,6 +1,7 @@
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, PANTRY, createDocument, readDocument, writeDocument } from './book';
 import { type DocumentKind } from './document';
+import { SKETCH_FIELDS } from './sketch';
 
 /**
  * Starting points. A book template lays out the Bookshelf and Pantry; a
@@ -46,6 +47,9 @@ export const SCENE_TEMPLATES: DocTemplate[] = [
   },
 ];
 
+/** Every new Pantry Item starts from the Pantry Sketch: its four short facts, and an empty Sketch. */
+const SKETCH_START: Record<string, unknown> = { ...Object.fromEntries(SKETCH_FIELDS.map((k) => [k, ''])), sketch: {} };
+
 export const CARD_TEMPLATES: DocTemplate[] = [
   {
     id: 'character',
@@ -53,8 +57,8 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     kind: 'character',
     folder: 'characters',
     title: 'New character',
-    fields: { role: '', age: '', wants: '', fears: '' },
-    // Nearly empty: the writer adds brainstorming cards with the + on an empty line.
+    fields: SKETCH_START,
+    // The Sketch is on the card; the page is free, and the + on an empty line adds brainstorming cards.
     body: '',
   },
   {
@@ -63,10 +67,10 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     kind: 'setting',
     folder: 'settings',
     title: 'New setting',
-    fields: { role: '', when: '', offers: '', threatens: '' },
+    fields: SKETCH_START,
     body: '',
   },
-  { id: 'research', name: 'Material', kind: 'research', folder: 'research', title: 'New material', body: '' },
+  { id: 'research', name: 'Material', kind: 'research', folder: 'research', title: 'New material', fields: SKETCH_START, body: '' },
 ];
 
 /** Writes a new scene or card from a template and returns its path. */

@@ -258,7 +258,9 @@ Cookbook finds Pantry names in your writing by itself, so Mama Lou and June abov
 
 To type a name from the Pantry, type **@** after a space${k('shelf') ? ` or press ${k('shelf')}` : ''} and pick it from the list.
 
-On a character or place card, click the **+** on an empty line to add brainstorming questions, like What do they want? and What are they hiding?
+Every card starts with the **Pantry Sketch**: one line on who or what it is, a few short facts, and the same sections for a character, a setting or a material (Purpose, Look, Senses, Nature, Past, Tension and Notes). The faint hint in each box tells you what that question means for this kind of card. Open Mama Lou to see one filled in.
+
+On a character or place card, click the **+** on an empty line of the page to add brainstorming questions, like What do they want? and What are they hiding?
 
 Right-click any words on the page and choose **Make it a Pantry card** to start a new card from them.
 `,
@@ -436,28 +438,56 @@ export const PANTRY_CARDS: Card[] = [
     section: 'characters',
     kind: 'character',
     title: 'Mama Lou',
-    fields: { role: 'Runs the Kitchen', age: '62', wants: 'To hand the Kitchen to June', fears: 'That June doesn’t want it', aka: ['Lou'] },
-    body: 'An example character. Change anything here, or click the + on an empty line below for brainstorming questions.\n\n',
+    fields: {
+      'role in story': 'Runs the Kitchen',
+      where: 'Above the Kitchen',
+      when: '62',
+      work: 'Cook and owner',
+      aka: ['Lou'],
+      sketch: {
+        line: 'The cook who built the Kitchen and can’t let it go.',
+        want: 'To hand the Kitchen to June.',
+        need: 'To let June make it her own.',
+        temperament: 'Warm with customers, sharp with family.',
+        quirks: 'Wipes her hands on her apron before she says anything that matters.',
+        within: 'She’s afraid the Kitchen is all she is.',
+        without: 'That June doesn’t want it.',
+      },
+    },
+    body: 'An example character. Change anything in the Sketch above, or click the + on an empty line below for brainstorming questions.\n\n',
   },
   {
     section: 'characters',
     kind: 'character',
     title: 'June',
-    fields: { role: 'Mama Lou’s daughter', age: '29', wants: 'A kitchen of her own', fears: 'Turning into her mother' },
+    fields: { 'role in story': 'Mama Lou’s daughter', where: '', when: '29', work: '', sketch: { want: 'A kitchen of her own.', within: 'Turning into her mother.' } },
     body: '',
   },
   {
     section: 'settings',
     kind: 'setting',
     title: 'Kitchen',
-    fields: { role: 'Where everything happens', when: 'Every evening since 1971', offers: 'Warmth, and an audience', threatens: 'The boiler in the cellar' },
-    body: 'An example setting. Settings have their own fields: what the place offers and what it threatens.\n',
+    fields: {
+      'role in story': 'Where everything happens',
+      where: 'The corner of Fifth and Vine',
+      when: 'Every evening since 1971',
+      work: 'Restaurant',
+      sketch: {
+        line: 'The restaurant Mama Lou built, and the only place the family all sits down.',
+        want: 'Warmth, and an audience.',
+        smell: 'Cornbread and coffee',
+        sound: 'Pans, and the radio',
+        without: 'The boiler in the cellar.',
+      },
+    },
+    body: 'An example setting. It has the same Sketch as a character; only the hints change.\n',
   },
   {
     section: 'research',
     kind: 'research',
     title: 'Materials',
-    body: 'Materials hold anything you need to keep to hand: sources, links, pictures, timelines. Unlike characters and settings, they have no fields, just the page.\n',
+    fields: { 'role in story': '', where: '', when: '', work: '', sketch: {} },
+    body: 'Materials hold anything you need to keep to hand: objects, letters, sources, links, pictures, timelines. They have the same Sketch as characters and settings, so fill in only what helps.\n',
   },
 ];
 

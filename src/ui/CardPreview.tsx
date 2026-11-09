@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { plainText } from '../editor/markdown';
 import { type CookbookDocument, akaOf, cardFieldsOf, portraitOf } from '../storage/document';
+import { sketchOf } from '../storage/sketch';
 
 const KIND_LABEL: Record<string, string> = { character: 'Character', setting: 'Setting', research: 'Material', scene: 'Item' };
 
@@ -29,6 +30,7 @@ export function CardPreview({ card, loadPicture, full = false }: { card: Cookboo
   const picture = usePicture(portraitOf(card.fields), loadPicture);
   const fields = cardFieldsOf(card).filter(([, v]) => v.trim());
   const aka = akaOf(card.fields);
+  const line = sketchOf(card.fields)?.line?.trim();
   const text = plainText(card.body).replace(/\s+/g, ' ').trim();
   const limit = full ? 900 : 180;
   return (
@@ -41,6 +43,7 @@ export function CardPreview({ card, loadPicture, full = false }: { card: Cookboo
           {aka.length > 0 && <span className="peek-aka">Also {aka.join(', ')}</span>}
         </div>
       </div>
+      {line && <p className="peek-line">{line}</p>}
       {fields.length > 0 && (
         <dl className="peek-fields">
           {(full ? fields : fields.slice(0, 3)).map(([k, v]) => (

@@ -126,6 +126,10 @@ Every paragraph has a **paragraph style** (Body, Chapter title, Letter, and any 
 
 The Font menu lists Cookbook's own fonts, then the ones installed on your computer. A font you install while Cookbook is open shows up the next time you come back to Cookbook or open a font menu, with no restart. If one is still missing, pick **Refresh fonts** at the bottom of the menu.
 
+## Text colour
+
+The colour button in the toolbar opens a colour wheel with a brightness slider beside it and a Hex box. Along the bottom are **Automatic**, the style's own colour, which is picked until you set a colour by hand, and a row of ready-made colours. The ready-made colours are fitted to your page, so each one stays easy to read on it.
+
 ## Footnotes
 
 Insert › Footnote ({key:footnote|no shortcut}) puts a footnote number at the cursor. Footnotes are written at the foot of the page; click a number to change its note.

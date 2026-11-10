@@ -1,5 +1,6 @@
 import { dialogueRanges } from '../editor/dialogue';
 import { type Issue, words } from './check';
+import { CLICHES, FILLERS, FILLER_AFTER_GUARDS, FILLER_GUARDS, NOT_ECHOES, NOT_MANNER, NOT_PASSIVE, REDUNDANCIES, WORDY, listRegExp, shorterWay } from './styleLists';
 
 /**
  * Style and readability: Hemingway-style highlights (adverbs, simpler words,
@@ -12,11 +13,13 @@ export const STYLE_RULES: { id: string; label: string; why: string }[] = [
   { id: 'adverb', label: 'Adverbs', why: 'Adverbs often prop up a weak verb. “Ran quickly” is “dashed”. Keep the ones that earn their place.' },
   { id: 'simpler-word', label: 'Simpler words', why: 'A shorter, plainer word usually says the same thing with less effort for the reader.' },
   { id: 'passive', label: 'Passive voice', why: 'In the passive voice the doer of the action comes last or not at all. Saying who did what is usually livelier.' },
-  { id: 'sticky-sentence', label: 'Sticky sentences', why: 'Almost half of this sentence is glue words (the, of, to, it, that…), which carry little meaning. Cut some to tighten it.' },
+  { id: 'sticky-sentence', label: 'Sticky sentences', why: 'Most of this long sentence is glue words (the, of, to, it, that…), which carry little meaning. Cut some to tighten it.' },
   { id: 'crutch-word', label: 'Crutch words', why: 'Words like “just”, “really” and “suddenly” creep into every draft and rarely add anything. Speech is left alone, since that is how people talk.' },
   { id: 'echo', label: 'Echoes', why: 'The same word twice in quick succession can sound like an echo. Change one if it wasn’t on purpose.' },
   { id: 'cliche', label: 'Clichés', why: 'A phrase readers have seen many times slides past them. Something of your own will stick.' },
   { id: 'redundancy', label: 'Redundancies', why: 'Part of this phrase repeats the rest. The shorter version means the same.' },
+  { id: 'OxfordComma', label: 'Oxford comma', why: 'A comma before the “and” that ends a list: “bread, butter, and jam”. Some house styles want it and some don’t, so this starts off.' },
+  { id: 'own-pattern', label: 'Your own list', why: 'You put this on your own list in Recipe Settings › Seasonings.' },
 ];
 
 const WHY = Object.fromEntries(STYLE_RULES.map((r) => [r.id, r.why]));
@@ -40,57 +43,27 @@ const SIMPLER: Record<string, string> = {
   observe: 'see', observed: 'saw', proceed: 'go', proceeded: 'went', retain: 'keep', retained: 'kept', sufficiently: 'enough', initial: 'first',
   initially: 'at first', frequently: 'often', nevertheless: 'still', consequently: 'so', therefore: 'so', accordingly: 'so', perceive: 'see',
   perceived: 'saw', converse: 'talk', conversed: 'talked', depart: 'leave', departed: 'left', inform: 'tell', informed: 'told', modify: 'change',
-  modified: 'changed', indicate: 'show', indicated: 'showed', locate: 'find', located: 'found', permit: 'let', permitted: 'let', ascertain: 'find out',
+  modified: 'changed', indicate: 'show', indicated: 'showed', locate: 'find', permit: 'let', permitted: 'let', ascertain: 'find out',
   'in order to': 'to', 'prior to': 'before', 'a number of': 'some', 'at this point in time': 'now', 'due to the fact that': 'because',
   'in the event that': 'if', 'with regard to': 'about', 'in spite of the fact that': 'although', 'for the purpose of': 'to', 'at the present time': 'now',
+  ...WORDY,
 };
-
-const CRUTCH = ['just', 'really', 'very', 'suddenly', 'somehow', 'actually', 'literally', 'basically', 'totally', 'definitely', 'simply', 'began to', 'started to', 'seemed to', 'managed to'];
-
-const REDUNDANT: Record<string, string> = {
-  'each and every': 'each', 'free gift': 'gift', 'past history': 'history', 'end result': 'result', 'close proximity': 'proximity',
-  'absolutely essential': 'essential', 'added bonus': 'bonus', 'advance planning': 'planning', 'completely finished': 'finished',
-  'final outcome': 'outcome', 'unexpected surprise': 'surprise', 'reason why': 'reason', 'revert back': 'revert', 'return back': 'return',
-  'repeat again': 'repeat', 'join together': 'join', 'merge together': 'merge', 'plan ahead': 'plan', 'basic fundamentals': 'fundamentals',
-  'true facts': 'facts', 'past experience': 'experience', 'sum total': 'total', 'first began': 'began', 'still remains': 'remains',
-  'shrug your shoulders': 'shrug', 'shrugged his shoulders': 'shrugged', 'shrugged her shoulders': 'shrugged', 'shrugged their shoulders': 'shrugged',
-  'nodded his head': 'nodded', 'nodded her head': 'nodded', 'nodded their head': 'nodded', 'nodded their heads': 'nodded', 'blinked her eyes': 'blinked',
-  'blinked his eyes': 'blinked', 'stood up to his feet': 'stood up', 'sat down on the chair': 'sat on the chair', 'whispered quietly': 'whispered',
-  'shouted loudly': 'shouted', 'ascend up': 'ascend', 'descend down': 'descend', 'circle around': 'circle', 'collaborate together': 'collaborate',
-  'completely empty': 'empty', 'completely full': 'full', 'entirely unique': 'unique', 'very unique': 'unique', 'new innovation': 'innovation',
-  'over exaggerate': 'exaggerate', 'brief moment': 'moment', 'tiny little': 'tiny', 'empty space': 'space', 'mix together': 'mix', 'gather together': 'gather',
-};
-
-const CLICHES = [
-  'at the end of the day', 'avoid like the plague', 'better late than never', 'blood ran cold', 'busy as a bee', 'calm before the storm',
-  'cold as ice', 'cool as a cucumber', 'dead as a doornail', 'easier said than done', 'every cloud has a silver lining', 'fit as a fiddle',
-  'flat as a pancake', 'heart of gold', 'in the nick of time', 'it goes without saying', 'last but not least', 'light as a feather',
-  'only time will tell', 'quiet as a mouse', 'scared to death', 'sick as a dog', 'slept like a log', 'sleep like a log', 'think outside the box',
-  'time heals all wounds', 'tip of the iceberg', 'all walks of life', 'at a loss for words', 'heart skipped a beat', 'heart pounded in her chest',
-  'heart pounded in his chest', 'let out a breath she didn’t know she was holding', 'let out a breath he didn’t know he was holding',
-  'released a breath she didn’t know she was holding', 'released a breath he didn’t know he was holding', 'a chill ran down her spine',
-  'a chill ran down his spine', 'shiver down her spine', 'shiver down his spine', 'dark and stormy night', 'eyes like saucers',
-  'in the blink of an eye', 'like a kid in a candy store', 'more than meets the eye', 'needle in a haystack', 'raining cats and dogs',
-  'read between the lines', 'stood the test of time', 'the writing on the wall', 'took her breath away', 'took his breath away',
-  'white as a sheet', 'white as a ghost', 'pale as a ghost', 'without further ado', 'all of a sudden', 'out of the blue', 'nerves of steel',
-  'sharp as a tack', 'smart as a whip', 'quick as a flash', 'drop in the bucket', 'piece of cake', 'once in a blue moon', 'when pigs fly',
-  'the apple of her eye', 'the apple of his eye', 'little did she know', 'little did he know', 'little did they know', 'time stood still',
-  'frozen in time', 'like a moth to a flame', 'butterflies in her stomach', 'butterflies in his stomach', 'a single tear', 'pregnant pause',
-  'deafening silence', 'hit the ground running', 'in this day and age', 'needless to say', 'the calm before the storm', 'a matter of time',
-];
 
 const IRREGULAR = new Set(
   'given taken written seen done made known shown thrown grown drawn broken chosen driven eaten fallen forgotten forgiven frozen hidden ridden risen shaken spoken stolen sworn torn worn woken beaten bitten built bought brought caught taught thought sought fought felt kept left lost meant met paid said sent sold told held found heard hit hurt cut put set shut spent struck stuck won led fed born borne begun sung rung drunk sunk swum laid hung slain sewn sown shorn spun flung stung swung wrung'.split(' '),
 );
-/** Words ending in -ed that read as adjectives after "was" far more often than as the passive. */
-const NOT_PASSIVE = new Set('tired excited interested bored scared worried pleased surprised married supposed used named bed red shed sled'.split(' '));
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const phrases = (list: string[]) => new RegExp(`(?<![\\p{L}'’])(?:${[...list].sort((a, b) => b.length - a.length).map(escape).join('|')})(?![\\p{L}'’])`, 'giu');
+/** Matches any of the phrases, with a straight or curly apostrophe. */
+const phrases = (list: string[]) =>
+  new RegExp(`(?<![\\p{L}'’])(?:${[...list].sort((a, b) => b.length - a.length).map((p) => escape(p).replace(/['’]/g, "['’]")).join('|')})(?![\\p{L}'’])`, 'giu');
+/** How a matched phrase is looked up in a list: lower case, curly apostrophes. */
+const keyOf = (s: string) => s.toLowerCase().replace(/'/g, '’');
 const SIMPLER_RE = phrases(Object.keys(SIMPLER));
-const CRUTCH_RE = phrases(CRUTCH);
-const REDUNDANT_RE = phrases(Object.keys(REDUNDANT));
-const CLICHE_RE = phrases(CLICHES);
+const CRUTCH_RE = phrases(FILLERS);
+const FILLER_WORDS = new Set(FILLERS);
+const REDUNDANT_RE = listRegExp(REDUNDANCIES.map(([pattern]) => pattern));
+const CLICHE_RE = listRegExp(CLICHES);
 const PASSIVE_RE = /(?<![\p{L}])(?:am|is|are|was|were|be|been|being)\s+(?:\p{L}+ly\s+)?(\p{L}+)(?![\p{L}'’])/giu;
 
 /** Keeps a replacement's capital when the original started with one. */
@@ -144,7 +117,13 @@ export function readingGrade({ letters, words: count, sentences: total }: { lett
   return { grade: count > 0 ? Math.max(1, Math.round(gradeLevel(letters, count, total))) : 0, words: count, sentences: total };
 }
 
-const ECHO_WINDOW = 30;
+/** How many words apart the same word still sounds like an echo. */
+const ECHO_WINDOW = 10;
+/** A sentence is sticky when it is this long and this much of it is glue. Shorter ones read fine whatever they're made of. */
+const STICKY_WORDS = 20;
+const STICKY_GLUE = 0.6;
+/** “Again and again”, “day after day”, “very, very”: a word repeated on purpose. */
+const ON_PURPOSE = /^[\s,;:—–-]*(?:(?:and|or|after|by|upon|to|for|on)\s+)?$/iu;
 
 function issue(from: number, to: number, rule: string, message: string, suggestions: string[] = []): Issue {
   return { from, to, kind: 'style', rule, message, suggestions, why: WHY[rule] };
@@ -158,23 +137,23 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   const out: Issue[] = [];
 
   for (const s of sentences(text)) {
-    if (s.words >= 12) {
+    if (s.words >= STICKY_WORDS) {
       const ws = words(text.slice(s.from, s.to));
       const glue = ws.filter((w) => GLUE.has(w.word.toLowerCase().replace(/’/g, "'"))).length;
-      if (glue / ws.length >= 0.45) out.push(issue(s.from, s.to, 'sticky-sentence', `This sentence is sticky: ${Math.round((glue / ws.length) * 100)}% glue words.`));
+      if (glue / ws.length >= STICKY_GLUE) out.push(issue(s.from, s.to, 'sticky-sentence', `This sentence is sticky: ${Math.round((glue / ws.length) * 100)}% glue words.`));
     }
   }
 
   const tokens = words(text);
   for (const w of tokens) {
     const lower = w.word.toLowerCase();
-    if (lower.length > 4 && lower.endsWith('ly') && !NOT_ADVERBS.has(lower) && !nameWords.has(lower) && !inSpeech(w.from)) {
+    if (lower.length > 4 && lower.endsWith('ly') && !NOT_ADVERBS.has(lower) && (!NOT_MANNER.has(lower) || FILLER_WORDS.has(lower)) && !nameWords.has(lower) && !inSpeech(w.from)) {
       out.push(issue(w.from, w.to, 'adverb', `“${w.word}” is an adverb. Could a stronger verb do the work?`));
     }
   }
 
   for (const m of text.matchAll(SIMPLER_RE)) {
-    const plain = SIMPLER[m[0].toLowerCase()]!;
+    const plain = SIMPLER[keyOf(m[0])]!;
     out.push(issue(m.index, m.index + m[0].length, 'simpler-word', `“${plain}” is simpler than “${m[0]}”.`, [matchCase(m[0], plain)]));
   }
   for (const m of text.matchAll(PASSIVE_RE)) {
@@ -185,10 +164,14 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   }
   for (const m of text.matchAll(CRUTCH_RE)) {
     if (inSpeech(m.index)) continue;
+    const lower = keyOf(m[0]);
+    if (FILLER_GUARDS[lower]?.test(text.slice(Math.max(0, m.index - 20), m.index))) continue;
+    if (FILLER_AFTER_GUARDS[lower]?.test(text.slice(m.index + m[0].length, m.index + m[0].length + 20))) continue;
     out.push(issue(m.index, m.index + m[0].length, 'crutch-word', `“${m[0]}” is a crutch word. Does the sentence need it?`));
   }
   for (const m of text.matchAll(REDUNDANT_RE)) {
-    const short = REDUNDANT[m[0].toLowerCase()]!;
+    const short = shorterWay(m[0]);
+    if (short === undefined) continue;
     out.push(issue(m.index, m.index + m[0].length, 'redundancy', `“${m[0]}” says it twice. “${short}” is enough.`, [matchCase(m[0], short)]));
   }
   for (const m of text.matchAll(CLICHE_RE)) out.push(issue(m.index, m.index + m[0].length, 'cliche', `“${m[0]}” is a cliché.`));
@@ -201,11 +184,11 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   const seen = new Map<string, number>();
   tokens.forEach((w, i) => {
     const lower = w.word.toLowerCase().replace(/’/g, "'");
-    if (lower.length < 4 || GLUE.has(lower) || nameWords.has(lower) || CRUTCH.includes(lower)) return;
+    if (lower.length < 5 || GLUE.has(lower) || nameWords.has(lower) || FILLER_WORDS.has(lower) || NOT_ECHOES.has(lower)) return;
     if (/^\p{Lu}/u.test(w.word) && i > 0 && !/[.!?…]["”’]?\s*$/u.test(text.slice(tokens[i - 1]!.to, w.from))) return;
     const stem = lower.replace(/(?:'s|s)$/, '');
     const last = seen.get(stem);
-    if (last !== undefined && i - last <= ECHO_WINDOW) out.push(issue(w.from, w.to, 'echo', `“${w.word}” echoes the same word just before it.`));
+    if (last !== undefined && i - last <= ECHO_WINDOW && !ON_PURPOSE.test(text.slice(tokens[last]!.to, w.from))) out.push(issue(w.from, w.to, 'echo', `“${w.word}” echoes the same word just before it.`));
     seen.set(stem, i);
   });
 

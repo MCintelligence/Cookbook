@@ -4,7 +4,9 @@ import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
 import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
 import { combine, peteIssues } from './pete';
+import { NO_PATTERNS, type OwnPatterns, compilePatterns, ownPatternIssues, spareExceptions, withOwn } from './ownPatterns';
 import { isSentenceRule, styleIssues } from './style';
+import { supplementEntries } from './supplement';
 
 /**
  * The proofreader's background worker: it holds the Hunspell dictionary and,
@@ -16,7 +18,8 @@ export type Request =
   | { id: number; type: 'configure'; dialect: Dialect; words: string[]; names: string[] }
   | { id: number; type: 'check'; texts: string[]; review: boolean }
   | { id: number; type: 'suggest'; word: string; around?: Around }
-  | { id: number; type: 'learn'; texts: string[] };
+  | { id: number; type: 'learn'; texts: string[] }
+  | { id: number; type: 'patterns'; lines: string[] };
 
 export type Response = { id: number; result: unknown } | { id: number; error: string };
 
@@ -26,8 +29,10 @@ const loaded = new Map<Dialect, Promise<{ aff: string; dic: string }>>();
 let ready: Promise<{ speller: Speller; names: string[] }> | null = null;
 let config: { dialect: Dialect; words: string[] } = { dialect: 'en-US', words: [] };
 /** Harper is large, so it is only loaded the first time grammar is wanted. */
-let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues }> | null = null;
+let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues; parsedIssues: typeof import('./parse').parsedIssues }> | null = null;
 let grammarConfigured: Promise<void> | null = null;
+/** The writer's own list for Spicy Sally (see ownPatterns.ts). */
+let own: OwnPatterns = NO_PATTERNS;
 /** Which words follow which in the books, loaded the first time a suggestion is wanted; empty if it can't be. */
 let pairs: Promise<Counts> | null = null;
 /** The same for the writer's own book. */
@@ -76,10 +81,10 @@ function files(dialect: Dialect) {
 function loadGrammar() {
   if (!grammar) {
     grammar = (async () => {
-      const [{ LocalLinter }, { slimBinary }, g] = await Promise.all([import('harper.js'), import('harper.js/slimBinary'), import('./grammar')]);
+      const [{ LocalLinter }, { slimBinary }, g, parse] = await Promise.all([import('harper.js'), import('harper.js/slimBinary'), import('./grammar'), import('./parse')]);
       const linter = new LocalLinter({ binary: slimBinary });
       await g.setUpLinter(linter, config.dialect, config.words);
-      return { linter, why: await linter.getLintDescriptions(), grammarIssues: g.grammarIssues };
+      return { linter, why: await linter.getLintDescriptions(), grammarIssues: g.grammarIssues, parsedIssues: parse.parsedIssues };
     })();
     grammar.catch(() => (grammar = null));
     grammarConfigured = grammar.then(() => {});
@@ -97,6 +102,7 @@ async function handle(req: Request): Promise<unknown> {
     generation++;
     ready = files(req.dialect).then(({ aff, dic }) => {
       const speller = nspell(aff, dic);
+      for (const [word, model] of supplementEntries()) speller.add(word, model);
       for (const word of words) speller.add(word);
       return { speller, names: req.names };
     });
@@ -107,6 +113,13 @@ async function handle(req: Request): Promise<unknown> {
     await ready;
     // Read the word pairs while the writer is busy, so the first suggestion doesn't wait for them.
     void loadPairs();
+    return null;
+  }
+  if (req.type === 'patterns') {
+    own = compilePatterns(req.lines);
+    // The writer's own list changes what Sally says, so earlier full reviews are stale.
+    answers.review.clear();
+    generation++;
     return null;
   }
   if (req.type === 'learn') {
@@ -133,7 +146,10 @@ async function handle(req: Request): Promise<unknown> {
       const found = await g.grammarIssues(g.linter, todo, spelling, g.why);
       const counts = [await loadPairs(), book];
       const isWord = (w: string) => speller.correct(w);
-      const reviewed = todo.map((text, i) => combine(spelling[i]!, found[i]!, peteIssues(text, isWord, counts), styleIssues(text, names), isSentenceRule));
+      const reviewed = todo.map((text, i) => {
+        const style = withOwn(styleIssues(text, names), ownPatternIssues(text, own));
+        return spareExceptions(text, combine(spelling[i]!, found[i]!, ownGrammar(peteIssues(text, isWord, counts), g.parsedIssues(text)), style, isSentenceRule), own);
+      });
       todo.forEach((text, i) => remember(answers.review, text, reviewed[i]!, from));
       const fresh = new Map(todo.map((t, i) => [t, reviewed[i]!]));
       return req.texts.map((t, i) => known[i] ?? fresh.get(t)!);
@@ -142,6 +158,11 @@ async function handle(req: Request): Promise<unknown> {
     return req.texts.map((t, i) => known[i] ?? fresh.get(t)!);
   }
   return known as Issue[][];
+}
+
+/** Pete's word rules first; the sentence reader adds what they didn't already mark. */
+function ownGrammar(pete: Issue[], parsed: Issue[]): Issue[] {
+  return [...pete, ...parsed.filter((p) => !pete.some((i) => p.from < i.to && p.to > i.from))];
 }
 
 self.onmessage = (e: MessageEvent<Request>) => {

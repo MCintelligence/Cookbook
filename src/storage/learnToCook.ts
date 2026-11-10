@@ -276,9 +276,9 @@ Right-click any words on the page and choose **Make it a Pantry card** to start 
 Cookbook checks your writing on this device, with no account and nothing sent anywhere, using four **Seasonings**. Each recipe picks its own. Open them from View › Seasonings${k('seasonings') ? ` or with ${k('seasonings')}` : ''}.
 
 - **Salty Sam** checks spelling, and near misses of names in the Pantry. A new word with a capital in mid-sentence is probably a name, so he marks it with a soft dotted line instead.
-- **Peppery Pete** checks grammar and punctuation.
+- **Peppery Pete** checks grammar and punctuation, and right spellings of the wrong word, like "form" for "from". He reads whole sentences too, for fragments, openers that dangle and slips from past to present.
 - **Drunk Daniel** measures how much of the open page is dialogue.
-- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness.
+- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness. Give her your own list in Recipe Settings › Seasonings: phrases to watch for, and with a - in front, ones she should never mark.
 
 Salty Sam is already picked for this recipe. Click the **+** at the bottom of Seasonings to add the other three, then watch what they find below:
 
@@ -290,11 +290,13 @@ She had a apple pie cooling on the sill.
 
 The MOnster in the cellar was only the boiler.
 
+She went form the cellar to the kitchen.
+
 She very quickly and really suddenly ran, and at the end of the day the end result was a free gift.
 
 Each seasoning's card has a meter for this page, a Check that shows or hides its underlines (Daniel's dims the narration instead), and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Materials › Seasoning Reports.
 
-A Check is one switch for the whole recipe: turn it on or off once and every Item follows, in Mise en Place too.
+A Check is one switch for the whole recipe: turn it on or off once and every Item follows, in Mise en Place too. Each kind of check can also be switched on or off in App Settings › Seasonings › Checks. One starts off: run-on sentences and comma splices, since novelists use them on purpose.
 
 Close Seasonings and keep writing: the underlines stay, and every picked seasoning with its Check on keeps tasting the page. The number beside the **Seasonings** button says how many of them have something to say; close the panel now and watch it go down as you fix the slips above.
 

@@ -170,12 +170,17 @@ const CONTRACTIONS: Record<string, string> = Object.fromEntries(
   ['don’t', 'doesn’t', 'didn’t', 'can’t', 'won’t', 'isn’t', 'wasn’t', 'aren’t', 'weren’t', 'hasn’t', 'haven’t', 'hadn’t', 'couldn’t', 'wouldn’t', 'shouldn’t', 'mustn’t', 'ain’t', 'I’m', 'I’ve', 'you’re', 'they’re', 'we’ve', 'they’ve', 'you’ve', 'that’s', 'what’s', 'there’s', 'here’s', 'who’s', 'it’ll', 'she’ll', 'he’ll', 'we’ll', 'they’ll', 'you’ll', 'I’ll'].map((c) => [c.replace('’', '').toLowerCase(), c]),
 );
 
+/** Plurals that own something, typed without the apostrophe: "womens coats". */
+const OWNING: Record<string, string> = { womens: 'women’s', mens: 'men’s', childrens: 'children’s', peoples: 'people’s' };
+
 /**
  * "dont" and its kind: the fix puts the apostrophe back, and after he, she or
  * it gives "doesn’t" straight away, so "She dont know" is caught in one go.
  */
 function missingApostrophe(issue: Issue, text: string): Issue {
   const word = text.slice(issue.from, issue.to);
+  const owning = OWNING[word.toLowerCase()];
+  if (owning) return { ...issue, message: `“${word}” needs an apostrophe: “${owning}”.`, suggestions: [/^\p{Lu}/u.test(word) ? owning[0]!.toUpperCase() + owning.slice(1) : owning] };
   let fixed = CONTRACTIONS[word.toLowerCase()];
   if (!fixed) return issue;
   if (/^[A-Z]/.test(word) && !fixed.startsWith('I’')) fixed = fixed[0]!.toUpperCase() + fixed.slice(1);

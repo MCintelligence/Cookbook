@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Issue } from './check';
-import { isHidden, keysOf, ruleGroup } from './rules';
+import { effectiveOff, isHidden, keysOf, ruleGroup, storedOff } from './rules';
 
 const at = (text: string, part: string, kind: Issue['kind'], rule: string): Issue => {
   const from = text.indexOf(part);
@@ -24,5 +24,17 @@ describe('proofreader switches', () => {
     expect(isHidden(other, hiding)).toBe(false);
     expect(isHidden(other, { ignored: new Set(['AnA:a']), off: new Set() })).toBe(true);
     expect(isHidden(other, { ignored: new Set(), off: new Set(['grammar']) })).toBe(true);
+  });
+
+  it('starts run-ons and the Oxford comma off, and keeps a writer’s choice either way', () => {
+    expect(effectiveOff([])).toEqual(['run-on', 'OxfordComma']);
+    expect(effectiveOff(['adverb'])).toEqual(['adverb', 'run-on', 'OxfordComma']);
+    const on = storedOff([], 'run-on', true);
+    expect(on).toEqual(['+run-on']);
+    expect(effectiveOff(on)).toEqual(['OxfordComma']);
+    expect(ruleGroup({ kind: 'style', rule: 'OxfordComma' })).toBe('OxfordComma');
+    expect(storedOff(on, 'run-on', false)).toEqual([]);
+    expect(storedOff(['adverb'], 'adverb', true)).toEqual([]);
+    expect(storedOff([], 'echo', false)).toEqual(['echo']);
   });
 });

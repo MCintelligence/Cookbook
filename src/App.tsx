@@ -2625,6 +2625,7 @@ export function App() {
   // Through updateBook, so a change made a moment before isn't written back over with the old settings.
   const onDialect = useCallback((dialect: Dialect) => updateBook({ dialect }), [fs, book]);
   const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
+  const onList = useCallback((sallyList: string[]) => updateBook({ sallyList }), [fs, book]);
   // Switched off, every seasoning rests and nothing is marked on the page.
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
@@ -2633,7 +2634,7 @@ export function App() {
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
   // The checks keep running with Seasonings closed; see needsReview for when grammar and style are left out.
   const review = !!doc && needsReview(chosen, unchecked, paused, seasoningsOpen);
-  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
+  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, list: book?.sallyList, onList, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
   const uncheckedKinds = unchecked.flatMap((id) => KIND_OF[id] ?? []).join(' ');
   // Every Check is one setting for the whole Recipe, put on each editor as it is made, so every Item,
   // Mise en Place and split view show the same. Daniel dims only while he is picked and not paused.

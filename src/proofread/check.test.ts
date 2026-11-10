@@ -92,6 +92,10 @@ describe('spelling', () => {
       ['wasnt', ['wasn’t']],
       ['Dont', ['Don’t']],
     ]);
+    expect(fixes('The womens coats and the childrens toys.')).toEqual([
+      ['womens', ['women’s']],
+      ['childrens', ['children’s']],
+    ]);
   });
 
   it('leaves words the writer ignored', () => {

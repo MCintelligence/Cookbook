@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { compilePatterns, ownPatternIssues, spareExceptions, withOwn } from './ownPatterns';
 import { gradeLevel, sentences, styleIssues, textGrade } from './style';
+import { CLICHES, expand, shorterWay } from './styleLists';
 
 const said = (text: string, names: string[] = []) => styleIssues(text, names).map((i) => [i.rule, text.slice(i.from, i.to), ...i.suggestions]);
 
@@ -47,6 +49,51 @@ describe('style', () => {
 
   it('hears echoes, but not names or glue words', () => {
     expect(said('The gravy was thick. Mama Lou stirred the gravy. Mama Lou smiled.', ['Mama Lou']).map((x) => x.slice(0, 2))).toEqual([['echo', 'gravy']]);
+  });
+
+  it('knows many more fillers, clichés and redundancies, in any form', () => {
+    const text = 'She was kind of tired. Her heart skipped a beat, and she let out a breath she didn’t know she’d been holding. He rolled his eyes and shrugged his shoulders. They made a decision to combine together the flour and butter.';
+    expect(said(text)).toEqual([
+      ['crutch-word', 'kind of'],
+      ['cliche', 'Her heart skipped a beat'],
+      ['cliche', 'let out a breath she didn’t know she’d been holding'],
+      ['cliche', 'rolled his eyes'],
+      ['redundancy', 'shrugged his shoulders', 'shrugged'],
+      ['simpler-word', 'made a decision', 'decided'],
+      ['redundancy', 'combine together', 'combine'],
+    ]);
+    expect(CLICHES.length).toBeGreaterThan(300);
+  });
+
+  it('leaves fillers alone where they do real work', () => {
+    expect(said('A kind of bread. That sort of thing. Not quite. Quite a few. A bit of cake. Rather than wait, she ate.')).toEqual([]);
+  });
+
+  it('works out the shorter way with the words of the phrase', () => {
+    expect(shorterWay('sat down on the sofa')).toBe('sat on the sofa');
+    expect(shorterWay('clapped her hands together')).toBe('clapped her hands');
+    expect(expand('{her|his} {out |}breath')).toEqual(['her out breath', 'her breath', 'his out breath', 'his breath']);
+  });
+
+  it('is quieter: no echoes said on purpose or far apart, no sticky short sentences, no adjectives as passive', () => {
+    expect(said('Again and again, day after day, she waited. “Never,” he said, and she said nothing.')).toEqual([]);
+    expect(said('It was in the end all of it for us.')).toEqual([]);
+    expect(said('She was born in May and was located by the river.')).toEqual([]);
+    expect(said('He nearly fell and hardly spoke, but he answered softly.').map((x) => x.slice(0, 2))).toEqual([['adverb', 'softly']]);
+  });
+
+  it('marks the writer’s own list, with fixes, and spares their exceptions', () => {
+    const own = compilePatterns(['honestly', '{grinned|smirked} wryly', 'a myriad of => many', '-suddenly', '# a note', '{broken', '']);
+    const text = 'He smirked wryly at a myriad of stars, and suddenly honestly smiled.';
+    expect(ownPatternIssues(text, own).map((i) => [text.slice(i.from, i.to), ...i.suggestions])).toEqual([
+      ['honestly'],
+      ['smirked wryly'],
+      ['a myriad of', 'many'],
+    ]);
+    const all = spareExceptions(text, withOwn(styleIssues(text), ownPatternIssues(text, own)), own).map((i) => [i.rule, text.slice(i.from, i.to)]);
+    expect(all).toContainEqual(['own-pattern', 'smirked wryly']);
+    expect(all).not.toContainEqual(['adverb', 'wryly']);
+    expect(all.map(([, w]) => w)).not.toContain('suddenly');
   });
 
   it('works out the grade level', () => {

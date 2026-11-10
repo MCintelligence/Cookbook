@@ -12,6 +12,8 @@ interface Props {
   version: number;
   /** Swaps: this scene opens for writing, and the one being written moves here. */
   onWrite: (path: string) => void;
+  /** A double-click on this page: it opens for writing and split view closes. */
+  onKeep: (path: string) => void;
   onClose: () => void;
 }
 
@@ -19,7 +21,7 @@ interface Props {
  * A second scene beside the one being written, to read while writing, like
  * Scrivener's split editor. One scene is written at a time; Swap trades them.
  */
-export function Beside({ path, load, version, onWrite, onClose }: Props) {
+export function Beside({ path, load, version, onWrite, onKeep, onClose }: Props) {
   const [doc, setDoc] = useState<{ title: string; body: NodeJSON } | null>(null);
   const [missing, setMissing] = useState(false);
   const schema = useMemo(() => getSchema(cookbookExtensions((s) => s)), []);
@@ -46,7 +48,7 @@ export function Beside({ path, load, version, onWrite, onClose }: Props) {
           ×
         </button>
       </div>
-      <div className="cb-page beside-page">{doc && <SceneText schema={schema} body={doc.body} />}</div>
+      <div className="cb-page beside-page" title="Double-click to write in this item and close the other" onDoubleClick={() => !missing && onKeep(path)}>{doc && <SceneText schema={schema} body={doc.body} />}</div>
     </aside>
   );
 }

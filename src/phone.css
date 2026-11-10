@@ -1,0 +1,147 @@
+/*
+ * Phones and tablets. mobile.ts puts two classes on <html>:
+ *   .touch  a finger does the pointing (phones, tablets, touch laptops used by touch)
+ *   .phone  a phone-sized touch screen, held either way up
+ * The narrow-window layout in styles.css (900px and under) is the starting point; this file
+ * makes it sit the way an Android app does: targets a thumb can hit, menus that rise from the
+ * bottom, panels that fill the screen, and formatting on top of the keyboard.
+ */
+
+/* ---------- Any touch screen ---------- */
+
+html.touch { -webkit-tap-highlight-color: transparent; }
+html.touch button, html.touch [role='button'], html.touch summary { touch-action: manipulation; }
+/* The app's own furniture isn't text to select: a long press there opens a row's menu or starts a drag, never a selection. */
+html.touch :is(.topbar, .toolbar, .sidebar, .footer, .panel-head, .panel-bar, .menu, .phone-bar, .segmented, .set-nav, .palette-list) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.touch :is(.topbar, .toolbar, .sidebar, .footer, .panel-head, .panel-bar, .phone-bar) :is(input, textarea) { user-select: text; -webkit-user-select: text; }
+
+/* Rows and buttons grow to at least 44px, the smallest a thumb hits reliably. */
+html.touch .tree button { min-height: 44px; padding: 0 10px; font-size: 15px; border-radius: 8px; }
+html.touch .pantry-panel .tree button { min-height: 48px; }
+html.touch .tree .tree-recipe { min-height: 40px; line-height: 40px; }
+html.touch .sidebar .tree-folder .chevron { width: 32px; height: 40px; margin-left: -8px; }
+html.touch .bar-btn { width: 44px; height: 40px; border-radius: 8px; }
+html.touch .icon-btn { min-width: 40px; height: 40px; border-radius: 8px; }
+html.touch .panel-head { height: 44px; }
+html.touch .panel-search { height: 44px; border-radius: 10px; }
+html.touch .panel-search input { font-size: 16px; }
+html.touch .segmented button { min-height: 38px; font-size: 14px; }
+html.touch .btn { min-height: 40px; padding: 0 14px; font-size: 14px; border-radius: 8px; }
+html.touch .menu:not(.menu-sheet) button { min-height: 44px; padding: 6px 14px; font-size: 15px; }
+html.touch .tb-select { height: 40px; }
+html.touch .tb-combo input, html.touch .tb-select select { height: 38px; font-size: 15px; }
+html.touch .tb-combo-open { width: 32px; height: 36px; }
+html.touch :is(.tb-menu, .tb-list) button { min-height: 44px; font-size: 15px; }
+html.touch .palette-item { min-height: 48px; }
+html.touch .insert-item { min-height: 44px; }
+html.touch .find-hit { padding: 10px 12px; }
+html.touch .set-nav-item { min-height: 44px; font-size: 15px; }
+html.touch .notice { min-height: 48px; font-size: 14px; }
+html.touch .notice-undo, html.touch .notice-close { height: 40px; min-width: 40px; font-size: 14px; }
+/* A press shows at once, the way a hover does for a mouse. */
+html.touch :is(.tree button, .menu button, .panel-btn, .bar-btn, .icon-btn, .pb-btn, .side-toggle, .palette-item, .set-nav-item):active:not(:disabled) { background: color-mix(in srgb, var(--text) 9%, transparent); }
+/* What a mouse finds by pointing is simply shown. */
+html.touch .recipe-more { opacity: 1; }
+
+/* ---------- Phone ---------- */
+
+/* In a phone's browser the app keeps clear of the notch and the gesture bar itself. The Android app is kept clear by MainActivity.kt, and these are zero there. */
+html.phone .app { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+html.phone .app, html.phone .app.drawer-open {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 56px auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'top' 'tools' 'desk' 'pbar' 'foot';
+}
+
+/* Top bar: the Shelf, the open Item's name, then Pantry, Seasonings, Search and More. The recipe's own menu is under More. */
+html.phone .topbar { padding: 0 4px; gap: 2px; }
+html.phone .brand-wrap { gap: 2px; flex: 1 1 auto; }
+html.phone .side-toggle { width: 48px; height: 48px; margin: 0; flex: none; }
+html.phone .crumb-book { display: none; }
+html.phone .crumb { flex: 1 1 auto; }
+html.phone .crumb-mode { min-height: 44px; padding: 0 8px; font-size: 16px; color: var(--text); }
+html.phone .top-actions { gap: 0; flex: none; }
+html.phone .panel-btn { justify-content: center; width: 44px; height: 48px; padding: 0; border-radius: 10px; position: relative; }
+html.phone .panel-btn .badge { position: absolute; top: 6px; right: 0; margin: 0; }
+html.phone .more-btn { width: 40px; }
+html.phone .find > button:first-child, html.phone .find-toggle { width: 44px; height: 48px; }
+
+/* The full format row waits behind the writing bar's Aa button. */
+html.phone .app:not(.phone-tools) .toolbar { display: none; }
+html.phone .toolbar { height: 52px; padding: 0 8px; }
+
+/* The page fills the screen edge to edge, with room under the last line to bring it clear of the keyboard. */
+html.phone .desk { padding: 4px 0 96px; }
+html.phone .cb-page.draft { padding: 16px 20px 32px; max-width: none; }
+html.phone .pantry-card { margin: 8px; width: auto !important; }
+html.phone .error { margin: 8px; }
+html.phone .empty { padding: 48px 24px; text-align: center; font-size: 16px; }
+
+/* The Shelf slides out as a drawer, tall rows and all. */
+html.phone .app.side-open .sidebar { width: min(360px, 88vw); padding-top: calc(8px + env(safe-area-inset-top)); padding-left: calc(8px + env(safe-area-inset-left)); animation: phone-drawer-in 0.18s ease-out; }
+html.phone .side-backdrop { background: rgba(var(--shadow), 0.4); animation: phone-fade-in 0.18s ease-out; }
+@keyframes phone-drawer-in { from { transform: translateX(-24px); opacity: 0.6; } }
+@keyframes phone-fade-in { from { opacity: 0; } }
+@keyframes phone-sheet-in { from { transform: translateY(32px); opacity: 0.6; } }
+
+/* The Pantry and Seasonings take the whole screen; Back or their own close button returns to the page. */
+html.phone .drawer { left: 0; width: auto; box-shadow: none; border-left: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); animation: phone-sheet-in 0.18s ease-out; }
+html.phone .drawer .panel-h { font-size: 22px; }
+
+/* Footer: today's words and the saved dot. It gives its row to the writing bar, and to the keyboard, while something is being typed. */
+html.phone .footer { min-height: 44px; padding: 0 8px; gap: 8px; flex-wrap: nowrap; }
+html.phone .footer .zoom { display: none; }
+html.phone .footer-end { flex-wrap: nowrap; gap: 6px; }
+html.phone .gear { width: 44px; height: 44px; margin: 0; }
+html.phone .goals-button { min-height: 44px; }
+html.phone .app:has(.cb-page .ProseMirror-focused) .footer,
+html.phone .app:has(:is(input, textarea, [contenteditable='true']):focus):not(:has(.footer:focus-within)) .footer { display: none; }
+html.phone .goals-pop { bottom: calc(56px + env(safe-area-inset-bottom)); max-height: calc(100dvh - 140px); }
+
+/* The writing bar: one row of 48px buttons on top of the keyboard, shown while the page has the cursor. */
+.phone-bar { display: none; }
+html.phone .phone-bar { grid-area: pbar; align-items: stretch; height: 48px; border-top: 1px solid var(--line); background: var(--bar); color: var(--text); }
+html.phone .app:has(.cb-page .ProseMirror-focused) .phone-bar { display: flex; }
+.pb-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.pb-scroll::-webkit-scrollbar { display: none; }
+.pb-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 48px; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--text); }
+.pb-btn:disabled { color: var(--faint); opacity: 0.5; }
+.pb-btn[aria-pressed='true'] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pb-letter { font-family: var(--font-display); font-size: 20px; line-height: 1; font-style: normal; text-decoration: none; }
+i.pb-letter { font-style: italic; font-family: var(--font-text); font-size: 22px; }
+u.pb-letter { text-decoration: underline; text-underline-offset: 3px; }
+.pb-aa { font-size: 17px; font-weight: 700; }
+.pb-sep { flex: none; align-self: center; width: 1px; height: 24px; margin: 0 4px; background: var(--line-strong); }
+/* The keyboard-down button stays put at the end while the rest scrolls under it. */
+.phone-bar > .pb-btn { border-left: 1px solid var(--line); border-radius: 0; width: 52px; }
+
+/* Messages sit clear of the writing bar and the gesture bar. */
+html.phone .notice { bottom: calc(60px + env(safe-area-inset-bottom)); }
+
+/* Menus are sheets that rise from the bottom (Menu.tsx): tall rows, a drill-down for submenus. */
+.menu-sheet-wrap { position: fixed; inset: 0; z-index: 40; }
+.menu-sheet-shade { position: absolute; inset: 0; background: rgba(var(--shadow), 0.4); animation: phone-fade-in 0.18s ease-out; }
+.menu.menu-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: auto; min-width: 0; max-width: none; max-height: min(78dvh, 640px); overflow-y: auto; overscroll-behavior: contain; padding: 0 8px calc(10px + env(safe-area-inset-bottom)); border: none; border-radius: 18px 18px 0 0; box-shadow: 0 -8px 32px rgba(var(--shadow), 0.24); animation: phone-sheet-in 0.2s ease-out; }
+.menu.menu-sheet button { min-height: 50px; padding: 0 14px; font-size: 16px; border-radius: 10px; }
+.menu.menu-sheet .menu-sep { margin: 6px 14px; }
+.menu.menu-sheet .menu-heading { padding: 12px 14px 4px; font-size: 11px; }
+/* A phone has no keys for the shortcuts a menu lists; the arrow that marks a submenu stays. */
+.menu.menu-sheet .menu-hint:not([aria-hidden]) { display: none; }
+.menu.menu-sheet .menu-hint[aria-hidden] { font-size: 20px; }
+.menu-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 4px; min-height: 52px; margin: 0 -8px 4px; padding: 0 8px; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 18px 18px 0 0; }
+.menu-sheet-grip { position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--line-strong); }
+.menu-sheet-title { padding: 10px 14px 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu.menu-sheet .menu-sheet-back { width: 44px; min-height: 44px; flex: none; padding: 0; justify-content: center; }
+.menu-sheet-back + .menu-sheet-title { padding: 0 4px; }
+
+/* Pop-ups that hang off a button on a computer fill the width here, so nothing is cut off at the edge. */
+html.phone .palette-backdrop { padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
+html.phone .palette { max-height: min(70dvh, 520px); }
+html.phone .palette-input { height: 56px; }
+html.phone .tb-popover { max-width: calc(100vw - 16px); }
+html.phone .insert-menu { width: min(300px, calc(100vw - 16px)); }
+
+@media (prefers-reduced-motion: reduce) {
+  html.phone .sidebar, html.phone .drawer, html.phone .side-backdrop, .menu-sheet-shade, .menu.menu-sheet { animation: none !important; }
+}

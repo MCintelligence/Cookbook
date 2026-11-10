@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NotesMarkdown } from './notesMarkdown';
 import { isTauri } from '../storage/platform';
+import { ANDROID_APP } from '../mobile';
 import { getSettings } from '../settings';
 
 /**
@@ -71,6 +72,8 @@ let announce: ((ready: Ready) => void) | null = null;
 
 /** Looks for a new version now, from Settings, and says what it found. */
 export async function checkForUpdates(): Promise<string> {
+  // The Android app is updated the way it was installed: by a newer download from Cookbook's releases page.
+  if (ANDROID_APP) return 'On Android, Cookbook updates when you install a newer version from its releases page. Your recipes stay where they are.';
   if (isTauri()) {
     const ready = await checkDesktop();
     if (!ready) return 'You have the latest version.';
@@ -117,6 +120,7 @@ export function UpdatePopup({ beforeRestart }: Props) {
   };
 
   useEffect(() => {
+    if (ANDROID_APP) return;
     if (isTauri()) {
       let live = true;
       // Settings can turn automatic checks off; "Check now" there still works.

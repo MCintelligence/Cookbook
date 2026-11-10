@@ -137,3 +137,96 @@ jobs:
           tagName: ${{ needs.draft.outputs.tag }}
           releaseBody: ${{ needs.draft.outputs.notes }}
           args: ${{ matrix.args }}
+
+  # The Android app, as one APK for ARM phones and tablets (64- and 32-bit), signed with the
+  # project's Android key so each version installs over the last. Until that key is set up
+  # (RELEASING.md), this job says so and is skipped, and the desktop release goes ahead without it.
+  android:
+    name: Android
+    needs: draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the Android signing key is set up
+        id: key
+        shell: bash
+        env:
+          KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::warning::No Android APK in this release: the ANDROID_KEYSTORE_BASE64 secret is missing. See RELEASING.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.key.outputs.ready == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.key.outputs.ready == 'true'
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+      - uses: Swatinem/rust-cache@v2
+        if: steps.key.outputs.ready == 'true'
+        with:
+          workspaces: src-tauri
+          key: android
+      - uses: actions/setup-node@v4
+        if: steps.key.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        if: steps.key.outputs.ready == 'true'
+
+      - name: Put the signing key in place
+        if: steps.key.outputs.ready == 'true'
+        shell: bash
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/cookbook-android.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/cookbook-android.jks"
+            echo "keyAlias=${KEY_ALIAS:-cookbook}"
+            echo "password=$KEY_PASSWORD"
+          } > src-tauri/gen/android/keystore.properties
+
+      - name: Build the APK
+        if: steps.key.outputs.ready == 'true'
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android build --apk --target aarch64 armv7 --ci
+
+      - name: Name the APK
+        if: steps.key.outputs.ready == 'true'
+        id: apk
+        shell: bash
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -n 1)
+          test -n "$apk"
+          cp "$apk" "Cookbook_${version}_android.apk"
+          echo "file=Cookbook_${version}_android.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Add the APK to the draft release
+        if: steps.key.outputs.ready == 'true'
+        uses: actions/github-script@v7
+        env:
+          FILE: ${{ steps.apk.outputs.file }}
+          RELEASE: ${{ needs.draft.outputs.id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { FILE: name, RELEASE: id } = process.env;
+            const release_id = Number(id);
+            // A second run for the same tag replaces the APK rather than failing on its name.
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id });
+            for (const old of assets.filter((a) => a.name === name)) await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: old.id });
+            await github.rest.repos.uploadReleaseAsset({ ...context.repo, release_id, name, data: fs.readFileSync(name), headers: { 'content-type': 'application/vnd.android.package-archive' } });

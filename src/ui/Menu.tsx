@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { placeAt } from './zoom';
+import { isPhone, isTouch } from '../mobile';
 
 export type MenuItem =
   | {
@@ -42,9 +43,19 @@ interface Props {
  * A small pop-up menu, for right-clicks and the book menu. Arrow keys move
  * between items, → and ← open and close submenus, Escape or a click
  * elsewhere closes it, and choosing an item closes it before the item runs.
+ *
+ * On a phone it is a sheet that rises from the bottom of the screen, within
+ * reach of a thumb, with rows tall enough for one; a submenu takes the
+ * sheet's place, with a way back at the top.
  */
-export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Props) {
+export function Menu({ items: allItems, x, y, label: ownLabel, onClose, nested, onSide, opener }: Props) {
   const box = useRef<HTMLUListElement>(null);
+  // Decided as the menu opens, so turning the phone with a menu up doesn't swap one kind for the other.
+  const [sheet] = useState(() => !nested && isPhone());
+  /** On a phone, the submenus opened so far; the last one is what the sheet shows. */
+  const [drill, setDrill] = useState<{ label: string; items: MenuItem[] }[]>([]);
+  const items = drill.length > 0 ? drill[drill.length - 1]!.items : allItems;
+  const label = drill.length > 0 ? drill[drill.length - 1]!.label : ownLabel;
   const [at, setAt] = useState({ left: x, top: y });
   const [sub, setSub] = useState<{ index: number; from: HTMLElement; focus: boolean } | null>(null);
   const hover = useRef<number | undefined>(undefined);
@@ -55,26 +66,38 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
+    if (sheet) return void el.querySelector<HTMLElement>('li > button:not(:disabled)')?.focus({ preventScroll: true });
     const r = el.getBoundingClientRect();
     let left = x;
     // A submenu that doesn't fit on the right opens on the left of its menu instead.
     if (nested && left + r.width > window.innerWidth - 8) left = nested.from.getBoundingClientRect().left - r.width + 4;
     setAt(placeAt(el.parentElement, { left: Math.max(8, Math.min(left, window.innerWidth - r.width - 8)), top: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) }));
     el.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
-  }, [x, y]);
+  }, [x, y, sheet, drill.length]);
 
   useEffect(() => {
     if (nested) return;
-    const onDown = (e: PointerEvent) => box.current && !box.current.contains(e.target as Node) && !opener?.contains(e.target as Node) && onClose();
+    // A sheet closes on a tap of the shade behind it (below), once the finger lifts, so the tap can't land on what was under it.
+    const onDown = (e: PointerEvent) => !sheet && box.current && !box.current.contains(e.target as Node) && !opener?.contains(e.target as Node) && onClose();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        // On a phone, Escape (the Back button) steps out of a submenu before it closes the sheet.
+        if (sheet && drillNow.current > 0) return setDrill((d) => d.slice(0, -1));
         back();
         onClose();
       }
     };
     window.addEventListener('pointerdown', onDown, true);
     window.addEventListener('keydown', onKey);
+    // A touch screen's keyboard sliding away resizes the window, and the app losing focus to the
+    // system (a share sheet, the notification shade) is no reason to lose the menu.
+    if (isTouch()) {
+      return () => {
+        window.removeEventListener('pointerdown', onDown, true);
+        window.removeEventListener('keydown', onKey);
+      };
+    }
     window.addEventListener('blur', onClose);
     window.addEventListener('resize', onClose);
     return () => {
@@ -83,7 +106,10 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
       window.removeEventListener('blur', onClose);
       window.removeEventListener('resize', onClose);
     };
-  }, [onClose, nested, opener]);
+  }, [onClose, nested, opener, sheet]);
+
+  const drillNow = useRef(0);
+  drillNow.current = drill.length;
 
   useEffect(() => () => window.clearTimeout(hover.current), []);
 
@@ -123,6 +149,8 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
 
   const openSub = (index: number, from: HTMLElement, focus: boolean) => {
     window.clearTimeout(hover.current);
+    const item = items[index];
+    if (sheet) return void (item && 'items' in item && setDrill((d) => [...d, { label: item.label, items: item.items }]));
     setSub({ index, from, focus });
   };
 
@@ -137,8 +165,22 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
         {checked ? '✓' : ''}
       </span>
     );
-  return (
-    <ul className="menu" role="menu" aria-label={label} ref={box} style={at} onKeyDown={step} onContextMenu={(e) => e.preventDefault()}>
+  const list = (
+    <ul className={sheet ? 'menu menu-sheet' : 'menu'} role="menu" aria-label={label} ref={box} style={sheet ? undefined : at} onKeyDown={step} onContextMenu={(e) => e.preventDefault()}>
+      {sheet && (
+        <li role="presentation" className="menu-sheet-head">
+          {drill.length > 0 ? (
+            <button className="menu-sheet-back" aria-label="Back" onClick={() => setDrill((d) => d.slice(0, -1))}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            </button>
+          ) : (
+            <span className="menu-sheet-grip" aria-hidden="true" />
+          )}
+          <span className="menu-sheet-title">{label}</span>
+        </li>
+      )}
       {items.map((item, i) =>
         'separator' in item ? (
           <li key={i} role="separator" className="menu-sep" />
@@ -157,6 +199,7 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
               className={sub?.index === i ? 'menu-open' : undefined}
               onClick={(e) => openSub(i, e.currentTarget, true)}
               onPointerEnter={(e) => {
+                if (sheet || e.pointerType === 'touch') return;
                 const el = e.currentTarget;
                 window.clearTimeout(hover.current);
                 hover.current = window.setTimeout(() => setSub({ index: i, from: el, focus: false }), 150);
@@ -179,7 +222,8 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
               className={item.danger ? 'menu-danger' : undefined}
               disabled={item.disabled}
               data-menu-index={i}
-              onPointerEnter={() => {
+              onPointerEnter={(e) => {
+                if (sheet || e.pointerType === 'touch') return;
                 window.clearTimeout(hover.current);
                 hover.current = window.setTimeout(() => setSub(null), 150);
               }}
@@ -199,7 +243,7 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
           </li>
         ),
       )}
-      {sub && subItem && 'items' in subItem && (
+      {!sheet && sub && subItem && 'items' in subItem && (
         <SubMenu
           key={sub.index}
           items={subItem.items}
@@ -215,6 +259,19 @@ export function Menu({ items, x, y, label, onClose, nested, onSide, opener }: Pr
         />
       )}
     </ul>
+  );
+  if (!sheet) return list;
+  return (
+    <div className="menu-sheet-wrap">
+      <div
+        className="menu-sheet-shade"
+        onClick={() => {
+          back();
+          onClose();
+        }}
+      />
+      {list}
+    </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import { isTauri } from '../storage/platform';
 import { IS_MAC } from '../shortcuts';
+import { IS_ANDROID } from '../mobile';
 import { type ScrivenerSource, filesSource, folderSource, zipSource } from '../storage/scrivener';
 
 /**
@@ -13,6 +14,15 @@ export async function pickScrivener(): Promise<ScrivenerSource | 'files' | null>
   if (isTauri()) {
     const { open } = await import('@tauri-apps/plugin-dialog');
     const { TauriAdapter } = await import('../storage/tauri');
+    if (IS_ANDROID) {
+      // Android's picker hands over single files, so a project comes in zipped.
+      const path = await open({ title: 'Choose a zipped Scrivener project', filters: [{ name: 'Zipped Scrivener project', extensions: ['zip'] }] });
+      if (typeof path !== 'string') return null;
+      const { readFile } = await import('@tauri-apps/plugin-fs');
+      const source = zipSource(await readFile(path));
+      if (!source) throw new Error('That zip has no Scrivener project in it. Zip the whole .scriv folder and try again.');
+      return source;
+    }
     if (IS_MAC) {
       // On a Mac a .scriv is a package, which looks like a file, and a folder picker greys it out.
       // So it is picked as a file: the .scriv itself, the .scrivx inside one (where Scrivener isn't

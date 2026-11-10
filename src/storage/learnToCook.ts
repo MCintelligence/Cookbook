@@ -69,7 +69,32 @@ interface Card {
 /** "press Ctrl+K" or, when the writer has taken the shortcut off, the menu way there. */
 const press = (k: KeyLabel, id: string, otherwise: string) => (k(id) ? `press ${k(id)}` : otherwise);
 
-export function shelfOf(k: KeyLabel): Group[] {
+/** The page that Learn to Cook gains on a touch screen, where the rest of it speaks of clicks, right-clicks and menus along the top. */
+const TOUCH_PAGE: Page = {
+  title: 'On a phone or tablet',
+  synopsis: 'Where the menus are, what a right-click is, and the bar above the keyboard.',
+  body: `# On a phone or tablet
+
+The rest of Learn to Cook was written with a mouse and a keyboard in mind. Everything in it works here too; a few things are simply reached another way.
+
+- **Menus.** File, Edit, View and the rest are under the **⋮** button at the top right. Where a page says "the View menu", tap ⋮, then View.
+- **The Shelf** slides out from the **☰** button at the top left. The Pantry and Seasonings are the two buttons beside Search, and each fills the screen.
+- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf, a card in the Pantry or a recipe in Your Recipes to see what you can do with it. Keep holding and move your finger to drag it somewhere else.
+- **In the page**, press and hold picks a word, with your device's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
+- **The writing bar** sits on top of the keyboard while you type: undo and redo, **B**, *I* and U, the paragraph's style (¶), things to insert (+), and **Aa** for fonts and spacing. Its last button puts the keyboard away.
+- **Back** closes whatever is open (a menu, the Shelf, the Pantry, Settings) and only then leaves Cookbook. Your words are saved as you type, so leaving never loses them.
+- **Your recipes are kept inside the app**, not in a folder you can browse. To keep a copy somewhere else, use ⋮ › File › **Back up as a zip…**, or one of the exports.
+`,
+};
+
+/** The Shelf of Learn to Cook. On a touch screen (`touch`) it starts with a page on how the rest translates to fingers. */
+export function shelfOf(k: KeyLabel, touch = false): Group[] {
+  const groups = shelfFor(k);
+  if (touch) groups[0]!.items.push(TOUCH_PAGE);
+  return groups;
+}
+
+function shelfFor(k: KeyLabel): Group[] {
   return [
     {
       title: 'Start here',
@@ -519,14 +544,14 @@ export const FIRST_ITEM = joinPath(BOOKSHELF, 'Start here', 'Welcome.md');
 const SEASONINGS_ITEM = joinPath(BOOKSHELF, 'Seasonings', 'Meet the seasonings.md');
 
 /** Lays out Learn to Cook in an empty folder. Run inside makeBookOrUndo. */
-export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel): Promise<BookInfo> {
+export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel, touch = false): Promise<BookInfo> {
   const info: BookInfo = {
     ...(await createBook(fs, LEARN_TO_COOK)),
     // Sam is picked, so a misspelling shows at once; the writer adds the others on the Seasonings page.
     seasonings: { chosen: ['sam'], tracked: [SEASONINGS_ITEM], gone: [] },
   };
   const order: Record<string, string[]> = { [BOOKSHELF]: [] };
-  for (const group of shelfOf(k)) {
+  for (const group of shelfOf(k, touch)) {
     const folder = joinPath(BOOKSHELF, fileNameFor(group.title));
     await fs.makeFolder(folder);
     order[BOOKSHELF]!.push(fileNameFor(group.title));

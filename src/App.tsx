@@ -48,7 +48,7 @@ import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { PhoneBar } from './ui/PhoneBar';
 import { usePhone } from './ui/usePhone';
-import { ANDROID_APP, fromTouch, isPhone, onBack } from './mobile';
+import { ANDROID_APP, fromTouch, isPhone, isTouch, onBack } from './mobile';
 import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
@@ -497,7 +497,7 @@ export function App() {
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
     else if (mode.create && mode.make) info = await makeBookOrUndo(nextFs, () => mode.make!(nextFs));
     else if (mode.create && mode.learn) {
-      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
+      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, isTouch() ? () => '' : keysFor, isTouch()));
       rememberLearnToCook(target);
       // It opens at Welcome, like a recipe reopening where the writer left off.
       try {

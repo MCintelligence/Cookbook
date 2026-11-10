@@ -13,8 +13,12 @@ export const ANDROID_APP = isTauri() && IS_ANDROID;
 
 const media = (query: string) => (typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query) : null);
 const TOUCH = '(pointer: coarse)';
-/** A phone held either way up: a narrow screen, or a short one, worked by touch. */
-const PHONE = `${TOUCH} and (max-width: 700px), ${TOUCH} and (max-height: 500px)`;
+/**
+ * A phone held either way up, or a small tablet held upright: a touch screen no wider than the
+ * narrow-window layout (styles.css, 900px), or a short one. A tablet on its side is wide enough
+ * for the desktop layout, with touch-sized targets.
+ */
+const PHONE = `${TOUCH} and (max-width: 900px), ${TOUCH} and (max-height: 500px)`;
 
 /** Whether a finger does the pointing: targets grow, hover hints go, and a long press picks words as it does everywhere else on the device. */
 export const isTouch = () => media(TOUCH)?.matches ?? false;

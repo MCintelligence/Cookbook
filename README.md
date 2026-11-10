@@ -237,11 +237,25 @@ You need Node 22 or newer. For the desktop app you also need Rust and the [Tauri
 npm install
 npm run dev          # browser version at http://localhost:1420
 npm run tauri dev    # desktop app
+npm run tauri android dev   # Android app, on a connected phone or an emulator
 npm test             # storage, format and editor tests
 npm run build        # production web build, including the offline service worker
 ```
 
 Click the recipe's title in the top bar for Your recipes…, to start a new one or open a recipe's folder. In the desktop app a recipe can live in any folder. In the browser, recipes are kept in the browser's private storage, and Chrome and Edge can also open a real folder on your computer.
+
+## On Android
+
+The Android app is the same Cookbook, from the same code, arranged for a phone (`src/mobile.ts`, `src/phone.css`, `src-tauri/gen/android`). It needs Android 7 or newer.
+
+- **Menus** are under the ⋮ button and rise from the bottom of the screen; a press and hold opens what a right-click does on a computer.
+- **The writing bar** rides on top of the keyboard while you type: undo, redo, bold, italic, underline, the paragraph's style, inserts, and Aa for fonts and spacing.
+- **A long press in the page** is left to Android: it picks the word and shows the system's own Cut, Copy and Paste.
+- **Back** closes whatever is open (a menu, the Shelf, the Pantry, Settings) and only then leaves the app. Words are saved as you type and again whenever the app is put away, when an automatic backup is taken too.
+- **Recipes live in the app's own storage**, since Android gives apps single files rather than folders to work in. They leave as exports (Word, EPUB, Markdown, PDF through Android's print screen) and as zip backups, each saved wherever the system's file picker reaches, including Drive. A Scrivener project is imported as a zip.
+- **Updates** come as a newer APK from the releases page, installed over the old one. Recipes stay put.
+
+To build it you also need the Android SDK and NDK, and the Rust targets (`rustup target add aarch64-linux-android armv7-linux-androideabi`); then `npm run tauri android build -- --apk`. See [RELEASING.md](RELEASING.md) for the signing key.
 
 ## Search
 
@@ -267,7 +281,7 @@ src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android
 1. Offline editor: rich text, named paragraph and character styles, notes, find and replace.
 2. Shelf and Pantry: groups and items, character and setting cards, linked names.
 3. Seasonings v1: spelling, grammar and style checks on the device.
-4. Mobile apps.
+4. Mobile apps: Android (this), then iOS.
 5. Signed updates for the desktop app (see [RELEASING.md](RELEASING.md)).
 6. Optional on-device AI suggestions.
 7. Release.

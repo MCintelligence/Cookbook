@@ -137,3 +137,6 @@ export function watchBack(): void {
     .then(({ onBackButtonPress }) => onBackButtonPress(() => void (goBack() || leave())))
     .catch(viaHistory);
 }
+
+/** How a row's menu is opened here, to start a hint with: "Right-click" with a mouse, "Press and hold" with a finger. */
+export const menuPress = () => (isTouch() ? 'Press and hold' : 'Right-click');

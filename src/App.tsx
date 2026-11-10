@@ -48,7 +48,7 @@ import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { PhoneBar } from './ui/PhoneBar';
 import { usePhone } from './ui/usePhone';
-import { ANDROID_APP, fromTouch, onBack } from './mobile';
+import { ANDROID_APP, fromTouch, isPhone, onBack } from './mobile';
 import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
@@ -985,6 +985,8 @@ export function App() {
       await saveUndoNow();
     }
     setSideOpen(false);
+    // On a phone the Pantry fills the screen, so it steps aside for the card it was asked to open.
+    if (isPhone() && !getSettings().focus) setPanel((open) => (open === 'pantry' ? null : open));
     docRef.current = opened;
     bodyFrom.current = null;
     savedText.current = serializeDocument(opened);
@@ -3395,7 +3397,8 @@ export function App() {
     const el = desk.current;
     if (el && el.clientWidth > 0) el.style.setProperty('--fit', String(fitZoom(el.clientWidth, pageSize.width)));
   }, [pageSize.width]);
-  const small = isSmallDesk(deskWidth, panelColumn);
+  // A phone, either way up, is narrower than a sheet of paper worth reading: the page is its words, at their own size.
+  const small = isSmallDesk(deskWidth, panelColumn) || phone;
   const asDraft = page.view === 'draft' || small;
   const fitWidth = page.zoom === 0 && !asDraft;
   const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? fitZoom(deskWidth, pageSize.width) : page.zoom / 100 / UI_ZOOM[settings.size];

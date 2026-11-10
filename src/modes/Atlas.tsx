@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { PANTRY_SECTIONS } from '../storage/book';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL } from '../storage/pantry';
@@ -221,7 +222,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             );
           })}
         </div>
-        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. Right-click here for a new Character, Setting or Material.</p>}
+        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. {menuPress()} here for a new Character, Setting or Material.</p>}
       </div>
     </>
   );

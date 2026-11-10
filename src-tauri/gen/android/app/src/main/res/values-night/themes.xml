@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- The window shows this colour while the app starts and behind the system bars; it matches the app's own bars (src/styles.css, --bar). -->
+    <!-- The window shows this colour while the app starts and behind the system bars; it matches the app's own bars. -->
     <style name="Theme.cookbook" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/cookbook_bar</item>
         <item name="android:windowLightStatusBar">false</item>

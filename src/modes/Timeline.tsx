@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF } from '../storage/book';
@@ -281,7 +282,7 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
               </div>
             );
           })}
-          {dated.length === 0 && <p className="mode-empty tl-empty">No Item has a story date yet. Drag one up from below, or right-click a lane for a new Item on that day.</p>}
+          {dated.length === 0 && <p className="mode-empty tl-empty">No Item has a story date yet. Drag one up from below, or {menuPress().toLowerCase()} a lane for a new Item on that day.</p>}
         </div>
       </div>
       <aside className="tl-tray" aria-label="Not dated yet">

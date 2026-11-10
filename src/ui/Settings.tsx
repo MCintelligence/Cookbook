@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { isTouch } from '../mobile';
 import { Icon } from './Icon';
 import { type AppSettings, MARKDOWN_RULES, type Theme, getSettings, setSettings, useSettings } from '../settings';
 import { WRITERS } from '../writers';
@@ -863,7 +864,7 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
               );
             })}
           </div>
-          <p className="set-row-help">Apply them with the shortcuts, or a right-click on the page.</p>
+          <p className="set-row-help">{isTouch() ? 'Apply them from the Format menu, or the writing bar above the keyboard.' : 'Apply them with the shortcuts, or a right-click on the page.'}</p>
         </div>
       </div>
     </>

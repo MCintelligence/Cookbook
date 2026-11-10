@@ -68,7 +68,7 @@ html.phone .more-btn { width: 40px; }
 html.phone .find > button:first-child, html.phone .find-toggle { width: 44px; height: 48px; }
 
 /* The full format row waits behind the writing bar's Aa button. */
-html.phone .app:not(.phone-tools) .toolbar { display: none; }
+html.phone .app:not(.phone-tools):not(.in-mode) .toolbar { display: none; }
 html.phone .toolbar { height: 52px; padding: 0 8px; }
 
 /* The page fills the screen edge to edge, with room under the last line to bring it clear of the keyboard. */
@@ -145,3 +145,60 @@ html.phone .insert-menu { width: min(300px, calc(100vw - 16px)); }
 @media (prefers-reduced-motion: reduce) {
   html.phone .sidebar, html.phone .drawer, html.phone .side-backdrop, .menu-sheet-shade, .menu.menu-sheet { animation: none !important; }
 }
+
+/* Windows that float in the middle of a computer screen (Your Recipes, New Recipe, the Manual, reports, Set the Table) are whole screens here. */
+html.phone .lib-backdrop { padding: 0; align-items: stretch; background: var(--surface); }
+html.phone .lib, html.phone .lib.recipes, html.phone .lib.new-recipe { width: 100%; height: auto; max-height: none; border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+html.phone .recipes-nav, html.phone .tpl-nav { max-height: 168px; }
+html.phone .manual-nav { width: auto; }
+html.phone .manual-main { padding: 16px 18px 32px; }
+html.phone .manual-page { font-size: 15px; }
+html.phone .shelf-backdrop { padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
+html.phone .shelf { max-height: min(80dvh, 560px); }
+html.phone .plate, html.phone .settings { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+/* Settings: one long page, its sections a row of chips that scrolls sideways under the header. */
+html.phone .settings { font-size: 15px; }
+html.phone .set-body { padding: 12px 14px 40vh; }
+html.phone .set-nav { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; gap: 6px; scrollbar-width: none; }
+html.phone .settings { overflow-x: hidden; }
+html.phone .set-main { max-width: 100%; }
+html.phone .set-nav::-webkit-scrollbar { display: none; }
+html.phone .set-nav .set-nav-item { flex: none; min-height: 40px; padding: 0 14px; border-radius: 20px; white-space: nowrap; }
+html.phone :is(.set-sel, .set-search, .set-num, .set-text) { min-height: 40px; font-size: 15px; }
+html.phone .set-sel { height: 40px; }
+html.phone .settings input[type='checkbox'], html.phone .lib input[type='checkbox'] { width: 20px; height: 20px; }
+html.phone .set-top { flex-wrap: nowrap; min-height: 56px; padding: 6px 10px; }
+html.phone .set-brand { display: none; }
+html.phone .set-top-actions { flex: 1 1 auto; }
+html.phone .set-btn { min-height: 40px; }
+html.phone .set-nav { position: sticky; top: 56px; z-index: 1; align-items: center; background: var(--bg); padding-top: 8px; padding-bottom: 8px; }
+html.phone .set-scope { flex: none; width: auto; padding: 0 2px 0 6px; white-space: nowrap; }
+html.phone .set-section { scroll-margin-top: 124px; }
+html.phone .set-h2 { scroll-margin-top: 128px; }
+/* A phone has no keys for the shortcuts the command list shows. */
+html.phone .palette-hint { display: none; }
+html.phone .recipes-nav, html.phone .tpl-nav { max-height: none; }
+/* The Manual: the page being read gets the screen; its contents list scrolls in a short strip under it. */
+html.phone .manual .recipes-nav { max-height: 28dvh; }
+html.phone .manual .manual-main { flex: 1 1 auto; }
+/* Turned on its side a phone is wide enough for File to Help along the top, but they are already under More. */
+html.phone .menubar { display: none; }
+html.phone .brand { display: none; }
+
+/* Plate and serve: its three columns become three tabs, the pages first. */
+.plate-panes { display: none; }
+html.phone .plate-panes { display: flex; flex: none; padding: 6px 8px; gap: 6px; background: var(--bar); border-bottom: 1px solid var(--line); }
+html.phone .plate-panes button { flex: 1; min-height: 40px; border: none; border-radius: 20px; background: transparent; color: var(--muted); font-size: 15px; }
+html.phone .plate-panes button[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-weight: 700; }
+html.phone .plate-main > * { display: none; }
+html.phone .plate-main.show-pages > .plate-stage { display: flex; }
+html.phone .plate-main.show-book > .plate-book, html.phone .plate-main.show-style > .plate-style { display: block; flex: 1 1 auto; width: auto; max-width: none; padding: 16px; font-size: 15px; }
+html.phone .plate-top { gap: 10px; padding: 0 10px; height: 56px; }
+html.phone .plate-brand { display: none; }
+html.phone .plate-btn { height: 40px; padding: 0 14px; font-size: 14px; }
+html.phone .plate-menu { top: 46px; width: min(280px, calc(100vw - 20px)); }
+html.phone .plate-menu button { min-height: 48px; font-size: 15px; }
+html.phone .plate-stagebar { height: auto; min-height: 48px; flex-wrap: wrap; gap: 6px 12px; padding: 6px 10px; }
+html.phone .plate-side input[type='checkbox'] { width: 20px; height: 20px; }
+html.phone .plate-main.show-style > .plate-style { padding-right: 26px; }

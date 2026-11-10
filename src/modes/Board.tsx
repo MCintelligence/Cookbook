@@ -1,4 +1,5 @@
 import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF, PANTRY_SECTIONS, childrenOf } from '../storage/book';
@@ -150,7 +151,7 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
               return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} k={pan.look.k} onPut={(spot) => put(item.card.id, spot)} />;
             })}
           </div>
-          {total === 0 && <p className="mode-empty">{pantry ? 'The Pantry is empty. Right-click here for a new Character, Setting or Material.' : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
+          {total === 0 && <p className="mode-empty">{pantry ? `The Pantry is empty. ${menuPress()} here for a new Character, Setting or Material.` : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
         </div>
       )}
     </>
@@ -305,7 +306,7 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
     ]);
   };
 
-  if (groups.length === 0) return <p className="mode-empty">Nothing on the Shelf yet. Right-click the Shelf to add a Group, and it becomes a column here.</p>;
+  if (groups.length === 0) return <p className="mode-empty">Nothing on the Shelf yet. {menuPress()} the Shelf to add a Group, and it becomes a column here.</p>;
   return (
     <div className="grid-board-scroll">
       <div className={`grid-board${by === 'none' ? '' : ' with-rows'}`} style={{ gridTemplateColumns: `${by === 'none' ? '' : '132px '}repeat(${groups.length}, 248px)` }} role="grid" aria-label="Board">

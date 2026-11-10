@@ -28,7 +28,7 @@ const loaded = new Map<Dialect, Promise<{ aff: string; dic: string }>>();
 let ready: Promise<{ speller: Speller; names: string[] }> | null = null;
 let config: { dialect: Dialect; words: string[] } = { dialect: 'en-US', words: [] };
 /** Harper is large, so it is only loaded the first time grammar is wanted. */
-let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues }> | null = null;
+let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues; parsedIssues: typeof import('./parse').parsedIssues }> | null = null;
 let grammarConfigured: Promise<void> | null = null;
 /** The writer's own list for Spicy Sally (see ownPatterns.ts). */
 let own: OwnPatterns = NO_PATTERNS;
@@ -63,10 +63,10 @@ function files(dialect: Dialect) {
 function loadGrammar() {
   if (!grammar) {
     grammar = (async () => {
-      const [{ LocalLinter }, { slimBinary }, g] = await Promise.all([import('harper.js'), import('harper.js/slimBinary'), import('./grammar')]);
+      const [{ LocalLinter }, { slimBinary }, g, parse] = await Promise.all([import('harper.js'), import('harper.js/slimBinary'), import('./grammar'), import('./parse')]);
       const linter = new LocalLinter({ binary: slimBinary });
       await g.setUpLinter(linter, config.dialect, config.words);
-      return { linter, why: await linter.getLintDescriptions(), grammarIssues: g.grammarIssues };
+      return { linter, why: await linter.getLintDescriptions(), grammarIssues: g.grammarIssues, parsedIssues: parse.parsedIssues };
     })();
     grammar.catch(() => (grammar = null));
     grammarConfigured = grammar.then(() => {});
@@ -118,8 +118,13 @@ async function handle(req: Request): Promise<unknown> {
   return spelling.map((s, i) => {
     const text = req.texts[i]!;
     const style = withOwn(styleIssues(text, names), ownPatternIssues(text, own));
-    return spareExceptions(text, combine(s, found[i]!, peteIssues(text, isWord, counts), style, isSentenceRule), own);
+    return spareExceptions(text, combine(s, found[i]!, ownGrammar(peteIssues(text, isWord, counts), g.parsedIssues(text)), style, isSentenceRule), own);
   });
+}
+
+/** Pete's word rules first; the sentence reader adds what they didn't already mark. */
+function ownGrammar(pete: Issue[], parsed: Issue[]): Issue[] {
+  return [...pete, ...parsed.filter((p) => !pete.some((i) => p.from < i.to && p.to > i.from))];
 }
 
 self.onmessage = (e: MessageEvent<Request>) => {

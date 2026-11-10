@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon as Art } from './Icon';
 import {
   type BookLocation,
   type RecentBook,
@@ -88,76 +89,22 @@ const percent = (b: RecentBook) => (b.goal && b.words !== undefined ? Math.min(1
 const seriesLine = (b: RecentBook) => (b.series ? `${b.series}${b.seriesNumber ? ` · Book ${b.seriesNumber}` : ''}` : '');
 
 const Icon = {
-  recent: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-      <circle cx="7" cy="7" r="5.5" />
-      <path d="M7 4v3l2 1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  all: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2.5 2.5h3.5a1 1 0 0 1 1 1v8a1 1 0 0 0-1-1H2.5zM11.5 2.5H8a1 1 0 0 0-1 1v8a1 1 0 0 1 1-1h3.5z" />
-    </svg>
-  ),
-  star: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-      <path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6L1.8 5.6l3.6-.5z" />
-    </svg>
-  ),
-  starOn: (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" aria-label="Favourite">
-      <path d="m7 1.8 1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 10l-3.2 1.7.6-3.6L1.8 5.6l3.6-.5z" />
-    </svg>
-  ),
-  archive: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="11" height="3" rx=".6" />
-      <path d="M2.5 5.5v6h9v-6M5.5 8h3" strokeLinecap="round" />
-    </svg>
-  ),
-  trash: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2 3.5h10M5.5 3.5V2h3v1.5M3.2 3.5l.6 8.5h6.4l.6-8.5" />
-    </svg>
-  ),
-  series: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-      <rect x="2" y="2" width="2.6" height="10" rx=".5" />
-      <rect x="5.7" y="2" width="2.6" height="10" rx=".5" />
-      <path d="m9.6 2.6 2.4-.6 1.6 9.4-2.4.6z" />
-    </svg>
-  ),
-  more: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
-      <circle cx="3" cy="7" r="1.25" />
-      <circle cx="7" cy="7" r="1.25" />
-      <circle cx="11" cy="7" r="1.25" />
-    </svg>
-  ),
-  warn: (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M7 1.8 12.6 12H1.4z" />
-      <path d="M7 5.6v3M7 10.2v.1" />
-    </svg>
-  ),
-  search: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" />
-    </svg>
-  ),
+  recent: <Art name="recent" size={14} />,
+  all: <Art name="book" size={14} />,
+  star: <Art name="star" size={14} />,
+  starOn: <Art name="starFull" size={12} label="Favourite" />,
+  archive: <Art name="archive" size={14} />,
+  trash: <Art name="trash" size={14} />,
+  series: <Art name="shelf" size={14} />,
+  more: <Art name="more" size={14} />,
+  warn: <Art name="warning" size={13} />,
+  search: <Art name="search" size={14} />,
   close: (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
       <path d="m3 3 8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   ),
-  pot: (
-    <svg width="44" height="44" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M18 8c0 3-2 3-2 6M24 6c0 3-2 3-2 6M30 8c0 3-2 3-2 6" />
-      <path d="M8 22h32v12a8 8 0 0 1-8 8H16a8 8 0 0 1-8-8z" />
-      <path d="M8 26H4M40 26h4M6 22h36" />
-    </svg>
-  ),
+  pot: <Art name="pot" size={44} />,
 };
 
 /** Your Recipes: every recipe the writer has opened, as cards or a list, with New Recipe and the writer's templates. */

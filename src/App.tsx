@@ -161,6 +161,7 @@ import { ShelfSearch } from './ui/ShelfSearch';
 import { UNTRACKED, changesAt, goToChange, hasChanges, hasChangesJSON, setSuggesting, settleAll, settleAt, settledJSON } from './editor/trackChanges';
 import { shrinkPicture } from './ui/pictures';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
+import { Icon } from './ui/Icon';
 
 type Notes = Record<string, string>;
 /** The panel open on the right of the page, if any. */
@@ -3605,9 +3606,7 @@ export function App() {
             // On a small window the Shelf slides over the page, so the right-hand panel makes way.
             if (!sideOpen && !settings.focus && narrowWindow()) setPanel(null);
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Icon name="menu" size={20} />
           </button>
           <span className="brand">cookbook</span>
           {!MAC_APP && <MenuBar menus={topMenus} />}
@@ -3639,16 +3638,11 @@ export function App() {
         </div>
         <div className="top-actions">
           <button className="panel-btn" title="Pantry" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
-            </svg>
+            <Icon name="pantry" size={24} />
             Pantry
           </button>
           <button className="panel-btn" title="Seasonings" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
-              <path d="M5 19 13 11" />
-            </svg>
+            <Icon name="seasonings" size={24} />
             Seasonings
             <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
@@ -4082,10 +4076,7 @@ export function App() {
           {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
           <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
+            <Icon name="gear" size={18} />
           </button>
         </span>
       </footer>

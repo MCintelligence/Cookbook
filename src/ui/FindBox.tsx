@@ -1,4 +1,5 @@
 import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { getFind, replaceAll, replaceCurrent, setFindQuery, stepFind } from '../editor/findPlugin';
 import { type SearchHit, MATCH_END, MATCH_START } from '../storage/index';
@@ -99,20 +100,14 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
           requestAnimationFrame(() => input.current?.select());
         }}
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="6" />
-          <path d="m19.5 19.5-4-4" />
-        </svg>
+        <Icon name="search" size={24} />
         Search
       </button>
       {open && (
         <section className="find-pop" aria-label="Search and replace" onKeyDown={(e) => e.key === 'Escape' && close()}>
           <div className="find-bar">
             <label className="find-field">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="6" />
-                <path d="m19.5 19.5-4-4" />
-              </svg>
+              <Icon name="search" size={14} />
               <input
                 ref={input}
                 value={query}

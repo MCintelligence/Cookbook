@@ -62,6 +62,12 @@ interface Props {
   onDraft?: (path: string, n: number) => void;
   /** A right-click (or the menu key) on a draft. */
   onDraftMenu?: (path: string, n: number, x: number, y: number) => void;
+  /**
+   * An Item dragged out of the list, over somewhere else that takes it (the editor). `over` is
+   * told where the pointer is (null once the drag ends or comes back) and says whether that place
+   * takes the Item; `drop` is the Item let go there.
+   */
+  outside?: { over: (path: string | null, x: number, y: number) => boolean; drop: (path: string, x: number, y: number) => void };
 }
 
 export interface Recipe {
@@ -293,7 +299,9 @@ export const Tree = memo(function Tree(props: Props) {
       }
       if (Math.hypot(ev.clientX - x0, ev.clientY - y0) >= 8) moved = true;
       setDrag((d) => d && { ...d, x: ev.clientX, y: ev.clientY });
-      setDrop(target(ev.clientX, ev.clientY, node.path));
+      const to = target(ev.clientX, ev.clientY, node.path);
+      setDrop(to);
+      if (props.outside && node.kind === 'file') props.outside.over(to ? null : node.path, ev.clientX, ev.clientY);
       if (scroller) {
         const box = scroller.getBoundingClientRect();
         if (ev.clientY < box.top + 40) scroller.scrollBy(0, -12);
@@ -306,8 +314,10 @@ export const Tree = memo(function Tree(props: Props) {
         return props.onMenu(node, ev.clientX, ev.clientY);
       }
       const landed = active ? target(ev.clientX, ev.clientY, node.path) : null;
+      const out = active && !landed && node.kind === 'file' && !!props.outside?.over(node.path, ev.clientX, ev.clientY);
       finish();
       if (landed) onMove(node.path, landed.folder, landed.index);
+      else if (out) props.outside!.drop(node.path, ev.clientX, ev.clientY);
     };
     const key = (ev: KeyboardEvent) => ev.key === 'Escape' && finish();
     const holdStill = (ev: TouchEvent) => active && ev.preventDefault();
@@ -325,6 +335,7 @@ export const Tree = memo(function Tree(props: Props) {
       }
       setDrag(null);
       setDrop(null);
+      props.outside?.over(null, 0, 0);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);

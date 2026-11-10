@@ -30,7 +30,13 @@ describe('templates', () => {
     await createBook(fs, 'Book');
     const path = await createFromTemplate(fs, 'bookshelf', CARD_TEMPLATES[0]!, 'Mama Lou');
     expect(path).toBe('pantry/characters/Mama Lou.md');
-    expect(await readDocument(fs, path)).toMatchObject({ title: 'Mama Lou', kind: 'character', fields: { role: '', wants: '' } });
+    expect(await readDocument(fs, path)).toMatchObject({ title: 'Mama Lou', kind: 'character', fields: { 'role in story': '', where: '', when: '', work: '', sketch: {} } });
+  });
+
+  it('starts every kind of Pantry Item from the same Sketch', () => {
+    const [character, setting, material] = CARD_TEMPLATES;
+    expect(setting!.fields).toEqual(character!.fields);
+    expect(material!.fields).toEqual(character!.fields);
   });
 
   it('only uses Markdown the editor writes back unchanged', () => {

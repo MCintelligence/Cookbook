@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { type BookInfo } from '../storage/book';
 import {
   BUILT_IN_OUTLINES,
@@ -41,22 +42,9 @@ interface Props {
 
 type Picked = { builtIn: BookTemplateId } | { user: string };
 
-const docIcon = (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 1.5h5.5L11 4v8.5H3z" />
-    <path d="M8.5 1.5V4H11" />
-  </svg>
-);
-const bookIcon = (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-    <path d="M2.5 2.5h3.5a1 1 0 0 1 1 1v8a1 1 0 0 0-1-1H2.5zM11.5 2.5H8a1 1 0 0 0-1 1v8a1 1 0 0 1 1-1h3.5z" />
-  </svg>
-);
-const mineIcon = (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3.5 1.5h7v11L7 10l-3.5 2.5z" />
-  </svg>
-);
+const docIcon = <Icon name="page" size={14} />;
+const bookIcon = <Icon name="book" size={14} />;
+const mineIcon = <Icon name="bookmark" size={14} />;
 
 const numberOf = (text: string) => {
   const n = Number(text.replace(/[,\s]/g, ''));

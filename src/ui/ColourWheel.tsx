@@ -37,13 +37,109 @@ function toHex({ h, s, v }: Hsv): string {
 const SIZE = 168;
 
 /**
- * A colour wheel, a brightness slider and a hex field, like Word's custom
- * colours. Hue goes round the wheel and strength out from the centre.
+ * Ready-made colours under the wheel, like Word's standard colours: a row of darks and a row of
+ * brights. They are fitted to the page colour before they are shown (see swatchesFor).
  */
-export function ColourWheel({ value, onPick, onAutomatic }: { value: string; onPick: (hex: string) => void; onAutomatic: () => void }) {
+export const SWATCHES: { hex: string; name: string }[] = [
+  { hex: '#000000', name: 'Black' },
+  { hex: '#595959', name: 'Dark grey' },
+  { hex: '#7f1d1d', name: 'Dark red' },
+  { hex: '#8a4b14', name: 'Brown' },
+  { hex: '#3f5f2a', name: 'Dark green' },
+  { hex: '#1e4f6e', name: 'Dark teal' },
+  { hex: '#1f3a8a', name: 'Navy' },
+  { hex: '#4c2a7a', name: 'Dark purple' },
+  { hex: '#a6a6a6', name: 'Grey' },
+  { hex: '#d93025', name: 'Red' },
+  { hex: '#e8692f', name: 'Orange' },
+  { hex: '#d4a017', name: 'Gold' },
+  { hex: '#4f8a3c', name: 'Green' },
+  { hex: '#178a8a', name: 'Teal' },
+  { hex: '#2f6fb5', name: 'Blue' },
+  { hex: '#7d4fb0', name: 'Purple' },
+];
+
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+    const x = c / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio between two colours, 1 to 21. */
+export function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p) as [number, number];
+  return (x + 0.05) / (y + 0.05);
+}
+
+/** Readable text needs 4.5:1 against the page. */
+const READABLE = 4.5;
+
+/**
+ * The swatches fitted to a page colour: each keeps its hue and is darkened (on a light page)
+ * or lightened (on a dark one) only as far as it takes to read well on that page.
+ */
+export function swatchesFor(paper: string): { hex: string; name: string }[] {
+  const dark = luminance(paper) < 0.18;
+  return SWATCHES.map(({ hex, name }) => {
+    let hsv = toHsv(hex);
+    // On a dark page the greys turn over, so Black becomes white rather than a muddy grey.
+    if (dark && hsv.s < 0.05) hsv = { ...hsv, v: 1 - hsv.v };
+    let out = toHex(hsv);
+    for (let i = 0; i < 40 && contrast(out, paper) < READABLE; i++) {
+      hsv = dark ? { h: hsv.h, s: Math.max(0, hsv.s - 0.03), v: Math.min(1, hsv.v + 0.04) } : { ...hsv, v: Math.max(0, hsv.v - 0.03) };
+      out = toHex(hsv);
+    }
+    return { hex: out, name };
+  });
+}
+
+/** "rgb(253, 253, 252)" or "#fdfdfc" as a hex colour, or null. */
+function cssToHex(css: string): string | null {
+  const m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?/.exec(css);
+  if (m) {
+    if (m[4] !== undefined && Number(m[4]) === 0) return null;
+    return `#${[m[1], m[2], m[3]].map((c) => Number(c).toString(16).padStart(2, '0')).join('')}`;
+  }
+  return normalHex(css);
+}
+
+/** The colour of the page being written on: the open page if there is one, else the theme's paper. */
+function pageColour(): string {
+  const page = document.querySelector('.cb-page');
+  const own = page && cssToHex(getComputedStyle(page).backgroundColor);
+  return own ?? cssToHex(getComputedStyle(document.documentElement).getPropertyValue('--paper')) ?? '#ffffff';
+}
+
+/**
+ * A colour wheel with a brightness slider beside it and a hex field, then Automatic and the
+ * ready-made swatches along the bottom, like Word's font colour menu. Hue goes round the
+ * wheel and strength out from the centre; Automatic (the style's own colour) is ticked
+ * until a colour is set by hand.
+ */
+export function ColourWheel({
+  value,
+  automatic,
+  autoColour,
+  onPick,
+  onAutomatic,
+}: {
+  value: string;
+  /** True when the words have no colour of their own and follow their style. */
+  automatic: boolean;
+  /** The style's colour, shown on the Automatic button. */
+  autoColour: string;
+  /** `done` is true for a one-click pick (a swatch), after which the menu can close. */
+  onPick: (hex: string, done?: boolean) => void;
+  onAutomatic: () => void;
+}) {
   const [hsv, setHsv] = useState(() => toHsv(normalHex(value) ?? '#000000'));
   const [text, setText] = useState(value.toUpperCase());
   const canvas = useRef<HTMLCanvasElement>(null);
+  // Read once as the menu opens, so the swatches suit this theme's page, or a page given its own colour.
+  const [swatches] = useState(() => swatchesFor(pageColour()));
 
   useEffect(() => {
     const hex = normalHex(value);
@@ -89,35 +185,61 @@ export function ColourWheel({ value, onPick, onAutomatic }: { value: string; onP
     const s = Math.min(1, Math.hypot(dx, dy) / (box.width / 2));
     pick({ h: (Math.atan2(dy, dx) * 180) / Math.PI + 180, s, v: hsv.v || 1 });
   };
+  // The slider is drawn by hand, so it stands upright the same way in every web view.
+  const fromSlider = (e: React.PointerEvent<HTMLDivElement>) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    const v = 1 - Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
+    pick({ ...hsv, v: Math.round(v * 100) / 100 });
+  };
+  const sliderKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 0.1 : 0.01;
+    const keys: Record<string, number> = { ArrowUp: hsv.v + step, ArrowRight: hsv.v + step, ArrowDown: hsv.v - step, ArrowLeft: hsv.v - step, PageUp: hsv.v + 0.1, PageDown: hsv.v - 0.1, Home: 1, End: 0 };
+    const next = keys[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    pick({ ...hsv, v: Math.round(Math.min(1, Math.max(0, next)) * 100) / 100 });
+  };
   const angle = ((hsv.h - 180) * Math.PI) / 180;
   const dot = { left: `${50 + 50 * hsv.s * Math.cos(angle)}%`, top: `${50 + 50 * hsv.s * Math.sin(angle)}%` };
+  const current = automatic ? null : normalHex(value);
 
   return (
     <div className="wheel">
-      <div className="wheel-disc">
-        <canvas
-          ref={canvas}
-          width={SIZE}
-          height={SIZE}
-          aria-label="Colour wheel"
+      <div className="wheel-top">
+        <div className="wheel-disc">
+          <canvas
+            ref={canvas}
+            width={SIZE}
+            height={SIZE}
+            aria-label="Colour wheel"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              fromPointer(e);
+            }}
+            onPointerMove={(e) => e.buttons === 1 && fromPointer(e)}
+          />
+          <span className="wheel-dot" style={{ ...dot, background: toHex(hsv) }} aria-hidden="true" />
+        </div>
+        <div
+          className="wheel-light"
+          role="slider"
+          tabIndex={0}
+          aria-label="Brightness"
+          aria-orientation="vertical"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(hsv.v * 100)}
+          style={{ background: `linear-gradient(to top, #000, ${toHex({ ...hsv, v: 1 })})` }}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
-            fromPointer(e);
+            fromSlider(e);
           }}
-          onPointerMove={(e) => e.buttons === 1 && fromPointer(e)}
-        />
-        <span className="wheel-dot" style={{ ...dot, background: toHex(hsv) }} aria-hidden="true" />
+          onPointerMove={(e) => e.buttons === 1 && fromSlider(e)}
+          onKeyDown={sliderKey}
+        >
+          <span className="wheel-thumb" style={{ top: `${(1 - hsv.v) * 100}%` }} aria-hidden="true" />
+        </div>
       </div>
-      <input
-        className="wheel-light"
-        type="range"
-        min={0}
-        max={100}
-        aria-label="Brightness"
-        value={Math.round(hsv.v * 100)}
-        style={{ background: `linear-gradient(to right, #000, ${toHex({ ...hsv, v: 1 })})` }}
-        onChange={(e) => pick({ ...hsv, v: Number(e.target.value) / 100 })}
-      />
       <div className="wheel-row">
         <span className="wheel-swatch" style={{ background: toHex(hsv) }} aria-hidden="true" />
         <label className="wheel-hex">
@@ -138,9 +260,30 @@ export function ColourWheel({ value, onPick, onAutomatic }: { value: string; onP
             onBlur={() => setText(toHex(hsv).toUpperCase())}
           />
         </label>
-        <button className="wheel-auto" onClick={onAutomatic}>
+      </div>
+      <div className="wheel-swatches" role="radiogroup" aria-label="Colours">
+        <button className="wheel-auto" role="radio" aria-checked={automatic} onClick={onAutomatic} title="The style's own colour">
+          <span className="wheel-chip" style={{ background: autoColour }} aria-hidden="true" />
           Automatic
         </button>
+        <div className="wheel-grid">
+          {swatches.map((s) => (
+            <button
+              key={s.hex}
+              className="wheel-chip"
+              role="radio"
+              aria-checked={current === s.hex}
+              aria-label={s.name}
+              title={s.name}
+              style={{ background: s.hex }}
+              onClick={() => {
+                setHsv(toHsv(s.hex));
+                setText(s.hex.toUpperCase());
+                onPick(s.hex, true);
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

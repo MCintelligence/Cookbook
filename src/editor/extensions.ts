@@ -17,6 +17,7 @@ import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, 
 import { DropCaps } from './dropCaps';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
+import { KeptSelection } from './keptSelection';
 import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
@@ -532,6 +533,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     PageShortcuts.configure({ onRequest }),
     ListKeys,
     PageKeys,
+    KeptSelection,
     Note.configure({ onRequest }),
     Footnote.configure({ onRequest }),
     Bold,

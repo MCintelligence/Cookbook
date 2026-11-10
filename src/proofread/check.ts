@@ -17,6 +17,8 @@ export interface Issue {
   suggestions: string[];
   /** What the rule looks for, for the card's Why? */
   why?: string;
+  /** An unknown word with a capital in mid-sentence: most likely a name, so it is marked softly. */
+  name?: boolean;
 }
 
 /** What Ignore remembers: the word for spelling, the rule and its text for anything else. */
@@ -65,7 +67,18 @@ export function isCorrect(word: string, speller: Speller): boolean {
   const base = w.replace(/'s$/i, '');
   if (base !== w && speller.correct(base)) return true;
   if (w.includes('-')) return w.split('-').every((part) => part === '' || isCorrect(part, speller));
+  // Café, naïve, fiancée, déjà: right when the plain letters are right.
+  const plain = w.normalize('NFD').replace(/\p{M}/gu, '');
+  if (plain !== w && (speller.correct(plain) || speller.correct(plain.toLowerCase()))) return true;
+  if (isStretched(w, speller)) return true;
   return isAffixed(w, speller);
+}
+
+/** Nooo, Aaargh, sooo, hmmmm: a letter held down for effect, right when it is right with the letter once or twice. */
+function isStretched(word: string, speller: Speller): boolean {
+  const lower = word.toLowerCase();
+  if (!/(\p{L})\1\1/u.test(lower)) return false;
+  return [lower.replace(/(\p{L})\1{2,}/gu, '$1'), lower.replace(/(\p{L})\1{2,}/gu, '$1$1')].some((w) => speller.correct(w) || speller.correct(w[0]!.toUpperCase() + w.slice(1)));
 }
 
 /** Prefixes and suffixes English adds to almost any word, so “untextured” and “textureless” count when “textured” and “texture” do. */
@@ -80,12 +93,24 @@ function isAffixed(word: string, speller: Speller): boolean {
   return PREFIXES.some((p) => lower.startsWith(p) && real(lower.slice(p.length))) || SUFFIXES.some((x) => lower.endsWith(x) && real(lower.slice(0, -x.length)));
 }
 
+/** What can start a sentence, so a capital after it says nothing. A closing ” usually leads to a speech tag, so it doesn't. */
+const SENTENCE_START = /[.!?…“"‘'(—–:;\-]$/u;
+
+/** Capitalised, not all capitals, and in mid-sentence: Brannoch, Ysolde, McAllister. */
+export function isNameLike(text: string, from: number, word: string): boolean {
+  if (!/^\p{Lu}/u.test(word) || !/\p{Ll}/u.test(word)) return false;
+  const before = text.slice(0, from).trimEnd();
+  return before !== '' && !SENTENCE_START.test(before);
+}
+
 /** Misspelt words. `ignored` holds words the writer has said to leave alone in this scene. */
 export function spellingIssues(text: string, speller: Speller, ignored: Set<string> = new Set()): Issue[] {
   return words(text)
     .filter((w) => !ignored.has(w.word) && !isCorrect(w.word, speller))
-    .map((w) => ({ ...w, kind: 'spelling', rule: 'spelling', message: `“${w.word}” may be misspelt.`, suggestions: [] }))
-    .map(({ word: _w, ...issue }) => issue as Issue);
+    .map(({ word, from, to }): Issue => {
+      const issue: Issue = { from, to, kind: 'spelling', rule: 'spelling', message: `“${word}” may be misspelt.`, suggestions: [] };
+      return isNameLike(text, from, word) ? { ...issue, message: `“${word}” isn’t in the dictionary. Is it a name?`, name: true } : issue;
+    });
 }
 
 /** Optimal string alignment distance: edits, counting a swap of two letters as one. */
@@ -145,12 +170,17 @@ const CONTRACTIONS: Record<string, string> = Object.fromEntries(
   ['don’t', 'doesn’t', 'didn’t', 'can’t', 'won’t', 'isn’t', 'wasn’t', 'aren’t', 'weren’t', 'hasn’t', 'haven’t', 'hadn’t', 'couldn’t', 'wouldn’t', 'shouldn’t', 'mustn’t', 'ain’t', 'I’m', 'I’ve', 'you’re', 'they’re', 'we’ve', 'they’ve', 'you’ve', 'that’s', 'what’s', 'there’s', 'here’s', 'who’s', 'it’ll', 'she’ll', 'he’ll', 'we’ll', 'they’ll', 'you’ll', 'I’ll'].map((c) => [c.replace('’', '').toLowerCase(), c]),
 );
 
+/** Plurals that own something, typed without the apostrophe: "womens coats". */
+const OWNING: Record<string, string> = { womens: 'women’s', mens: 'men’s', childrens: 'children’s', peoples: 'people’s' };
+
 /**
  * "dont" and its kind: the fix puts the apostrophe back, and after he, she or
  * it gives "doesn’t" straight away, so "She dont know" is caught in one go.
  */
 function missingApostrophe(issue: Issue, text: string): Issue {
   const word = text.slice(issue.from, issue.to);
+  const owning = OWNING[word.toLowerCase()];
+  if (owning) return { ...issue, message: `“${word}” needs an apostrophe: “${owning}”.`, suggestions: [/^\p{Lu}/u.test(word) ? owning[0]!.toUpperCase() + owning.slice(1) : owning] };
   let fixed = CONTRACTIONS[word.toLowerCase()];
   if (!fixed) return issue;
   if (/^[A-Z]/.test(word) && !fixed.startsWith('I’')) fixed = fixed[0]!.toUpperCase() + fixed.slice(1);

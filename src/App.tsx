@@ -62,6 +62,8 @@ import { type ModeHost } from './modes/host';
 import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, sideOf } from './modes/prefs';
 const ModeView = lazy(() => import('./modes/ModeView'));
 import { useStable } from './ui/useStable';
+import { type DeskZone, deskZone } from './ui/deskDrop';
+import { DeskDropHint } from './ui/DeskDropHint';
 import { docWords } from './editor/docStats';
 import { useBookIndex } from './storage/useBookIndex';
 import { ownerOf, useBackups } from './storage/useBackups';
@@ -130,7 +132,7 @@ import { IssueCard } from './ui/IssueCard';
 import { KIND_OF, type SeasoningId, fixText, isSeasoning, needsReview, rulesOff } from './proofread/remarks';
 import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
 import { ReportWindow } from './ui/ReportWindow';
-import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, stepIssue } from './proofread/plugin';
+import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, likelyNames, stepIssue } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
@@ -165,6 +167,7 @@ import { ShelfSearch } from './ui/ShelfSearch';
 import { UNTRACKED, changesAt, goToChange, hasChanges, hasChangesJSON, setSuggesting, settleAll, settleAt, settledJSON } from './editor/trackChanges';
 import { shrinkPicture } from './ui/pictures';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL, pictureType, savePicture, sectionOf } from './storage/pantry';
+import { Icon } from './ui/Icon';
 
 type Notes = Record<string, string>;
 /** The panel open on the right of the page, if any. */
@@ -1401,10 +1404,17 @@ export function App() {
 
   /** The scene shown beside the one being written, if any. */
   const [beside, setBeside] = useState<string | null>(null);
+  /** The Item beside goes on the left of the page, when it was dropped on the left edge. */
+  const [besideLeft, setBesideLeft] = useState(false);
   const swapBeside = async (p: string) => {
     const writing = path;
     await select(p);
     setBeside(writing && writing !== p ? writing : null);
+  };
+  /** Ends split view, keeping `p` (either of the two) as the page being written. */
+  const keepOnly = async (p: string) => {
+    if (p !== path) await select(p);
+    setBeside(null);
   };
 
   /** Turns everything after a scene break into a new scene that comes right after this one. */
@@ -1823,12 +1833,14 @@ export function App() {
     if (!ed) return [];
     const fixes = issue.issue.suggestions.length > 0 || issue.issue.rule !== 'spelling' ? issue.issue.suggestions : await proof.suggest(issue.word, aroundIssue(ed.state.doc, issue)).catch(() => []);
     const label = RULE_GROUPS.flatMap((g) => g.rules).find((r) => r.id === issue.group)?.label;
+    const names = issue.issue.name ? likelyNames(ed.state) : [];
     return [
       ...(fixes.length > 0
         ? fixes.slice(0, 6).map((f) => ({ label: fixText(issue.word, f), onPick: () => applySuggestion(ed, issue, f) }))
         : [{ label: issue.issue.kind === 'spelling' ? 'No suggestions' : issue.issue.message, onPick: () => {}, disabled: true }]),
       { separator: true },
       ...(issue.issue.rule === 'spelling' ? [{ label: 'Add to dictionary', onPick: () => proof.addWord(issue.word) }] : []),
+      ...(names.length > 1 ? [{ label: `Add all ${names.length} likely names`, onPick: () => proof.addWords(names) }] : []),
       { label: 'Remove for good', onPick: () => proof.ignore(issue, 'once') },
       ...(issue.issue.rule !== 'spelling' ? [{ label: 'Remove everywhere for good', onPick: () => proof.ignore(issue, 'always') }] : []),
       ...(label ? [{ label: `Stop checking ${label.toLowerCase()}`, onPick: () => proof.setRuleOn(issue.group, false) }] : []),
@@ -2587,7 +2599,7 @@ export function App() {
   const cardChoices = useMemo<CardChoice[]>(
     () =>
       [...cards]
-        .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
+        .filter(([, c]) => isCard(c.kind))
         .map(([p, c]) => ({ id: c.id, title: c.title, path: p }))
         .filter((c) => c.id !== doc?.id)
         .sort((a, b) => a.title.localeCompare(b.title, 'en')),
@@ -2634,6 +2646,7 @@ export function App() {
   // Through updateBook, so a change made a moment before isn't written back over with the old settings.
   const onDialect = useCallback((dialect: Dialect) => updateBook({ dialect }), [fs, book]);
   const onOff = useCallback((proofreadOff: string[]) => updateBook({ proofreadOff }), [fs, book]);
+  const onList = useCallback((sallyList: string[]) => updateBook({ sallyList }), [fs, book]);
   // Switched off, every seasoning rests and nothing is marked on the page.
   const paused = !!seas?.paused;
   const resting = useMemo(() => rulesOff(paused ? [] : chosen), [chosen, paused]);
@@ -2642,7 +2655,7 @@ export function App() {
   const unchecked = useMemo(() => (seas?.unchecked ?? []).filter(isSeasoning), [seas?.unchecked]);
   // The checks keep running with Seasonings closed; see needsReview for when grammar and style are left out.
   const review = !!doc && needsReview(chosen, unchecked, paused, seasoningsOpen);
-  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
+  const proof = useProofreader({ fs, dialect: book?.dialect ?? dialectOf(settings.english === 'auto' ? systemEnglish() : settings.english), onDialect, off: book?.proofreadOff, resting, onOff, list: book?.sallyList, onList, editor, docId: doc?.id ?? null, names: storyNames, review, bookTexts, bookVersion: textCount, onError: setError });
   const uncheckedKinds = unchecked.flatMap((id) => KIND_OF[id] ?? []).join(' ');
   // Every Check is one setting for the whole Recipe, put on each editor as it is made, so every Item,
   // Mise en Place and split view show the same. Daniel dims only while he is picked and not paused.
@@ -3588,6 +3601,35 @@ export function App() {
     if (picking) showPicked(next);
   });
   const onTreeMove = useStable((from: string, folder: string, at: number) => moveInTree(from, folder, at));
+  /**
+   * A Shelf Item dragged onto the editor: near the left or right edge it opens beside the page,
+   * anywhere else it opens in place of it. Set only when the zone changes, so dragging never
+   * redraws the app on every move.
+   */
+  const [deskDrop, setDeskDrop] = useState<DeskZone | null>(null);
+  const zoneAt = (p: string, x: number, y: number): DeskZone | null => {
+    const box = desk.current?.getBoundingClientRect();
+    if (!box) return null;
+    const zone = deskZone(box, x, y, !!doc && !!path && !miseShown);
+    // The open Item dropped on itself goes nowhere.
+    return zone && p === path && !miseShown ? null : zone;
+  };
+  const deskOver = useStable((p: string | null, x: number, y: number) => {
+    const zone = p ? zoneAt(p, x, y) : null;
+    setDeskDrop(zone);
+    return zone !== null;
+  });
+  const deskLand = useStable((p: string, x: number, y: number) => {
+    const zone = zoneAt(p, x, y);
+    if (zone === 'open') {
+      if (p === beside) setBeside(null);
+      void select(p);
+    } else if (zone) {
+      setBeside(p);
+      setBesideLeft(zone === 'left');
+    }
+  });
+  const shelfOutside = useMemo(() => ({ over: deskOver, drop: deskLand }), [deskOver, deskLand]);
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
@@ -3678,9 +3720,7 @@ export function App() {
             // On a small window the Shelf slides over the page, so the right-hand panel makes way.
             if (!sideOpen && !settings.focus && narrowWindow()) setPanel(null);
           }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Icon name="menu" size={20} />
           </button>
           <span className="brand">cookbook</span>
           {!MAC_APP && <MenuBar menus={topMenus} />}
@@ -3712,16 +3752,11 @@ export function App() {
         </div>
         <div className="top-actions">
           <button className="panel-btn" title="Pantry" aria-pressed={pantryShown} aria-expanded={pantryShown} onClick={() => togglePanel('pantry')}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 4.2C8.6 4.2 5.5 9.4 5.5 13.4 5.5 16.8 8.4 19.7 12 19.7s6.5-2.9 6.5-6.3C18.5 9.4 15.4 4.2 12 4.2z" />
-            </svg>
+            <Icon name="pantry" size={24} />
             Pantry
           </button>
           <button className="panel-btn" title="Seasonings" aria-pressed={seasoningsShown} aria-expanded={seasoningsShown} disabled={!doc} onClick={() => togglePanel('seasonings')}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 19c8 0 14-6 14-14-8 0-14 6-14 14z" />
-              <path d="M5 19 13 11" />
-            </svg>
+            <Icon name="seasonings" size={24} />
             Seasonings
             <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
@@ -3789,6 +3824,7 @@ export function App() {
           ghost={path && ghostN !== null ? { path, n: ghostN } : null}
           onDraft={onDraftRow}
           onDraftMenu={onDraftMenuRow}
+          outside={shelfOutside}
         />
         </ShelfSearch>
         {shelfBar()}
@@ -3805,7 +3841,7 @@ export function App() {
       )}
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
 
-      <main className={`desk${beside && doc ? ' split' : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
+      <main className={`desk${beside && doc ? ' split' : ''}${deskDrop ? ' drop-' + deskDrop : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         {error && (
           <div role="alert" className="error" title={error}>
             <span>{error.replace(/ \([^]*\)$/, '')}</span>
@@ -3858,19 +3894,28 @@ export function App() {
               onOpen={(p) => void select(p)}
             />
           )}
-          <div className="page-row">
+          <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
           {doc && path ? (
-            <article className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`} key={path} style={pageStyle} onContextMenu={pageMenu}>
+            <article
+              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              key={path}
+              style={pageStyle}
+              onContextMenu={pageMenu}
+              // In split view, a double-click in the page's margin keeps this page and closes the other.
+              // A double-click in the text still just picks a word.
+              onDoubleClick={beside ? (e) => !(e.target as HTMLElement).closest('.ProseMirror') && void keepOnly(path) : undefined}
+            >
               {pageBody()}
             </article>
           ) : null}
           {doc && path && beside && beside !== path ? (
-            <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onClose={() => setBeside(null)} /></Suspense>
+            <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onKeep={(p) => void keepOnly(p)} onClose={() => setBeside(null)} /></Suspense>
           ) : null}
           </div>
           {doc && path ? null : <p className="empty">Pick an item from the Shelf to start writing.</p>}
           </>
         )}
+        {deskDrop && <DeskDropHint zone={deskDrop} box={desk.current?.getBoundingClientRect() ?? null} />}
       </main>
 
       {drawerOpen && (
@@ -4160,10 +4205,7 @@ export function App() {
           {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
           <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-            </svg>
+            <Icon name="gear" size={18} />
           </button>
         </span>
       </footer>

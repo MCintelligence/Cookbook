@@ -79,6 +79,12 @@ const SAM_NAME = [
   (n: string) => `${n} would make you walk the plank for that spelling.`,
   (n: string) => `You’ve sailed with ${n} this long and still can’t spell them?`,
 ];
+/** An unknown word with a capital in mid-sentence: more likely a new shipmate than a mistake. */
+const SAM_NEW_NAME = [
+  (w: string) => `“${w}”? Not in my charts. A new hand aboard? Add them.`,
+  (w: string) => `Never heard of “${w}”. If that’s a name, sign them on.`,
+  (w: string) => `“${w}” isn’t in my book. A name, is it? Then write it in.`,
+];
 const SAM_APOSTROPHE = ['No apostrophe? Bold. Wrong, but bold.', 'Lost your apostrophe overboard, sailor. Hook it back on.', 'An apostrophe’s gone missing. Check the bilges.'];
 
 /** Peppery Pete, sweetly passive-aggressive, after the plain fact of what is wrong. */
@@ -102,6 +108,15 @@ const PETE: Record<string, (word: string, fix: string | undefined, message: stri
   'pronoun-case': (_w, _f, m) => `Wrong case! ${m}`,
   'verb-form': (_w, _f, m) => `Verb form! ${m}`,
   'reported-question': (_w, _f, m) => `Word order! ${m}`,
+  'look-alike': (w, f) => f && `Wrong word! “${w}” is spelt fine, but “${f}” is the one that fits here.`,
+  apostrophe: (_w, _f, m) => `Apostrophe! ${m}`,
+  'double-negative': (_w, _f, m) => `Double negative! ${m}`,
+  'run-on': (_w, _f, m) => `Run-on! ${m}`,
+  fragment: (_w, _f, m) => `Fragment! ${m}`,
+  dangling: (_w, _f, m) => `Dangling! ${m}`,
+  'tense-shift': (_w, _f, m) => `Tense! ${m}`,
+  capitals: (_w, _f, m) => `Capitals! ${m}`,
+  usage: (_w, _f, m) => `Usage! ${m}`,
   PronounVerbAgreement: (_w, f) => f && `Agreement! That verb doesn’t match its subject. Make it “${f}”.`,
   PronounInflectionBe: (_w, f) => f && `Agreement! That verb doesn’t match its subject. Make it “${f}”.`,
   AnA: () => 'Grammar! It’s “an” before a vowel sound and “a” before the rest.',
@@ -153,6 +168,11 @@ const SALLY_ON: Record<string, ((w: string) => string)[]> = {
   'simpler-word': [() => 'Fancy talk, cool it down!', () => 'Darling, you don’t need big words to impress me.', () => 'So formal. Loosen your tie a little.'],
   'sticky-sentence': [() => 'Gloopy!', () => 'Sticky, hon. Too much glue, not enough flavour.', () => 'This one clings. Peel off a few little words.'],
   redundancy: [() => 'Double helping, hon.', () => 'You said it twice, darling. Once was plenty.', () => 'Saying it again won’t make me like it more.'],
+  'own-pattern': [
+    (w) => `“${w}”, darling. It’s on your own list, so I’m only doing as I’m told.`,
+    (w) => `You asked me to watch for “${w}”, hon. Caught one.`,
+    (w) => `“${w}” again? You told me you were trying to quit.`,
+  ],
 };
 
 /** What the issue's character says about it. The same issue always gets the same line, so nothing shuffles as the page changes. */
@@ -161,6 +181,7 @@ export function remark(issue: Issue, word: string): string {
   if (owner === 'sam') {
     if (issue.rule === 'name') return pick(SAM_NAME, word)(issue.suggestions[0] ?? 'they');
     if (/apostrophe|doesn’t/.test(issue.message)) return pick(SAM_APOSTROPHE, word);
+    if (issue.name) return pick(SAM_NEW_NAME, word)(word);
     return pick(SAM_WORD, word)(word);
   }
   if (owner === 'pete') {
@@ -174,7 +195,7 @@ export function remark(issue: Issue, word: string): string {
   if (lines) {
     const line = pick(lines, word)(word);
     // Harper's own suggestions say what to change; Sally's words come first.
-    return issue.rule === 'harper-style' || issue.rule === 'simpler-word' || issue.rule === 'sticky-sentence' || issue.rule === 'redundancy' ? `${line} ${issue.message}` : line;
+    return issue.rule === 'harper-style' || issue.rule === 'simpler-word' || issue.rule === 'sticky-sentence' || issue.rule === 'redundancy' || (issue.rule === 'own-pattern' && issue.suggestions.length > 0) ? `${line} ${issue.message}` : line;
   }
   return `${pick(SALLY_ON['harper-style']!, word)(word)} ${issue.message}`;
 }

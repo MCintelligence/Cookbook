@@ -25,6 +25,12 @@ interface ProofState {
   version: number;
   /** Issues by paragraph text, with offsets into that text. */
   cache: Map<string, Issue[]>;
+  /**
+   * While reviewing: spelling alone, by paragraph text, for paragraphs whose grammar and style are
+   * still being checked. Spelling takes a moment and grammar much longer, so a page that opens shows
+   * Sam's underlines at once and the rest as they come.
+   */
+  spelled: Map<string, Issue[]>;
   /** What the writer ignored and the checks they switched off. */
   hiding: Hiding;
   set: DecorationSet;
@@ -42,7 +48,7 @@ interface Meta {
   review?: boolean;
   ignored?: Set<string>;
   off?: Set<string>;
-  results?: { version: number; entries: [string, Issue[]][] };
+  results?: { version: number; entries: [string, Issue[]][]; spellingOnly?: boolean };
   /** Drops the underlines on a word at once, such as one just added to the dictionary. */
   forget?: string;
 }
@@ -95,20 +101,24 @@ function decorate(pos: number, map: TextMap, issue: Issue, keys: IssueKeys): Dec
   const space = word.trim() === '' ? ' cb-issue-space' : '';
   // Each issue gets its own element (nodeName), so a word's underline and its sentence's tint don't merge into one.
   const sentence = isSentenceRule(issue.rule) ? ' cb-issue-sentence' : '';
+  const name = issue.name ? ' cb-issue-name' : '';
   const spec = { issue, word, ...keys };
-  const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}`, 'data-rule': issue.rule }, spec);
+  const mark = Decoration.inline(from, to, { nodeName: 'span', class: `cb-issue cb-issue-${issue.kind}${space}${sentence}${name}`, 'data-rule': issue.rule }, spec);
   if (issue.kind !== 'style') return [mark];
   const [open, close] = bracketsFor(word);
   return [bracket(from, true, open, spec), mark, bracket(to, false, close, spec)];
 }
 
-/** Underlines from the cache, keeping the last ones (moved with the text) for paragraphs still being checked. */
-function build(doc: PMNode, cache: Map<string, Issue[]>, hiding: Hiding, old: DecorationSet): DecorationSet {
+/**
+ * Underlines from the cache, or spelling alone while grammar is still on its way, keeping the
+ * last ones (moved with the text) for paragraphs still being checked.
+ */
+function build(doc: PMNode, cache: Map<string, Issue[]>, spelled: Map<string, Issue[]>, hiding: Hiding, old: DecorationSet): DecorationSet {
   const decos: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
     const map = mapOf(node);
-    const issues = cache.get(map.text);
+    const issues = cache.get(map.text) ?? spelled.get(map.text);
     if (issues) {
       for (const issue of issues) {
         const keys = keysOf(issue, map.text);
@@ -148,42 +158,70 @@ function wordAt(state: EditorState): { from: number; to: number } | null {
   return a === b ? null : { from: $from.start() + a, to: $from.start() + b };
 }
 
-function uncheckedTexts(doc: PMNode, cache: Map<string, Issue[]>, skip: Set<string>): string[] {
-  const texts = new Set<string>();
-  doc.descendants((node) => {
+/** Paragraphs not yet in the cache, nearest the cursor first when `near` is given, so the page the writer is on fills in first. */
+function uncheckedTexts(doc: PMNode, cache: Map<string, Issue[]>, skip: Set<string>, near?: number): string[] {
+  const found = new Map<string, number>();
+  doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
     const text = mapOf(node).text;
-    if (/\p{L}/u.test(text) && !cache.has(text) && !skip.has(text)) texts.add(text);
+    if (/\p{L}/u.test(text) && !cache.has(text) && !skip.has(text) && !found.has(text)) {
+      found.set(text, near === undefined ? 0 : near < pos ? pos - near : Math.max(0, near - pos - node.nodeSize));
+    }
     return false;
   });
-  return [...texts];
+  const texts = [...found.keys()];
+  return near === undefined ? texts : texts.sort((a, b) => found.get(a)! - found.get(b)!);
 }
+
+/**
+ * Paragraphs asked about in one go while reviewing. Grammar takes about a third of a second per
+ * thousand words, so a long page is sent a little at a time and its underlines come in as each
+ * part is done, rather than all at once after several seconds.
+ */
+const BATCH = 20;
 
 function checkInBackground(view: EditorView) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let asking = new Set<string>();
+  let spelling = new Set<string>();
   let askingFor = -1;
-  const run = () => {
-    const state = proofreadKey.getState(view.state)!;
-    if (!state.checker) return;
-    if (askingFor !== state.version) asking = new Set();
-    askingFor = state.version;
-    const texts = uncheckedTexts(view.state.doc, state.cache, asking);
-    if (texts.length === 0) return;
-    for (const t of texts) asking.add(t);
-    const { version } = state;
+  const ask = (checker: Checker, texts: string[], review: boolean, version: number, spellingOnly: boolean, then?: () => void) => {
+    const waiting = spellingOnly ? spelling : asking;
+    for (const t of texts) waiting.add(t);
     const done = () => {
-      if (askingFor === version) for (const t of texts) asking.delete(t);
+      if (askingFor === version) for (const t of texts) waiting.delete(t);
     };
-    state.checker.check(texts, state.review).then(
+    checker.check(texts, review).then(
       (results) => {
         done();
         if (view.isDestroyed) return;
-        const meta: Meta = { results: { version, entries: texts.map((t, i) => [t, results[i] ?? []]) } };
+        const meta: Meta = { results: { version, entries: texts.map((t, i) => [t, results[i] ?? []]), spellingOnly } };
         view.dispatch(view.state.tr.setMeta(proofreadKey, meta).setMeta('addToHistory', false));
+        then?.();
       },
       done,
     );
+  };
+  const run = () => {
+    if (view.isDestroyed) return;
+    const state = proofreadKey.getState(view.state)!;
+    if (!state.checker) return;
+    if (askingFor !== state.version) {
+      asking = new Set();
+      spelling = new Set();
+    }
+    askingFor = state.version;
+    const texts = uncheckedTexts(view.state.doc, state.cache, asking, view.state.selection.from);
+    if (texts.length === 0) return;
+    const { version, checker, review } = state;
+    if (!review) {
+      ask(checker, texts, false, version, false);
+      return;
+    }
+    // Spelling for the whole page first, which is quick, then grammar and style a part at a time.
+    const quick = texts.filter((t) => !state.spelled.has(t) && !spelling.has(t));
+    if (quick.length > 0) ask(checker, quick, false, version, true);
+    ask(checker, texts.slice(0, BATCH), true, version, false, texts.length > BATCH ? run : undefined);
   };
   const schedule = () => {
     clearTimeout(timer);
@@ -208,7 +246,7 @@ export const Proofread = Extension.create({
       new Plugin<ProofState>({
         key: proofreadKey,
         state: {
-          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), hiding: { ignored: new Set(), off: new Set() }, set: DecorationSet.empty, fresh: null, tasted: false }),
+          init: () => ({ checker: null, review: false, version: 0, cache: new Map(), spelled: new Map(), hiding: { ignored: new Set(), off: new Set() }, set: DecorationSet.empty, fresh: null, tasted: false }),
           apply(tr, value, _old, state) {
             const meta = tr.getMeta(proofreadKey) as Meta | undefined;
             let next = value;
@@ -222,8 +260,12 @@ export const Proofread = Extension.create({
               next = { ...next, fresh: inside ? { from, to } : null };
             }
             if (meta) {
-              if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map(), tasted: false };
-              if (meta.review !== undefined && meta.review !== next.review) next = { ...next, review: meta.review, version: next.version + 1, cache: new Map(), tasted: false };
+              if ('checker' in meta) next = { ...next, checker: meta.checker ?? null, version: next.version + 1, cache: new Map(), spelled: new Map(), tasted: false };
+              if (meta.review !== undefined && meta.review !== next.review) {
+                // Turning review on keeps the spelling already found, so Sam's underlines stay while the rest is checked.
+                const spelled = meta.review ? next.cache : new Map<string, Issue[]>();
+                next = { ...next, review: meta.review, version: next.version + 1, cache: new Map(), spelled, tasted: false };
+              }
               if (meta.ignored) next = { ...next, hiding: { ...next.hiding, ignored: meta.ignored } };
               if (meta.off) next = { ...next, hiding: { ...next.hiding, off: meta.off } };
               if (meta.forget) {
@@ -231,10 +273,14 @@ export const Proofread = Extension.create({
                 const spelling = (spec: { word: string; issue: Issue }) => spec.issue.kind === 'spelling' && spec.word === word;
                 next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => spelling(spec as { word: string; issue: Issue }))) };
               }
-              if (meta.results && meta.results.version === next.version) {
+              if (meta.results && meta.results.version === next.version && meta.results.spellingOnly) {
+                const spelled = new Map(next.spelled);
+                for (const [text, issues] of meta.results.entries) spelled.set(text, issues);
+                next = { ...next, spelled: prune(state.doc, spelled) };
+              } else if (meta.results && meta.results.version === next.version) {
                 const cache = new Map(next.cache);
                 for (const [text, issues] of meta.results.entries) cache.set(text, issues);
-                next = { ...next, cache: prune(state.doc, cache) };
+                next = { ...next, cache: prune(state.doc, cache), spelled: prune(state.doc, next.spelled) };
                 // A paragraph typed in while the rest was checked doesn't keep the page waiting.
                 if (!next.tasted && uncheckedTexts(state.doc, next.cache, new Set()).length <= 1) next = { ...next, tasted: true };
               }
@@ -242,7 +288,7 @@ export const Proofread = Extension.create({
               // Leaving review takes grammar and style away at once; spelling stays until rechecked.
               if (meta.review === false) next = { ...next, set: next.set.remove(next.set.find(undefined, undefined, (spec) => (spec as { issue: Issue }).issue.kind !== 'spelling')) };
             }
-            if (tr.docChanged || (meta && (meta.ignored || meta.off || meta.results))) next = { ...next, set: build(state.doc, next.cache, next.hiding, next.set) };
+            if (tr.docChanged || (meta && (meta.ignored || meta.off || meta.results))) next = { ...next, set: build(state.doc, next.cache, next.spelled, next.hiding, next.set) };
             return next;
           },
         },
@@ -321,6 +367,11 @@ export function issuesOf(state: EditorState): FoundIssue[] {
   return list;
 }
 const issueLists = new WeakMap<DecorationSet, FoundIssue[]>();
+
+/** The unknown words on the page that look like names, each once, for “Add all likely names”. */
+export function likelyNames(state: EditorState): string[] {
+  return [...new Set(issuesOf(state).filter((f) => f.issue.name).map((f) => f.word))];
+}
 
 /**
  * The issue F7 (or Shift+F7) goes to: the next one after the cursor, or the one before it,

@@ -117,7 +117,7 @@ export interface Relationship {
 }
 
 /** Front matter keys Cookbook uses itself; everything else on a card is one of the writer's fields. */
-const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export', 'when', 'events', 'arc']);
+const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export', 'sketch', 'when', 'events', 'arc']);
 
 /** The writer's own fields on a card, like role, age and wants, in order. */
 export function cardFieldsOf(doc: Pick<CookbookDocument, 'fields' | 'order'>): [string, string][] {

@@ -6,6 +6,7 @@ import { type Around } from './context';
 import { WorkerChecker } from './client';
 import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
 import { BOOK_WIDE, type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
+import { effectiveOff, storedOff } from './rules';
 
 export interface Proofreader {
   dialect: Dialect;
@@ -13,6 +14,8 @@ export interface Proofreader {
   /** The writer's own dictionary. */
   words: string[];
   addWord: (word: string) => void;
+  /** Several words at once, saved once, such as every likely name on the page. */
+  addWords: (words: string[]) => void;
   removeWord: (word: string) => void;
   /** Leaves an issue alone just here, or everywhere in the book. */
   ignore: (issue: FoundIssue, scope: 'once' | 'always') => void;
@@ -22,6 +25,9 @@ export interface Proofreader {
   /** Rule groups switched off (see rules.ts). */
   off: string[];
   setRuleOn: (rule: string, on: boolean) => void;
+  /** Spicy Sally's list from the writer, one entry a line, kept with the recipe. */
+  list: string[];
+  setList: (lines: string[]) => void;
   /** Suggestions for a misspelling, in the order that fits the words around it. */
   suggest: (word: string, around?: Around) => Promise<string[]>;
 }
@@ -36,6 +42,9 @@ interface Options {
   /** Rule groups nobody is checking for now, because their seasoning isn't picked. Not saved. */
   resting?: string[];
   onOff: (off: string[]) => void;
+  /** Spicy Sally's list from the writer (see ownPatterns.ts). */
+  list?: string[];
+  onList?: (lines: string[]) => void;
   editor: Editor | null;
   /** The open scene or card, whose ignored words apply. */
   docId: string | null;
@@ -53,7 +62,7 @@ interface Options {
 const NO_VERSION = () => 0;
 
 /** The proofreader for the open book: its worker, the writer's dictionary and ignored words. */
-export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, editor, docId, names, review, bookTexts, bookVersion = NO_VERSION, onError }: Options): Proofreader {
+export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, resting, onOff, list: listLines, onList, editor, docId, names, review, bookTexts, bookVersion = NO_VERSION, onError }: Options): Proofreader {
   const checker = useRef<WorkerChecker | null>(null);
   const [words, setWords] = useState<string[]>([]);
   const [ignored, setIgnoredWords] = useState<Ignored>({});
@@ -110,9 +119,25 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
     };
   }, [dialect, wordsKey, namesKey]);
 
+  // Sally's list is sent on its own, so editing it doesn't reload the dictionary; the page is then checked again.
+  const listKey = JSON.stringify(listLines ?? []);
+  const [listed, setListed] = useState(0);
+  useEffect(() => {
+    const c = checker.current;
+    if (!c) return;
+    let live = true;
+    c.setPatterns(JSON.parse(listKey) as string[]).then(
+      () => live && setListed((n) => n + 1),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [listKey]);
+
   useEffect(() => {
     if (editor) setChecker(editor, ready > 0 ? checker.current : null);
-  }, [editor, ready]);
+  }, [editor, ready, listed]);
 
   useEffect(() => {
     if (editor) setReview(editor, review);
@@ -124,7 +149,8 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
     if (editor) setIgnored(editor, [...(bookIgnored ?? []), ...(sceneIgnored ?? [])]);
   }, [editor, sceneIgnored, bookIgnored]);
 
-  const off = useMemo(() => offRules ?? [], [offRules]);
+  const stored = useMemo(() => offRules ?? [], [offRules]);
+  const off = useMemo(() => effectiveOff(stored), [stored]);
   const restingKey = (resting ?? []).join('\n');
   useEffect(() => {
     if (editor) setRulesOff(editor, [...off, ...(resting ?? [])]);
@@ -147,6 +173,11 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         if (editor) forgetWord(editor, word);
         if (!words.includes(word)) saveWords([...words, word]);
       },
+      addWords: (more) => {
+        if (editor) for (const word of more) forgetWord(editor, word);
+        const next = [...new Set([...words, ...more])];
+        if (next.length > words.length) saveWords(next);
+      },
       removeWord: (word) => saveWords(words.filter((w) => w !== word)),
       ignore: (issue, scope) => {
         const where = scope === 'always' ? BOOK_WIDE : docId;
@@ -162,7 +193,9 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         if (fs) saveIgnored(fs, {}).catch(() => {});
       },
       off,
-      setRuleOn: (rule, on) => onOff(on ? off.filter((r) => r !== rule) : [...new Set([...off, rule])]),
+      setRuleOn: (rule, on) => onOff(storedOff(stored, rule, on)),
+      list: listLines ?? [],
+      setList: (lines) => onList?.(lines),
       suggest: (word, around) => {
         const c = checker.current;
         if (!c) return Promise.resolve([]);
@@ -176,6 +209,6 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         return c.suggest(word, around);
       },
     }),
-    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, onOff],
+    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, stored, onOff, listLines, onList],
   );
 }

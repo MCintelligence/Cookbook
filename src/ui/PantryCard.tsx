@@ -1,7 +1,8 @@
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CookbookDocument, type Relationship, akaOf, cardFieldKeys, cardFieldsOf, portraitOf, relationshipsOf, withCardFields } from '../storage/document';
 import { type IncomingRelationship, type SceneMention } from '../storage/index';
-import { FIELD_PLACEHOLDERS, fieldPlaceholder, isBrainstormKind } from '../storage/brainstorm';
+import { fieldPlaceholder } from '../storage/brainstorm';
+import { LINE_HINT, SKETCH, SKETCH_FIELD_HINTS, type Sketch, type SketchKind, isSketchKind, sketchOf, withSketch, withSketchValue } from '../storage/sketch';
 
 export interface CardChoice {
   id: string;
@@ -35,17 +36,66 @@ interface FieldRow {
 }
 
 let nextRowId = 1;
-const rowsOf = (doc: CookbookDocument): FieldRow[] => cardFieldsOf(doc).map(([key, value]) => ({ id: nextRowId++, name: label(key), value }));
+const rowsOf = (doc: CookbookDocument): FieldRow[] =>
+  cardFieldsOf(doc).map(([key, value]) => ({
+    id: nextRowId++,
+    name: label(key),
+    value,
+  }));
+
+const PICTURE: Record<SketchKind, string> = {
+  character: 'Add a portrait',
+  setting: 'Add a picture or map',
+  research: 'Add an image or scan',
+};
+
+/** A text box that grows with what is typed, so a long answer never scrolls inside the card. */
+function Grow({ value, onChange, className, label, hint }: { value: string; onChange: (v: string) => void; className: string; label: string; hint: string }) {
+  const box = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return <textarea ref={box} rows={1} className={className} aria-label={label} placeholder={hint} value={value} onChange={(e) => onChange(e.target.value)} />;
+}
+
+/** The Pantry Sketch's sections: the same headings for every kind, with hints that fit this one. */
+function SketchSections({ kind, sketch, onEdit }: { kind: SketchKind; sketch: Sketch; onEdit: (key: string, value: string) => void }) {
+  return (
+    <div className="pc-sketch">
+      {SKETCH.map((section) => (
+        <section className="sk-sec" key={section.id} aria-label={section.title}>
+          <div className="sk-head">
+            <h3>{section.title}</h3>
+            <span className="sk-q">{section.question[kind]}</span>
+          </div>
+          <div className={`sk-${section.layout}`}>
+            {section.slots.map((slot) => (
+              <label className="sk-slot" key={slot.key}>
+                {slot.label && <span className="sk-label">{slot.label}</span>}
+                <Grow className="sk-text" label={slot.label ?? section.title} hint={slot.hint[kind]} value={sketch[slot.key] ?? ''} onChange={(v) => onEdit(slot.key, v)} />
+              </label>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 /**
- * The top of a character, setting or research card: portrait, other names,
- * the writer's own fields and relationships. The free writing is the page
+ * The top of a character, setting or material: portrait, other names, the
+ * Pantry Sketch's one line and short facts, the writer's own fields, ties to
+ * other Items, and then the Sketch's sections. The free writing is the page
  * below, in the same editor as a scene.
  */
 export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onChange, onPickPortrait, onOpen, style }: Props) {
   const relationships = relationshipsOf(doc.fields);
   const portrait = portraitOf(doc.fields);
-  const isResearch = doc.kind === 'research';
+  const kind: SketchKind = isSketchKind(doc.kind) ? doc.kind : 'character';
+  const sketch = sketchOf(doc.fields);
   const [aka, setAka] = useState(akaOf(doc.fields).join(', '));
   const [picture, setPicture] = useState<string | null>(null);
   const filePicker = useRef<HTMLInputElement>(null);
@@ -82,7 +132,12 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
     // A row with neither a name nor a value is still being made; it isn't saved yet.
     const kept = next.filter((r) => r.name.trim() || r.value.trim());
     const keys = cardFieldKeys(kept.map((r) => r.name));
-    onChange(withCardFields(doc, kept.map((r, i) => [keys[i]!, r.value])));
+    onChange(
+      withCardFields(
+        doc,
+        kept.map((r, i) => [keys[i]!, r.value]),
+      ),
+    );
   };
   const editRow = (id: number, change: Partial<FieldRow>) => saveRows(rows.map((r) => (r.id === id ? { ...r, ...change } : r)));
   // A new field starts with no name, so the writer types one from scratch; it is saved once it has a name or a value.
@@ -104,14 +159,21 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
     onChange({ ...doc, fields: empty ? rest : { ...rest, [key]: value } });
   };
   const setRelationships = (list: Relationship[]) => setOwn('relationships', list.length > 0 ? list : undefined);
-  const commitAka = () => setOwn('aka', aka.split(',').map((s) => s.trim()).filter(Boolean));
+  const commitAka = () =>
+    setOwn(
+      'aka',
+      aka
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
 
   return (
     <section className="pantry-card" aria-label="Card details" style={style}>
-      {!isResearch && (
+      <div className="pc-top">
         <div className="pc-portrait">
           <button className="pc-picture" aria-label={portrait ? 'Change portrait' : 'Add a portrait'} onClick={() => filePicker.current?.click()}>
-            {picture ? <img src={picture} alt="" /> : <span>Add a portrait</span>}
+            {picture ? <img src={picture} alt="" /> : <span>{PICTURE[kind]}</span>}
           </button>
           {portrait && (
             <button className="pc-remove" onClick={() => setOwn('portrait', undefined)}>
@@ -130,56 +192,42 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
             }}
           />
         </div>
-      )}
-      <div className="pc-main">
-        <input className="pc-name" aria-label="Card name" value={doc.title} onChange={(e) => onChange({ ...doc, title: e.target.value })} />
-        {!isResearch && (
+        <div className="pc-main">
+          <input className="pc-name" aria-label="Card name" value={doc.title} onChange={(e) => onChange({ ...doc, title: e.target.value })} />
           <label className="pc-row">
             <span className="pc-key">Also known as</span>
-            <input
-              className="pc-value"
-              value={aka}
-              placeholder={isBrainstormKind(doc.kind) ? FIELD_PLACEHOLDERS[doc.kind].aka : 'Nicknames, separated by commas'}
-              onChange={(e) => setAka(e.target.value)}
-              onBlur={commitAka}
-              onKeyDown={(e) => e.key === 'Enter' && commitAka()}
-            />
+            <input className="pc-value" value={aka} placeholder={SKETCH_FIELD_HINTS.aka![kind]} onChange={(e) => setAka(e.target.value)} onBlur={commitAka} onKeyDown={(e) => e.key === 'Enter' && commitAka()} />
           </label>
-        )}
-        <div className="pc-fields" ref={rowList}>
-          {rows.map((r) => (
-            <div className="pc-row" key={r.id}>
-              <input className="pc-key" aria-label="Field name" placeholder="Field name" value={r.name} onChange={(e) => editRow(r.id, { name: e.target.value })} onKeyDown={onFieldKey} />
-              <input className="pc-value" aria-label={r.name.trim() || 'Field'} placeholder={fieldPlaceholder(doc.kind, r.name)} value={r.value} onChange={(e) => editRow(r.id, { value: e.target.value })} onKeyDown={onFieldKey} />
-              <button className="pc-x" aria-label={`Remove ${r.name.trim() || 'field'}`} onClick={() => saveRows(rows.filter((x) => x.id !== r.id))}>
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <button className="ghost pc-add" onClick={addField}>
-          + Field
-        </button>
+          {sketch && <Grow className="pc-line" label="In a line" hint={LINE_HINT[kind]} value={sketch.line ?? ''} onChange={(v) => onChange(withSketchValue(doc, 'line', v))} />}
+          <div className="pc-fields" ref={rowList}>
+            {rows.map((r) => (
+              <div className="pc-row" key={r.id}>
+                <input className="pc-key" aria-label="Field name" placeholder="Field name" value={r.name} onChange={(e) => editRow(r.id, { name: e.target.value })} onKeyDown={onFieldKey} />
+                <input
+                  className="pc-value"
+                  aria-label={r.name.trim() || 'Field'}
+                  placeholder={fieldPlaceholder(doc.kind, r.name)}
+                  value={r.value}
+                  onChange={(e) => editRow(r.id, { value: e.target.value })}
+                  onKeyDown={onFieldKey}
+                />
+                <button className="pc-x" aria-label={`Remove ${r.name.trim() || 'field'}`} onClick={() => saveRows(rows.filter((x) => x.id !== r.id))}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <button className="ghost pc-add" onClick={addField}>
+            + Field
+          </button>
 
-        {!isResearch && (
           <div className="pc-relations">
-            <span className="pc-heading">Relationships</span>
+            <span className="pc-heading">Ties</span>
             {relationships.map((r, i) => (
               <div className="pc-row" key={i}>
-                <input
-                  className="pc-key"
-                  aria-label="Relationship"
-                  placeholder="Mother of"
-                  value={r.as}
-                  onChange={(e) => setRelationships(relationships.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))}
-                />
-                <select
-                  className="pc-value"
-                  aria-label="Who"
-                  value={r.to}
-                  onChange={(e) => setRelationships(relationships.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))}
-                >
-                  <option value="">Choose a card…</option>
+                <input className="pc-key" aria-label="Relationship" placeholder="Mother of" value={r.as} onChange={(e) => setRelationships(relationships.map((x, j) => (j === i ? { ...x, as: e.target.value } : x)))} />
+                <select className="pc-value" aria-label="Who" value={r.to} onChange={(e) => setRelationships(relationships.map((x, j) => (j === i ? { ...x, to: e.target.value } : x)))}>
+                  <option value="">Choose an Item…</option>
                   {choices.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.title}
@@ -203,26 +251,33 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
               </div>
             ))}
             <button className="ghost pc-add" onClick={() => setRelationships([...relationships, { to: '', as: '' }])}>
-              + Relationship
+              + Tie
             </button>
           </div>
-        )}
 
-        {appearsIn && (
-          <div className="pc-relations">
-            <span className="pc-heading">Appears in</span>
-            {appearsIn.length === 0 && <span className="pc-quiet">No item names {doc.title} yet.</span>}
-            {appearsIn.map((m) => (
-              <div className="pc-row pc-incoming" key={m.path}>
-                <button className="pc-link" onClick={() => onOpen(m.path)}>
-                  {m.title}
-                </button>
-                <span>{m.count === 1 ? 'once' : `${m.count} times`}</span>
-              </div>
-            ))}
-          </div>
-        )}
+          {appearsIn && (
+            <div className="pc-relations">
+              <span className="pc-heading">Appears in</span>
+              {appearsIn.length === 0 && <span className="pc-quiet">No item names {doc.title} yet.</span>}
+              {appearsIn.map((m) => (
+                <div className="pc-row pc-incoming" key={m.path}>
+                  <button className="pc-link" onClick={() => onOpen(m.path)}>
+                    {m.title}
+                  </button>
+                  <span>{m.count === 1 ? 'once' : `${m.count} times`}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+      {sketch ? (
+        <SketchSections kind={kind} sketch={sketch} onEdit={(key, value) => onChange(withSketchValue(doc, key, value))} />
+      ) : (
+        <button className="ghost pc-add pc-use-sketch" onClick={() => onChange(withSketch(doc))}>
+          + Use the Pantry Sketch
+        </button>
+      )}
     </section>
   );
 }

@@ -168,7 +168,12 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
           <div className="tb-popover tb-colour" role="dialog" aria-label="Text colour">
             <ColourWheel
               value={color}
-              onPick={(color) => words({ color }, true)}
+              automatic={text.color === null}
+              autoColour={style.color}
+              onPick={(color, done) => {
+                words({ color }, true);
+                if (done) close();
+              }}
               onAutomatic={() => {
                 // Back to the style's colour.
                 words({ color: null }, true);

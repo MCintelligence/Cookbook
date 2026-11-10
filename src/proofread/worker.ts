@@ -4,6 +4,7 @@ import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
 import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
 import { combine, peteIssues } from './pete';
+import { NO_PATTERNS, type OwnPatterns, compilePatterns, ownPatternIssues, spareExceptions, withOwn } from './ownPatterns';
 import { isSentenceRule, styleIssues } from './style';
 
 /**
@@ -16,7 +17,8 @@ export type Request =
   | { id: number; type: 'configure'; dialect: Dialect; words: string[]; names: string[] }
   | { id: number; type: 'check'; texts: string[]; review: boolean }
   | { id: number; type: 'suggest'; word: string; around?: Around }
-  | { id: number; type: 'learn'; texts: string[] };
+  | { id: number; type: 'learn'; texts: string[] }
+  | { id: number; type: 'patterns'; lines: string[] };
 
 export type Response = { id: number; result: unknown } | { id: number; error: string };
 
@@ -28,6 +30,8 @@ let config: { dialect: Dialect; words: string[] } = { dialect: 'en-US', words: [
 /** Harper is large, so it is only loaded the first time grammar is wanted. */
 let grammar: Promise<{ linter: LocalLinter; why: Record<string, string>; grammarIssues: typeof import('./grammar').grammarIssues }> | null = null;
 let grammarConfigured: Promise<void> | null = null;
+/** The writer's own list for Spicy Sally (see ownPatterns.ts). */
+let own: OwnPatterns = NO_PATTERNS;
 /** Which words follow which in the books, loaded the first time a suggestion is wanted; empty if it can't be. */
 let pairs: Promise<Counts> | null = null;
 /** The same for the writer's own book. */
@@ -89,6 +93,10 @@ async function handle(req: Request): Promise<unknown> {
     void loadPairs();
     return null;
   }
+  if (req.type === 'patterns') {
+    own = compilePatterns(req.lines);
+    return null;
+  }
   if (req.type === 'learn') {
     book = countText(req.texts);
     return null;
@@ -109,7 +117,8 @@ async function handle(req: Request): Promise<unknown> {
   const isWord = (w: string) => speller.correct(w);
   return spelling.map((s, i) => {
     const text = req.texts[i]!;
-    return combine(s, found[i]!, peteIssues(text, isWord, counts), styleIssues(text, names), isSentenceRule);
+    const style = withOwn(styleIssues(text, names), ownPatternIssues(text, own));
+    return spareExceptions(text, combine(s, found[i]!, peteIssues(text, isWord, counts), style, isSentenceRule), own);
   });
 }
 

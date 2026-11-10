@@ -42,6 +42,11 @@ export class WorkerChecker implements Checker {
     return this.ask({ type: 'configure', dialect, words, names });
   }
 
+  /** Spicy Sally's list from the writer: what to mark, and what never to. */
+  setPatterns(lines: string[]): Promise<void> {
+    return this.ask({ type: 'patterns', lines });
+  }
+
   check(texts: string[], review: boolean): Promise<Issue[][]> {
     return this.ask({ type: 'check', texts, review });
   }

@@ -28,7 +28,7 @@ export const PETE_RULES: { id: string; label: string }[] = [
 ];
 
 /** Checks that start switched off: the writer turns them on in App Settings › Seasonings. */
-export const OPT_IN_RULES = ['run-on'];
+export const OPT_IN_RULES = ['run-on', 'OxfordComma'];
 
 /** Something that says whether a word is in the dictionary. */
 export type IsWord = (word: string) => boolean;

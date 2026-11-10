@@ -6,7 +6,6 @@ import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts }
 import { combine, peteIssues } from './pete';
 import { NO_PATTERNS, type OwnPatterns, compilePatterns, ownPatternIssues, spareExceptions, withOwn } from './ownPatterns';
 import { isSentenceRule, styleIssues } from './style';
-import { supplementEntries } from './supplement';
 
 /**
  * The proofreader's background worker: it holds the Hunspell dictionary and,
@@ -102,7 +101,6 @@ async function handle(req: Request): Promise<unknown> {
     generation++;
     ready = files(req.dialect).then(({ aff, dic }) => {
       const speller = nspell(aff, dic);
-      for (const [word, model] of supplementEntries()) speller.add(word, model);
       for (const word of words) speller.add(word);
       return { speller, names: req.names };
     });

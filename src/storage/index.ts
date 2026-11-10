@@ -2,7 +2,9 @@ import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
-import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
+import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, arcOf, cardFieldsOf, datesOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
+import { type ArcBeat } from './document';
+import { type StoryDate } from './storyDate';
 
 /**
  * The hidden index: everything that can be worked out again from the files
@@ -12,7 +14,7 @@ import { type CookbookDocument, type DocumentKind, type Relationship, type Scene
  * that changed since last time. Deleting it is always safe.
  */
 export const INDEX_FILE = joinPath(HIDDEN_FOLDER, 'index.sqlite');
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 export interface IndexedDocument {
   path: string;
@@ -31,13 +33,24 @@ export interface IndexedDocument {
   /** Left out when the book is exported. */
   skipExport: boolean;
   relationships: Relationship[];
+  /** When it happens in the story (a Shelf Item), or its dated events (a Pantry Item). */
+  dates: StoryDate[];
+  /** A Pantry Item's arc: beats by the id of the Shelf Item they happen in. */
+  arc: Record<string, ArcBeat>;
   /** The words of the file without markup. */
   text: string;
   stamp: string;
 }
 
 /** What the Bookshelf shows on each card. */
-export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka' | 'portrait' | 'label' | 'skipExport'>;
+export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka' | 'portrait' | 'label' | 'skipExport' | 'dates' | 'arc'>;
+
+/** A tie from one Pantry Item to another, as the Atlas draws it. */
+export interface Link {
+  from: string;
+  to: string;
+  as: string;
+}
 
 export interface SceneMention {
   path: string;
@@ -90,6 +103,8 @@ export function toIndexed(path: string, doc: CookbookDocument, stamp: string): I
     label: labelOf(doc.fields) ?? '',
     skipExport: !includedInExport(doc.fields),
     relationships: relationshipsOf(doc.fields).filter((r) => r.to),
+    dates: datesOf(doc),
+    arc: isCard(doc.kind) ? arcOf(doc.fields) : {},
     text,
     stamp,
   };
@@ -143,7 +158,7 @@ export class BookIndex {
     }
     const db = new sqlite3.oo1.DB(':memory:');
     db.exec(`
-      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, portrait text, label text, skip_export integer, stamp text);
+      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, portrait text, label text, dates text, arc text, skip_export integer, stamp text);
       create table links (from_path text not null, to_id text not null, label text);
       create index links_to on links (to_id);
       create virtual table docs_fts using fts5(title, text, tokenize = 'porter unicode61 remove_diacritics 2');
@@ -156,8 +171,8 @@ export class BookIndex {
     this.db.transaction(() => {
       this.removeRow(doc.path);
       this.db.exec({
-        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.portrait, doc.label, doc.skipExport ? 1 : 0, doc.stamp],
+        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, portrait, label, dates, arc, skip_export, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.portrait, doc.label, JSON.stringify(doc.dates), JSON.stringify(doc.arc), doc.skipExport ? 1 : 0, doc.stamp],
       });
       const rowid = this.db.selectValue('select last_insert_rowid()') as number;
       this.db.exec({ sql: 'insert into docs_fts (rowid, title, text) values (?, ?, ?)', bind: [rowid, doc.title, doc.text] });
@@ -228,9 +243,15 @@ export class BookIndex {
     return rows.map(([path, title, as]) => ({ path, title, as }));
   }
 
+  /** Every tie between Pantry Items: the path of the Item that has it, the id of the one it points to, and how it reads. */
+  links(): Link[] {
+    const rows = this.db.selectArrays('select from_path, to_id, label from links order by from_path, to_id') as [string, string, string][];
+    return rows.map(([from, to, as]) => ({ from, to, as: as ?? '' }));
+  }
+
   /** Path to what the Bookshelf shows, for every indexed file. */
   cards(): Map<string, CardSummary> {
-    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export from docs') as [
+    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export, dates, arc from docs') as [
       string,
       string,
       string,
@@ -242,11 +263,13 @@ export class BookIndex {
       string,
       string,
       number,
+      string,
+      string,
     ][];
     return new Map(
-      rows.map(([path, id, title, kind, words, synopsis, status, aka, portrait, label, skip]) => [
+      rows.map(([path, id, title, kind, words, synopsis, status, aka, portrait, label, skip, dates, arc]) => [
         path,
-        { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[], portrait: portrait ?? '', label: label ?? '', skipExport: skip === 1 },
+        { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[], portrait: portrait ?? '', label: label ?? '', skipExport: skip === 1, dates: JSON.parse(dates || '[]') as StoryDate[], arc: JSON.parse(arc || '{}') as Record<string, ArcBeat> },
       ]),
     );
   }

@@ -306,6 +306,27 @@ Which checks run, and American or British spelling, are in App Settings › Seas
       ],
     },
     {
+      title: 'Cook, Prep and Plan',
+      items: [
+        {
+          title: 'Three ways to look',
+          synopsis: 'The page, the outline and board, and the calendar and timeline.',
+          body: `# Three ways to look
+
+You are in **Cook**: the page. A recipe can be looked at two more ways, and the switch is this Item’s name in the top bar. Click it and choose:
+
+- **Prep**${k('modePrep') ? ` (${k('modePrep')})` : ''} sets the Items out to be put in order. Its **Outline** lists them with their synopses; its **Board** shows them as cards, in a **Grid** with a column for each Group, or **Free** on a board with no edges.
+- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it onto a day.
+- **Cook**${k('modeCook') ? ` (${k('modeCook')})` : ''} brings you back to the page. So does a double-click on anything in Prep or Plan.
+
+Try it now: open Prep, choose Board, and drag a card to another Group. The Shelf follows. New things come from the right-click menu.
+
+Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan. **Shelf and Pantry together**, at the foot of the list, joins them with the Shelf’s.
+`,
+        },
+      ],
+    },
+    {
       title: 'Stove and Oven',
       items: [
         {

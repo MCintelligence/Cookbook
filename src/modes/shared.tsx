@@ -269,11 +269,24 @@ export function FormBox({ form, onClose }: { form: Form; onClose(): void }) {
 export function Synopsis({ value, label, onSave, placeholder = 'What happens here?' }: { value: string; label: string; onSave(text: string): void; placeholder?: string }) {
   const [text, setText] = useState(value);
   const box = useRef<HTMLTextAreaElement | null>(null);
+  // As tall as its words: measured again when they change, and when the card gets wider or the font arrives.
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
+    const fit = () => {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight + 2}px`;
+    };
+    fit();
+    let width = el.clientWidth;
+    const watch = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      fit();
+    });
+    watch.observe(el);
+    void document.fonts?.ready.then(fit);
+    return () => watch.disconnect();
   }, [text]);
   return (
     <textarea
@@ -300,4 +313,9 @@ export function Synopsis({ value, label, onSave, placeholder = 'What happens her
       }}
     />
   );
+}
+
+/** A date for a small space: "3 Sep 1954", "14 to 16 Sep 1954". */
+export function shortWhen(date: Pick<StoryDate, 'on' | 'to'>): string {
+  return sayWhen(date).replace(/([A-Z][a-z]{2})[a-z]+/g, '$1');
 }

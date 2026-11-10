@@ -1,6 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { PANTRY_SECTIONS, type PantrySection, SECTION_KIND, SECTION_LABEL } from '../storage/pantry';
+import { PANTRY_SECTIONS } from '../storage/book';
+import { type PantrySection, SECTION_KIND, SECTION_LABEL } from '../storage/pantry';
 import { useStore } from '../ui/store';
 import { type ViewProps } from './host';
 import { type Item, type Tie, labelColor, layOut, pairTies, pantryGroups, tiesOf } from './model';

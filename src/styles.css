@@ -1579,3 +1579,13 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 @media (max-width: 900px) {
   .app:not(.focus):not(.side-open) .sidebar { display: none; }
 }
+
+/* Cook, Prep and Plan: the open Item's name in the top bar is the switch between them. */
+.crumb { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.crumb-mode { display: inline-flex; align-items: center; gap: 6px; min-width: 0; border: none; background: transparent; padding: 4px 6px; border-radius: 8px; color: inherit; font-size: inherit; }
+.crumb-mode:hover, .crumb-mode[aria-expanded='true'] { background: var(--sidebar); color: var(--text); }
+.crumb-mode .mode-icon { flex: none; color: var(--accent); }
+.crumb-mode-name { overflow: hidden; text-overflow: ellipsis; }
+.menu .mode-icon { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
+/* In Prep and Plan the page and its toolbar are put away (still there, so nothing is lost) and the mode's own take their places. */
+.app.in-mode > .toolbar:not(.mode-toolbar), .app.in-mode > .desk { display: none; }

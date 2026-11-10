@@ -78,7 +78,7 @@ export interface ModePrefs {
 
 export const OUTLINE_COLUMNS = [
   { id: 'synopsis', name: 'Synopsis' },
-  { id: 'label', name: 'Label' },
+  { id: 'label', name: 'Plotline' },
   { id: 'status', name: 'Status' },
   { id: 'when', name: 'Story date' },
   { id: 'words', name: 'Words' },

@@ -1,8 +1,8 @@
 import { baseName, parentOf } from '../storage/adapter';
-import { BOOKSHELF, type TreeNode, childrenOf, walkFiles } from '../storage/book';
+import { BOOKSHELF, PANTRY_SECTIONS, type TreeNode, childrenOf, walkFiles } from '../storage/book';
 import { LABELS, STATUSES, type Relationship } from '../storage/document';
 import { type CardSummary, type Link } from '../storage/index';
-import { PANTRY_SECTIONS, SECTION_LABEL, type PantrySection, sectionOf } from '../storage/pantry';
+import { SECTION_LABEL, type PantrySection, sectionOf } from '../storage/pantry';
 import { MONTHS, type StoryDate, type Ymd, formatDay, fromDayNumber, parseDay, parseWhen, span } from '../storage/storyDate';
 
 /** A file as the views show it: where it is, and what the index knows of it. */
@@ -156,8 +156,8 @@ export function layOut(ids: string[], ties: { a: string; b: string }[], placed: 
     }
     for (const t of ties) {
       if (!at[t.a] || !at[t.b]) continue;
-      const dx = at[t.b][0] - at[t.a][0];
-      const dy = at[t.b][1] - at[t.a][1];
+      const dx = at[t.b]![0] - at[t.a]![0];
+      const dy = at[t.b]![1] - at[t.a]![1];
       const d = Math.max(1, Math.hypot(dx, dy));
       const f = (d - 210) * 0.06;
       if (free.has(t.a)) {

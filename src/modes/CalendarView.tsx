@@ -31,7 +31,9 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
   const pantry = useMemo(() => (showPantry ? pantryGroups(host.pantryTree, host.cards).flatMap((g) => g.items) : []), [showPantry, host.pantryTree, host.cards]);
   const dated = useMemo(() => [...datedOf(shelf, false), ...datedOf(pantry, true)].sort((a, b) => a.first - b.first || b.last - a.last || a.title.localeCompare(b.title, 'en')), [shelf, pantry]);
   const undated = shelf.filter((i) => i.card.dates.length === 0);
-  const start = dated.length > 0 ? fromDayNumber(Math.min(...dated.map((d) => d.first))) : null;
+  // The story starts at the first dated Shelf Item; a birthday forty years before it is not where the calendar opens.
+  const starts = dated.some((d) => d.event === null) ? dated.filter((d) => d.event === null) : dated;
+  const start = starts.length > 0 ? fromDayNumber(Math.min(...starts.map((d) => d.first))) : null;
   const at = (prefs.calendar.at && parseDay(`${prefs.calendar.at}-01`)) || start || today();
   const [over, setOver] = useState<number | null>(null);
   const go = (y: number, m: number) => {

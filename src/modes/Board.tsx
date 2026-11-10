@@ -1,22 +1,21 @@
 import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { parentOf } from '../storage/adapter';
-import { BOOKSHELF, childrenOf } from '../storage/book';
+import { BOOKSHELF, PANTRY_SECTIONS, childrenOf } from '../storage/book';
 import { LABELS, STATUSES } from '../storage/document';
-import { PANTRY_SECTIONS, type PantrySection, SECTION_LABEL } from '../storage/pantry';
-import { sayWhen } from '../storage/storyDate';
+import { type PantrySection } from '../storage/pantry';
 import { type MenuItem } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
 import { useStore } from '../ui/store';
 import { type Form, type ModeHost, type ViewProps } from './host';
 import { type Group, type Item, boardRows, dropPlace, labelColor, pantryGroups, readingOrder, rowOf, shelfGroups } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
-import { Face, Pick, Seg, Synopsis, Tally, ToolButton, Zoomer, cardMenu, itemMenu } from './shared';
+import { Face, Pick, Seg, Synopsis, Tally, ToolButton, Zoomer, cardMenu, itemMenu, shortWhen } from './shared';
 import { dragFrom, usePanZoom } from './usePanZoom';
 
 const DRAG = 'application/x-cookbook-item';
 /** A card on a free board, and the room each takes when they are laid out in rows. */
-const CARD = { w: 224, h: 148, dx: 252, dy: 180, across: 6 };
+const CARD = { w: 224, h: 160, dx: 252, dy: 196, across: 6 };
 const SINGULAR: Record<PantrySection, string> = { characters: 'Character', settings: 'Setting', research: 'Material' };
 const sectionOfGroup = (group: string) => group.slice('pantry/'.length) as PantrySection;
 
@@ -189,7 +188,7 @@ function CardFace({ host, item, pantry, ties }: CardProps) {
             <span className="prep-card-status">
               <StatusIcon status={card.status} decorative /> {STATUSES.find((s) => s.id === card.status)!.label}
             </span>
-            <span>{card.dates[0] ? sayWhen(card.dates[0]) : `${card.words.toLocaleString('en')} words`}</span>
+            <span>{card.dates[0] ? shortWhen(card.dates[0]) : `${card.words.toLocaleString('en')} words`}</span>
           </>
         )}
       </footer>

@@ -8,7 +8,7 @@ import { prefsStore, setPrefs } from './prefs';
 import { Face, Pick, Tally, ToolButton } from './shared';
 
 const COL = 84;
-const ROW = 104;
+const ROW = 128;
 const NAMES = 176;
 const STEP = 17;
 /** How things stand for someone, from the top of the chart to the bottom. */
@@ -46,7 +46,7 @@ export function Arcs({ host, tools }: ViewProps) {
     void host.setField(who.path, 'arc', Object.keys(next).length > 0 ? next : undefined);
   };
   const width = scenes.length * COL;
-  const mid = ROW / 2 + 6;
+  const mid = ROW / 2;
   const yOf = (level: number) => mid - level * STEP;
   const kindChoice = kinds.includes('research') ? 'all' : kinds.includes('setting') ? 'places' : 'people';
 

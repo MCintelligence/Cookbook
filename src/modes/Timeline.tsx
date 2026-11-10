@@ -77,8 +77,10 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
     return [...datedOf(items, false), ...pantry];
   }, [items, side, host.pantryTree, host.cards]);
   const undated = items.filter((i) => i.card.dates.length === 0);
-  const first = dated.length > 0 ? Math.min(...dated.map((d) => d.first)) : null;
-  const last = dated.length > 0 ? Math.max(...dated.map((d) => d.last)) : null;
+  // Fit all and Story start go by the Shelf's own dates when it has any, so one far-off birthday doesn't shrink the story to a dot.
+  const story = dated.some((d) => d.event === null) ? dated.filter((d) => d.event === null) : dated;
+  const first = story.length > 0 ? Math.min(...story.map((d) => d.first)) : null;
+  const last = story.length > 0 ? Math.max(...story.map((d) => d.last)) : null;
   const [left, setLeft] = useState<number>(() => {
     if (first !== null) return first - HEAD / 4 / px - 2;
     const now = new Date();
@@ -254,7 +256,7 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
                   return (
                     <div
                       key={d.key}
-                      className={`tl-bar${d.event !== null ? ' pantry' : ''}${b > a ? ' long' : ''}${d.path === host.path ? ' chosen' : ''}${moving?.key === d.key ? ' lifted' : ''}`}
+                      className={`tl-bar${d.event !== null ? ' pantry' : ''}${b > a ? ' long' : ''}${b > a && w < d.title.length * 7 + 20 ? ' tight' : ''}${d.path === host.path ? ' chosen' : ''}${moving?.key === d.key ? ' lifted' : ''}`}
                       style={{ left: bx, top: 8 + rows[i]! * ROW, width: w, '--label': labelColor(d.card.label) ?? 'var(--accent)' } as CSSProperties}
                       title={`${d.title} · ${sayWhen(moving?.key === d.key ? { on: dayText(a), to: b > a ? dayText(b) : undefined } : d.date)}`}
                       role="button"

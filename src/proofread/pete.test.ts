@@ -44,6 +44,28 @@ describe('Peppery Pete', () => {
     expect(said('It were a long day.')).toEqual([['were', 'was']]);
   });
 
+  it('finds plurals made with an apostrophe, "laying" for "lying" and double negatives', () => {
+    expect(said('The apple’s were ripe.')).toEqual([['apple’s', 'apples']]);
+    expect(said('The Smith’s came for dinner.')).toEqual([['Smith’s', 'Smiths']]);
+    expect(said('She bought two cake’s.')).toEqual([['cake’s', 'cakes']]);
+    expect(said('She was laying on the sofa.')).toEqual([['laying', 'lying']]);
+    expect(said('She didn’t have no money.')).toEqual([['no', 'any']]);
+    expect(said('He never told nobody.')).toEqual([['nobody', 'anybody']]);
+    expect(said('My brother and my sister is coming.')).toEqual([['is', 'are']]);
+    expect(said('She gave it to Sam and I.')).toEqual([['I', 'me']]);
+    for (const text of ['The cook’s knife was sharp.', 'Two cook’s knives lay there.', 'The Smith’s house was empty.', 'He was laying the table.', '“I ain’t got no money,” he said.', 'He didn’t, no.', 'Salt and pepper is all it needs.', 'Sam and I went home.']) {
+      expect(said(text), text).toEqual([]);
+    }
+  });
+
+  it('finds sentences run together, and leaves the ones that aren’t', () => {
+    expect(said('The stove was hot she burned her hand.')).toEqual([['hot she', 'hot. She']]);
+    expect(said('The kettle boiled, she poured the tea.')).toEqual([[', she', '. She']]);
+    for (const text of ['If it rains, we stay in.', '“Go,” she said.', 'He knew she was lying.', 'When he came, she left.', 'Tired, she went to bed.', 'The more she ate, the more she wanted.', 'It looked kind, she thought.', 'It was the place he loved.', 'She felt sure she would win.', 'Having got the key, he left.']) {
+      expect(said(text), text).toEqual([]);
+    }
+  });
+
   it('leaves good English alone', () => {
     for (const text of [
       'If he were here, he would know what to do.',

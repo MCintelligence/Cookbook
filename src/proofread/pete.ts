@@ -1,6 +1,8 @@
 import { dialogueRanges } from '../editor/dialogue';
 import { type Issue, words } from './check';
 import { type Counts } from './context';
+import { lookalikes } from './lookalikes';
+import { isPast } from './verbs';
 
 /**
  * Peppery Pete's own grammar checks, for the mistakes Harper misses. They
@@ -19,7 +21,14 @@ export const PETE_RULES: { id: string; label: string }[] = [
   { id: 'pronoun-case', label: 'I or me, he or him' },
   { id: 'verb-form', label: 'Wrong verb forms (I seen, she lay the book)' },
   { id: 'reported-question', label: 'Questions inside a sentence' },
+  { id: 'look-alike', label: 'Look-alike words (form/from, quite/quiet…)' },
+  { id: 'apostrophe', label: 'Apostrophes in plurals (the apple’s were)' },
+  { id: 'double-negative', label: 'Double negatives (didn’t see nothing)' },
+  { id: 'run-on', label: 'Run-ons and comma splices (off at first: novelists use them on purpose)' },
 ];
+
+/** Checks that start switched off: the writer turns them on in App Settings › Seasonings. */
+export const OPT_IN_RULES = ['run-on'];
 
 /** Something that says whether a word is in the dictionary. */
 export type IsWord = (word: string) => boolean;
@@ -302,6 +311,17 @@ function agreement(ts: Token[], isWord: IsWord, counts: Counts[], out: Issue[]) 
     if (prev && ['if', 'though', 'as'].includes(prev.lower)) continue;
     const subject = subjectAt(ts, i, isWord) ?? (t.start ? bareNoun(ts, i, isWord) : null);
     if (!subject) continue;
+    // "My brother and my sister is": two things joined by "and", each with its own determiner, are many.
+    const joined = ts[subject.next];
+    if (t.start && joined?.lower === 'and' && !/,/.test(joined.gap) && (OPEN_DET.has(ts[subject.next + 1]?.lower ?? '') || SINGULAR_DET.has(ts[subject.next + 1]?.lower ?? ''))) {
+      const second = subjectAt(ts, subject.next + 1, isWord);
+      const verb2 = second && ts[second.next];
+      if (second && verb2 && !verb2.start && ['is', 'was', 'has', "isn't", "wasn't", "hasn't"].includes(verb2.lower)) {
+        const fix = SINGULAR_BE[verb2.lower]!;
+        out.push(issue(verb2.from, verb2.to, 'agreement', `“${subject.head.word.toLowerCase()}” and “${second.head.word.toLowerCase()}” are two, so it’s “${fix}”.`, [matchCase(verb2.word, fix)]));
+      }
+      continue;
+    }
     const v = ts[subject.next];
     const head = subject.head.lower;
     const wrongOne = v && !v.start && subject.number === 'one' && PLURAL_BE[v.lower];
@@ -378,19 +398,28 @@ function pronounCase(ts: Token[], out: Issue[]) {
       out.push(issue(a.from, b.to, 'pronoun-case', 'Before a verb it’s “I” and “he”, not “me” and “him”, and “I” goes last.', [fix]));
       continue;
     }
-    // After a preposition: "between you and I".
+    // After a preposition: "between you and I", "to Sam and I".
     const prep = ts[i - 1];
-    if (b.word === 'I' && prep && CASE_PREPOSITIONS.has(prep.lower) && !a.start && ['you', 'him', 'her', 'them', 'us'].includes(a.lower)) {
+    const named = /^\p{Lu}\p{Ll}+$/u.test(a.word) && a.word !== 'I';
+    if (b.word === 'I' && prep && CASE_PREPOSITIONS.has(prep.lower) && !a.start && (named || ['you', 'him', 'her', 'them', 'us'].includes(a.lower))) {
       out.push(issue(b.from, b.to, 'pronoun-case', `After “${prep.word.toLowerCase()}”, it’s “me”, not “I”.`, ['me']));
     }
   }
 }
 
-/** "I seen", "she lay the book". */
+/** Where "lying" (resting) is meant: "was laying on the sofa", "had been laying awake". */
+const AFTER_LYING = new Set('on in down there here awake still back around about asleep flat beside under face low dead quietly in bed'.split(' '));
+const BE_FORMS = new Set(['was', 'were', 'is', 'are', 'am', 'be', 'been', "i'm", "he's", "she's", "it's", "they're", "we're", "you're"]);
+
+/** "I seen", "she lay the book", "was laying on the bed". */
 function verbForms(ts: Token[], out: Issue[]) {
   for (let i = 0; i + 1 < ts.length; i++) {
     const [t, v] = [ts[i]!, ts[i + 1]!];
     if (v.start) continue;
+    if (BE_FORMS.has(t.lower) && v.lower === 'laying' && (!ts[i + 2] || ts[i + 2]!.start || AFTER_LYING.has(ts[i + 2]!.lower))) {
+      out.push(issue(v.from, v.to, 'verb-form', 'To rest is to “lie”, so it’s “lying”. “Laying” is putting something down, like laying the table.', [matchCase(v.word, 'lying')]));
+      continue;
+    }
     if (SEEN_SUBJECTS.has(t.lower) && v.lower === 'seen') {
       out.push(issue(v.from, v.to, 'verb-form', '“Seen” needs a helper, as in “have seen”. On its own it’s “saw”.', ['saw', `${t.lower === 'he' || t.lower === 'she' || t.lower === 'it' ? 'has' : 'have'} seen`]));
       continue;
@@ -426,6 +455,103 @@ function reportedQuestions(text: string, ts: Token[], out: Issue[]) {
   }
 }
 
+const PLURAL_VERBS = new Set(['are', 'were', 'have', 'do', "aren't", "weren't", "haven't", "don't"]);
+const NAME_FAMILY_VERBS = new Set('are were have had came come arrived left live lived said say own owned invited moved sat stood'.split(' '));
+
+/** "The apple’s were ripe", "two cake’s", "the Smith’s came to dinner": an apostrophe making a plural. */
+function apostrophePlurals(ts: Token[], isWord: IsWord, out: Issue[]) {
+  for (let i = 1; i < ts.length; i++) {
+    const t = ts[i]!;
+    const prev = ts[i - 1]!;
+    const next = ts[i + 1];
+    const m = /^(\p{L}{2,})'s$/u.exec(t.lower);
+    if (!m || PRONOUNS.has(m[1]!) || ['let', 'that', 'what', 'who', 'there', 'here', 'where', 'how', 'it', 'he', 'she'].includes(m[1]!)) continue;
+    const plural = `${t.word.slice(0, -2)}s`;
+    const counted = (PLURAL_DET.has(prev.lower) && prev.lower !== 'these' && prev.lower !== 'those') || ['two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'many', 'several', 'few'].includes(prev.lower);
+    const named = /^\p{Lu}/u.test(t.word) && prev.lower === 'the' && !!next && !next.start && NAME_FAMILY_VERBS.has(next.lower);
+    const thing = !named && prev.lower === 'the' && !!next && !next.start && PLURAL_VERBS.has(next.lower) && isWord(m[1]!);
+    if (!counted && !named && !thing) continue;
+    if (counted && next && !next.start && isWord(next.lower) && !PLURAL_VERBS.has(next.lower) && /^\p{Ll}/u.test(next.word) && !AFTER_VERB.has(next.lower) && !/ed$/.test(next.lower)) {
+      // "two cook’s knives": the apostrophe owns the next word.
+      continue;
+    }
+    out.push(issue(t.from, t.to, 'apostrophe', `An apostrophe doesn’t make a plural. More than one is “${plural}”.`, [plural]));
+  }
+}
+
+const NEGATIVE_VERBS = /^(?:don't|doesn't|didn't|won't|wouldn't|can't|couldn't|shouldn't|isn't|wasn't|aren't|weren't|haven't|hasn't|hadn't|ain't|never)$/;
+const NEGATIVE_WORDS = new Set(['no', 'nothing', 'nobody', 'nowhere', 'none', 'noone', 'neither']);
+const ANY_OF: Record<string, string> = { no: 'any', nothing: 'anything', nobody: 'anybody', nowhere: 'anywhere', none: 'any', neither: 'either' };
+
+/** "She didn’t have no money", "he never told nobody": outside speech, where dialect is the writer’s call. */
+function doubleNegatives(ts: Token[], out: Issue[]) {
+  for (let i = 0; i < ts.length; i++) {
+    if (!NEGATIVE_VERBS.test(ts[i]!.lower)) continue;
+    for (let k = i + 1; k <= i + 3 && k < ts.length; k++) {
+      const w = ts[k]!;
+      if (w.start || /,/.test(w.gap)) break;
+      if (!NEGATIVE_WORDS.has(w.lower)) continue;
+      // "not no" never; "didn't, no" is broken off above; "no one" reads as "nobody".
+      const fix = ANY_OF[w.lower]!;
+      out.push(issue(w.from, w.to, 'double-negative', `“${ts[i]!.word}” already says no, so it’s “${fix}”.`, [matchCase(w.word, fix)]));
+      break;
+    }
+  }
+}
+
+const SUBJECTS = new Set(['he', 'she', 'they', 'we', 'i']);
+/** Words that can lead into a clause with no comma: "and she went", "knew she was", "said he". */
+const LEADS_IN = new Set(
+  'and but or nor so yet for that than as if when whenever while because though although since until till unless once where wherever whereas whether before after what why how who whom which said says say asked asks replied whispered cried called shouted muttered answered added knew know knows thought think thinks hoped hope wished wish felt feel guessed suppose supposed believed believe realised realized noticed saw heard told tell decided remembered forgot forgotten found find wondered wonder doubted swore promised admitted agreed meant hoped prayed bet dreamt dreamed figured reckoned guess saying thinking knowing hoping wishing wondering perhaps maybe then now only even just because still also again too here there today tonight yesterday tomorrow unless lest whilst like'.split(
+    ' ',
+  ),
+);
+const FINITE = new Set("was were is are am had has have did does do could would will can should might must may shall wasn't weren't isn't aren't hadn't hasn't haven't didn't doesn't don't couldn't wouldn't won't can't shouldn't".split(' '));
+const SUBORDINATE_START = new Set('if when whenever while because though although since until unless once as after before whether where wherever whatever whoever however wherever'.split(' '));
+
+const isFinite = (t: Token | undefined) => !!t && !t.start && (FINITE.has(t.lower) || isPast(t.lower));
+
+/**
+ * Two sentences run together: "The stove was hot she burned her hand" (no stop at all) or "It
+ * was late, she was tired" (only a comma). Off at first, since novelists do both on purpose.
+ */
+function runOns(text: string, ts: Token[], out: Issue[]) {
+  // Where the current stretch began: the sentence start, or the last comma, semicolon or colon.
+  let from = 0;
+  for (let i = 0; i < ts.length; i++) {
+    const t = ts[i]!;
+    const first = ts.slice(from, i);
+    if (t.start || /[,;:]/.test(t.gap)) from = i;
+    if (i === 0 || t.start || !SUBJECTS.has(t.lower) || !isFinite(ts[i + 1])) continue;
+    // "It looked good-natured, she thought": a tag on what came before.
+    if (REPORTING.has(ts[i + 1]!.lower)) continue;
+    const prev = ts[i - 1]!;
+    if (LEADS_IN.has(prev.lower) || PREPOSITIONS.has(prev.lower) || /er$/.test(prev.lower)) continue;
+    // The stretch before has to be a sentence of its own: three words or more with a verb, not "If it rains".
+    if (first.length < 3 || SUBORDINATE_START.has(first[0]!.lower) || !first.slice(1).some((x) => FINITE.has(x.lower) || isPast(x.lower))) continue;
+    if (first.some((x) => JOINERS.has(x.lower) || SUBORDINATE_START.has(x.lower))) continue;
+    // "Having got his information, he…", "In a world he half understood, he…": an opening, not a sentence.
+    if (/ing$/.test(first[0]!.lower) || PREPOSITIONS.has(first[0]!.lower)) continue;
+    if (/^\s+$/.test(t.gap)) {
+      // "the place he held", "all the time she went on": a noun, then "that" left out.
+      const back = ts.slice(Math.max(from, i - 4), i);
+      const det = back.findLastIndex((x) => OPEN_DET.has(x.lower) || SINGULAR_DET.has(x.lower) || PLURAL_DET.has(x.lower) || x.lower === 'all');
+      if (det >= 0 && !back.slice(det + 1).some((x) => FINITE.has(x.lower) || isPast(x.lower))) continue;
+      // "felt sure she would", "fancied he could": a feeling or a thought, then what it was.
+      if (isPast(prev.lower) || CLAUSE_ADJECTIVES.has(prev.lower)) continue;
+      out.push(issue(prev.from, t.to, 'run-on', 'Two sentences run together here. End one with a full stop, or join them with “and”.', [`${prev.word}. ${capital(t.word)}`]));
+    } else if (/^\s*,\s+$/.test(t.gap)) {
+      const comma = text.indexOf(',', prev.to);
+      out.push(issue(comma, t.to, 'run-on', 'A comma can’t join two sentences on its own. Use a full stop, a semicolon or “and”.', [`. ${capital(t.word)}`, `; ${t.word}`]));
+    }
+  }
+}
+
+const REPORTING = new Set('said says thought thinks asked replied whispered supposed suppose fancied knew wondered added cried muttered answered admitted agreed guessed reckoned realised realized noticed hoped'.split(' '));
+const CLAUSE_ADJECTIVES = new Set('sure certain glad afraid aware sorry so such convinced confident positive'.split(' '));
+const JOINERS = new Set(['what', 'how', 'and', 'but', 'or', 'so', 'because', 'when', 'while', 'if', 'that', 'as', 'though', 'although', 'than', 'until', 'since', 'unless', 'whether', 'which', 'who', 'where']);
+const capital = (word: string) => (word === 'I' ? 'I' : word[0]!.toUpperCase() + word.slice(1));
+
 /** Pete's own issues in one paragraph. `counts` are Sam's word pairs: the books' and the writer's own. */
 export function peteIssues(text: string, isWord: IsWord, counts: Counts[] = []): Issue[] {
   const speech = dialogueRanges(text);
@@ -437,9 +563,14 @@ export function peteIssues(text: string, isWord: IsWord, counts: Counts[] = []):
   pronounCase(ts, out);
   verbForms(ts, out);
   reportedQuestions(text, ts, out);
+  apostrophePlurals(ts, isWord, out);
+  doubleNegatives(ts, out);
+  runOns(text, ts, out);
+  out.push(...lookalikes(text, counts));
   const kept: Issue[] = [];
   for (const i of out.sort((a, b) => a.from - b.from || b.to - a.to)) {
-    if (inSpeech(i) || kept.some((k) => i.from < k.to && i.to > k.from)) continue;
+    // A look-alike is a slip of the pen even in speech; the rest may be how a character talks.
+    if ((inSpeech(i) && i.rule !== 'look-alike') || kept.some((k) => i.from < k.to && i.to > k.from)) continue;
     kept.push(i);
   }
   return kept;

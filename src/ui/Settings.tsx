@@ -167,6 +167,15 @@ const CHECK_HELP: Record<string, string> = {
   grammar: 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'unclosed-quote': 'Peppery Pete: a blue wavy underline, while Seasonings is open.',
   'stray-capitals': 'Peppery Pete: “MOnster” or “mONSTER”, while Seasonings is open.',
+  agreement: 'Peppery Pete: “the children was”, while Seasonings is open.',
+  'word-mixup': 'Peppery Pete: “your going”, “less people”, while Seasonings is open.',
+  'pronoun-case': 'Peppery Pete: “me and him went”, while Seasonings is open.',
+  'verb-form': 'Peppery Pete: “I seen”, “was laying on the bed”, while Seasonings is open.',
+  'reported-question': 'Peppery Pete: “he asked where are you going?”, while Seasonings is open.',
+  'look-alike': 'Peppery Pete: “form” for “from”, “quite” for “quiet”, found from the words around them.',
+  apostrophe: 'Peppery Pete: “the apple’s were ripe”, “the Smith’s came”.',
+  'double-negative': 'Peppery Pete: “didn’t have no”, outside speech.',
+  'run-on': 'Peppery Pete: “it was late, she was tired”. Off at first, since novels use these on purpose.',
 };
 
 /**

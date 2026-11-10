@@ -6,6 +6,7 @@ import { type Around } from './context';
 import { WorkerChecker } from './client';
 import { type FoundIssue, forgetWord, setChecker, setIgnored, setReview, setRulesOff } from './plugin';
 import { BOOK_WIDE, type Ignored, defaultDialect, readDictionary, readIgnored, saveDictionary, saveIgnored } from './store';
+import { effectiveOff, storedOff } from './rules';
 
 export interface Proofreader {
   dialect: Dialect;
@@ -124,7 +125,8 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
     if (editor) setIgnored(editor, [...(bookIgnored ?? []), ...(sceneIgnored ?? [])]);
   }, [editor, sceneIgnored, bookIgnored]);
 
-  const off = useMemo(() => offRules ?? [], [offRules]);
+  const stored = useMemo(() => offRules ?? [], [offRules]);
+  const off = useMemo(() => effectiveOff(stored), [stored]);
   const restingKey = (resting ?? []).join('\n');
   useEffect(() => {
     if (editor) setRulesOff(editor, [...off, ...(resting ?? [])]);
@@ -162,7 +164,7 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         if (fs) saveIgnored(fs, {}).catch(() => {});
       },
       off,
-      setRuleOn: (rule, on) => onOff(on ? off.filter((r) => r !== rule) : [...new Set([...off, rule])]),
+      setRuleOn: (rule, on) => onOff(storedOff(stored, rule, on)),
       suggest: (word, around) => {
         const c = checker.current;
         if (!c) return Promise.resolve([]);
@@ -176,6 +178,6 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
         return c.suggest(word, around);
       },
     }),
-    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, onOff],
+    [dialect, onDialect, words, editor, saveWords, docId, ignored, fs, off, stored, onOff],
   );
 }

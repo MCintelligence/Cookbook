@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import nspell from 'nspell';
-import { checkSpelling, editDistance, nameIssues, rankSuggestions, words } from './check';
+import { checkSpelling, editDistance, isNameLike, nameIssues, rankSuggestions, spellingIssues, words } from './check';
+import { supplementEntries } from './supplement';
 
 const load = (d: string) => nspell({ aff: readFileSync(`public/dictionaries/${d}.aff`), dic: readFileSync(`public/dictionaries/${d}.dic`) });
 const us = load('en-US');
@@ -9,6 +10,43 @@ const gb = load('en-GB');
 const names = ['Mama Lou', 'June', 'Earlene'];
 us.add('Earlene');
 const said = (text: string, found = checkSpelling(text, us, names)) => found.map((i) => [text.slice(i.from, i.to), i.rule]);
+
+const plus = load('en-US');
+for (const [word, model] of supplementEntries()) plus.add(word, model);
+const flagged = (text: string) => spellingIssues(text, plus).map((i) => text.slice(i.from, i.to));
+
+describe('Sam’s wider dictionary', () => {
+  it('takes accented spellings when the plain letters are right', () => {
+    expect(flagged('The naïve fiancée met her protégé at the café, déjà vu, and ordered crème brûlée.')).toEqual([]);
+    expect(flagged('The cafféé was naïïve.')).toEqual(['cafféé', 'naïïve']);
+  });
+
+  it('takes letters held down for effect, but not a stretched typo', () => {
+    expect(flagged('“Nooo,” she said. “Sooo good. Aaargh! Hmmmm. Yesss.”')).toEqual([]);
+    expect(flagged('“Brekkkfast is teeeh,” he said.')).toEqual(['Brekkkfast', 'teeeh']);
+  });
+
+  it('knows the words of the kitchen, the phone and the room', () => {
+    expect(flagged('She livestreamed the sous-vide brisket, unfollowed a vlogger, and ate kimchi ramen with gochujang and tahini.')).toEqual([]);
+    expect(flagged('There’re three podcasters and an influencer on the Wi-Fi. Ugh. Shh!')).toEqual([]);
+    expect(flagged('She livestreemed the kimchee.')).toEqual(['livestreemed', 'kimchee']);
+  });
+});
+
+describe('likely names', () => {
+  it('marks a capital in mid-sentence, not at the start or in capitals', () => {
+    const text = 'Then Brannoch smiled. Ysolde did not. “Hush,” Ysolde said, and NASA laughed. Wrnog.';
+    const found = spellingIssues(text, plus).map((i) => [text.slice(i.from, i.to), !!i.name]);
+    expect(found).toEqual([
+      ['Brannoch', true],
+      ['Ysolde', false],
+      ['Ysolde', true],
+      ['Wrnog', false],
+    ]);
+    expect(isNameLike('He met McAllister', 7, 'McAllister')).toBe(true);
+    expect(isNameLike('(Mcallister', 1, 'Mcallister')).toBe(false);
+  });
+});
 
 describe('spelling', () => {
   it('splits prose into words, skipping links, emails and numbers', () => {

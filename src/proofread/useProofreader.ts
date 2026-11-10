@@ -14,6 +14,8 @@ export interface Proofreader {
   /** The writer's own dictionary. */
   words: string[];
   addWord: (word: string) => void;
+  /** Several words at once, saved once, such as every likely name on the page. */
+  addWords: (words: string[]) => void;
   removeWord: (word: string) => void;
   /** Leaves an issue alone just here, or everywhere in the book. */
   ignore: (issue: FoundIssue, scope: 'once' | 'always') => void;
@@ -170,6 +172,11 @@ export function useProofreader({ fs, dialect: chosen, onDialect, off: offRules, 
       addWord: (word) => {
         if (editor) forgetWord(editor, word);
         if (!words.includes(word)) saveWords([...words, word]);
+      },
+      addWords: (more) => {
+        if (editor) for (const word of more) forgetWord(editor, word);
+        const next = [...new Set([...words, ...more])];
+        if (next.length > words.length) saveWords(next);
       },
       removeWord: (word) => saveWords(words.filter((w) => w !== word)),
       ignore: (issue, scope) => {

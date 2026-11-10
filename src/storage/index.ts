@@ -3,6 +3,7 @@ import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
 import { BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
 import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, cardFieldsOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
+import { sketchText } from './sketch';
 
 /**
  * The hidden index: everything that can be worked out again from the files
@@ -75,7 +76,7 @@ export function countWords(text: string): number {
 export function toIndexed(path: string, doc: CookbookDocument, stamp: string): IndexedDocument {
   const body = plainText(doc.body);
   // A Pantry card's names and fields are searchable too, so "baker" finds the character whose role it is.
-  const extra = !isCard(doc.kind) ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc).map(([, v]) => v)].filter(Boolean);
+  const extra = !isCard(doc.kind) ? [] : [...akaOf(doc.fields), ...cardFieldsOf(doc).map(([, v]) => v), ...sketchText(doc.fields)].filter(Boolean);
   const text = extra.length > 0 ? `${body}\n${extra.join('\n')}` : body;
   return {
     path,

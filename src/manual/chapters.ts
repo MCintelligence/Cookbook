@@ -200,7 +200,9 @@ Each part holds **Items** (cards), in Groups of your own, nested as deep as you 
 
 ## A card
 
-A card opens on the page like an Item. Above the writing are its portrait, the other names it goes by, its fields (role, age, wants and fears for a character; role, when, offers and threatens for a place; or any you add) and its relationships. A relationship such as "Mother of June" links two cards and shows on both.
+A card opens on the page like an Item. Above the writing is its **Pantry Sketch**, the same for a character, a setting or a material: a picture, the other names it goes by, one line on who or what it is to the story, four short facts (**Role in story**, **Where**, **When** and **Work**, plus any fields you add) and its **Ties** to other cards. A tie such as "Mother of June" links two cards and shows on both.
+
+Below those are the Sketch's sections, in the same order on every card: **Purpose** (Want and Need), **Look**, **Senses** (Sight, Sound, Smell, Touch and Taste), **Nature** (Temperament and Quirks), **Past**, **Tension** (Within and Without) and **Notes** (Notes and Sources). Each blank box has a faint hint that fits the kind of card: on a character, **When** asks their age; on a setting, its era and season; on a material, when it was made. Fill in as much or as little as you like; the Sketch is searched along with the rest of the card. A card made before the Sketch keeps what it had, with a **+ Use the Pantry Sketch** button to add it.
 
 On a character or place card, put the cursor on an empty line and click the **+** beside it for brainstorming questions: Basics, Drive, and World on Fire. Each one is an ordinary heading, and one Undo takes out what you just added.
 

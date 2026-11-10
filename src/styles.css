@@ -413,7 +413,8 @@ button:disabled, select:disabled { cursor: default; opacity: 0.5; }
 /* Pantry */
 .pantry-results mark { background: var(--find); color: inherit; border-radius: 2px; }
 
-.pantry-card { width: 816px; max-width: 100%; flex: none; display: flex; gap: 18px; margin: 0 0 14px; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+.pantry-card { width: 816px; max-width: 100%; flex: none; display: flex; flex-direction: column; gap: 18px; margin: 0 0 14px; padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); }
+.pc-top { display: flex; gap: 18px; min-width: 0; }
 .pc-portrait { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .pc-picture { width: 112px; height: 136px; padding: 0; overflow: hidden; border-radius: 8px; border: 1px dashed var(--line-strong); background: var(--sidebar); color: var(--muted); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; text-align: center; }
 .pc-picture img { width: 100%; height: 100%; object-fit: cover; }
@@ -468,6 +469,25 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .peek-text { margin: 0; font-family: var(--font-text); font-size: 13px; line-height: 1.5; color: var(--muted); }
 .peek-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .pc-quiet { font-size: 13px; color: var(--muted); }
+/* The Pantry Sketch: one line under the name, then the same sections on every Item. */
+.pc-line { width: 100%; min-height: 26px; margin: 2px 0 4px; padding: 2px 0; border: none; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); font-family: var(--font-text); font-size: 16px; line-height: 1.4; resize: none; overflow: hidden; }
+.pc-line:focus, .sk-text:focus { outline: none; box-shadow: inset 0 -1.5px 0 var(--accent); }
+.pc-line::placeholder, .sk-text::placeholder { color: var(--faint); font-style: italic; }
+.pc-sketch { display: flex; flex-direction: column; gap: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
+.sk-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sk-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
+.sk-head h3 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 16px; color: var(--text); }
+.sk-q { font-size: 12px; font-style: italic; color: var(--muted); }
+.sk-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+.sk-senses { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.sk-single { display: flex; flex-direction: column; }
+.sk-slot { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sk-senses .sk-slot { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.sk-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sk-text { width: 100%; min-height: 24px; padding: 1px 0; border: none; background: transparent; color: var(--text); font-family: var(--font-text); font-size: 15px; line-height: 1.5; resize: none; overflow: hidden; }
+.sk-senses .sk-text { font-size: 14px; line-height: 1.35; }
+.pc-use-sketch { margin-top: -6px; }
+.peek-line { margin: 0 0 6px; font-family: var(--font-text); font-size: 13px; line-height: 1.4; font-style: italic; color: var(--text); }
 
 /* Pinned cards */
 .pins { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 0; }
@@ -654,7 +674,8 @@ button.seas-quote:hover { color: var(--accent); }
   .shelf-list { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); }
   /* On a phone, pinned cards wait in the drawer until Seasonings opens it. */
   .app:not(.panel-open) .drawer { display: none; }
-  .pantry-card { flex-direction: column; }
+  .pc-top { flex-direction: column; }
+  .sk-pair, .sk-senses { grid-template-columns: minmax(0, 1fr); }
   .pc-key { flex-basis: 96px; }
   /* On a phone the suggestion card rises from the bottom, within reach of a thumb. */
   .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: var(--radius-pop) var(--radius-pop) 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }

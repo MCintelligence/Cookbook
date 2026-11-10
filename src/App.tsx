@@ -2588,7 +2588,7 @@ export function App() {
   const cardChoices = useMemo<CardChoice[]>(
     () =>
       [...cards]
-        .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
+        .filter(([, c]) => isCard(c.kind))
         .map(([p, c]) => ({ id: c.id, title: c.title, path: p }))
         .filter((c) => c.id !== doc?.id)
         .sort((a, b) => a.title.localeCompare(b.title, 'en')),

@@ -105,16 +105,16 @@ html.phone .phone-bar { grid-area: pbar; align-items: stretch; height: 48px; bor
 html.phone .app:has(.cb-page .ProseMirror-focused) .phone-bar { display: flex; }
 .pb-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 .pb-scroll::-webkit-scrollbar { display: none; }
-.pb-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 48px; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--text); }
+.pb-btn { flex: 1 0 37px; max-width: 52px; display: inline-flex; align-items: center; justify-content: center; height: 48px; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--text); }
 .pb-btn:disabled { color: var(--faint); opacity: 0.5; }
 .pb-btn[aria-pressed='true'] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .pb-letter { font-family: var(--font-display); font-size: 20px; line-height: 1; font-style: normal; text-decoration: none; }
 i.pb-letter { font-style: italic; font-family: var(--font-text); font-size: 22px; }
 u.pb-letter { text-decoration: underline; text-underline-offset: 3px; }
 .pb-aa { font-size: 17px; font-weight: 700; }
-.pb-sep { flex: none; align-self: center; width: 1px; height: 24px; margin: 0 4px; background: var(--line-strong); }
+.pb-sep { flex: none; align-self: center; width: 1px; height: 24px; margin: 0 2px; background: var(--line-strong); }
 /* The keyboard-down button stays put at the end while the rest scrolls under it. */
-.phone-bar > .pb-btn { border-left: 1px solid var(--line); border-radius: 0; width: 52px; }
+.phone-bar > .pb-btn { flex: none; border-left: 1px solid var(--line); border-radius: 0; width: 48px; }
 
 /* Messages sit clear of the writing bar and the gesture bar. */
 html.phone .notice { bottom: calc(60px + env(safe-area-inset-bottom)); }

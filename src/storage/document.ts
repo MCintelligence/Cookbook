@@ -1,4 +1,5 @@
 import { isScalar, isMap, parseDocument as parseYaml, stringify } from 'yaml';
+import { type StoryDate, formatWhen, parseWhen } from './storyDate';
 
 /**
  * Every scene and Pantry card is one Markdown file with YAML front matter:
@@ -116,7 +117,7 @@ export interface Relationship {
 }
 
 /** Front matter keys Cookbook uses itself; everything else on a card is one of the writer's fields. */
-const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export', 'sketch']);
+const RESERVED = new Set(['notes', 'goal', 'status', 'synopsis', 'aka', 'portrait', 'relationships', 'label', 'export', 'sketch', 'when', 'events', 'arc']);
 
 /** The writer's own fields on a card, like role, age and wants, in order. */
 export function cardFieldsOf(doc: Pick<CookbookDocument, 'fields' | 'order'>): [string, string][] {
@@ -189,4 +190,61 @@ export function labelOf(fields: Record<string, unknown>): string | null {
 /** Whether a scene goes into the exported book. It does unless the writer leaves it out (export: false). */
 export function includedInExport(fields: Record<string, unknown>): boolean {
   return fields.export !== false;
+}
+
+// ---------- Story dates and arcs (Plan) ----------
+
+/** When a Shelf Item happens in the story, kept as `when` in the front matter: "1954-09-03" or "1954-09-14/1954-09-16". */
+export function whenOf(fields: Record<string, unknown>): StoryDate | null {
+  return parseWhen(fields.when);
+}
+
+/**
+ * The dated events of a Pantry Item (a birthday, the night someone left, a debt falling due),
+ * kept as `events` in the front matter: a list of `{ on: 1954-09-02, what: Ruth leaves }`.
+ */
+export function eventsOf(fields: Record<string, unknown>): StoryDate[] {
+  if (!Array.isArray(fields.events)) return [];
+  return fields.events.flatMap((e) => {
+    if (!e || typeof e !== 'object') return [];
+    const { on, what } = e as Record<string, unknown>;
+    const date = parseWhen(typeof on === 'string' ? on : '');
+    return date ? [{ ...date, what: typeof what === 'string' ? what : '' }] : [];
+  });
+}
+
+/** Events as the file keeps them. */
+export function eventsField(events: StoryDate[]): { on: string; what: string }[] | undefined {
+  return events.length > 0 ? events.map((e) => ({ on: formatWhen(e), what: e.what ?? '' })) : undefined;
+}
+
+/** The dates the Plan views show for a file: a Shelf Item's own day, or a Pantry Item's events. */
+export function datesOf(doc: Pick<CookbookDocument, 'kind' | 'fields'>): StoryDate[] {
+  if (isCard(doc.kind)) return eventsOf(doc.fields);
+  const when = whenOf(doc.fields);
+  return when ? [when] : [];
+}
+
+/**
+ * One beat of a Pantry Item's arc: how things stand for them in one Shelf Item, from -2
+ * (rock bottom) to 2 (on top of the world), with a few words on why.
+ */
+export interface ArcBeat {
+  level: number;
+  note: string;
+}
+
+export const ARC_LEVELS = [2, 1, 0, -1, -2] as const;
+
+/** A Pantry Item's arc, kept as `arc` in the front matter: beats by the id of the Shelf Item they happen in. */
+export function arcOf(fields: Record<string, unknown>): Record<string, ArcBeat> {
+  const arc: Record<string, ArcBeat> = {};
+  if (!fields.arc || typeof fields.arc !== 'object' || Array.isArray(fields.arc)) return arc;
+  for (const [id, beat] of Object.entries(fields.arc as Record<string, unknown>)) {
+    if (!beat || typeof beat !== 'object') continue;
+    const { level, note } = beat as Record<string, unknown>;
+    if (typeof level !== 'number' || !Number.isFinite(level)) continue;
+    arc[id] = { level: Math.max(-2, Math.min(2, Math.round(level))), note: typeof note === 'string' ? note : '' };
+  }
+  return arc;
 }

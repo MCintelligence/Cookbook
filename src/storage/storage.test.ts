@@ -123,6 +123,32 @@ describe('hidden index', () => {
     expect(countWords('')).toBe(0);
   });
 
+  it('keeps story dates, events, arcs and ties for Prep and Plan', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    const ruth = await createDocument(fs, 'pantry/characters', 'Ruth', 'character');
+    const june = await createDocument(fs, 'pantry/characters', 'June', 'character');
+    const scene = await createDocument(fs, 'bookshelf', 'First service');
+    const sceneDoc = await readDocument(fs, scene);
+    const juneDoc = await readDocument(fs, june);
+    await writeDocument(fs, scene, { ...sceneDoc, fields: { when: '1954-09-14/1954-09-16' } });
+    await writeDocument(fs, ruth, {
+      ...(await readDocument(fs, ruth)),
+      fields: { events: [{ on: '1912-03-08', what: 'Born' }], arc: { [sceneDoc.id]: { level: -1, note: 'Burnt tray' } }, relationships: [{ to: juneDoc.id, as: 'Mother of' }] },
+    });
+
+    const index = await BookIndex.open();
+    await refreshIndex(fs, index);
+    const cards = index.cards();
+    expect(cards.get(scene)!.dates).toEqual([{ on: '1954-09-14', to: '1954-09-16' }]);
+    expect(cards.get(scene)!.arc).toEqual({});
+    expect(cards.get(ruth)!.dates).toEqual([{ on: '1912-03-08', what: 'Born' }]);
+    expect(cards.get(ruth)!.arc).toEqual({ [sceneDoc.id]: { level: -1, note: 'Burnt tray' } });
+    expect(cards.get(june)!.dates).toEqual([]);
+    expect(index.links()).toEqual([{ from: ruth, to: juneDoc.id, as: 'Mother of' }]);
+    index.close();
+  });
+
   it('builds from the files and searches by kind', async () => {
     const fs = new MemoryAdapter();
     await createBook(fs, 'Book');

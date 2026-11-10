@@ -56,7 +56,11 @@ import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './ed
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
-import { createStore } from './ui/store';
+import { createStore, useStore } from './ui/store';
+import { ModeSwitch, goToMode, modeItems } from './modes/ModeSwitch';
+import { type ModeHost } from './modes/host';
+import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, sideOf } from './modes/prefs';
+const ModeView = lazy(() => import('./modes/ModeView'));
 import { useStable } from './ui/useStable';
 import { type DeskZone, deskZone } from './ui/deskDrop';
 import { DeskDropHint } from './ui/DeskDropHint';
@@ -348,6 +352,13 @@ export function App() {
   const [adopting, setAdopting] = useState<BookLocation | null>(null);
   const [busy, setBusy] = useState(false);
   const { index, version: indexVersion, changed: indexChanged, textChanged, show: showIndex, saveNow: saveIndexNow, textCount } = useBookIndex();
+  // Cook, Prep or Plan. The views and their own state live in src/modes; the app only swaps the page for them.
+  const mode = useStore(modeStore);
+  const modesTogether = useStore(prefsStore).together;
+  useEffect(() => {
+    void loadPrefs(fs);
+    return flushPrefs;
+  }, [fs]);
   /** What the Shelf and Pantry show of the open Item as last indexed (see shownOf), to tell a save that only changed words. */
   const shownBefore = useRef<{ path: string; shown: string } | null>(null);
   /** Saves since the Shelf last caught up changed only words, so the open Item's saved word count is behind. */
@@ -2890,7 +2901,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2930,6 +2941,7 @@ export function App() {
     else if (id === 'nextIssue' || id === 'prevIssue') goToIssue(id === 'nextIssue' ? 1 : -1);
     else if (id === 'prevItem' || id === 'nextItem') stepItem(id === 'nextItem' ? 1 : -1);
     else if (id === 'mise') toggleMise();
+    else if (id === 'modeCook' || id === 'modePrep' || id === 'modePlan') book && goToMode(MODES.find((m) => m.shortcut === id)!.id);
     else if (id === 'suggest' || id === 'suggestAlt') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
   };
@@ -3240,6 +3252,7 @@ export function App() {
         : []),
       ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
       ...(isTauri() && !IS_MAC ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
+      ...MODES.map((m) => cmd(m.shortcut, `${m.name}: ${m.hint[modeSide].toLowerCase()}`, () => goToMode(m.id), 'View', keysFor(m.shortcut), 'mode cook prep plan outline board corkboard calendar timeline atlas arcs relationships')),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -3476,6 +3489,7 @@ export function App() {
       items: () => {
         const page = pageOf(book?.page);
         return [
+          ...(book ? [...modeItems(modeSide).map((m) => ('hint' in m && m.hint ? { ...m, hint: keysFor(MODES.find((x) => x.name === m.label)!.shortcut), binding: binding(MODES.find((x) => x.name === m.label)!.shortcut), icon: undefined } : m)), { separator: true as const }] : []),
           { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
           { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
@@ -3630,9 +3644,71 @@ export function App() {
   );
   const shelfLive = useMemo(() => (doc && path ? { path, editor } : null), [!!doc, path, editor]);
 
+  const modeSide = sideOf(modesTogether, isCard(doc?.kind));
+  const inMode = mode !== 'cook' && !!book && !!fs;
+  useEffect(() => {
+    // Prep and Plan need the Shelf and their toolbar, which Oven Mode puts away.
+    if (mode !== 'cook' && getSettings().focus) setSettings({ focus: false });
+  }, [mode]);
+  useEffect(() => {
+    // Oven Mode is for the page: going into it goes back to Cook.
+    if (settings.focus && modeStore.get() !== 'cook') goToMode('cook');
+  }, [settings.focus]);
+  /** A new file for a board, a day or a lane: made with its fields already set, and its name ready to type. */
+  const addForMode = async (template: DocTemplate, folder: string, fields: Record<string, unknown> = {}): Promise<string | null> => {
+    if (!fs) return null;
+    try {
+      await flushSave();
+      const p = await createFromTemplate(fs, folder, template);
+      let made = await readDocument(fs, p);
+      for (const [key, value] of Object.entries(fields)) made = withField(made, key, value);
+      if (Object.keys(fields).length > 0) await writeDocument(fs, p, made);
+      const top = topOf(p);
+      order.current = await placeNew(fs, order.current, treeOf(top), top, p, null);
+      index.current?.index.upsert(toIndexed(p, made, await fs.stamp(p)));
+      indexChanged();
+      await refreshTree();
+      await select(p);
+      setRenaming(p);
+      return made.id;
+    } catch (e) {
+      setError(`Couldn’t start a new item. ${friendlyError(e)}`);
+      return null;
+    }
+  };
+  // Only made while Prep or Plan is showing, so Cook pays nothing for them.
+  const modeHost: ModeHost | null = !inMode ? null : {
+    tree,
+    pantryTree,
+    cards,
+    path,
+    indexVersion,
+    links: () => index.current?.index.links() ?? [],
+    mentions: (card) => index.current?.index.scenesNaming([card.title, ...card.aka], (text) => countNames(text, matcher).get(card.id) ?? 0) ?? [],
+    select: (p) => void select(p),
+    open: (p) => {
+      goToMode('cook');
+      if (p !== path) void select(p);
+    },
+    // The open file's change is written at once, so the board shows it without waiting for the save timer.
+    setField: async (p, key, value) => {
+      await setFieldOf(p, key, value);
+      if (p === path) await flushSave();
+    },
+    move: (from, folder, at) => moveInTree(from, folder, at),
+    newItem: (folder, fields) => addForMode(SCENE_TEMPLATES[0]!, folder, fields),
+    newCard: (section, fields) => addForMode(CARD_TEMPLATES.find((t) => t.folder === section)!, joinPath(PANTRY, section), fields),
+    newGroup: () => void addFolderIn(BOOKSHELF),
+    rename: (p) => setRenaming(p),
+    trash: (p) => void trashPath(p),
+    menu: showMenu,
+    loadPicture,
+    say,
+      };
+
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}`}
+      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
@@ -3671,7 +3747,7 @@ export function App() {
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
-            {doc ? ` · ${doc.title}` : ''}
+            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode'} />}
           </span>
         </div>
         <div className="top-actions">
@@ -3689,6 +3765,11 @@ export function App() {
       </header>
 
       <Toolbar editor={editor} sheet={sheet} onEditStyle={onEditStyle} onAddStyle={onAddStyle} onRenameStyle={onRenameStyle} />
+      {inMode && modeHost && (
+        <Suspense fallback={null}>
+          <ModeView host={modeHost} mode={mode} openIsCard={isCard(doc?.kind)} />
+        </Suspense>
+      )}
 
       <nav
         ref={shelfRef}

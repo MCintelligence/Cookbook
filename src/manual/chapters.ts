@@ -35,6 +35,7 @@ export const CHAPTERS: Chapter[] = [
 | **Pantry** | Everything that isn't the writing itself: Characters, Settings (places) and Materials (research). |
 | **Seasonings** | The proofreader: four characters who each read for one thing. |
 | **Mise en Place** | A whole Group set out as one page. |
+| **Cook**, **Prep** and **Plan** | Three ways to look at a recipe: the page, the outline and board, and the calendar and timeline. |
 | **Stove Mode** and **Oven Mode** | The normal view, and focus mode. |
 | **Plate** and **Serve** | Setting the finished book like a real one, and making the e-book or PDF. |
 
@@ -243,6 +244,41 @@ Each seasoning is one card: a remark in its own voice, its meter for the open pa
 Salty Sam spells in American, British, Canadian or Australian English. A recipe uses the English you chose in Set the Table (App Settings › General › Your English) until it picks its own in Recipe Settings › Seasonings. New Zealand English uses the Australian word list; Irish, Indian and South African English use the British one.
 
 Every character's and place's name counts as a word. Your own words go in \`dictionary.txt\` in the recipe's folder, one a line; Recipe Settings › Seasonings shows them and can bring back every mark you removed.`,
+  },
+  {
+    id: 'views',
+    title: 'Cook, Prep and Plan',
+    summary: 'The page, the outline and board, and the calendar and timeline.',
+    body: `A recipe can be looked at three ways. **Cook** is the page you write on. **Prep** sets the Items out to be put in order. **Plan** sets them in story time. The name of the open Item in the top bar is the switch: the small picture before it is a pot for Cook, a chopping board for Prep or a calendar page for Plan, and a click lists all three. They are in the View menu too: {key:modeCook|View › Cook}, {key:modePrep|View › Prep} and {key:modePlan|View › Plan}.
+
+In Prep and Plan the toolbar changes. Its first box, where Cook has the Style box, picks the view. A click on anything picks it, as on the Shelf; a double-click opens it in Cook. New things come from the right-click menu.
+
+## Prep
+
+- **Outline** lists every Item under its Group with its synopsis, plotline, status, story date and words. Write a synopsis in place; drag a line to move the Item on the Shelf. **Columns** chooses what is shown.
+- **Board** shows the Items as cards. As a **Grid**, each Group is a column, and the rows can be plotlines or statuses: drag a card to another cell and the Item moves on the Shelf and takes that plotline or status. **Free** is a board with no edges: put the cards anywhere, drag the board to move about, and hold Ctrl (⌘ on a Mac) while scrolling to zoom. **Fit all** shows everything, **Tidy up** lays the cards out in rows again, and a right-click on the board can put the Shelf in the board's order.
+
+A **plotline** is a label colour with a name of your own. Right-click a row's name on the Grid to name one or start another.
+
+## Plan
+
+Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item onto a day.
+
+- **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it. Items with no date wait at the side under **Not dated yet**.
+- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+
+## The Pantry's own Prep and Plan
+
+Open a Pantry Item and the same switch shows the Pantry's views, shared by the whole Pantry.
+
+- **Atlas** (Prep) draws who and what is tied to whom: Characters are round, Settings square, Materials a diamond, and each relationship is a line with its words on it. Drag a mark where it reads best. To tie two, drag from the small ring at a mark's edge to the other, or right-click and choose **Tie to**.
+- **Board** (Prep) is the Pantry as cards, a column each for Characters, Settings and Materials.
+- **Arcs** (Plan) runs the Shelf's Items left to right with a line for each Character. A ring marks each Item that names them. Click to set a **beat**: how things stand for them there, from Rock bottom to Flying, with a word or two on why.
+- **Calendar** (Plan) shows the Pantry's own dates: a birthday, the day a debt falls due. Right-click a day to add one.
+
+**Shelf and Pantry together**, at the foot of the switch's list, joins the two: one Prep with the outline, both boards and the atlas, and one Plan whose calendar and timeline show the Pantry's dates (dashed) beside the Shelf's Items.
+
+Everything here is kept in the recipe's own files. Story dates, Pantry dates and arcs are in each Item's front matter (\`when\`, \`events\`, \`arc\`); how the views are set up, and where the cards of a free board lie, is in \`modes.json\`.`,
   },
   {
     id: 'modes',

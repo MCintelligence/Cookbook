@@ -487,7 +487,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
         >
           <span className="tree-card-top">
             {status && <StatusIcon status={status.id} />}
-            {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
+            {card && isCard(card.kind) && !tagCards && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
             {tagCards && isCard(card?.kind) && <span className="tree-flag tree-from">Pantry</span>}
             {card?.skipExport && !tagCards && <span className="tree-flag">Not exported</span>}

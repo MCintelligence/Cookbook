@@ -93,7 +93,7 @@ Moving never renames a file unless the Group it lands in already has one of the 
 
 The **Archive**, at the foot of the Shelf, is for Items and Groups set aside without deleting them. Drag a row from the Shelf or the Pantry onto it, or right-click and choose **Move to Archive**. Click its name to open or close it.
 
-Pantry Items keep their own mark there, a **Pantry** tag and their portrait, but otherwise lie wherever you like: drag them up and down, mix them in with Shelf Items, or gather any of them into Groups of the Archive's own.
+Pantry Items keep their own mark there, a **Pantry** tag, but otherwise lie wherever you like: drag them up and down, mix them in with Shelf Items, or gather any of them into Groups of the Archive's own.
 
 Nothing in the Archive shows in Prep or Plan, is exported, counted towards your words, linked by name on the page or found by the Shelf's and Pantry's searches. It can still be opened and edited, and the search in the top bar still finds it. To put something back, drag it onto the Shelf, or right-click it and choose **Put back**: a Pantry Item goes home to its own part of the Pantry, and a Shelf Item or Group goes where you pick.`
   },

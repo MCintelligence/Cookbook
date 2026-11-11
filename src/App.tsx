@@ -4054,7 +4054,6 @@ export function App() {
             onMenu={onRowMenu}
             onTrash={onTreeTrash}
             folding={folding}
-            loadPicture={loadPicture}
             tagCards
             outside={outOfArchive}
           />

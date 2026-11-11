@@ -44,16 +44,16 @@ export function ToolButton({ label, onClick, children, pressed, disabled }: { la
 }
 
 /** Closer, further and everything at once, for the endless boards. */
-export function Zoomer({ k, onZoom, onFit }: { k: number; onZoom(factor: number): void; onFit(): void }) {
+export function Zoomer({ k, onZoom, onFit }: { k: number; onZoom(dir: 1 | -1): void; onFit(): void }) {
   return (
     <span className="mode-zoom">
-      <ToolButton label="Zoom out" onClick={() => onZoom(1 / 1.25)}>
+      <ToolButton label="Zoom out" onClick={() => onZoom(-1)}>
         −
       </ToolButton>
       <span className="mode-zoom-now" aria-live="off">
         {Math.round(k * 100)}%
       </span>
-      <ToolButton label="Zoom in" onClick={() => onZoom(1.25)}>
+      <ToolButton label="Zoom in" onClick={() => onZoom(1)}>
         +
       </ToolButton>
       <ToolButton label="Show everything" onClick={onFit}>

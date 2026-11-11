@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 const DWELL_MS = 350;
 
 /**
- * Oven Mode's two window edges: resting the pointer on the left one (or clicking it) slides the
+ * Chef Mode's two window edges: resting the pointer on the left one (or clicking it) slides the
  * Shelf in, the right one the Pantry or Seasonings. The panels themselves slide in by CSS
  * (`.app.focus.side-open`, `.app.focus.oven-side`); this only listens at the edges, so typing
  * never runs any of it.
@@ -44,7 +44,7 @@ export function OvenEdges({ seasonings, onShelf, onSide }: { seasonings: boolean
 const LEAVE_MS = 400;
 
 /**
- * Pointer handlers for a panel slid in over the page in Oven Mode: when the mouse leaves it, it
+ * Pointer handlers for a panel slid in over the page in Chef Mode: when the mouse leaves it, it
  * slides away again, unless a menu or dialog it opened is in use or a drag is under way.
  */
 export function useSlideAway(active: boolean, close: () => void) {

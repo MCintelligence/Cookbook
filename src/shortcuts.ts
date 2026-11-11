@@ -20,7 +20,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'find', label: 'Search', key: 'Mod-F' },
   { id: 'shelf', label: 'Name from the Pantry', key: 'Mod-J' },
   { id: 'seasonings', label: 'Seasonings', key: 'Mod-Shift-S' },
-  { id: 'focus', label: 'Oven Mode (focus)', key: 'Mod-Shift-F' },
+  { id: 'focus', label: 'Chef Mode (focus)', key: 'Alt-F' },
   // The desktop app starts full screen; F11 leaves and comes back, as in most Windows and Linux apps.
   // A Mac has it already as Window › Enter Full Screen (⌃⌘F), and a browser keeps F11 for itself.
   ...(isTauri() && !IS_MAC ? [{ id: 'fullscreen', label: 'Full screen', key: 'F11' }] : []),
@@ -40,6 +40,10 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'modeCook', label: 'Cook (the page)', key: 'Mod-Shift-1' },
   { id: 'modePrep', label: 'Prep (outline and board)', key: 'Mod-Shift-2' },
   { id: 'modePlan', label: 'Plan (calendar and timeline)', key: 'Mod-Shift-3' },
+  // Drafts: ⌥ on a Mac. The three keys sit together at the bottom left, older to the left of newer.
+  { id: 'draft', label: 'Draft this item', key: 'Alt-X' },
+  { id: 'olderDraft', label: 'Older draft as ghost text', key: 'Alt-Z' },
+  { id: 'newerDraft', label: 'Newer draft as ghost text', key: 'Alt-C' },
   { id: 'settings', label: 'App Settings', key: 'Mod-,' },
   { id: 'manual', label: 'Manual', key: 'F1' },
   // Cookbook saves as you type; this saves anything still waiting straight away and says so.

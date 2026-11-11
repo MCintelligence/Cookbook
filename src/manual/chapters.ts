@@ -36,7 +36,7 @@ export const CHAPTERS: Chapter[] = [
 | **Seasonings** | The proofreader: four characters who each read for one thing. |
 | **Mise en Place** | A whole Group set out as one page. |
 | **Cook**, **Prep** and **Plan** | Three ways to look at a recipe: the page, the outline and board, and the calendar and timeline. |
-| **Stove Mode** and **Oven Mode** | The normal view, and focus mode. |
+| **Chef Mode** | Focus mode. |
 | **Plate** and **Serve** | Setting the finished book like a real one, and making the e-book or PDF. |
 
 ## Where to start
@@ -166,9 +166,9 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 
 ## Drafts
 
-To write an Item again from scratch, right-click it on the Shelf and choose **Draft this item** (also in the Recipe menu and the command palette). The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on, and keeps pace a paragraph at a time as you write the new version.
+To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on. As you write the new version it keeps pace a sentence at a time: each sentence you write takes the place of one of the draft's, and the rest of that paragraph carries on just after the cursor.
 
-Draft again for Draft 2, and so on; click a draft to have it show through instead. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
+Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. {key:olderDraft|Recipe › Older draft as ghost text} shows an older draft through the Item and {key:newerDraft|Recipe › Newer draft as ghost text} a newer one, back up to the newest; clicking a draft does the same. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',
@@ -246,8 +246,8 @@ Type **@** after a space, or press {key:shelf|Edit › Name from the Pantry}, to
 
 | Seasoning | Reads for | Meter |
 | --- | --- | --- |
-| **Salty Sam** | Spelling, and near misses of Pantry names | Unsalted to Seawater: slips per 1,000 words |
-| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Plain to Smoking: slips per 1,000 words |
+| **Salty Sam** | Spelling, and near misses of Pantry names | Savoury to Seawater: slips per 1,000 words |
+| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Zesty to Smoking: slips per 1,000 words |
 | **Drunk Daniel** | How much of the page is dialogue | Sober to Drunk |
 | **Spicy Sally** | Style: adverbs, clichés, passive voice, sticky sentences | Mild to Inferno: how hard the page is to read |
 
@@ -305,11 +305,9 @@ Everything here is kept in the recipe's own files. Story dates, Pantry dates and
   },
   {
     id: 'modes',
-    title: 'Stove Mode and Oven Mode',
-    summary: 'The normal view, focus mode, and other ways to see the page.',
-    body: `**Stove Mode** is the normal view, with the Shelf, toolbar and panels around the page.
-
-**Oven Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Oven Mode}, the page's right-click menu or the command palette. Press it again, press Escape, or click Oven Mode in the bottom bar to go back to Stove Mode.
+    title: 'Chef Mode',
+    summary: 'Focus mode, and other ways to see the page.',
+    body: `**Chef Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Chef Mode}, the page's right-click menu or the command palette. Press it again or press Escape to leave it.
 
 Also in the View menu:
 
@@ -381,7 +379,7 @@ Backups go to Cookbook's own folder, on the same disk as your recipes, unless yo
     id: 'finding',
     title: 'Finding your way',
     summary: 'Search, the command palette, and moving round by keyboard.',
-    body: `- **Command palette**: {key:palette|Help › Command palette} and type what you want, such as "oven", "export" or "manual".
+    body: `- **Command palette**: {key:palette|Help › Command palette} and type what you want, such as "chef", "export" or "manual".
 - **Go to an Item, Group or card**: {key:switcher|Edit › Go to an item or card} and type part of its name. A Group opens as one page.
 - **Search**: {key:find|Edit › Search} finds and replaces in the open Item, and lists every other Item and Pantry card that matches. Words match from their start and by stem, so "corn" finds "cornbread" and "run" finds "running".
 - **Search the Shelf**: the field under the Shelf's heading lists the Items whose name or text matches, like the Pantry's search does for cards. Escape empties it.
@@ -399,7 +397,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 
 - **General**: About you (your name, your English, what you write, your daily goal and the Seasonings new recipes start with, and Set the Table again), starting up, and how shortcuts are shown.
 - **Appearance**: theme (System, Light, Dark, Sepia), text size and motion. The page stays white paper in every theme, so text colours look the same in dark mode as they were picked.
-- **Writing**: curly quotes and dashes, Markdown and each of its rules, @ and / menus, Oven Mode's fade, typewriter scrolling and pasting.
+- **Writing**: curly quotes and dashes, Markdown and each of its rules, @ and / menus, Chef Mode's fade, typewriter scrolling and pasting.
 - **Saving and backups**: how soon a change is saved, backups and where they go, snapshots.
 - **Keyboard shortcuts**: every shortcut, and changing it.
 - **Updates and privacy**.

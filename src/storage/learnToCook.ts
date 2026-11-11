@@ -89,7 +89,7 @@ Try these as you go:
 - [ ] Click the name of the next Group, **The Shelf**, to read all of it as one page.
 - [ ] Open the **Pantry** from the View menu and find Mama Lou.
 - [ ] Open **Seasonings** and let Salty Sam find a spelling mistake.
-- [ ] Turn on **Oven Mode** to write without distractions.
+- [ ] Turn on **Chef Mode** to write without distractions.
 - [ ] Start a recipe of your own from File › New Recipe.
 - [ ] Look anything up in the **Manual**: ${press(k, 'manual', 'open it from Help › Manual')}.
 
@@ -132,11 +132,12 @@ Hover over a Group to see how many words it holds.
           synopsis: 'Writing an Item again, with the old version showing through.',
           body: `# Drafts
 
-Want to write a scene again from scratch? Right-click the Item on the Shelf and choose **Draft this item** (or Recipe › Draft this item, or type **Draft** in the command palette).
+Want to write a scene again from scratch? Press **Alt+X** (**⌥X** on a Mac), or right-click the Item on the Shelf and choose **Draft this item**.
 
-The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: the ghost keeps pace a paragraph at a time, always showing the next paragraph of the old one.
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: each sentence you write takes the place of one of the old ones, and the rest of the old paragraph carries on just after the cursor.
 
-- Draft again and you get **Draft 2**, and so on. Click a draft to have it show through instead.
+- Draft again and you get **Draft 2**, and so on. The newest draft is listed first, right under the Item.
+- **Alt+Z** (⌥Z) shows an older draft as the ghost text, and **Alt+C** (⌥C) a newer one, back up to the newest. Or click a draft.
 - Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
 - Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
 `,
@@ -335,16 +336,16 @@ Right-click anything in Prep or Plan and choose **Remove** to take it out of tha
       ],
     },
     {
-      title: 'Stove and Oven',
+      title: 'Chef Mode',
       items: [
         {
-          title: 'Oven Mode and views',
+          title: 'Chef Mode and views',
           synopsis: 'Writing without distractions, and other ways to see the page.',
-          body: `# Oven Mode and views
+          body: `# Chef Mode and views
 
-Cookbook has two modes. **Stove Mode** is the normal view, with the Shelf and panels around you. **Oven Mode** is for focus: it hides everything but the page and fades all but where you are writing. Turn it on from the View menu${k('focus') ? ` or with ${k('focus')}` : ''}, and the same way off again.
+**Chef Mode** is for focus: it hides everything but the page and fades all but where you are writing. Turn it on from the View menu${k('focus') ? ` or with ${k('focus')}` : ''}, and the same way off again.
 
-Nothing is gone in Oven Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape goes back to Stove Mode.
+Nothing is gone in Chef Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape leaves Chef Mode.
 
 Also in the View menu:
 
@@ -424,7 +425,7 @@ Coming from Scrivener? File › **Import Scrivener project** turns a whole proje
           synopsis: 'The command palette, search, and getting around by keyboard.',
           body: `# Search and shortcuts
 
-The fastest way to anything is the **command palette**: ${press(k, 'palette', 'open it from Help › Command palette')} and type what you want, such as “oven” or “export”.
+The fastest way to anything is the **command palette**: ${press(k, 'palette', 'open it from Help › Command palette')} and type what you want, such as “chef” or “export”.
 
 - **Go to an Item, a Group or a card**: ${press(k, 'switcher', 'Edit › Go to an item or card')} and type part of its name. A Group opens as one page.
 - **Search** the whole recipe: ${press(k, 'find', 'Edit › Search')}. Replace is there too.

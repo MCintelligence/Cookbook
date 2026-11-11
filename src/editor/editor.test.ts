@@ -238,6 +238,24 @@ describe('find and replace', () => {
     const { from, to } = editor.state.selection;
     expect(editor.state.doc.textBetween(from, to)).toBe('Lou');
   });
+
+  it('fades every word but the matches, and clears with the search', () => {
+    const editor = make('Lou asked.\n\nLouise and Lou.');
+    const text = (sel: string) => [...editor.view.dom.querySelectorAll(sel)].map((e) => e.textContent);
+    setFindQuery(editor, 'lou', { matchCase: false, wholeWord: true });
+    expect(text('.cb-find')).toEqual(['Lou', 'Lou']);
+    expect(text('.cb-find-dim')).toEqual([' asked.', 'Louise and ', '.']);
+    stepFind(editor, 1);
+    expect(editor.view.dom.querySelectorAll('.cb-find-current')).toHaveLength(1);
+    setFindQuery(editor, '', { matchCase: false, wholeWord: true });
+    expect(editor.view.dom.querySelectorAll('.cb-find, .cb-find-dim')).toHaveLength(0);
+  });
+
+  it('fades nothing when there are no matches', () => {
+    const editor = make('Lou asked.');
+    setFindQuery(editor, 'Ruth', { matchCase: false, wholeWord: false });
+    expect(editor.view.dom.querySelectorAll('.cb-find-dim')).toHaveLength(0);
+  });
 });
 
 describe('notes', () => {

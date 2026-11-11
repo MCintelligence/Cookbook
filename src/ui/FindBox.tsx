@@ -43,13 +43,14 @@ export function FindBox({ editor, search, currentPath, onOpenHit, request, befor
   const jumpOnOpen = useRef(false);
   useEffect(() => {
     if (!editor) return;
-    setFindQuery(editor, query, { wholeWord, matchCase });
+    // The page only shows matches (and fades the rest) while the box is open.
+    setFindQuery(editor, open ? query : '', { wholeWord, matchCase });
     // Opening a scene from the results lands on its first match.
     if (jumpOnOpen.current) {
       jumpOnOpen.current = false;
       stepFind(editor, 1);
     }
-  }, [editor, query, wholeWord, matchCase]);
+  }, [editor, query, wholeWord, matchCase, open]);
 
   const deferred = useDeferredValue(query);
   const hits = useMemo(() => (deferred.trim() ? search(deferred) : []), [deferred, search]);

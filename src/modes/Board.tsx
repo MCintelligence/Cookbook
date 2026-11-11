@@ -71,7 +71,6 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
       const ordered = readingOrder(direct, (i) => spots.get(i.card.id)!, CARD.dy);
       for (let n = 0; n < ordered.length; n++) if (ordered[n] !== direct[n]) await host.move(ordered[n]!.path, folder, n);
     }
-    host.say('The Shelf now follows the board, Group by Group.');
   };
 
   const here = host.path && host.cards.get(host.path)?.kind === 'scene' ? groups.find((g) => g.items.some((i) => i.path === host.path))?.path : undefined;

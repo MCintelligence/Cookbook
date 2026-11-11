@@ -434,7 +434,6 @@ export function App() {
     failed: (text) => setError(text),
     mended: (text) => {
       setError((shown) => (shown === text ? null : shown));
-      say('Backups are working again.');
     },
     sameDisk: () =>
       say(
@@ -459,7 +458,6 @@ export function App() {
     if (!bookRef.current) return;
     const on = !bookRef.current.suggest;
     updateBook({ suggest: on || undefined });
-    say(on ? 'Suggesting changes: what you type and delete is marked, to accept or reject later.' : 'Stopped suggesting changes. Edits go straight in again.');
   };
 
 
@@ -626,7 +624,6 @@ export function App() {
     fromLibrary(async () => {
       const copyTitle = `${title} copy`;
       await openAt(await freshLocation(copyTitle, null), { create: copyTitle, from });
-      say(`Made a copy of “${title}”.`);
       return 'done';
     });
 
@@ -1104,8 +1101,6 @@ export function App() {
       indexChanged();
       await refreshTree();
       await select(p);
-      const groupName = baseName(g);
-      say(`Started a new item in “${groupName}”.`, () => void trashPath(p));
       return p;
     } catch (e) {
       setError(`Couldn’t start a new item. ${friendlyError(e)}`);
@@ -1152,7 +1147,6 @@ export function App() {
     try {
       await storeSnapshot(fs, scene, reason);
       if (snapshots?.path === path) setSnapshots({ ...snapshots, list: await listSnapshots(fs, scene.id) });
-      else if (reason === 'By hand') say(`Took a snapshot of “${scene.title}”.`);
     } catch (e) {
       setError(`Couldn’t take a snapshot. ${friendlyError(e)}`);
     }
@@ -1174,7 +1168,6 @@ export function App() {
     await storeSnapshot(fs, scene, 'Before rolling back');
     editor.chain().focus().setMeta(UNTRACKED, true).setContent(parseMarkdown(snapshot.body), { emitUpdate: true }).run();
     setSnapshots(null);
-    say(`Rolled “${scene.title}” back to ${snapshot.date.toLocaleString('en', { dateStyle: 'medium', timeStyle: 'short' })}. Undo puts it back.`);
   };
 
   /**
@@ -1266,7 +1259,6 @@ export function App() {
       }
       pickGhost(item.id, n);
       setDraftIds(await listDrafts(fs));
-      say(`Drafted “${item.title}” as Draft ${n}. It shows through as ghost text while you write the Item again.`);
     } catch (e) {
       setError(`Couldn’t draft “${item.title}”. ${friendlyError(e)}`);
     }
@@ -1278,7 +1270,8 @@ export function App() {
     if (!fs || !item) return;
     try {
       const draft = await readDraft(fs, item.id, n);
-      const keep = plainText(item.body).trim() ? await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes: readNotes(item) }) : null;
+      // The text it replaces is kept as a draft of its own.
+      if (plainText(item.body).trim()) await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes: readNotes(item) });
       if (p === path) await replaceOpenText(draft.body, draft.notes ?? {});
       else {
         await replaceFileText(p, item, draft.body, draft.notes ?? {});
@@ -1287,7 +1280,6 @@ export function App() {
       await deleteDraft(fs, item.id, n);
       pickGhost(item.id, 0);
       setDraftIds(await listDrafts(fs));
-      say(`Put Draft ${n} back into “${item.title}”.${keep ? ` The text it replaced is kept as Draft ${keep}.` : ''}`);
     } catch (e) {
       setError(`Couldn’t put Draft ${n} back. ${friendlyError(e)}`);
     }
@@ -1335,8 +1327,7 @@ export function App() {
     const ed = editor;
     if (!ed) return;
     if (all) {
-      const n = settleAll(ed.view, accept);
-      say(n ? `${accept ? 'Accepted' : 'Rejected'} ${n === 1 ? 'the change' : `all ${n} changes`} on this page.` : 'There are no changes on this page.');
+      if (!settleAll(ed.view, accept)) say('There are no changes on this page.');
     } else if (!settleAt(ed.view, accept)) say('Put the cursor in a change first, or use Next change to find one.');
     ed.commands.focus();
   };
@@ -1376,7 +1367,6 @@ export function App() {
     await reindex();
     setMiseRound((n) => n + 1);
     if (items === 0) say('There are no changes in this recipe.');
-    else say(`${accept ? 'Accepted' : 'Rejected'} the changes in ${items === 1 ? 'one item' : `${items} items`}. Items other than the open one have a snapshot from just before.`);
     editor?.commands.focus();
   };
   const nextChange = (dir: 1 | -1) => {
@@ -1575,7 +1565,6 @@ export function App() {
     try {
       // A Word file keeps suggested changes as Word's own tracked changes, for an editor to review there.
       const m = await collect(fs, part?.title ?? book.title, part?.nodes ?? (await readTree(fs, BOOKSHELF, order.current)), kind === 'docx');
-      const tracked = kind === 'docx' && m.parts.some((p) => p.kind === 'scene' && hasChangesJSON(p.body));
       if (kind === 'print') return await printHtml(bookHtml(m, sheet, pageOf(book.page)));
       let id = book.id;
       if (kind === 'epub' && !id) {
@@ -1587,8 +1576,7 @@ export function App() {
       const author = { name: getSettings().writerName.trim() || 'Cookbook', date: new Date().toISOString().replace(/\.\d+Z$/, 'Z') };
       const data = kind === 'docx' ? bookDocx(m, sheet, pageOf(book.page), author) : kind === 'epub' ? bookEpub(m, sheet, id!) : bookMarkdown(m);
       const title = part?.title ?? book.title;
-      if (await saveFile(fileNameFor(title), data, KINDS[kind]))
-        say(`Exported “${title}” as ${kind === 'docx' ? 'a Word document' : kind === 'epub' ? 'an EPUB e-book' : 'Markdown'}.${tracked ? ' Your suggested changes are in it as Word tracked changes; accept all first for a clean copy.' : ''}`);
+      await saveFile(fileNameFor(title), data, KINDS[kind]);
     } catch (e) {
       setError(`Couldn’t export “${part?.title ?? book.title}”. ${friendlyError(e)}`);
     }
@@ -1602,7 +1590,7 @@ export function App() {
     try {
       const name = fileNameFor(book.title);
       const day = new Date().toLocaleDateString('en-CA');
-      if (await saveFile(`${name} backup ${day}`, await backupZip(fs, name), KINDS.zip)) say(`Backed up “${book.title}”.`);
+      await saveFile(`${name} backup ${day}`, await backupZip(fs, name), KINDS.zip);
     } catch (e) {
       setError(`Couldn’t back up the recipe. ${friendlyError(e)}`);
     }
@@ -1649,8 +1637,6 @@ export function App() {
     if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
     if (first) {
       await select(first);
-      const where = folder === top ? (top === BOOKSHELF ? 'the Shelf' : 'the Pantry') : `“${baseName(folder)}”`;
-      say(`Imported ${count === 1 ? 'one file' : `${count} files`} into ${where}.`);
     }
   };
 
@@ -1691,16 +1677,10 @@ export function App() {
       });
       const result = done as Awaited<ReturnType<typeof importScrivener>> | null;
       if (!result) return;
-      const count = (n: number, one: string, many: string) => (n === 1 ? `one ${one}` : `${n} ${many}`);
-      const also = [
-        result.files > 0 && count(result.files, 'file', 'files'),
-        result.notes > 0 && count(result.notes, 'note', 'notes'),
-        result.snapshots > 0 && count(result.snapshots, 'snapshot', 'snapshots'),
-      ].filter(Boolean);
-      const brought = also.length > 0 ? ` It also brought ${also.length > 1 ? `${also.slice(0, -1).join(', ')} and ${also[also.length - 1]}` : also[0]}.` : '';
       const n = result.skipped.length;
       const missing = n === 0 ? '' : n === 1 ? ` One file (“${result.skipped[0]}”) wasn’t in the project, so only its card came.` : ` ${n} files weren’t in the project, so only their cards came.`;
-      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf and ${count(result.cards, 'card', 'cards')} in the Pantry.${brought}${missing}`);
+      // Only worth a word when something didn’t come across.
+      if (missing) say(missing.trim());
     } catch (e) {
       setError(`Couldn’t import the Scrivener project. ${friendlyError(e)}`);
     }
@@ -1735,7 +1715,6 @@ export function App() {
       await saveUndoNow();
       await autoBackup(true);
       await refreshBackups();
-      say(`Backed up “${bookRef.current?.title ?? 'the recipe'}”.`);
     } catch (e) {
       setError(e instanceof BackupCheckError ? e.message : `Couldn’t back up the recipe. ${friendlyError(e)}`);
     }
@@ -2050,7 +2029,6 @@ export function App() {
     index.current?.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
     await refreshTree();
-    say(`Made a ${template.name.toLowerCase()} card for “${title}”.`);
   };
 
   /** Right-click on the empty part of the Shelf. */
@@ -2363,7 +2341,6 @@ export function App() {
       order.current = copied.order;
       await reindex();
       await refreshTree();
-      say(`Duplicated “${cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '')}”.`);
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -2420,7 +2397,6 @@ export function App() {
     try {
       const d = await readDocument(fs, p);
       await navigator.clipboard.writeText(d.body);
-      say(`Copied “${d.title}” as Markdown.`);
     } catch (e) {
       setError(`Couldn’t copy that. ${friendlyError(e)}`);
     }
@@ -2453,7 +2429,6 @@ export function App() {
     try {
       const d = await readDocument(fs, p);
       await navigator.clipboard.writeText(plainText(d.body));
-      say(`Copied the text of “${d.title}”.`);
     } catch (e) {
       setError(`Couldn’t copy that. ${friendlyError(e)}`);
     }
@@ -2906,7 +2881,7 @@ export function App() {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
       e.preventDefault();
-      void flushSave().then(() => !pendingSave.current && say('Saved.'));
+      void flushSave();
       return;
     }
     if (settingsAt) {
@@ -2985,7 +2960,6 @@ export function App() {
   const toggleFocus = () => {
     const focus = !getSettings().focus;
     setSettings({ focus });
-    say(focus ? `Oven Mode. ${keysFor('focus')} or Escape goes back to Stove Mode.` : 'Stove Mode.');
   };
   useEffect(() => {
     // Escape leaves Oven Mode (focus mode) for Stove Mode, unless something else (a menu, Search) wanted it first.
@@ -3001,7 +2975,6 @@ export function App() {
         return;
       }
       setSettings({ focus: false });
-      say('Stove Mode.');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -4070,8 +4043,7 @@ export function App() {
           busy={busy}
           onRestore={(name) =>
             void inTrash(async () => {
-              const p = await putBack(name);
-              if (p) say(`Put “${baseName(p).replace(/\.md$/, '')}” back in ${parentOf(p) === BOOKSHELF ? 'the Shelf' : `“${baseName(parentOf(p))}”`}.`);
+              await putBack(name);
             })
           }
           onDelete={(name) =>
@@ -4266,7 +4238,6 @@ export function App() {
             onChange={(next: PlateSettings) => updateBook({ plate: next as unknown as Record<string, unknown> })}
             bookId={ensureBookId}
             onClose={() => setPlateShelf(null)}
-            say={(text) => say(text)}
             onError={setError}
           />
         </Suspense>

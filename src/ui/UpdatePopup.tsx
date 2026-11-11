@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NotesMarkdown } from './notesMarkdown';
 import { isTauri } from '../storage/platform';
 import { getSettings } from '../settings';
+import { checkDue, lastGoodCheck, untilMidnight, putOff, rememberGoodCheck, rememberLater } from './updateSchedule';
 
 /**
  * A popup that tells the writer a new version of Cookbook is ready and installs it only
@@ -10,8 +11,8 @@ import { getSettings } from '../settings';
  * worker. Nothing is ever installed or reloaded behind the writer's back.
  *
  * The popup shows over every part of the app, but waits until the writer
- * pauses typing, and shows once per version: "Later" keeps it away until
- * the next version (or until "Check now" in App Settings finds it again).
+ * pauses typing. "Later" keeps it away for a day (or until "Check now" in
+ * App Settings finds it again). See updateSchedule.ts for when checks run.
  */
 
 interface Ready {
@@ -21,28 +22,12 @@ interface Ready {
   install: (onProgress: (fraction: number | null) => void) => Promise<void>;
 }
 
+/** The first check waits this long after starting, then for an idle moment. */
 const CHECK_AFTER_MS = 8_000;
-const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 /** How long the writer must stop typing before the popup appears. */
 const QUIET_MS = 4_000;
-const LATER_KEY = 'cookbook.updateLater';
 
-/** The version the writer put off with "Later", so automatic checks don't ask again. */
-export function putOff(version: string | null): boolean {
-  try {
-    return !!version && localStorage.getItem(LATER_KEY) === version;
-  } catch {
-    return false;
-  }
-}
-
-function rememberLater(version: string | null) {
-  try {
-    if (version) localStorage.setItem(LATER_KEY, version);
-  } catch {
-    // Private mode: the popup just comes back next time.
-  }
-}
+export { putOff };
 
 async function checkDesktop(): Promise<Ready | null> {
   const [{ check }, { relaunch }] = await Promise.all([import('@tauri-apps/plugin-updater'), import('@tauri-apps/plugin-process')]);
@@ -73,6 +58,7 @@ let announce: ((ready: Ready) => void) | null = null;
 export async function checkForUpdates(): Promise<string> {
   if (isTauri()) {
     const ready = await checkDesktop();
+    rememberGoodCheck();
     if (!ready) return 'You have the latest version.';
     announce?.(ready);
     return `Cookbook ${ready.version} is ready. Choose “Update and restart” in the popup.`;
@@ -80,6 +66,7 @@ export async function checkForUpdates(): Promise<string> {
   const registration = await navigator.serviceWorker?.getRegistration();
   if (!registration) return 'This copy of Cookbook updates when the page reloads.';
   await registration.update();
+  rememberGoodCheck();
   return registration.waiting || registration.installing ? 'A new version is ready. Choose “Update and restart” in the popup.' : 'You have the latest version.';
 }
 
@@ -117,41 +104,72 @@ export function UpdatePopup({ beforeRestart }: Props) {
   };
 
   useEffect(() => {
-    if (isTauri()) {
-      let live = true;
-      // Settings can turn automatic checks off; "Check now" there still works.
-      const run = () =>
-        getSettings().checkUpdates &&
-        checkDesktop().then(
-          (r) => live && r && found(r),
-          () => {}, // Offline, or no releases yet: try again later.
-        );
-      const first = window.setTimeout(run, CHECK_AFTER_MS);
-      const every = window.setInterval(run, CHECK_EVERY_MS);
-      return () => {
-        live = false;
-        window.clearTimeout(first);
-        window.clearInterval(every);
-      };
-    }
-    if (!('serviceWorker' in navigator)) return;
     let live = true;
-    import('virtual:pwa-register').then(({ registerSW }) => {
-      const reload = registerSW({
-        onNeedRefresh: () =>
-          live &&
-          found({
-            version: null,
-            notes: null,
-            install: () => reload(true),
-          }),
-        onRegisteredSW: (_url, registration) => {
-          if (registration) window.setInterval(() => getSettings().checkUpdates && void registration.update().catch(() => {}), CHECK_EVERY_MS);
-        },
+    let busy = false;
+    let lastTry = 0;
+    /** One small request: the desktop asks GitHub's release feed, the browser its service worker. */
+    let look: (() => Promise<void>) | null = null;
+    // No polling loop: try once soon after starting, once at midnight, and when the
+    // window or the network comes back, only if the last good check is old.
+    const maybe = () => {
+      const now = Date.now();
+      if (!live || busy || !look || !getSettings().checkUpdates || !navigator.onLine || !checkDue(now, lastGoodCheck(), lastTry)) return;
+      busy = true;
+      lastTry = now;
+      look().then(
+        () => rememberGoodCheck(),
+        () => {}, // Offline, or no releases yet: try again later, quietly.
+      ).finally(() => {
+        busy = false;
       });
-    }, () => {});
+    };
+    const onShow = () => document.visibilityState === 'visible' && maybe();
+    let idle = 0;
+    const first = window.setTimeout(() => {
+      // Wait for an idle moment too, so opening a recipe is never slowed.
+      idle = typeof window.requestIdleCallback === 'function' ? window.requestIdleCallback(maybe, { timeout: 10_000 }) : window.setTimeout(maybe, 0);
+    }, CHECK_AFTER_MS);
+    // At midnight, with the daily target, check again while Cookbook is open.
+    // One timer a day, set again for the next midnight each time it fires.
+    let night = 0;
+    const atMidnight = () => {
+      night = window.setTimeout(() => {
+        maybe();
+        atMidnight();
+      }, untilMidnight(Date.now()));
+    };
+    atMidnight();
+    window.addEventListener('focus', maybe);
+    window.addEventListener('online', maybe);
+    document.addEventListener('visibilitychange', onShow);
+
+    if (isTauri()) {
+      look = () => checkDesktop().then((r) => void (live && r && found(r)));
+    } else if ('serviceWorker' in navigator) {
+      import('virtual:pwa-register').then(({ registerSW }) => {
+        const reload = registerSW({
+          onNeedRefresh: () =>
+            live &&
+            found({
+              version: null,
+              notes: null,
+              install: () => reload(true),
+            }),
+          onRegisteredSW: (_url, registration) => {
+            if (registration) look = () => registration.update().then(() => {});
+          },
+        });
+      }, () => {});
+    }
     return () => {
       live = false;
+      window.clearTimeout(first);
+      window.clearTimeout(night);
+      if (typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idle);
+      window.clearTimeout(idle);
+      window.removeEventListener('focus', maybe);
+      window.removeEventListener('online', maybe);
+      document.removeEventListener('visibilitychange', onShow);
     };
   }, []);
 

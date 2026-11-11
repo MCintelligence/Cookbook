@@ -35,11 +35,37 @@ describe('release notes Markdown', () => {
 });
 
 describe('update popup', () => {
-  it('stays away from a version the writer put off', async () => {
-    const { putOff } = await import('./UpdatePopup');
+  it('stays away from a version the writer put off, for a day', async () => {
+    const { putOff, rememberLater, LATER_FOR_MS } = await import('./updateSchedule');
+    rememberLater('0.4.2', 1_000);
+    expect(putOff('0.4.2', 2_000)).toBe(true);
+    expect(putOff('0.4.3', 2_000)).toBe(false);
+    expect(putOff(null, 2_000)).toBe(false);
+    expect(putOff('0.4.2', 1_000 + LATER_FOR_MS)).toBe(false);
+  });
+
+  it('forgets an old-style "Later" so the popup asks again', async () => {
+    const { putOff } = await import('./updateSchedule');
     localStorage.setItem('cookbook.updateLater', '0.4.2');
-    expect(putOff('0.4.2')).toBe(true);
-    expect(putOff('0.4.3')).toBe(false);
-    expect(putOff(null)).toBe(false);
+    expect(putOff('0.4.2')).toBe(false);
+  });
+
+  it('checks only when the last good check is old and the last try was a while ago', async () => {
+    const { checkDue, CHECK_EVERY_MS, RETRY_AFTER_MS } = await import('./updateSchedule');
+    const now = new Date(2026, 10, 11, 20, 0).getTime();
+    expect(checkDue(now, 0, 0)).toBe(true);
+    expect(checkDue(now, now - CHECK_EVERY_MS + 1, 0)).toBe(false);
+    expect(checkDue(now, 0, now - RETRY_AFTER_MS + 1)).toBe(false);
+    expect(checkDue(now, now - CHECK_EVERY_MS, now - RETRY_AFTER_MS)).toBe(true);
+  });
+
+  it('checks again on a new day, as the daily target resets', async () => {
+    const { checkDue, untilMidnight } = await import('./updateSchedule');
+    const late = new Date(2026, 10, 11, 23, 30).getTime();
+    const after = late + untilMidnight(late);
+    expect(new Date(after).getDate()).toBe(12);
+    expect(after - late).toBe(30 * 60 * 1000 + 1000);
+    expect(checkDue(late + 60_000, late, 0)).toBe(false);
+    expect(checkDue(after, late, 0)).toBe(true);
   });
 });

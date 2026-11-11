@@ -130,11 +130,12 @@ Hover over a Group to see how many words it holds.
           synopsis: 'Writing an Item again, with the old version showing through.',
           body: `# Drafts
 
-Want to write a scene again from scratch? Right-click the Item on the Shelf and choose **Draft this item** (or Recipe › Draft this item, or type **Draft** in the command palette).
+Want to write a scene again from scratch? Press **Alt+X** (**⌥X** on a Mac), or right-click the Item on the Shelf and choose **Draft this item**.
 
-The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: the ghost keeps pace a paragraph at a time, always showing the next paragraph of the old one.
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: each sentence you write takes the place of one of the old ones, and the rest of the old paragraph carries on just after the cursor.
 
-- Draft again and you get **Draft 2**, and so on. Click a draft to have it show through instead.
+- Draft again and you get **Draft 2**, and so on. The newest draft is listed first, right under the Item.
+- **Alt+Z** (⌥Z) shows an older draft as the ghost text, and **Alt+C** (⌥C) a newer one, back up to the newest. Or click a draft.
 - Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
 - Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
 `,

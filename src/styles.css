@@ -1281,8 +1281,8 @@ button.seas-quote:hover { color: var(--accent); }
 .cb-prose p.ghost-line > br.ProseMirror-trailingBreak { display: none; }
 .cb-prose p.ghost-line::before { content: attr(data-ghost); position: absolute; top: 0; left: 0; right: 0; opacity: 0.32; pointer-events: none; user-select: none; }
 .cb-prose p.ghost-line::after { content: attr(data-ghost); visibility: hidden; pointer-events: none; user-select: none; }
-.cb-ghost { opacity: 0.32; pointer-events: none; user-select: none; }
-.mise .cb-prose p.ghost-line::before, .mise .cb-prose p.ghost-line::after, .mise .cb-ghost { display: none; }
+.cb-ghost, .cb-ghost-inline { opacity: 0.32; pointer-events: none; user-select: none; }
+.mise .cb-prose p.ghost-line::before, .mise .cb-prose p.ghost-line::after, .mise .cb-ghost, .mise .cb-ghost-inline { display: none; }
 .tree-draft { font-style: italic; }
 
 /* Panel toolbars: a thin row of icons that stays at the foot of the Shelf, the Pantry and Seasonings. */

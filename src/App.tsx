@@ -1309,6 +1309,19 @@ export function App() {
     say(`Deleted Draft ${n} of “${title}”.`, () => void writeDraft(fs, id, title, gone).then(async () => setDraftIds(await listDrafts(fs))));
   };
 
+  /** Shows the next older (-1) or newer (1) draft through the open Item; from no ghost, the newest. */
+  const stepGhost = (dir: -1 | 1) => {
+    if (!doc || doc.kind !== 'scene') return say('Open an Item on the Shelf to see its drafts.');
+    const list = draftsOf(draftIds, doc.id);
+    if (list.length === 0) return say(`“${doc.title}” has no drafts yet. ${keysFor('draft') || 'Draft this item'} makes one.`);
+    const at = ghostN === null ? -1 : list.indexOf(ghostN);
+    const to = at === -1 ? list.length - 1 : at + dir;
+    if (to < 0) return say(`Draft ${list[0]} is the oldest.`);
+    if (to >= list.length) return say(`Draft ${list[list.length - 1]} is the newest.`);
+    pickGhost(doc.id, list[to]!);
+    say(`Showing Draft ${list[to]} as ghost text.`);
+  };
+
   /** Shows a draft through its Item, opening the Item if it isn't open. */
   const showDraft = async (p: string, n: number) => {
     const id = cards.get(p)?.id;
@@ -2171,7 +2184,7 @@ export function App() {
       common.duplicate,
       common.label,
       { label: 'Include in export', checked: !card?.skipExport, onPick: () => void setFieldOf(p, 'export', card?.skipExport ? undefined : false) },
-      { label: 'Draft this item', onPick: () => void draftItem(p) },
+      { label: 'Draft this item', hint: p === path ? keysFor('draft') : undefined, onPick: () => void draftItem(p) },
       {
         label: 'Snapshots',
         items: [
@@ -2901,7 +2914,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan', 'draft', 'olderDraft', 'newerDraft']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -2944,6 +2957,8 @@ export function App() {
     else if (id === 'modeCook' || id === 'modePrep' || id === 'modePlan') book && goToMode(MODES.find((m) => m.shortcut === id)!.id);
     else if (id === 'suggest' || id === 'suggestAlt') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
+    else if (id === 'draft') path && doc?.kind === 'scene' ? void draftItem(path) : say('Open an Item on the Shelf to draft it.');
+    else if (id === 'olderDraft' || id === 'newerDraft') stepGhost(id === 'olderDraft' ? -1 : 1);
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -3228,7 +3243,13 @@ export function App() {
       ...(doc ? [cmd('seasonings', seasoningsOpen ? 'Close Seasonings' : 'Open Seasonings', () => togglePanel('seasonings'), 'Actions', keysFor('seasonings'), 'spelling grammar dialogue readability proofreader')] : []),
       ...(doc?.kind === 'scene' && path
         ? [
-            cmd('draft', 'Draft this item', () => void draftItem(path), 'Actions', undefined, 'version rewrite redraft ghost placeholder'),
+            cmd('draft', 'Draft this item', () => void draftItem(path), 'Actions', keysFor('draft'), 'version rewrite redraft ghost placeholder'),
+            ...(draftsOf(draftIds, doc.id).length > 0
+              ? [
+                  cmd('olderDraft', 'Older draft as ghost text', () => stepGhost(-1), 'View', keysFor('olderDraft'), 'draft version previous back ghost'),
+                  cmd('newerDraft', 'Newer draft as ghost text', () => stepGhost(1), 'View', keysFor('newerDraft'), 'draft version next forward ghost'),
+                ]
+              : []),
             ...(draftsOf(draftIds, doc.id).length > 0
               ? [cmd('ghost', ghostN !== null ? 'Hide the draft’s ghost text' : 'Show the newest draft as ghost text', () => pickGhost(doc.id, ghostN !== null ? 0 : draftsOf(draftIds, doc.id).at(-1)!), 'View', undefined, 'draft version placeholder faded')]
               : []),
@@ -3543,7 +3564,9 @@ export function App() {
         { label: 'Goals…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
         { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
         { separator: true },
-        { label: 'Draft this item', disabled: !doc || !path || doc.kind !== 'scene', onPick: () => path && void draftItem(path) },
+        { label: 'Draft this item', hint: keysFor('draft'), disabled: !doc || !path || doc.kind !== 'scene', onPick: () => path && void draftItem(path) },
+        { label: 'Older draft as ghost text', hint: keysFor('olderDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(-1) },
+        { label: 'Newer draft as ghost text', hint: keysFor('newerDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(1) },
         {
           label: 'Snapshots of this item',
           disabled: !doc || !path,

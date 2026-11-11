@@ -1,14 +1,14 @@
-import { type DragEvent, useMemo, useState } from 'react';
+import { type DragEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BOOKSHELF } from '../storage/book';
 import { eventsField } from '../storage/document';
 import { MONTHS, WEEKDAYS, type Ymd, dayNumber, daysInMonth, formatDay, fromDayNumber, movedTo, parseDay, sayWhen, weekday } from '../storage/storyDate';
 import { type MenuItem } from '../ui/Menu';
 import { useStore } from '../ui/store';
-import { type ViewProps } from './host';
+import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, labelColor, pantryGroups, readDay, shelfGroups } from './model';
 import { prefsStore, setPrefs } from './prefs';
-import { Seg, Tally, ToolButton, askDate, datedMenu, itemMenu, redate } from './shared';
+import { Seg, Tally, ToolButton, askDate, datedMenu, redate } from './shared';
 
 const DRAG = 'application/x-cookbook-dated';
 
@@ -21,7 +21,7 @@ function today(): Ymd {
 /**
  * The calendar: a month of the story, with each dated Shelf Item on its day (or across its
  * days) and the Pantry's dated events beside them. Dragging one to another day re-dates it;
- * what has no date yet waits in a tray at the side to be dragged on.
+ * an Item with no date yet is dragged on from the Shelf (or a Pantry Item from the Pantry).
  */
 export function CalendarView({ host, side, tools, ask }: ViewProps) {
   const prefs = useStore(prefsStore);
@@ -30,7 +30,6 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
   const shelf = useMemo(() => (showShelf ? shelfGroups(host.tree, host.cards).flatMap((g) => g.items) : []), [showShelf, host.tree, host.cards]);
   const pantry = useMemo(() => (showPantry ? pantryGroups(host.pantryTree, host.cards).flatMap((g) => g.items) : []), [showPantry, host.pantryTree, host.cards]);
   const dated = useMemo(() => [...datedOf(shelf, false), ...datedOf(pantry, true)].sort((a, b) => a.first - b.first || b.last - a.last || a.title.localeCompare(b.title, 'en')), [shelf, pantry]);
-  const undated = shelf.filter((i) => i.card.dates.length === 0);
   // The story starts at the first dated Shelf Item; a birthday forty years before it is not where the calendar opens.
   const starts = dated.some((d) => d.event === null) ? dated.filter((d) => d.event === null) : dated;
   const start = starts.length > 0 ? fromDayNumber(Math.min(...starts.map((d) => d.first))) : null;
@@ -58,10 +57,27 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
     e.preventDefault();
     const on = fromDayNumber(day);
     const was = dated.find((d) => d.key === key);
-    if (was) return redate(host, was, movedTo(was.date, on));
-    const item = undated.find((i) => i.path === key);
-    if (item) void host.setField(item.path, 'when', formatDay(on));
+    if (was) redate(host, was, movedTo(was.date, on));
   };
+
+  // A row let go on a day from the Shelf gets that day; one from the Pantry is asked for a new date there.
+  const root = useRef<HTMLDivElement | null>(null);
+  const landRef = useRef<(drop: ShelfDrop, target: Element) => void>(() => {});
+  landRef.current = ({ path, card }, target) => {
+    const cell = target.closest<HTMLElement>('[data-day]');
+    if (!cell || !card) return;
+    const on = fromDayNumber(Number(cell.dataset.day));
+    if (card.kind === 'scene') {
+      if (showShelf) void host.setField(path, 'when', formatDay(on));
+    } else if (showPantry) addEvent({ path, card, group: '' }, on);
+  };
+  useEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    const land = (e: Event) => landRef.current((e as CustomEvent<ShelfDrop>).detail, e.target as Element);
+    node.addEventListener(SHELF_DROP, land);
+    return () => node.removeEventListener(SHELF_DROP, land);
+  }, []);
 
   const dayMenu = (e: React.MouseEvent, day: number) => {
     if ((e.target as HTMLElement).closest('.cal-chip')) return;
@@ -147,6 +163,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
             <div
               key={n}
               role="gridcell"
+              data-day={n}
               className={`cal-day${inMonth ? '' : ' out'}${over === n ? ' drop-into' : ''}`}
               onDragOver={(e) => {
                 if (!e.dataTransfer.types.includes(DRAG)) return;
@@ -166,7 +183,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
   };
 
   return (
-    <div className="calendar">
+    <div className="calendar" ref={root}>
       {tools &&
         createPortal(
           <>
@@ -191,7 +208,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
               ]}
               onPick={(span) => setPrefs({ calendar: { ...prefs.calendar, span } })}
             />
-            <Tally>{[`${dated.length} dated`, showShelf ? `${undated.length} not yet` : ''].filter(Boolean).join(' · ')}</Tally>
+            <Tally>{`${dated.length} dated`}</Tally>
           </>,
           tools,
         )}
@@ -206,43 +223,6 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
         </div>
       ) : (
         month(at.y, at.m, false)
-      )}
-      {showShelf && (
-        <aside
-          className="cal-tray"
-          aria-label="Not dated yet"
-          onDragOver={(e) => e.dataTransfer.types.includes(DRAG) && e.preventDefault()}
-          onDrop={(e) => {
-            const was = dated.find((d) => d.key === e.dataTransfer.getData(DRAG));
-            if (was && was.event === null) redate(host, was, null);
-          }}
-        >
-          <h3>Not dated yet</h3>
-          {undated.length === 0 ? (
-            <p>Every Item has its day. Drag one back here to take its date away.</p>
-          ) : (
-            undated.map((i) => (
-              <button
-                key={i.path}
-                className={`cal-chip${i.path === host.path ? ' chosen' : ''}`}
-                style={labelColor(i.card.label) ? { borderLeftColor: labelColor(i.card.label) } : undefined}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(DRAG, i.path);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onClick={() => i.path !== host.path && host.select(i.path)}
-                onDoubleClick={() => host.open(i.path)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  host.menu('Item', e.clientX, e.clientY, itemMenu(host, i, ask));
-                }}
-              >
-                {i.card.title}
-              </button>
-            ))
-          )}
-        </aside>
       )}
     </div>
   );

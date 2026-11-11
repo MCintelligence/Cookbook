@@ -1633,3 +1633,21 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 .menu .mode-icon { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
 /* In Prep and Plan the page and its toolbar are put away (still there, so nothing is lost) and the mode's own take their places. */
 .app.in-mode > .toolbar:not(.mode-toolbar), .app.in-mode > .desk { display: none; }
+
+/* The Archive: a compartment at the foot of the Shelf for Items set aside. */
+.archive { flex: none; position: sticky; bottom: 32px; z-index: 1; margin: 4px -8px 0; padding: 4px 8px 4px; border-top: 1px solid var(--line); background: var(--sidebar); }
+.archive-body { max-height: 38vh; overflow-y: auto; }
+.archive-head { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; cursor: pointer; }
+.archive-head:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.archive-chevron { flex: none; transition: transform 0.15s ease; }
+.archive.is-open .archive-chevron { transform: rotate(90deg); }
+.archive-name { flex: 1; }
+.archive-count { flex: none; min-width: 18px; padding: 0 5px; border-radius: 9px; background: color-mix(in srgb, var(--text) 8%, transparent); font-size: 11px; letter-spacing: 0; text-align: center; }
+.archive-body > .tree { padding-left: 0; }
+.archive-empty { margin: 4px 8px 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.archive.is-drop { background: color-mix(in srgb, var(--accent) 10%, var(--sidebar)); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
+.archive.is-drop .archive-head { color: var(--accent); }
+.archive .tree-card .tree-card-title { color: var(--muted); }
+.archive .tree-card.from-pantry { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+.tree-flag.tree-from { margin-left: auto; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.sidebar.put-back > .tree { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }

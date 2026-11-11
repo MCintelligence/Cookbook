@@ -2,6 +2,7 @@ import { type CSSProperties, lazy, Suspense, useCallback, useEffect, useLayoutEf
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
+  ARCHIVE,
   BOOKSHELF,
   PANTRY,
   NOTES_ON,
@@ -58,8 +59,8 @@ import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
 import { createStore, useStore } from './ui/store';
 import { ModeSwitch, goToMode, modeItems } from './modes/ModeSwitch';
-import { type ModeHost } from './modes/host';
-import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, sideOf } from './modes/prefs';
+import { type ModeHost, SHELF_DROP, type ShelfDrop } from './modes/host';
+import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, setPrefs, sideOf } from './modes/prefs';
 const ModeView = lazy(() => import('./modes/ModeView'));
 import { useStable } from './ui/useStable';
 import { type DeskZone, deskZone } from './ui/deskDrop';
@@ -160,6 +161,7 @@ import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
+import { ArchiveShelf } from './ui/ArchiveShelf';
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
@@ -207,7 +209,7 @@ const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
   underline: { key: 'Mod-U', style: 'underline' },
 };
 
-/** The top folder a path is in: the Shelf (bookshelf), the Pantry or the recipes. */
+/** The top folder a path is in: the Shelf (bookshelf), the Pantry, the Archive or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
 const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order });
 /** The Group in the Pantry's Materials where Seasonings reports are kept. */
@@ -215,6 +217,9 @@ const REPORT_GROUP = 'Seasoning Reports';
 
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
+/** Where an Item of each kind belongs when it comes out of the Archive. */
+const HOME_OF: Record<string, string> = { scene: BOOKSHELF, ...Object.fromEntries(PANTRY_SECTIONS.map((s) => [SECTION_KIND[s], joinPath(PANTRY, s)])) };
+const inArchive = (p: string) => p.startsWith(ARCHIVE + '/');
 
 const NOT_A_BOOK = 'This folder is not a Cookbook recipe.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
@@ -299,6 +304,8 @@ export function App() {
   /** The Shelf's pages and books, the Pantry's groups, and the recipes, each as read from its folder. */
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [pantryTree, setPantryTree] = useState<TreeNode[]>([]);
+  /** The Archive: Shelf and Pantry Items set aside, in whatever order the writer likes. */
+  const [archiveTree, setArchiveTree] = useState<TreeNode[]>([]);
   const [recipes, setRecipes] = useState<Map<string, Recipe[]>>(new Map());
   /** Each Item's drafts by number, by Item id; read from folder names when the Shelf is read. */
   const [draftIds, setDraftIds] = useState<Map<string, number[]>>(new Map());
@@ -354,7 +361,6 @@ export function App() {
   const { index, version: indexVersion, changed: indexChanged, textChanged, show: showIndex, saveNow: saveIndexNow, textCount } = useBookIndex();
   // Cook, Prep or Plan. The views and their own state live in src/modes; the app only swaps the page for them.
   const mode = useStore(modeStore);
-  const modesTogether = useStore(prefsStore).together;
   useEffect(() => {
     void loadPrefs(fs);
     return flushPrefs;
@@ -717,6 +723,7 @@ export function App() {
     setTree(await readTree(fs, BOOKSHELF, ordered));
     // A Recipe folder with no Pantry yet (its folder deleted by hand, say) shows an empty one.
     setPantryTree((await fs.exists(PANTRY)) ? await readTree(fs, PANTRY, ordered) : []);
+    setArchiveTree((await fs.exists(ARCHIVE)) ? await readTree(fs, ARCHIVE, ordered) : []);
     // Recipes are listed under the page they name, so they follow it wherever it moves.
     const byPage = new Map<string, Recipe[]>();
     if (NOTES_ON && (await fs.exists(RECIPES))) {
@@ -738,7 +745,7 @@ export function App() {
   }, [refreshTree, indexVersion > 0]);
 
   /** The tree a path's top folder holds. */
-  const treeOf = (top: string) => (top === PANTRY ? pantryTree : tree);
+  const treeOf = (top: string) => (top === PANTRY ? pantryTree : top === ARCHIVE ? archiveTree : tree);
 
   const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
   /** Words written each day. Kept in a store, so a save that adds to today redraws the Goals pop-up, not the whole app. */
@@ -2087,6 +2094,63 @@ export function App() {
   };
   const moveInto = (item: string, folder: string) => moveInTree(item, folder, childrenOf(treeOf(topOf(item)), topOf(item), folder).length);
 
+  /** The right-click menu for a row in the Archive: open it, rearrange it, or put it back. */
+  const archiveMenu = (node: TreeNode, x: number, y: number) => {
+    const p = node.path;
+    const card = cards.get(p);
+    const pantryItem = isCard(card?.kind);
+    const within: MenuItem[] = [
+      ...(parentOf(p) !== ARCHIVE ? [{ label: 'Top of the Archive', onPick: () => void moveInto(p, ARCHIVE) }] : []),
+      ...groupTargets(archiveTree, (f) => void moveInto(p, f), p),
+    ];
+    const rearrange: MenuItem = { label: 'Move within the Archive', items: within.length > 0 ? within : [{ label: 'No other groups', onPick: () => {}, disabled: true }] };
+    const back: MenuItem = pantryItem
+      ? { label: `Put back in ${SECTION_LABEL[sectionOf(HOME_OF[card!.kind]! + '/x')!]}`, onPick: () => void unarchive(p) }
+      : { label: 'Put back', items: putBackTargets(p) };
+    const trash: MenuItem[] = [{ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(p) }];
+    if (node.kind === 'folder') {
+      const kids = childrenOf(archiveTree, ARCHIVE, p);
+      showMenu('Archived group', x, y, [
+        back,
+        { separator: true },
+        { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+        { label: 'New group inside', onPick: () => void addFolderIn(p) },
+        rearrange,
+        {
+          label: 'Sort contents',
+          disabled: kids.length < 2,
+          items: [
+            { label: 'A to Z', onPick: () => void sortContents(p, false) },
+            { label: 'Z to A', onPick: () => void sortContents(p, true) },
+          ],
+        },
+        { label: 'Expand all inside', onPick: () => setFolding({ open: true, under: p, at: Date.now() }) },
+        { label: 'Collapse all inside', onPick: () => setFolding({ open: false, under: p, at: Date.now() }) },
+        ...trash,
+      ]);
+      return;
+    }
+    showMenu(pantryItem ? 'Archived Pantry item' : 'Archived item', x, y, [
+      { label: 'Open', onPick: () => void select(p) },
+      ...(path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
+      back,
+      { separator: true },
+      { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+      rearrange,
+      { label: 'Put in a new group', onPick: () => void groupIntoFolder(p) },
+      ...trash,
+    ]);
+  };
+
+  /** The right-click menu for the space around the Archive's rows. */
+  const archiveSpaceMenu = (x: number, y: number) =>
+    showMenu('Archive', x, y, [
+      { label: 'New group in the Archive', onPick: () => void (async () => fs && (await fs.makeFolder(ARCHIVE), addFolderIn(ARCHIVE)))() },
+      { separator: true },
+      { label: 'Expand all', disabled: archiveTree.length === 0, onPick: () => setFolding({ open: true, under: ARCHIVE, at: Date.now() }) },
+      { label: 'Collapse all', disabled: archiveTree.length === 0, onPick: () => setFolding({ open: false, under: ARCHIVE, at: Date.now() }) },
+    ]);
+
   const rowMenu = (node: TreeNode, x: number, y: number) => {
     const p = node.path;
     const top = topOf(p);
@@ -2109,6 +2173,7 @@ export function App() {
       ]);
       return;
     }
+    if (top === ARCHIVE) return archiveMenu(node, x, y);
     const common = {
       label: {
         label: 'Label',
@@ -2119,7 +2184,16 @@ export function App() {
       },
       duplicate: { label: 'Duplicate', onPick: () => void duplicate(p) },
       move: { label: 'Move to', items: moveTargets(p) },
+      archive: { label: 'Move to Archive', onPick: () => void archivePaths([p]) },
     };
+    // An Item removed from Prep or Plan can come back from here as well as by dragging it in.
+    const removedFrom = card ? (['prep', 'plan'] as const).filter((m) => prefsStore.get().hidden[m].includes(card.id)) : [];
+    const bringBack: MenuItem[] = removedFrom.length === 0 ? [] : [
+      {
+        label: `Bring back to ${removedFrom.map((m) => MODES.find((x) => x.id === m)!.name).join(' and ')}`,
+        onPick: () => setPrefs((now) => ({ hidden: { prep: now.hidden.prep.filter((h) => h !== card!.id), plan: now.hidden.plan.filter((h) => h !== card!.id) } })),
+      },
+    ];
     if (node.kind === 'folder') {
       const kids = childrenOf(treeOf(top), top, p);
       showMenu('Group', x, y, [
@@ -2131,7 +2205,7 @@ export function App() {
         { label: 'New group inside', onPick: () => void addFolderIn(p) },
         ...(onShelf ? [{ label: 'Import files here…', onPick: () => chooseImport(p) }] : []),
         { separator: true },
-        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move]),
+        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move, common.archive]),
         {
           label: 'Sort contents',
           disabled: kids.length < 2,
@@ -2158,6 +2232,8 @@ export function App() {
         { separator: true },
         common.duplicate,
         common.move,
+        common.archive,
+        ...bringBack,
         ...trash,
       ]);
       return;
@@ -2185,6 +2261,8 @@ export function App() {
       },
       { separator: true },
       common.move,
+      common.archive,
+      ...bringBack,
       { label: 'Put in a new group', onPick: () => void groupIntoFolder(p) },
       ...(p === path ? [{ label: 'Merge with next', disabled: !next, onPick: () => void mergeNext() }] : []),
       { separator: true },
@@ -2213,6 +2291,85 @@ export function App() {
     await refreshTree();
   };
 
+  /** Moves `p` to the end of `folder`, reading the tree it lands in afresh. Settles with where it landed. */
+  const moveAcross = async (p: string, folder: string): Promise<string> => {
+    const top = topOf(folder);
+    const fresh = await readTree(fs!, top, ORDERED(order.current));
+    const moved = await moveItem(fs!, order.current, fresh, top, p, folder, childrenOf(fresh, top, folder).length);
+    order.current = moved.order;
+    followMove(p, moved.path);
+    return moved.path;
+  };
+
+  /**
+   * Sets Items and Groups aside in the Archive, at its end, in the order they are shown. They keep
+   * their words and fields; Prep, Plan, exports, counts and name links stop seeing them.
+   */
+  const archivePaths = async (paths: string[]) => {
+    if (!fs) return;
+    const list = topmost(paths).filter((p) => !PANTRY_FOLDERS.has(p) && !inArchive(p) && (topOf(p) === BOOKSHELF || topOf(p) === PANTRY));
+    if (list.length === 0) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      await fs.makeFolder(ARCHIVE);
+      for (const p of list) await moveAcross(p, ARCHIVE);
+      setShelfMarked(new Set());
+      setPantryMarked(new Set());
+      const name = (p: string) => cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '');
+      say(list.length === 1 ? `Archived “${name(list[0]!)}”.` : `Archived ${list.length} Items and Groups.`);
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+    await refreshTree();
+  };
+
+  /**
+   * Takes something out of the Archive. A Pantry Item goes back to its own part of the Pantry; a
+   * Shelf Item or a Group goes to `folder` (the top of the Shelf unless another is named). Anything
+   * inside a Group that belongs elsewhere (a character in a Group put back on the Shelf, say) goes
+   * home on its own, so the Shelf only ever holds Shelf Items and the Pantry only Pantry Items.
+   */
+  const unarchive = async (p: string, folder: string | null = null) => {
+    if (!fs || !inArchive(p)) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      const own = p.endsWith('.md') ? HOME_OF[cards.get(p)?.kind ?? 'scene'] : undefined;
+      const landed = await moveAcross(p, own && own !== BOOKSHELF ? own : (folder ?? BOOKSHELF));
+      if (!landed.endsWith('.md')) {
+        const top = topOf(landed);
+        const fresh = await readTree(fs, top, ORDERED(order.current));
+        const inside = [...walkFiles(childrenOf(fresh, top, landed))].map((f) => f.path);
+        for (const f of inside) {
+          const home = HOME_OF[cards.get(p + f.slice(landed.length))?.kind ?? 'scene'] ?? BOOKSHELF;
+          if (topOf(home) !== top || (top === PANTRY && !f.startsWith(home + '/'))) await moveAcross(f, home);
+        }
+      }
+      const where = landed.startsWith(PANTRY + '/') ? 'the Pantry' : 'the Shelf';
+      say(`Put “${cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '')}” back on ${where}.`);
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+    await refreshTree();
+  };
+
+  /** Every Group of a tree as menu items, indented, leaving out `skip` and what it holds. */
+  const groupTargets = (nodes: TreeNode[], pick: (folder: string) => void, skip?: string, depth = 0): MenuItem[] =>
+    nodes.flatMap((n) =>
+      n.kind !== 'folder' || (skip && (n.path === skip || n.path.startsWith(skip + '/')))
+        ? []
+        : [{ label: `${' '.repeat(depth)}${PANTRY_FOLDERS.get(n.path) ?? n.name}`, onPick: () => pick(n.path) }, ...groupTargets(n.children ?? [], pick, skip, depth + 1)],
+    );
+
+  /** Where something in the Archive can be put back: the Shelf's top and Groups, and for a Group, the Pantry's too. */
+  const putBackTargets = (p: string): MenuItem[] => [
+    { heading: 'Shelf' },
+    { label: 'Top of the Shelf', onPick: () => void unarchive(p, BOOKSHELF) },
+    ...groupTargets(tree, (f) => void unarchive(p, f)),
+    ...(p.endsWith('.md') ? [] : [{ separator: true as const }, { heading: 'Pantry' }, ...groupTargets(pantryTree, (f) => void unarchive(p, f))]),
+  ];
+
   /** The right-click menu for several picked rows at once. */
   const pickedMenu = (paths: string[], top: string, x: number, y: number) => {
     const list = topmost(paths);
@@ -2237,6 +2394,7 @@ export function App() {
       { heading: `${paths.length} picked` },
       ...(together ? [{ label: 'Show together as one page', onPick: () => void openView(together) }] : []),
       { label: 'Move to', items: targets.length > 0 ? targets : [{ label: 'No other groups', onPick: () => {}, disabled: true }] },
+      { label: 'Move to Archive', disabled: list.every((p) => PANTRY_FOLDERS.has(p)), onPick: () => void archivePaths(list) },
       {
         label: 'Label',
         disabled: files.length === 0,
@@ -2582,6 +2740,8 @@ export function App() {
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
+  /** Every card but those in the Archive, which is set aside from the rest of the recipe: its names, ties, Prep and Plan. */
+  const liveCards = useMemo(() => new Map([...(cards as Map<string, CardSummary>)].filter(([p]) => !inArchive(p))), [cards]);
   /** The drafts listed under each Shelf Item, by its path. Worked out when the Shelf or the drafts change, not as the writer types. */
   const draftRows = useMemo(() => {
     const rows = new Map<string, number[]>();
@@ -2598,12 +2758,12 @@ export function App() {
   }, [pantryQuery, indexVersion]);
   const cardChoices = useMemo<CardChoice[]>(
     () =>
-      [...cards]
+      [...liveCards]
         .filter(([, c]) => isCard(c.kind))
         .map(([p, c]) => ({ id: c.id, title: c.title, path: p }))
         .filter((c) => c.id !== doc?.id)
         .sort((a, b) => a.title.localeCompare(b.title, 'en')),
-    [cards, doc?.id],
+    [liveCards, doc?.id],
   );
   const incoming = useMemo(() => (doc && doc.kind !== 'scene' ? (index.current?.index.incoming(doc.id) ?? []) : []), [doc?.id, doc?.kind, indexVersion]);
   const loadPicture = useCallback(
@@ -2631,11 +2791,11 @@ export function App() {
   const namedKey = useMemo(
     () =>
       JSON.stringify(
-        [...cards]
+        [...liveCards]
           .filter(([, c]) => c.kind === 'character' || c.kind === 'setting')
           .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind, aka: c.aka }) as NamedCard),
       ),
-    [cards],
+    [liveCards],
   );
   const namedCards = useMemo(() => JSON.parse(namedKey) as NamedCard[], [namedKey]);
   const matcher = useMemo(() => nameMatcher(namedCards), [namedCards]);
@@ -2754,10 +2914,10 @@ export function App() {
 
   const shelfCards = useMemo<ShelfCard[]>(
     () =>
-      [...cards]
+      [...liveCards]
         .filter(([, c]) => c.kind !== 'scene')
         .map(([p, c]) => ({ id: c.id, path: p, title: c.title, kind: c.kind as ShelfCard['kind'], aka: c.aka })),
-    [cards],
+    [liveCards],
   );
   const searchPantry = useCallback(
     (query: string): SearchHit[] => index.current?.index.search(query, { kinds: ['character', 'setting', 'research'], limit: 20 }) ?? [],
@@ -3186,7 +3346,7 @@ export function App() {
       .map(([p, c]) => {
         const top = p.split('/')[0];
         const folder = parentOf(p) === top ? '' : ` · ${baseName(parentOf(p))}`;
-        const group = top === PANTRY ? 'Pantry' : top === RECIPES ? 'Notes' : 'Shelf';
+        const group = top === PANTRY ? 'Pantry' : top === RECIPES ? 'Notes' : top === ARCHIVE ? 'Archive' : 'Shelf';
         return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
       })
       .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
@@ -3282,7 +3442,7 @@ export function App() {
     ];
   };
 
-  const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8 }) ?? [], [indexVersion]);
+  const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8, archive: true }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
@@ -3614,8 +3774,11 @@ export function App() {
     // The open Item dropped on itself goes nowhere.
     return zone && p === path && !miseShown ? null : zone;
   };
+  /** What a drag out of a list is over: the Archive (from the Shelf or Pantry), or the Shelf or Pantry (from the Archive). */
+  const [archiveDrop, setArchiveDrop] = useState<'in' | 'out' | 'mode' | null>(null);
   const deskOver = useStable((p: string | null, x: number, y: number) => {
-    const zone = p ? zoneAt(p, x, y) : null;
+    // Only an Item opens on the page; a Group dragged over it is going nowhere.
+    const zone = p && p.endsWith('.md') ? zoneAt(p, x, y) : null;
     setDeskDrop(zone);
     return zone !== null;
   });
@@ -3629,7 +3792,56 @@ export function App() {
       setBesideLeft(zone === 'left');
     }
   });
-  const shelfOutside = useMemo(() => ({ over: deskOver, drop: deskLand }), [deskOver, deskLand]);
+  /** Prep or Plan under the pointer, for a row dragged in from the Shelf or Pantry. */
+  const modeAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest('.mode-desk') ?? null;
+  const intoMode = useStable((p: string, x: number, y: number) => {
+    const target = document.elementFromPoint(x, y);
+    if (!target?.closest('.mode-desk') || !p.endsWith('.md')) return;
+    target.dispatchEvent(new CustomEvent<ShelfDrop>(SHELF_DROP, { bubbles: true, detail: { path: p, card: cards.get(p), x, y } }));
+  });
+  const archiveDragged = useStable((p: string) => {
+    const marks = topOf(p) === PANTRY ? pantryMarked : shelfMarked;
+    void archivePaths(marks.has(p) && marks.size > 1 ? [...marks] : [p]);
+  });
+  const putBackDragged = useStable((p: string) => void unarchive(p));
+  const overArchive = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest('.archive');
+  const overShelfOrPantry = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y);
+    return !!el && !el.closest('.archive') && !!el.closest('.sidebar, .pantry-panel');
+  };
+  // From the Shelf or the Pantry: into the Archive (every picked row, if this is one), or onto the page.
+  const intoArchive = useMemo(
+    () => ({
+      over: (p: string | null, x: number, y: number) => {
+        const into = !!p && !PANTRY_FOLDERS.has(p) && overArchive(x, y);
+        const mode = !into && !!p && p.endsWith('.md') && !!modeAt(x, y);
+        // The day under the pointer lights up, as it does for a drag within the calendar.
+        const day = mode ? document.elementFromPoint(x, y)?.closest('[data-day]') : null;
+        document.querySelectorAll('.cal-day.shelf-over').forEach((el) => el !== day && el.classList.remove('shelf-over'));
+        day?.classList.add('shelf-over');
+        setArchiveDrop((was) => (into ? 'in' : mode ? 'mode' : was === 'in' || was === 'mode' ? null : was));
+        return into || mode || deskOver(into || mode ? null : p, x, y);
+      },
+      drop: (p: string, x: number, y: number) => {
+        if (modeAt(x, y)) return intoMode(p, x, y);
+        if (!overArchive(x, y)) return deskLand(p, x, y);
+        archiveDragged(p);
+      },
+    }),
+    [deskOver, deskLand, archiveDragged, intoMode],
+  );
+  // From the Archive: back to the Shelf or the Pantry, or onto the page.
+  const outOfArchive = useMemo(
+    () => ({
+      over: (p: string | null, x: number, y: number) => {
+        const out = !!p && overShelfOrPantry(x, y);
+        setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
+        return out || deskOver(out ? null : p, x, y);
+      },
+      drop: (p: string, x: number, y: number) => (overShelfOrPantry(x, y) ? putBackDragged(p) : deskLand(p, x, y)),
+    }),
+    [deskOver, deskLand, putBackDragged],
+  );
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
   const onTreeTrash = useStable(trashFromTree);
@@ -3644,7 +3856,7 @@ export function App() {
   );
   const shelfLive = useMemo(() => (doc && path ? { path, editor } : null), [!!doc, path, editor]);
 
-  const modeSide = sideOf(modesTogether, isCard(doc?.kind));
+  const modeSide = sideOf(isCard(doc?.kind));
   const inMode = mode !== 'cook' && !!book && !!fs;
   useEffect(() => {
     // Prep and Plan need the Shelf and their toolbar, which Oven Mode puts away.
@@ -3677,10 +3889,10 @@ export function App() {
     }
   };
   // Only made while Prep or Plan is showing, so Cook pays nothing for them.
-  const modeHost: ModeHost | null = !inMode ? null : {
+  const modeHost: Omit<ModeHost, 'remove'> | null = !inMode ? null : {
     tree,
     pantryTree,
-    cards,
+    cards: liveCards,
     path,
     indexVersion,
     links: () => index.current?.index.links() ?? [],
@@ -3700,7 +3912,6 @@ export function App() {
     newCard: (section, fields) => addForMode(CARD_TEMPLATES.find((t) => t.folder === section)!, joinPath(PANTRY, section), fields),
     newGroup: () => void addFolderIn(BOOKSHELF),
     rename: (p) => setRenaming(p),
-    trash: (p) => void trashPath(p),
     menu: showMenu,
     loadPicture,
     say,
@@ -3708,7 +3919,7 @@ export function App() {
 
   return (
     <div
-      className={`app${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}`}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
@@ -3773,7 +3984,7 @@ export function App() {
 
       <nav
         ref={shelfRef}
-        className={`sidebar${fileDrop !== null ? ' file-drop' : ''}`}
+        className={`sidebar${fileDrop !== null ? ' file-drop' : ''}${archiveDrop === 'out' ? ' put-back' : ''}`}
         aria-label="Shelf"
         {...shelfAway}
         onDragOver={(e) => {
@@ -3785,8 +3996,8 @@ export function App() {
         }}
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
         onContextMenu={(e) => {
-          // Rows have their own menu; this one is for the space around them.
-          if ((e.target as Element).closest('[data-tree-path], [data-draft-of], .pantry-results button, input, .menu')) return;
+          // Rows have their own menu; this one is for the space around them. The Archive has its own too.
+          if ((e.target as Element).closest('[data-tree-path], [data-draft-of], .pantry-results button, input, .menu, .archive')) return;
           e.preventDefault();
           shelfMenu(e.clientX, e.clientY);
         }}
@@ -3824,9 +4035,30 @@ export function App() {
           ghost={path && ghostN !== null ? { path, n: ghostN } : null}
           onDraft={onDraftRow}
           onDraftMenu={onDraftMenuRow}
-          outside={shelfOutside}
+          outside={intoArchive}
         />
         </ShelfSearch>
+        <ArchiveShelf count={archiveTree.length} dropping={archiveDrop === 'in'} openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`} onMenu={archiveSpaceMenu}>
+          <Tree
+            nodes={archiveTree}
+            root={ARCHIVE}
+            selected={path}
+            cards={cards}
+            live={shelfLive}
+            collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
+            renaming={renaming}
+            onSelect={onSelect}
+            onMove={onTreeMove}
+            onStartRename={setRenaming}
+            onRename={onTreeRename}
+            onMenu={onRowMenu}
+            onTrash={onTreeTrash}
+            folding={folding}
+            loadPicture={loadPicture}
+            tagCards
+            outside={outOfArchive}
+          />
+        </ArchiveShelf>
         {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
@@ -3963,6 +4195,7 @@ export function App() {
                 loadPicture={loadPicture}
                 marked={pantryMarked}
                 onMark={setPantryMarked}
+                outside={intoArchive}
               />
             </PantryPanel>
           )}

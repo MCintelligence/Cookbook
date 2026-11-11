@@ -83,11 +83,19 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
-- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, and Move to trash.
+- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, Move to Archive, and Move to trash.
 
 Each Item has a **status**, Not started, Simmering or Done, shown as a dot on the Shelf and in the bottom bar, never on the page. Hover over a Group to see the words inside it.
 
-Moving never renames a file unless the Group it lands in already has one of the same name.`,
+Moving never renames a file unless the Group it lands in already has one of the same name.
+
+## The Archive
+
+The **Archive**, at the foot of the Shelf, is for Items and Groups set aside without deleting them. Drag a row from the Shelf or the Pantry onto it, or right-click and choose **Move to Archive**. Click its name to open or close it.
+
+Pantry Items keep their own mark there, a **Pantry** tag and their portrait, but otherwise lie wherever you like: drag them up and down, mix them in with Shelf Items, or gather any of them into Groups of the Archive's own.
+
+Nothing in the Archive shows in Prep or Plan, is exported, counted towards your words, linked by name on the page or found by the Shelf's and Pantry's searches. It can still be opened and edited, and the search in the top bar still finds it. To put something back, drag it onto the Shelf, or right-click it and choose **Put back**: a Pantry Item goes home to its own part of the Pantry, and a Shelf Item or Group goes where you pick.`
   },
   {
     id: 'writing',
@@ -262,10 +270,14 @@ A **plotline** is a label colour with a name of your own. Right-click a row's na
 
 ## Plan
 
-Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item onto a day.
+Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item from the Shelf onto a day.
 
-- **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it. Items with no date wait at the side under **Not dated yet**.
-- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+- **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it, or drag one from the Shelf onto a day to date it. Drag a Pantry Item from the Pantry onto a day to give it a date of its own.
+- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer, or drag an Item from the Shelf onto the timeline to date it there. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+
+## Taking something out of a view
+
+**Remove**, in the right-click menu of anything in Prep or Plan, takes it out of that mode only. The Item itself is not touched, moved or deleted. To bring it back, drag it in from the Shelf or Pantry, or right-click it there and choose **Bring back**.
 
 ## The Pantry's own Prep and Plan
 
@@ -275,8 +287,6 @@ Open a Pantry Item and the same switch shows the Pantry's views, shared by the w
 - **Board** (Prep) is the Pantry as cards, a column each for Characters, Settings and Materials.
 - **Arcs** (Plan) runs the Shelf's Items left to right with a line for each Character. A ring marks each Item that names them. Click to set a **beat**: how things stand for them there, from Rock bottom to Flying, with a word or two on why.
 - **Calendar** (Plan) shows the Pantry's own dates: a birthday, the day a debt falls due. Right-click a day to add one.
-
-**Shelf and Pantry together**, at the foot of the switch's list, joins the two: one Prep with the outline, both boards and the atlas, and one Plan whose calendar and timeline show the Pantry's dates (dashed) beside the Shelf's Items.
 
 Everything here is kept in the recipe's own files. Story dates, Pantry dates and arcs are in each Item's front matter (\`when\`, \`events\`, \`arc\`); how the views are set up, and where the cards of a free board lie, is in \`modes.json\`.`,
   },
@@ -403,6 +413,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 | \`dictionary.txt\` | your own words, one a line |
 | \`bookshelf/\` | the Shelf: Items in nested Groups |
 | \`pantry/\` | Characters, Settings and Materials |
+| \`archive/\` | Shelf and Pantry Items set aside in the Archive |
 | \`pictures/\` | portraits for Pantry cards |
 | \`drafts/\` | earlier drafts of Items, one folder per Item |
 | \`.cookbook/\` | hidden: the search index, undo history, snapshots and the trash |

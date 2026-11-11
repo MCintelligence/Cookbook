@@ -41,6 +41,8 @@ interface Props {
   recipes?: Map<string, Recipe[]>;
   /** Shows a Pantry card's portrait beside its name. */
   loadPicture?: (path: string) => Promise<string>;
+  /** Marks each Pantry Item as one, where they lie among Shelf Items (in the Archive). */
+  tagCards?: boolean;
   /** Opens or closes every folder, or every one inside `under`. A new `at` asks again. */
   folding?: { open: boolean; under?: string; at: number } | null;
   /** Rows picked for the toolbar and right-click menu: Ctrl or ⌘-click adds one, Shift-click a run. */
@@ -63,7 +65,7 @@ interface Props {
   /** A right-click (or the menu key) on a draft. */
   onDraftMenu?: (path: string, n: number, x: number, y: number) => void;
   /**
-   * An Item dragged out of the list, over somewhere else that takes it (the editor). `over` is
+   * An Item or Group dragged out of the list, over somewhere else that takes it (the editor, the Archive). `over` is
    * told where the pointer is (null once the drag ends or comes back) and says whether that place
    * takes the Item; `drop` is the Item let go there.
    */
@@ -247,7 +249,10 @@ export const Tree = memo(function Tree(props: Props) {
 
   /** Where a drop at (x, y) would land, or null if nowhere sensible. */
   const target = (x: number, y: number, dragged: string): Drop | null => {
-    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-tree-path]');
+    const under = document.elementFromPoint(x, y);
+    // Another list's compartment, such as the Archive under the Shelf, is somewhere else, not this list's end.
+    if (under?.closest('[data-tree-away]') && !list.current?.closest('[data-tree-away]')?.contains(under)) return null;
+    const el = under?.closest<HTMLElement>('[data-tree-path]');
     let drop: Drop;
     if (!el || !list.current?.contains(el)) {
       const box = list.current?.getBoundingClientRect();
@@ -301,7 +306,7 @@ export const Tree = memo(function Tree(props: Props) {
       setDrag((d) => d && { ...d, x: ev.clientX, y: ev.clientY });
       const to = target(ev.clientX, ev.clientY, node.path);
       setDrop(to);
-      if (props.outside && node.kind === 'file') props.outside.over(to ? null : node.path, ev.clientX, ev.clientY);
+      if (props.outside) props.outside.over(to ? null : node.path, ev.clientX, ev.clientY);
       if (scroller) {
         const box = scroller.getBoundingClientRect();
         if (ev.clientY < box.top + 40) scroller.scrollBy(0, -12);
@@ -314,7 +319,7 @@ export const Tree = memo(function Tree(props: Props) {
         return props.onMenu(node, ev.clientX, ev.clientY);
       }
       const landed = active ? target(ev.clientX, ev.clientY, node.path) : null;
-      const out = active && !landed && node.kind === 'file' && !!props.outside?.over(node.path, ev.clientX, ev.clientY);
+      const out = active && !landed && !!props.outside?.over(node.path, ev.clientX, ev.clientY);
       finish();
       if (landed) onMove(node.path, landed.folder, landed.index);
       else if (out) props.outside!.drop(node.path, ev.clientX, ev.clientY);
@@ -414,7 +419,7 @@ interface Shared extends Props {
 }
 
 function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: TreeNode; parent: string; index: number; depth: number }) {
-  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onMenu, onTrash, dropTarget, recipes, loadPicture, marked, mark, markKeys, tabStop, cut, setCursor, navigate, renamed, drafts, ghost, onDraft, onDraftMenu } = shared;
+  const { selected, cards, live, collapsed, toggle, words, drop, dragging, begin, justDragged, renaming, locked, onSelect, onStartRename, onMenu, onTrash, dropTarget, recipes, loadPicture, tagCards, marked, mark, markKeys, tabStop, cut, setCursor, navigate, renamed, drafts, ghost, onDraft, onDraftMenu } = shared;
   const picked = marked?.has(node.path) ? ' is-marked' : '';
   const fixed = locked?.has(node.path) ?? false;
   const card = cards.get(node.path);
@@ -476,15 +481,16 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
         ) : (
         <button
           {...rowProps}
-          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}${cut === node.path ? ' is-cut' : ''}`}
+          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}${cut === node.path ? ' is-cut' : ''}${tagCards && isCard(card?.kind) ? ' from-pantry' : ''}`}
           onClick={(e) => !justDragged.current && !mark(e, node.path) && onSelect(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span className="tree-card-top">
             {status && <StatusIcon status={status.id} />}
-            {card && isCard(card.kind) && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
+            {card && isCard(card.kind) && !tagCards && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
-            {card?.skipExport && <span className="tree-flag">Not exported</span>}
+            {tagCards && isCard(card?.kind) && <span className="tree-flag tree-from">Pantry</span>}
+            {card?.skipExport && !tagCards && <span className="tree-flag">Not exported</span>}
             {colour && <span className="label-dot" style={{ background: colour.color }} title={`${colour.name} label`} aria-label={`${colour.name} label`} role="img" />}
             {live?.path === node.path ? <LiveWords editor={live.editor} saved={total} /> : total > 0 && <span className="tree-words">{fmt(total)}</span>}
           </span>

@@ -1,7 +1,7 @@
 import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
-import { BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
+import { ARCHIVE, BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
 import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, arcOf, cardFieldsOf, datesOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
 import { type ArcBeat } from './document';
 import { type StoryDate } from './storyDate';
@@ -69,7 +69,12 @@ export interface IncomingRelationship {
 export interface SearchOptions {
   kinds?: DocumentKind[];
   limit?: number;
+  /** Looks in the Archive too, which searches leave out unless asked. */
+  archive?: boolean;
 }
+
+/** Leaves out what is in the Archive, which is set aside from the rest of the recipe. */
+const LIVE = `d.path not like '${ARCHIVE}/%'`;
 
 export interface SearchHit {
   path: string;
@@ -218,7 +223,7 @@ export class BookIndex {
     if (!query) return [];
     const rows = this.db.selectArrays(
       `select d.path, d.title, docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid
-        where docs_fts match ? and d.kind = 'scene'`,
+        where docs_fts match ? and d.kind = 'scene' and ${LIVE}`,
       [`text : (${query})`],
     ) as [string, string, string][];
     return rows.map(([path, title, text]) => ({ path, title, count: count(text) })).filter((m) => m.count > 0);
@@ -226,7 +231,7 @@ export class BookIndex {
 
   /** The words of every page, for the proofreader to learn the book's own way with words. */
   pageTexts(): string[] {
-    return (this.db.selectArrays(`select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.kind = 'scene'`) as [string][]).map(([t]) => t);
+    return (this.db.selectArrays(`select docs_fts.text from docs_fts join docs d on d.rowid = docs_fts.rowid where d.kind = 'scene' and ${LIVE}`) as [string][]).map(([t]) => t);
   }
 
   /** The indexed text of one file, or undefined if it isn't indexed (yet). */
@@ -238,7 +243,7 @@ export class BookIndex {
   /** The relationships other cards have with the card whose id this is. */
   incoming(id: string): IncomingRelationship[] {
     const rows = this.db.selectArrays(
-      'select d.path, d.title, l.label from links l join docs d on d.path = l.from_path where l.to_id = ? order by d.title',
+      `select d.path, d.title, l.label from links l join docs d on d.path = l.from_path where l.to_id = ? and ${LIVE} order by d.title`,
       [id],
     ) as [string, string, string][];
     return rows.map(([path, title, as]) => ({ path, title, as }));
@@ -246,7 +251,7 @@ export class BookIndex {
 
   /** Every tie between Pantry Items: the path of the Item that has it, the id of the one it points to, and how it reads. */
   links(): Link[] {
-    const rows = this.db.selectArrays('select from_path, to_id, label from links order by from_path, to_id') as [string, string, string][];
+    const rows = this.db.selectArrays(`select from_path, to_id, label from links where from_path not like '${ARCHIVE}/%' order by from_path, to_id`) as [string, string, string][];
     return rows.map(([from, to, as]) => ({ from, to, as: as ?? '' }));
   }
 
@@ -286,10 +291,10 @@ export class BookIndex {
   }
 
   /** Title matches count ten times as much as matches in the text. */
-  search(query: string, { kinds, limit = 50 }: SearchOptions = {}): SearchHit[] {
+  search(query: string, { kinds, limit = 50, archive = false }: SearchOptions = {}): SearchHit[] {
     const match = toFtsQuery(query);
     if (!match) return [];
-    const kindFilter = kinds ? `and d.kind in (${kinds.map(() => '?').join(', ')})` : '';
+    const kindFilter = `${kinds ? `and d.kind in (${kinds.map(() => '?').join(', ')})` : ''}${archive ? '' : ` and ${LIVE}`}`;
     const rows = this.db.selectArrays(
       `select d.path, d.title, d.kind, snippet(docs_fts, 1, ?, ?, '…', 14)
             from docs_fts join docs d on d.rowid = docs_fts.rowid
@@ -326,7 +331,7 @@ export async function refreshIndex(fs: StorageAdapter, index: BookIndex): Promis
   const known = index.stamps();
   const seen = new Set<string>();
   let touched = 0;
-  for (const root of NOTES_ON ? [BOOKSHELF, PANTRY, RECIPES] : [BOOKSHELF, PANTRY]) {
+  for (const root of NOTES_ON ? [BOOKSHELF, PANTRY, RECIPES, ARCHIVE] : [BOOKSHELF, PANTRY, ARCHIVE]) {
     if (!(await fs.exists(root))) continue;
     for (const file of walkFiles(await readTree(fs, root))) {
       seen.add(file.path);

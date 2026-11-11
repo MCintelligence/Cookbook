@@ -18,6 +18,7 @@ import { isDialect } from '../proofread/english';
  *       characters/
  *       settings/
  *       research/
+ *     archive/           Shelf and Pantry Items set aside, in any order
  *     .cookbook/         hidden index, undo history and trash; safe to delete once the trash is empty
  *
  * The order of scenes and folders is kept in order.json (see order.ts).
@@ -27,6 +28,12 @@ export const BOOK_FILE = 'book.json';
 export const HIDDEN_FOLDER = '.cookbook';
 export const BOOKSHELF = 'bookshelf';
 export const PANTRY = 'pantry';
+/**
+ * The Archive: Shelf and Pantry Items set aside. They keep their words but leave the recipe's
+ * Prep and Plan, its exports, word counts and names, until they are put back. Made the first
+ * time something is archived; Shelf Items and Pantry Items can lie in it in any order.
+ */
+export const ARCHIVE = 'archive';
 /** Recipes: each one names the page it belongs to, and is listed under that page on the Shelf. */
 export const RECIPES = 'recipes';
 /**

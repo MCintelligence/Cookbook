@@ -165,7 +165,7 @@ export function itemMenu(host: ModeHost, item: Item, ask: (form: Form) => void):
     },
     { label: 'Rename', onPick: () => host.rename(item.path) },
     { separator: true },
-    { label: 'Move to trash', danger: true, onPick: () => host.trash(item.path) },
+    { label: 'Remove', onPick: () => host.remove(item.path) },
   ];
 }
 
@@ -183,7 +183,7 @@ export function cardMenu(host: ModeHost, item: Item, extra: MenuItem[] = []): Me
     },
     { label: 'Rename', onPick: () => host.rename(item.path) },
     { separator: true },
-    { label: 'Move to trash', danger: true, onPick: () => host.trash(item.path) },
+    { label: 'Remove', onPick: () => host.remove(item.path) },
   ];
 }
 

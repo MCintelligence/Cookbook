@@ -116,7 +116,8 @@ To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, o
 
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.
-- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, and Move to trash.
+- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, Move to Archive, and Move to trash.
+- **Archive** anything you want to keep but set aside by dragging it onto the Archive at the foot of the Shelf. It leaves Prep and Plan until you put it back.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
 
 Each Item can carry a **status**: Not started, Simmering or Done. This page is Simmering; Welcome is Done.
@@ -320,12 +321,14 @@ Which checks run, and American or British spelling, are in App Settings › Seas
 You are in **Cook**: the page. A recipe can be looked at two more ways, and the switch is this Item’s name in the top bar. Click it and choose:
 
 - **Prep**${k('modePrep') ? ` (${k('modePrep')})` : ''} sets the Items out to be put in order. Its **Outline** lists them with their synopses; its **Board** shows them as cards, in a **Grid** with a column for each Group, or **Free** on a board with no edges.
-- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it onto a day.
+- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it from the Shelf onto a day.
 - **Cook**${k('modeCook') ? ` (${k('modeCook')})` : ''} brings you back to the page. So does a double-click on anything in Prep or Plan.
 
 Try it now: open Prep, choose Board, and drag a card to another Group. The Shelf follows. New things come from the right-click menu.
 
-Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan. **Shelf and Pantry together**, at the foot of the list, joins them with the Shelf’s.
+Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan.
+
+Right-click anything in Prep or Plan and choose **Remove** to take it out of that view. The Item itself stays as it is; drag it in from the Shelf to bring it back.
 `,
         },
       ],

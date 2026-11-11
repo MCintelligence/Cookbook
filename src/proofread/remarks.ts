@@ -319,10 +319,10 @@ export const METERS: Record<SeasoningId, Meter> = {
     check: 'Salt Check',
     happy: 0,
     report: 'Salt Report',
-    ends: ['Perfectly salted', 'Seawater'],
+    ends: ['Savoury', 'Seawater'],
     steps: [
       {
-        level: 'Perfectly salted',
+        level: 'Savoury',
         upTo: 0,
         says: [
           'Not a speck of salt on her. Shipshape, sailor.',
@@ -334,7 +334,7 @@ export const METERS: Record<SeasoningId, Meter> = {
         ],
       },
       {
-        level: 'A bit salty',
+        level: 'Salty',
         upTo: 10,
         says: [
           'A pinch of brine here and there. Swab it and we sail.',
@@ -346,7 +346,7 @@ export const METERS: Record<SeasoningId, Meter> = {
         ],
       },
       {
-        level: 'Too salty',
+        level: 'Brackish',
         upTo: 25,
         says: [
           'Salty enough to cure a herring. Get scrubbing.',
@@ -390,10 +390,10 @@ export const METERS: Record<SeasoningId, Meter> = {
     check: 'Pepper Check',
     happy: 0,
     report: 'Pepper Report',
-    ends: ['Perfectly peppered', 'Smoking'],
+    ends: ['Zesty', 'Smoking'],
     steps: [
       {
-        level: 'Perfectly peppered',
+        level: 'Zesty',
         upTo: 0,
         says: [
           'Oh. No mistakes. How… nice for you.',
@@ -405,7 +405,7 @@ export const METERS: Record<SeasoningId, Meter> = {
         ],
       },
       {
-        level: 'A bit peppery',
+        level: 'Peppery',
         upTo: 10,
         says: [
           'Just a sprinkle of slips. No pressure, but I did notice.',
@@ -417,7 +417,7 @@ export const METERS: Record<SeasoningId, Meter> = {
         ],
       },
       {
-        level: 'Too peppery',
+        level: 'Hot',
         upTo: 25,
         says: [
           'A few sentences need tidying. Not to be dramatic.',

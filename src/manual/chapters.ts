@@ -225,8 +225,8 @@ Type **@** after a space, or press {key:shelf|Edit › Name from the Pantry}, to
 
 | Seasoning | Reads for | Meter |
 | --- | --- | --- |
-| **Salty Sam** | Spelling, and near misses of Pantry names | Perfectly salted to Seawater: slips per 1,000 words |
-| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Perfectly peppered to Smoking: slips per 1,000 words |
+| **Salty Sam** | Spelling, and near misses of Pantry names | Savoury to Seawater: slips per 1,000 words |
+| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Zesty to Smoking: slips per 1,000 words |
 | **Drunk Daniel** | How much of the page is dialogue | Sober to Drunk |
 | **Spicy Sally** | Style: adverbs, clichés, passive voice, sticky sentences | Mild to Inferno: how hard the page is to read |
 

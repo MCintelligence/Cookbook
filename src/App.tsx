@@ -49,7 +49,9 @@ import { type PlateSettings, plateOf } from './plate/settings';
 import { KINDS, saveFile } from './ui/saveFile';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
+import { createPortal } from 'react-dom';
 import { PhoneBar } from './ui/PhoneBar';
+import { PhoneFab } from './ui/PhoneFab';
 import { usePhone } from './ui/usePhone';
 import { ANDROID_APP, fromTouch, isPhone, isTouch, onBack } from './mobile';
 import { setMacMenu } from './ui/nativeMenu';
@@ -199,6 +201,10 @@ const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
 const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+/** On a phone the whole interface is larger, for fingers (phone.css), and Small, Medium and Large step from there. */
+const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
+/** How large the page's words are on a phone, against a computer's: larger, though not as much as the buttons. */
+const PHONE_PAGE = { small: 1, medium: 1.1, large: 1.22 } as const;
 /** A window narrow enough for the phone layout, where side panels slide over the page (styles.css, 900px). */
 const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches;
 /** Fit width's zoom: the page, plus the desk's 24px sides, fills the desk. */
@@ -333,6 +339,8 @@ export function App() {
   const phone = usePhone();
   /** On a phone the full format row is put away until asked for, to leave the screen to the words. */
   const [phoneTools, setPhoneTools] = useState(false);
+  /** Where today's words go on a phone: the head of the Shelf. */
+  const [phoneFooter, setPhoneFooter] = useState<HTMLDivElement | null>(null);
   const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
   panelNow.current = { panel, ovenSide };
   const togglePanel = (p: Panel) => {
@@ -1824,12 +1832,11 @@ export function App() {
     // A second click on the recipe's name closes its menu.
     if (menu?.label === 'Recipe' && menu.opener === e.currentTarget) return setMenu(null);
     const r = e.currentTarget.getBoundingClientRect();
-    setMenu({
-      label: 'Recipe',
-      opener: e.currentTarget,
-      x: r.left,
-      y: r.bottom + 4,
-      items: [
+    showMenu(
+      'Recipe',
+      r.left,
+      r.bottom + 4,
+      [
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Configure this recipe…', onPick: () => openSettings('page') },
         { label: 'App Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
@@ -1845,16 +1852,41 @@ export function App() {
         { label: 'Back up as a zip…', onPick: () => void backUp() },
         { separator: true },
         { label: 'Trash', onPick: openTrash },
+        ...(phone
+          ? ([
+              { separator: true },
+              { label: 'Goals…', onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
+              { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
+              { label: 'Expand the Shelf', onPick: () => setFolding({ open: true, at: Date.now() }) },
+              { label: 'Collapse the Shelf', onPick: () => setFolding({ open: false, at: Date.now() }) },
+            ] as MenuItem[])
+          : []),
       ],
-    });
+      e.currentTarget,
+    );
   };
 
   /**
    * Opens a menu. Given the button that opened it, a second press on that button
    * closes the menu instead of opening it again, as the Recipe button does.
    */
-  const showMenu = (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) =>
+  /** While set, a menu that would open hands its items here instead (see itemsOf). */
+  const borrowMenu = useRef<((label: string, items: MenuItem[]) => void) | null>(null);
+  const showMenu = (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) => {
+    if (borrowMenu.current) return borrowMenu.current(label, items);
     setMenu((open) => (opener && open?.opener === opener ? null : { label, x, y, items, opener }));
+  };
+  /** The items a menu-opening function would show, without showing them. */
+  const itemsOf = (open: () => void): MenuItem[] => {
+    let got: MenuItem[] = [];
+    borrowMenu.current = (_label, items) => (got = items);
+    try {
+      open();
+    } finally {
+      borrowMenu.current = null;
+    }
+    return got;
+  };
 
   /** Proofreader fixes and choices for an issue, for the underline's menu and the Seasonings card's. */
   const issueItems = async (issue: FoundIssue): Promise<MenuItem[]> => {
@@ -3709,7 +3741,9 @@ export function App() {
   const small = isSmallDesk(deskWidth, panelColumn) || phone;
   const asDraft = page.view === 'draft' || small;
   const fitWidth = page.zoom === 0 && !asDraft;
-  const pageZoom = asDraft && (page.zoom === 0 || small) ? 1 / UI_ZOOM[settings.size] : page.zoom === 0 ? fitZoom(deskWidth, pageSize.width) : page.zoom / 100 / UI_ZOOM[settings.size];
+  // The page is zoomed apart from the interface around it, so the interface's own zoom is taken back out.
+  const uiZoom = phone ? PHONE_ZOOM[settings.size] : UI_ZOOM[settings.size];
+  const pageZoom = asDraft && (page.zoom === 0 || small) ? (phone ? PHONE_PAGE[settings.size] : 1) / uiZoom : page.zoom === 0 ? fitZoom(deskWidth, pageSize.width) : page.zoom / 100 / uiZoom;
   const fittedZoom = Math.round(fitZoom(deskWidth, pageSize.width) * 100);
   zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || Math.round(fitZoom(desk.current?.clientWidth ?? deskWidth, pageSize.width) * 100), dir) } });
   const pageStyle: CSSProperties =
@@ -3754,6 +3788,44 @@ export function App() {
   const miseOthers = useMemo(() => miseWords(miseList, (p) => cards.get(p)?.words ?? 0, miseActive, 0), [miseList, cards, miseActive]);
 
   /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
+  /**
+   * On a phone, the open Item's name in the top bar opens one sheet with everything about it:
+   * which way to look (Cook, Prep, Plan), what can be done to the Item (its row's own menu on
+   * the Shelf, and its drafts and snapshots), and how the page behaves.
+   */
+  const phoneItemSheet = (opener: HTMLElement) => {
+    const recipe = topMenus.find((m) => m.label === 'Recipe')!.items();
+    const pick = (label: string) => recipe.find((i) => 'label' in i && i.label === label);
+    const node = path ? findNode([...tree, ...researchTree, ...archiveTree, ...pantryNodes], path) : null;
+    const own = node ? itemsOf(() => rowMenu(node, 0, 0)) : [];
+    const drafts = doc?.kind === 'scene' ? (['Draft this item', 'Older draft as ghost text', 'Newer draft as ghost text'].map(pick).filter(Boolean) as MenuItem[]) : [];
+    const snaps = pick('Snapshots of this item');
+    showMenu(
+      doc?.title || 'Item',
+      0,
+      0,
+      [
+        { heading: 'Look at it as' },
+        ...modeItems(sideOf(isCard(doc?.kind))),
+        ...(own.length > 0 ? ([{ separator: true }, { heading: 'This Item' }] as MenuItem[]) : []),
+        // Open is where the writer already is.
+        ...own.filter((i, n, all) => !('separator' in i && (n === 0 || n === all.length - 1)) && !('label' in i && i.label === 'Open')),
+        ...(drafts.length > 0 || snaps ? ([{ separator: true }, ...drafts, ...(snaps ? [snaps] : [])] as MenuItem[]) : []),
+        ...(doc && editor && !inMode
+          ? ([
+              { separator: true },
+              { heading: 'The page' },
+              { label: 'Track changes', items: trackItems(editor) },
+              { label: 'Mise en Place (the whole group)', checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
+              { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
+              { label: 'Chef Mode', checked: settings.focus, onPick: toggleFocus },
+            ] as MenuItem[])
+          : []),
+      ],
+      opener,
+    );
+  };
+
   const topMenus: BarMenu[] = [
     {
       label: 'File',
@@ -4063,6 +4135,7 @@ export function App() {
     if (sideOpen || (settings.focus && ovenSide)) return setSideOpen(false), setOvenSide(false), true;
     if (panel && narrowWindow() && !settings.focus) return setPanel(null), true;
     if (modeStore.get() !== 'cook') return goToMode('cook'), true;
+    if (phone && getSettings().focus) return toggleFocus(), true;
     return false;
   };
   useEffect(() => onBack(() => backNow.current()), []);
@@ -4135,6 +4208,63 @@ export function App() {
     say,
       };
 
+  // On a phone today's words sit at the head of the Shelf (see phoneFooter); everywhere else, along the foot.
+  const footerEl = (
+        <footer className="footer">
+          <LiveGoals
+            editor={editor}
+            history={history}
+            goals={goals}
+            onGoals={(changes) => updateBook(changes)}
+            item={doc && path && doc.kind === 'scene' ? { title: doc.title, goal: sceneGoal(doc), onShelf: path.startsWith(BOOKSHELF + '/') } : null}
+            savedItemWords={(path && cards.get(path)?.words) || 0}
+            otherWords={otherWords}
+            onSceneGoal={(goal) => {
+              const base = currentDoc() ?? doc;
+              if (!base) return;
+              const { goal: _old, ...fields } = base.fields;
+              const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
+              setDoc(updated);
+              scheduleSave(updated);
+            }}
+            onExport={exportHistoryCsv}
+            request={goalsRequest}
+          />
+          <span className="footer-end">
+            {miseShown && (
+              <MiseCount
+                name={miseShown.title}
+                items={miseList.length}
+                otherWords={miseOthers}
+                editor={miseActive ? editor : null}
+                savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
+              />
+            )}
+            {book?.suggest && (
+              <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>
+                Suggesting
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            )}
+            {doc && (
+              <ZoomControl
+                zoom={page.zoom}
+                fitted={fittedZoom}
+                label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
+                onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
+              />
+            )}
+            {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
+            <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
+            <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+              <Icon name="gear" size={18} />
+            </button>
+          </span>
+        </footer>
+  );
+
   return (
     <div
       className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}`}
@@ -4176,7 +4306,7 @@ export function App() {
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
-            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode'} />}
+            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode' || (phone && !!menu && menu.label === (doc?.title || 'Item'))} onPhone={phone ? phoneItemSheet : undefined} />}
           </span>
         </div>
         <div className="top-actions">
@@ -4190,37 +4320,6 @@ export function App() {
             <SeasoningsBadge editor={doc ? editor : null} chosen={chosen} paused={paused} />
           </button>
           <FindBox editor={editor} search={searchBook} currentPath={path} onOpenHit={select} request={findRequest} beforeReplaceAll={() => autoSnapshot('Before replacing all').catch(() => {})} />
-          {phone && (
-            // A phone has no room for File to Help along the top, and no keys for the command palette, so every menu waits under one button.
-            <button
-              className="panel-btn more-btn"
-              aria-label="More"
-              aria-haspopup="menu"
-              aria-expanded={menu?.label === 'Cookbook'}
-              onClick={(e) => {
-                const r = e.currentTarget.getBoundingClientRect();
-                showMenu(
-                  'Cookbook',
-                  r.left,
-                  r.bottom + 4,
-                  [
-                    { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
-                    { label: 'Search commands…', onPick: () => setPalette({ scenesOnly: false, at: Date.now() }) },
-                    { label: 'App Settings…', onPick: () => openSettings() },
-                    { separator: true },
-                    ...topMenus.map((m) => ({ label: m.label, items: m.items() })),
-                  ],
-                  e.currentTarget,
-                );
-              }}
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="12" cy="5" r="1.9" />
-                <circle cx="12" cy="12" r="1.9" />
-                <circle cx="12" cy="19" r="1.9" />
-              </svg>
-            </button>
-          )}
         </div>
       </header>
 
@@ -4257,7 +4356,20 @@ export function App() {
           void importFiles(Array.from(e.dataTransfer.files), dropFolder(e.target));
         }}
       >
-        <h2 className="panel-h shelf-h">Shelf</h2>
+        {phone ? (
+          <div className="phone-shelf-head">
+            <button className="phone-recipe" aria-haspopup="menu" onClick={bookMenu}>
+              <span className="phone-recipe-label">Recipe</span>
+              <span className="phone-recipe-name">{book?.title ?? 'Your Recipes'}</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+            <div className="phone-today" ref={setPhoneFooter} />
+          </div>
+        ) : (
+          <h2 className="panel-h shelf-h">Shelf</h2>
+        )}
         <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
         <Tree
           nodes={tree}
@@ -4349,7 +4461,48 @@ export function App() {
             />
           </Compartment>
         </div>
-        {shelfBar()}
+        {phone ? (
+          <>
+            <ul className="phone-places" aria-label="Cookbook">
+              <li>
+                <button onClick={() => (setSideOpen(false), openSettings())}>
+                  <Icon name="gear" size={22} />
+                  Settings
+                </button>
+              </li>
+              <li>
+                <button onClick={() => (setSideOpen(false), setManualAt({ chapter: '', at: Date.now() }))}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />
+                  </svg>
+                  Manual
+                </button>
+              </li>
+            </ul>
+            {book && (
+              <PhoneFab
+                label="New"
+                onPick={(opener) => {
+                  const group = pickedGroup(shelfMarked, tree);
+                  showMenu(
+                    'New',
+                    0,
+                    0,
+                    [
+                      { label: 'New Item', onPick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
+                      { label: 'New Group', onPick: () => void (group ? addFolderIn(group) : addFolder()) },
+                      { separator: true },
+                      { label: 'Import files…', onPick: () => chooseImport(null) },
+                    ],
+                    opener,
+                  );
+                }}
+              />
+            )}
+          </>
+        ) : (
+          shelfBar()
+        )}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
       {(sideOpen || (settings.focus && ovenSide)) && (
@@ -4470,7 +4623,20 @@ export function App() {
               onClose={closePanel}
               onMenu={pantryMenu}
               onHitMenu={onHitMenu}
-              bar={pantryBar()}
+              bar={
+                phone ? (
+                  <PhoneFab
+                    label={`New ${CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!.name}`}
+                    onPick={() => {
+                      const group = pickedGroup(pantryMarked, pantryNodes);
+                      const template = CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!;
+                      void (group ? addFrom(template, group, NAME_IT) : addCard(NAME_IT));
+                    }}
+                  />
+                ) : (
+                  pantryBar()
+                )
+              }
             >
               <Tree
                 nodes={pantryNodes}
@@ -4687,59 +4853,7 @@ export function App() {
         />
       )}
 
-      <footer className="footer">
-        <LiveGoals
-          editor={editor}
-          history={history}
-          goals={goals}
-          onGoals={(changes) => updateBook(changes)}
-          item={doc && path && doc.kind === 'scene' ? { title: doc.title, goal: sceneGoal(doc), onShelf: path.startsWith(BOOKSHELF + '/') } : null}
-          savedItemWords={(path && cards.get(path)?.words) || 0}
-          otherWords={otherWords}
-          onSceneGoal={(goal) => {
-            const base = currentDoc() ?? doc;
-            if (!base) return;
-            const { goal: _old, ...fields } = base.fields;
-            const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
-            setDoc(updated);
-            scheduleSave(updated);
-          }}
-          onExport={exportHistoryCsv}
-          request={goalsRequest}
-        />
-        <span className="footer-end">
-          {miseShown && (
-            <MiseCount
-              name={miseShown.title}
-              items={miseList.length}
-              otherWords={miseOthers}
-              editor={miseActive ? editor : null}
-              savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
-            />
-          )}
-          {book?.suggest && (
-            <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>
-              Suggesting
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
-          )}
-          {doc && (
-            <ZoomControl
-              zoom={page.zoom}
-              fitted={fittedZoom}
-              label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
-              onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
-            />
-          )}
-          {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
-          <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
-          <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
-            <Icon name="gear" size={18} />
-          </button>
-        </span>
-      </footer>
+      {phone ? phoneFooter && createPortal(footerEl, phoneFooter) : footerEl}
 
       {settingsAt && (
         <Suspense fallback={<div className="settings" aria-busy="true" />}>

@@ -58,13 +58,15 @@ interface Props {
   openIsCard: boolean;
   showMenu(label: string, x: number, y: number, items: MenuItem[], opener: HTMLElement): void;
   expanded: boolean;
+  /** On a phone, the name opens one sheet for the Item and the modes, built by the app. */
+  onPhone?: (opener: HTMLElement) => void;
 }
 
 /**
  * The open Item's name in the top bar, which is also the switch between Cook, Prep and Plan:
  * the picture before the name is the mode that is on, and a click lists all three.
  */
-export function ModeSwitch({ title, openIsCard, showMenu, expanded }: Props) {
+export function ModeSwitch({ title, openIsCard, showMenu, expanded, onPhone }: Props) {
   const mode = useStore(modeStore);
   const side = sideOf(openIsCard);
   const name = MODES.find((m) => m.id === mode)!.name;
@@ -76,6 +78,7 @@ export function ModeSwitch({ title, openIsCard, showMenu, expanded }: Props) {
       aria-label={`${name} mode${title ? `, ${title}` : ''}. Change mode`}
       title={`${name}: ${MODES.find((m) => m.id === mode)!.hint[side].toLowerCase()}`}
       onClick={(e) => {
+        if (onPhone) return onPhone(e.currentTarget);
         const box = e.currentTarget.getBoundingClientRect();
         showMenu('Mode', box.left, box.bottom + 4, modeItems(side), e.currentTarget);
       }}

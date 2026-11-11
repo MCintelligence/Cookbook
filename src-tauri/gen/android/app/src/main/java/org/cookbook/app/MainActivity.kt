@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.view.HapticFeedbackConstants
+import android.os.Build
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -30,6 +32,8 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : TauriActivity() {
   /** Kept while Android lays a document out for printing, which it does after the call returns. */
   private var printing: WebView? = null
+  /** The page, for haptics: feedback played on the view follows the phone's own touch-vibration setting. */
+  private var web: WebView? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -52,6 +56,14 @@ class MainActivity : TauriActivity() {
     super.onWebViewCreate(webView)
     // The page scrolls its own parts; the view around it never rubber-bands or shows a scrollbar.
     webView.overScrollMode = View.OVER_SCROLL_NEVER
+    // The app never zooms as a whole: a pinch belongs to the boards and the atlas, which zoom
+    // themselves, and a double tap is a tap. Text keeps the size Android's font setting asks for.
+    webView.settings.setSupportZoom(false)
+    webView.settings.builtInZoomControls = false
+    webView.settings.displayZoomControls = false
+    webView.settings.useWideViewPort = true
+    webView.settings.loadWithOverviewMode = false
+    web = webView
     webView.isVerticalScrollBarEnabled = false
     webView.isHorizontalScrollBarEnabled = false
     webView.addJavascriptInterface(Bridge(), "CookbookAndroid")
@@ -72,6 +84,19 @@ class MainActivity : TauriActivity() {
         controller.isAppearanceLightStatusBars = lightBackground
         controller.isAppearanceLightNavigationBars = lightBackground
       }
+    }
+
+    /** A tap felt in the hand: lift (a long press picks something up), tick, drop or reject. */
+    @JavascriptInterface
+    fun haptic(kind: String) {
+      val constant = when (kind) {
+        "lift" -> HapticFeedbackConstants.LONG_PRESS
+        "tick" -> if (Build.VERSION.SDK_INT >= 27) HapticFeedbackConstants.TEXT_HANDLE_MOVE else HapticFeedbackConstants.CLOCK_TICK
+        "drop" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
+        "reject" -> if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+        else -> HapticFeedbackConstants.VIRTUAL_KEY
+      }
+      runOnUiThread { web?.performHapticFeedback(constant) }
     }
 
     /** Back with nothing left to close: step aside to the home screen, and be as it was on return. */

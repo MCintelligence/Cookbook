@@ -1,5 +1,12 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { haptic } from '../mobile';
 import { BOARD_ZOOM } from './boardZoom';
+
+/** How much the interface size (and a phone's larger interface) scales `el`: screen pixels per CSS pixel. */
+export function scaleOf(el: Element | null): number {
+  if (!el || !(el instanceof HTMLElement)) return 1;
+  return el.getBoundingClientRect().width / Math.max(1, el.offsetWidth) || 1;
+}
 
 /** Where an endless board is looking: the board's point at the window's top left corner, and how close in. */
 export interface Look {
@@ -48,6 +55,9 @@ function zoomAround(look: Look, k: number, px: number, py: number): Look {
  * surface moves it, the wheel scrolls it, and Ctrl or ⌘ with the wheel (or a pinch) zooms on the pointer.
  * A wheel notch, ⌘= and the − and + buttons move one 10% step; a pinch follows the fingers
  * and then settles on the nearest step. Every change of zoom glides rather than jumps.
+ *
+ * On a touch screen one finger on the bare surface moves it and two fingers, wherever they
+ * land, pinch and move it together; `pinching` tells the cards to let go while they do.
  */
 export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   const [look, setLook] = useState<Look>(start);
@@ -65,6 +75,8 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   const goal = useRef({ k: start.k, px: 0, py: 0 });
   const [zoom, setZoom] = useState(start.k);
   const glide = useRef<{ from: Look; t0: number; frame: number } | null>(null);
+  /** True while two fingers are on the board: a card a finger is resting on stays where it is. */
+  const pinching = useRef(false);
 
   const stopGlide = () => {
     if (glide.current) cancelAnimationFrame(glide.current.frame);
@@ -151,11 +163,63 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
       const dir = (e as CustomEvent<number>).detail;
       glideTo(dir === 0 ? 1 : stepZoom(goal.current.k, dir > 0 ? 1 : -1), node.clientWidth / 2, node.clientHeight / 2);
     };
+    // Fingers on the board, wherever they landed (on the surface or on a card), for the pinch.
+    const fingers = new Map<number, [number, number]>();
+    let pinch: { d: number; mx: number; my: number; look: Look; scale: number } | null = null;
+    const spread = () => {
+      const [a, b] = [...fingers.values()];
+      return { d: Math.hypot(a![0] - b![0], a![1] - b![1]), mx: (a![0] + b![0]) / 2, my: (a![1] + b![1]) / 2 };
+    };
+    const onFingerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      fingers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (fingers.size === 2) {
+        stopGlide();
+        window.clearTimeout(settle);
+        pinching.current = true;
+        const box = node.getBoundingClientRect();
+        const scale = scaleOf(node);
+        const { d, mx, my } = spread();
+        pinch = { d: Math.max(1, d), mx: (mx - box.left) / scale, my: (my - box.top) / scale, look: now.current, scale };
+      }
+    };
+    const onFingerMove = (e: PointerEvent) => {
+      if (!fingers.has(e.pointerId)) return;
+      fingers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (!pinch || fingers.size < 2) return;
+      const box = node.getBoundingClientRect();
+      const { d, mx, my } = spread();
+      const px = (mx - box.left) / pinch.scale;
+      const py = (my - box.top) / pinch.scale;
+      // Zoom around where the fingers started, then carry the board along as they move together.
+      const k = clamp(pinch.look.k * (d / pinch.d));
+      const zoomed = zoomAround(pinch.look, k, pinch.mx, pinch.my);
+      goal.current = { k, px, py };
+      setZoom(k);
+      put({ k, x: zoomed.x - (px - pinch.mx) / k, y: zoomed.y - (py - pinch.my) / k });
+    };
+    const onFingerUp = (e: PointerEvent) => {
+      if (!fingers.delete(e.pointerId)) return;
+      if (pinch && fingers.size < 2) {
+        const { px, py } = goal.current;
+        pinch = null;
+        glideTo(snapZoom(now.current.k), px, py);
+      }
+      if (fingers.size === 0) pinching.current = false;
+    };
+    node.addEventListener('pointerdown', onFingerDown, true);
+    window.addEventListener('pointermove', onFingerMove, true);
+    window.addEventListener('pointerup', onFingerUp, true);
+    window.addEventListener('pointercancel', onFingerUp, true);
     node.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener(BOARD_ZOOM, onKeys);
     return () => {
       watch.disconnect();
       window.clearTimeout(settle);
+      node.removeEventListener('pointerdown', onFingerDown, true);
+      window.removeEventListener('pointermove', onFingerMove, true);
+      window.removeEventListener('pointerup', onFingerUp, true);
+      window.removeEventListener('pointercancel', onFingerUp, true);
       node.removeEventListener('wheel', onWheel);
       window.removeEventListener(BOARD_ZOOM, onKeys);
     };
@@ -166,12 +230,30 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   /** For the surface itself: a drag that starts on it, not on something lying on it, moves the view. */
   const onPointerDown = (e: ReactPointerEvent<HTMLElement>) => {
     if (e.button !== 0 || e.target !== e.currentTarget) return;
-    const from = { px: e.clientX, py: e.clientY, ...now.current };
-    const el = e.currentTarget;
-    el.setPointerCapture(e.pointerId);
+    panFrom(e.nativeEvent, e.currentTarget);
+  };
+
+  /** Moves the board with a pointer from where it went down, until it comes up; a second finger hands over to the pinch. */
+  const panFrom = (e: PointerEvent, el: HTMLElement) => {
+    // Step by step from the last point, so a pinch in the middle of a pan doesn't make the board jump.
+    let last = [e.clientX, e.clientY];
+    const scale = scaleOf(el);
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone.
+    }
     el.classList.add('panning');
-    const move = (m: PointerEvent) => put({ k: now.current.k, x: from.x - (m.clientX - from.px) / from.k, y: from.y - (m.clientY - from.py) / from.k });
-    const up = () => {
+    const move = (m: PointerEvent) => {
+      if (m.pointerId !== e.pointerId) return;
+      const [lx, ly] = last;
+      last = [m.clientX, m.clientY];
+      if (pinching.current) return;
+      const { x, y, k } = now.current;
+      put({ k, x: x - (m.clientX - lx!) / scale / k, y: y - (m.clientY - ly!) / scale / k });
+    };
+    const up = (u: PointerEvent) => {
+      if (u.pointerId !== e.pointerId) return;
       el.classList.remove('panning');
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
@@ -197,7 +279,14 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
     if (box && size[0] > 0) jump(lookAt(box, size[0], size[1]));
   };
 
-  return { look, setLook, size, ref, onPointerDown, toBoard, zoom, zoomStep, fit };
+  /** Moves the board by this many screen pixels, as when a dragged card nears an edge. */
+  const nudge = (dx: number, dy: number) => {
+    const { x, y, k } = now.current;
+    const scale = scaleOf(node);
+    put({ k, x: x + dx / scale / k, y: y + dy / scale / k });
+  };
+
+  return { look, setLook, size, ref, onPointerDown, panFrom, pinching, nudge, toBoard, zoom, zoomStep, fit, node };
 }
 
 /** Follows a drag from a press until the button comes up, wherever the pointer goes. */
@@ -220,4 +309,113 @@ export function dragFrom(e: ReactPointerEvent<Element>, onMove: (dx: number, dy:
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up);
+}
+
+/** How long a finger rests on a card before it lifts, as on the Shelf. */
+const LIFT_MS = 300;
+/** How far a finger can wander before it counts as a move, in screen pixels. */
+const SLOP = 8;
+/** How close to an edge a carried card makes the board move along, in screen pixels. */
+const EDGE = 48;
+
+interface Carry {
+  /** The card is lifted (true) or set down (false): it grows and casts a deeper shadow while held. */
+  onLift(lifted: boolean): void;
+  /** Where the card is while carried, on the board, or null when it goes back. */
+  onMove(spot: [number, number] | null): void;
+  onDrop(spot: [number, number]): void;
+  /** Held and let go without moving: the card's menu, at the finger. */
+  onMenu(x: number, y: number): void;
+  onTap(): void;
+}
+
+/**
+ * A finger on a card lying on an endless board (a free board, the atlas), the way a phone's home
+ * screen handles icons: moving at once moves the board under it; resting LIFT_MS lifts the card,
+ * with a tap felt in the hand, to be carried (the board moves along when it nears an edge) and
+ * set down with another; held and let go without moving opens its menu; a quick tap is a tap.
+ * A second finger turns the whole thing into a pinch and the card stays where it was.
+ */
+export function carryByTouch(e: ReactPointerEvent<HTMLElement>, pan: ReturnType<typeof usePanZoom>, from: [number, number], on: Carry): void {
+  const board = pan.node;
+  if (!board) return;
+  const id = e.pointerId;
+  const [x0, y0] = [e.clientX, e.clientY];
+  let state: 'press' | 'lift' | 'carry' | 'done' = 'press';
+  let at: [number, number] = [from[0], from[1]];
+  let last: [number, number] = [x0, y0];
+  let edge = 0;
+  const per = () => scaleOf(board) * pan.look.k;
+
+  const finish = () => {
+    window.clearTimeout(timer);
+    cancelAnimationFrame(edge);
+    window.removeEventListener('pointermove', move, true);
+    window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', cancel, true);
+    on.onLift(false);
+  };
+  const timer = window.setTimeout(() => {
+    if (state !== 'press' || pan.pinching.current) return;
+    state = 'lift';
+    haptic('lift');
+    on.onLift(true);
+  }, LIFT_MS);
+  const follow = () => {
+    const box = board.getBoundingClientRect();
+    const dx = last[0] < box.left + EDGE ? -1 : last[0] > box.right - EDGE ? 1 : 0;
+    const dy = last[1] < box.top + EDGE ? -1 : last[1] > box.bottom - EDGE ? 1 : 0;
+    if (dx || dy) {
+      pan.nudge(dx * 10, dy * 10);
+      const s = per();
+      at = [at[0] + (dx * 10) / s, at[1] + (dy * 10) / s];
+      on.onMove([Math.round(at[0]), Math.round(at[1])]);
+    }
+    edge = requestAnimationFrame(follow);
+  };
+  const move = (m: PointerEvent) => {
+    if (m.pointerId !== id) return;
+    if (pan.pinching.current) {
+      state = 'done';
+      finish();
+      return on.onMove(null);
+    }
+    const far = Math.hypot(m.clientX - x0, m.clientY - y0) >= SLOP;
+    if (state === 'press' && far) {
+      state = 'done';
+      finish();
+      // The board catches up with the finger, slop and all, then follows it.
+      pan.nudge(x0 - m.clientX, y0 - m.clientY);
+      return pan.panFrom(m, board);
+    }
+    if (state === 'lift' && far) {
+      state = 'carry';
+      edge = requestAnimationFrame(follow);
+    }
+    if (state !== 'carry') return;
+    const s = per();
+    at = [at[0] + (m.clientX - last[0]) / s, at[1] + (m.clientY - last[1]) / s];
+    last = [m.clientX, m.clientY];
+    on.onMove([Math.round(at[0]), Math.round(at[1])]);
+  };
+  const up = (u: PointerEvent) => {
+    if (u.pointerId !== id) return;
+    const was = state;
+    state = 'done';
+    finish();
+    if (was === 'carry') {
+      haptic('drop');
+      on.onDrop([Math.round(at[0]), Math.round(at[1])]);
+    } else if (was === 'lift') on.onMenu(u.clientX, u.clientY);
+    else if (was === 'press') on.onTap();
+  };
+  const cancel = (c: PointerEvent) => {
+    if (c.pointerId !== id) return;
+    state = 'done';
+    finish();
+    on.onMove(null);
+  };
+  window.addEventListener('pointermove', move, true);
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', cancel, true);
 }

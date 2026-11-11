@@ -248,8 +248,11 @@ Click the recipe's title in the top bar for Your recipes…, to start a new one 
 
 The Android app is the same Cookbook, from the same code, arranged for a phone (`src/mobile.ts`, `src/phone.css`, `src-tauri/gen/android`). It needs Android 7 or newer.
 
-- **Menus** are under the ⋮ button and rise from the bottom of the screen; a press and hold opens what a right-click does on a computer.
+- **No menu bar.** The top bar holds the Shelf, the open Item's name (tap it for everything about the Item, and Cook, Prep or Plan), Search, the Pantry and Seasonings. The recipe's own actions (Your Recipes, exports, backups, Trash, Goals) are under its name at the head of the Shelf, with Settings and the Manual at the end. Menus rise from the bottom of the screen.
+- **New things** come from a round + button in the corner of the Shelf and the Pantry; panels have no toolbars.
+- **Sized for fingers.** The whole interface is drawn larger (Settings › Interface size steps it further), rows are about 50px tall, and the page's words are larger too.
 - **The writing bar** rides on top of the keyboard while you type: undo, redo, bold, italic, underline, the paragraph's style, inserts, and Aa for fonts and spacing.
+- **Boards and the Atlas**: one finger moves the board, two pinch it. Press and hold a card to lift it (with a tap felt in the hand), carry it, and let go to put it down; near an edge the board moves along.
 - **A long press in the page** is left to Android: it picks the word and shows the system's own Cut, Copy and Paste.
 - **Back** closes whatever is open (a menu, the Shelf, the Pantry, Settings) and only then leaves the app. Words are saved as you type and again whenever the app is put away, when an automatic backup is taken too.
 - **Recipes live in the app's own storage**, since Android gives apps single files rather than folders to work in. They leave as exports (Word, EPUB, Markdown, PDF through Android's print screen) and as zip backups, each saved wherever the system's file picker reaches, including Drive. A Scrivener project is imported as a zip.

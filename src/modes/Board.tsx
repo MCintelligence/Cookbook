@@ -1,5 +1,5 @@
-import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
-import { menuPress } from '../mobile';
+import { type CSSProperties, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, useMemo, useState } from 'react';
+import { fromTouch, menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF, PANTRY_SECTIONS, childrenOf } from '../storage/book';
@@ -12,7 +12,7 @@ import { type Form, type ModeHost, type ViewProps } from './host';
 import { type Group, type Item, boardRows, dropPlace, labelColor, pantryGroups, readingOrder, rowOf, shelfGroups } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
 import { Face, Pick, Seg, Synopsis, Tally, ToolButton, Zoomer, cardMenu, itemMenu, shortWhen } from './shared';
-import { dragFrom, usePanZoom } from './usePanZoom';
+import { carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
 const DRAG = 'application/x-cookbook-item';
 /** A card on a free board, and the room each takes when they are laid out in rows. */
@@ -147,7 +147,7 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
               // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten.
               const [w, h] = pan.size;
               if (x + CARD.w < pan.look.x - 80 || y + CARD.h * 2 < pan.look.y - 80 || x > pan.look.x + w / pan.look.k + 80 || y > pan.look.y + h / pan.look.k + 80) return null;
-              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} k={pan.look.k} onPut={(spot) => put(item.card.id, spot)} />;
+              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} k={pan.look.k} pan={pan} onPut={(spot) => put(item.card.id, spot)} />;
             })}
           </div>
           {total === 0 && <p className="mode-empty">{pantry ? `The Pantry is empty. ${menuPress()} here for a new Character, Setting or Material.` : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
@@ -198,22 +198,46 @@ function CardFace({ host, item, pantry, ties }: CardProps) {
 
 const cardStyle = (item: Item): CSSProperties => ({ '--label': labelColor(item.card.label) ?? 'transparent' }) as CSSProperties;
 
-function FreeCard(props: CardProps & { x: number; y: number; k: number; onPut(spot: Spot): void }) {
-  const { host, item, x, y, k, onPut } = props;
+type Pan = ReturnType<typeof usePanZoom>;
+
+/**
+ * A card on the free board. With a mouse it drags at once and a double-click opens it. With a
+ * finger it works as cards do on a phone's home screen (see carryByTouch): a quick drag moves the
+ * board, a press and hold lifts the card with a tap in the hand, and a tap picks it, or opens it
+ * when it is already picked.
+ */
+function FreeCard(props: CardProps & { x: number; y: number; k: number; pan: Pan; onPut(spot: Spot): void }) {
+  const { host, item, x, y, k, pan, onPut } = props;
   const [moved, setMoved] = useState<Spot | null>(null);
+  const [lifted, setLifted] = useState(false);
   const [px, py] = moved ?? [x, y];
+  const chosen = item.path === host.path;
+
+  const byTouch = (e: ReactPointerEvent<HTMLElement>) =>
+    carryByTouch(e, pan, [x, y], {
+      onLift: setLifted,
+      onMove: setMoved,
+      onDrop: (spot) => (setMoved(null), onPut(spot)),
+      onMenu: (cx, cy) => host.menu('Item', cx, cy, menuOf(props)),
+      onTap: () => (chosen ? host.open(item.path) : host.select(item.path)),
+    });
+
   return (
     <article
-      className={`prep-card free${item.path === host.path ? ' chosen' : ''}${moved ? ' lifted' : ''}`}
+      className={`prep-card free${chosen ? ' chosen' : ''}${moved ? ' lifted' : ''}${lifted ? ' held' : ''}`}
       style={{ ...cardStyle(item), left: px, top: py, width: CARD.w }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
+        // The synopsis is written in place; a finger there types rather than carries.
+        if ((e.target as Element).closest('textarea, input, [contenteditable="true"]')) return;
+        if (e.pointerType === 'touch') return byTouch(e);
+        const scale = scaleOf(e.currentTarget.closest('.free-board')) * k;
         dragFrom(
           e,
-          (dx, dy) => setMoved([Math.round(x + dx / k), Math.round(y + dy / k)]),
+          (dx, dy) => setMoved([Math.round(x + dx / scale), Math.round(y + dy / scale)]),
           (did, up) => {
             setMoved(null);
-            if (did) onPut([Math.round(x + (up.clientX - e.clientX) / k), Math.round(y + (up.clientY - e.clientY) / k)]);
+            if (did) onPut([Math.round(x + (up.clientX - e.clientX) / scale), Math.round(y + (up.clientY - e.clientY) / scale)]);
             else if (item.path !== host.path) host.select(item.path);
           },
         );
@@ -221,6 +245,8 @@ function FreeCard(props: CardProps & { x: number; y: number; k: number; onPut(sp
       onDoubleClick={() => host.open(item.path)}
       onContextMenu={(e) => {
         e.preventDefault();
+        // A finger's long press is handled above: it lifts the card, and opens the menu only if the card isn't carried.
+        if (fromTouch(e)) return;
         host.menu('Item', e.clientX, e.clientY, menuOf(props));
       }}
     >

@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { haptic } from '../mobile';
 import { type Editor } from '@tiptap/react';
 import { type TreeNode } from '../storage/book';
 import { LABELS, STATUSES, isCard } from '../storage/document';
@@ -293,7 +294,7 @@ export const Tree = memo(function Tree(props: Props) {
     const start = (x: number, y: number) => {
       active = true;
       setDrag({ path: node.path, label, x, y });
-      navigator.vibrate?.(10);
+      haptic('lift');
     };
     const timer = touch ? window.setTimeout(() => start(x0, y0), LONG_PRESS_MS) : undefined;
 

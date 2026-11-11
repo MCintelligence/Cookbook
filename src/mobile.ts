@@ -37,6 +37,7 @@ interface AndroidBridge {
   setBars?: (colour: string, lightBackground: boolean) => void;
   leave?: () => void;
   print?: (html: string, title: string) => void;
+  haptic?: (kind: string) => void;
 }
 const bridge = (): AndroidBridge | undefined => (typeof window === 'undefined' ? undefined : (window as unknown as { CookbookAndroid?: AndroidBridge }).CookbookAndroid);
 
@@ -48,6 +49,23 @@ export function setSystemBars(rgb: [number, number, number]): void {
     bridge()?.setBars?.(hex, light);
   } catch {
     // An older shell without the bridge keeps the theme's own colours.
+  }
+}
+
+/**
+ * A tap felt in the hand, the way Android's own apps give one: `lift` when a long press picks
+ * something up, `tick` as a dragged thing crosses into a new place, `drop` when it is let go,
+ * `reject` when it can't go there. The Android app uses the system's haptics, which follow the
+ * phone's own vibration settings; a phone's browser falls back to a short buzz.
+ */
+export type Haptic = 'lift' | 'tick' | 'drop' | 'reject';
+export function haptic(kind: Haptic): void {
+  try {
+    const native = bridge()?.haptic;
+    if (native) return native(kind);
+    navigator.vibrate?.(kind === 'tick' ? 6 : kind === 'reject' ? [12, 40, 12] : 14);
+  } catch {
+    // No vibration motor, or vibration blocked: the drag works the same without it.
   }
 }
 

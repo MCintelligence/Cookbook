@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { type Entry, type StorageAdapter, joinPath } from './adapter';
-import { BOOKSHELF, HIDDEN_FOLDER, PANTRY, type BookInfo, createBook, fileNameFor, saveBookInfo, writeDocument } from './book';
+import { BOOKSHELF, FILES, HIDDEN_FOLDER, PANTRY, RESEARCH, type BookInfo, createBook, fileNameFor, saveBookInfo, writeDocument } from './book';
 import { type DocumentKind, LABELS, type SceneStatus, newId } from './document';
 import { type Order, freeName, saveOrder } from './order';
 import { PICTURES, type PantrySection, SECTION_KIND } from './pantry';
@@ -14,7 +14,7 @@ import { BODY_STYLE, HEADING_STYLES, type NodeJSON, serializeMarkdown } from '..
  *   The Draft (Manuscript)       → the Shelf: folders become Groups, documents Items, in Binder order
  *   a top-level Characters folder → the Pantry's Characters
  *   a Places, Locations or Settings folder → the Pantry's Settings
- *   Research and every other top-level folder → the Pantry's Materials
+ *   Research and every other top-level folder → Research, as it was in the Binder
  *   the Trash                     → left behind
  *
  * A Scrivener document can hold text and have documents inside it; Cookbook's
@@ -24,11 +24,12 @@ import { BODY_STYLE, HEADING_STYLES, type NodeJSON, serializeMarkdown } from '..
  *
  *   comments and inline annotations → notes to self on the words they were on
  *   linked and inline footnotes     → footnotes
- *   the Inspector's document notes  → the end of a Pantry card; a Shelf Item's or a
- *                                     folder's go to Materials › Notes from Scrivener
+ *   the Inspector's document notes  → the end of a Pantry card or a Research Item; a Shelf
+ *                                     Item's or a folder's go to Materials › Notes from Scrivener
  *   snapshots                       → the Item's snapshots
- *   pictures                        → pictures/, shown on a Materials card or as a card's portrait
- *   PDFs, web pages and other files → files/, on a Materials card that names them
+ *   a picture in Characters or Places → pictures/, as the card's portrait
+ *   every other picture, PDF, web page, sound, film or file → files/, shown by an Item in
+ *                                     Research (one in the Draft goes to the top of Research)
  *
  * Keywords, custom metadata, collections and project notes are left behind.
  * Scrivener 3 projects (Files/Data/<UUID>/content.rtf) and Scrivener 2 projects
@@ -222,8 +223,10 @@ export interface ScrivenerImport {
   cards: number;
   /** Notes to self made from Scrivener's comments and annotations. */
   notes: number;
-  /** PDFs, pictures and other files brought in, each as a Materials card. */
+  /** PDFs, pictures and other files brought in, each shown by an Item in Research or as a portrait. */
   files: number;
+  /** Items in Research: notes and the files above. */
+  research: number;
   /** Snapshots brought in with their Items. */
   snapshots: number;
   /** Titles of PDFs, pictures and other files whose file wasn't in the project. */
@@ -232,8 +235,6 @@ export interface ScrivenerImport {
   first: string | null;
 }
 
-/** Where a PDF, film or other file Cookbook can't show is kept in the Recipe, beside pictures/. */
-export const FILES_FOLDER = 'files';
 /** The Materials Group for document notes that have no page to sit on. */
 export const NOTES_GROUP = 'Notes from Scrivener';
 
@@ -345,7 +346,8 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
   const info = await createBook(fs, name);
   const order: Order = {};
   const skipped: string[] = [];
-  const count = { items: 0, cards: 0, notes: 0, files: 0, snapshots: 0 };
+  const count = { items: 0, cards: 0, notes: 0, files: 0, snapshots: 0, research: 0 };
+  const inResearch = (folder: string) => folder === RESEARCH || folder.startsWith(RESEARCH + '/');
   let first: string | null = null;
   /** Document notes with no page to sit on, written as Materials at the end. */
   const loose: { title: string; text: string }[] = [];
@@ -435,9 +437,9 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
     const content = page.content.map((n) => ({ ...n, ...(n.content && { content: [...n.content] }) }));
     const notes = { ...page.notes };
     if (page.docNotes) {
-      // The Inspector's notes end a Pantry card, under a heading if the card has words of its own.
+      // The Inspector's notes end a Pantry card or a Research Item, under a heading if it has words of its own.
       // A Shelf Item's would be printed with the book, so they go to Materials › Notes from Scrivener instead.
-      if (kind === 'scene') loose.push({ title: b.title, text: page.docNotes });
+      if (kind === 'scene' && !inResearch(into)) loose.push({ title: b.title, text: page.docNotes });
       else {
         if (content.length > 0) content.push({ type: 'paragraph', attrs: { style: HEADING_STYLES[2] }, content: [textNode('Notes')] });
         content.push(...paragraphsOf(page.docNotes));
@@ -448,13 +450,14 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
       ...(b.status && b.status !== 'not-started' && { status: b.status }),
       ...(page.synopsis && { synopsis: page.synopsis }),
       ...(b.label && { label: b.label }),
-      ...(kind === 'scene' && !b.included && { export: false }),
+      ...(kind === 'scene' && !b.included && !inResearch(into) && { export: false }),
       ...extra,
       ...(Object.keys(notes).length > 0 && { notes }),
     };
     const id = newId();
     await writeDocument(fs, path, { id, title: b.title, kind, fields, body: serializeMarkdown({ type: 'doc', content }) });
-    if (kind === 'scene') {
+    if (kind === 'scene' && inResearch(into)) count.research++;
+    else if (kind === 'scene') {
       count.items++;
       first ??= path;
     } else count.cards++;
@@ -472,43 +475,30 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
     return { path: joinPath(dataFolder(b), pick.name), ext: pick.name.slice(pick.name.lastIndexOf('.') + 1).toLowerCase() };
   };
 
-  /** A PDF, picture or web page becomes a card: a picture shown on it, anything else kept in files/ and named on it. */
+  /**
+   * A PDF, picture, web page or other file is kept in files/ and shown by an Item in Research, with
+   * its synopsis, label and notes. Only a picture in Characters or Places becomes a card's portrait.
+   */
   const writeFile = async (into: string, b: BinderItem, kind: DocumentKind): Promise<boolean> => {
     const found = await fileOf(b);
     const bytes = found ? await read(found.path) : null;
     const page = await pageOf(b);
+    const portrait = (kind === 'character' || kind === 'setting') && !!found && SHOWN.has(found.ext);
+    const where = portrait || inResearch(into) ? into : RESEARCH;
+    const as = portrait ? kind : 'scene';
+    if (where === RESEARCH) await fs.makeFolder(RESEARCH);
     if (!found || !bytes) {
       skipped.push(b.title);
       // Its synopsis and notes are still worth keeping.
-      if (page.synopsis || page.docNotes) await writeItem(into, b, kind, { ...page, content: [] });
+      if (page.synopsis || page.docNotes) await writeItem(where, b, as, { ...page, content: [] });
       return false;
     }
-    const what = fileKind(found.ext);
-    const shown = SHOWN.has(found.ext);
-    const keepIn = shown ? PICTURES : FILES_FOLDER;
+    const keepIn = portrait ? PICTURES : FILES;
     await fs.makeFolder(keepIn);
     const kept = joinPath(keepIn, await freeName(fs, keepIn, `${fileNameFor(b.title)}.${found.ext}`, `.${found.ext}`));
     await fs.writeBytes(kept, bytes);
     count.files++;
-    const content: NodeJSON[] = [];
-    let extra: Record<string, unknown> = {};
-    if (shown && kind !== 'research') extra = { portrait: kept };
-    else if (shown) content.push(para({ type: 'image', attrs: { src: kept, alt: b.title } }));
-    else {
-      content.push(para({ type: 'text', text: `A ${what} brought from Scrivener, kept with this recipe as `, marks: [{ type: 'italic' }] }, { type: 'text', text: kept, marks: [{ type: 'code' }] }, { type: 'text', text: '.', marks: [{ type: 'italic' }] }));
-      if (found.ext === 'webarchive') {
-        // A web archive is a binary file, but the address it was saved from is in it as plain text.
-        const address = /https?:\/\/[^\s"<>\u0000-\u001f]+/.exec(decodeRtf(bytes.subarray(0, 4096)))?.[0];
-        if (address) content.push(para(textNode('Saved from '), { type: 'text', text: address, marks: [{ type: 'link', attrs: { href: address } }] }));
-      }
-      if (/^html?$/.test(found.ext)) {
-        const html = new DOMParser().parseFromString(strFromU8(bytes), 'text/html');
-        html.querySelectorAll('script, style, noscript').forEach((el) => el.remove());
-        const blocks = Array.from(html.body?.querySelectorAll('h1, h2, h3, h4, p, li, blockquote') ?? []).map((el) => el.textContent?.replace(/\s+/g, ' ').trim() ?? '');
-        content.push(...(blocks.length > 0 ? blocks : [html.body?.textContent ?? '']).flatMap(paragraphsOf));
-      }
-    }
-    await writeItem(into, b, kind, { ...page, content: [...content, ...page.content] }, extra);
+    await writeItem(where, b, as, page, portrait ? { portrait: kept } : { file: kept });
     return true;
   };
 
@@ -516,15 +506,15 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
     for (const b of list) {
       const children = b.children.filter((c) => c.type !== 'TrashFolder');
       if (!isTextual(b)) {
-        // A file in the Draft is kept in Materials: Shelf Items are the book's own text.
-        const where = kind === 'scene' ? joinPath(PANTRY, 'research') : into;
-        const as = kind === 'scene' ? 'research' : kind;
-        if (children.length === 0) await writeFile(where, b, as);
+        // A file in the Draft is kept in Research: Shelf Items are the book's own text.
+        const where = kind === 'scene' && !inResearch(into) ? RESEARCH : into;
+        await fs.makeFolder(where);
+        if (children.length === 0) await writeFile(where, b, kind);
         else {
           const group = joinPath(where, unique(where, fileNameFor(b.title)));
           await fs.makeFolder(group);
-          await writeFile(group, b, as);
-          await place(group, children, as);
+          await writeFile(group, b, kind);
+          await place(group, children, kind);
         }
         continue;
       }
@@ -552,14 +542,20 @@ export async function importScrivener(source: ScrivenerSource, fs: StorageAdapte
       continue;
     }
     const section = top.type === 'ResearchFolder' ? 'research' : sectionFor(top);
-    const into = joinPath(PANTRY, section);
-    // Research, Characters and Places become the Pantry section itself; any other top-level folder is a Group in Materials.
+    // Characters and Places become the Pantry's sections. The Research folder becomes Research
+    // itself, and any other top-level folder a Group in it, as Scrivener keeps them all beside the Draft.
+    const into = section === 'research' ? RESEARCH : joinPath(PANTRY, section);
+    const kind = section === 'research' ? 'scene' : SECTION_KIND[section];
     if (isTextual(top) && (top.type === 'ResearchFolder' || section !== 'research' || /^research$/i.test(top.title))) {
+      if (into === RESEARCH) await fs.makeFolder(RESEARCH);
       const page = await pageOf(top);
-      if (hasWords(page)) await writeItem(into, top, SECTION_KIND[section], page);
+      if (hasWords(page)) await writeItem(into, top, kind, page);
       else if (page.docNotes) loose.push({ title: top.title, text: page.docNotes });
-      await place(into, top.children, SECTION_KIND[section]);
-    } else await place(into, [top], SECTION_KIND[section]);
+      await place(into, top.children, kind);
+    } else {
+      if (into === RESEARCH) await fs.makeFolder(RESEARCH);
+      await place(into, [top], kind);
+    }
   }
 
   // Document notes with no page of their own, such as a folder's, are kept together in Materials.

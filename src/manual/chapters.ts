@@ -83,11 +83,24 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
-- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, Move to Archive, and Move to trash.
+- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, Move to Research, Move to Archive, and Move to trash.
 
 Each Item has a **status**, Not started, Simmering or Done, shown as a dot on the Shelf and in the bottom bar, never on the page. Hover over a Group to see the words inside it.
 
 Moving never renames a file unless the Group it lands in already has one of the same name.
+
+## Research
+
+**Research**, at the foot of the Shelf, is for everything you gather while writing that isn't the book itself, as in Scrivener: notes, pictures, PDFs, web pages, sound and films. Click its name to open or close it.
+
+- **Add a note** by right-clicking Research and choosing **New note in Research**. Notes are pages like any other, with their own words, label and status.
+- **Bring in files** by dropping them from your computer onto Research, or right-click it and choose **Import files…**. Word, Markdown and text files become notes; anything else is kept as it is.
+- **Look at a file** by clicking it. A picture or PDF shows above a page of your own notes about it, with − and + to zoom. You can select and copy the words of a PDF. A web page shows as it was saved, Safari web archives included, without going online. Sound and films play. **Save a copy…** gives you the file back to open in another app.
+- **Arrange** Research as you like, in Groups of its own. Drag a Shelf Item or Group onto Research to move it there, or drag a note back onto the Shelf. Files stay in Research.
+
+Nothing in Research is exported, counted towards your words, or shown in Prep or Plan, and the Shelf's search leaves it out. The search in the top bar still finds it. A Scrivener project's Research folder comes in here, and so does any other folder Scrivener kept beside the Draft.
+
+Research isn't the Pantry's **Materials**: Materials are cards about the story itself, which can be named on the page and tied to Characters.
 
 ## The Archive
 
@@ -339,12 +352,12 @@ File › **Export** makes a Word document, an EPUB or Markdown of the manuscript
 File › **Import Scrivener project…** turns a whole Scrivener 2 or 3 project into a new recipe. Choose the project’s .scriv folder (or the folder it sits in); a zip of it, such as one of Scrivener’s backups, works through **Import files…** too. Your recipe is backed up first, and the Scrivener project is only read, never changed.
 
 - The **Draft** (Manuscript) goes on the Shelf in Binder order: folders become Groups and documents become Items. A document with documents inside it becomes a Group whose first Item holds its own text.
-- A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Materials. The Trash is left behind.
+- A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Research, in Binder order. The Trash is left behind.
 - Titles, synopses, status, label colours and Include in Compile come with each document, and so do bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks. Fonts and sizes take your recipe’s look.
 - **Comments** and inline annotations are kept on the words they were on, which are highlighted; right-click one to read it. Linked and inline footnotes become footnotes.
-- Each document’s **notes** from the Inspector go at the end of its Pantry card. A Shelf Item’s or folder’s notes become a card in Materials › Notes from Scrivener, so they never print with your book.
+- Each document’s **notes** from the Inspector go at the end of its Pantry card or Research Item. A Shelf Item’s or folder’s notes become a card in Materials › Notes from Scrivener, so they never print with your book.
 - **Snapshots** come with their Items, ready to compare or go back to.
-- **Pictures** go on a Materials card, or become the portrait of a Character or Setting. **PDFs**, web pages and other files are kept with the recipe in its files folder, each with a Materials card that names it. Cookbook can’t open a PDF itself yet.
+- **Pictures**, **PDFs**, web pages, sound, films and other files go to Research, to be looked at there as they were in Scrivener. A picture in Characters or Places becomes that card’s portrait instead.
 - Keywords, custom metadata, collections and project notes stay in Scrivener.`,
   },
   {
@@ -411,6 +424,8 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 | \`dictionary.txt\` | your own words, one a line |
 | \`bookshelf/\` | the Shelf: Items in nested Groups |
 | \`pantry/\` | Characters, Settings and Materials |
+| \`research/\` | Research: notes, and Items that show the files in \`files/\` |
+| \`files/\` | pictures, PDFs, web pages and other files kept in Research |
 | \`archive/\` | Shelf and Pantry Items set aside in the Archive |
 | \`pictures/\` | portraits for Pantry cards |
 | \`drafts/\` | earlier drafts of Items, one folder per Item |

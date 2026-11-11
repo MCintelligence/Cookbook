@@ -4,7 +4,7 @@ import { type CardSummary } from '../storage/index';
 import { boardRows, datedOf, dropPlace, layOut, packRows, pairTies, pantryGroups, readDay, readingOrder, shelfGroups, tiesOf, typedDate } from './model';
 import { DEFAULT_PREFS, readPrefs, sideOf, viewOf } from './prefs';
 
-const card = (id: string, extra: Partial<CardSummary> = {}): CardSummary => ({ id, title: id, kind: 'scene', words: 10, synopsis: '', status: 'not-started', aka: [], portrait: '', label: '', skipExport: false, dates: [], arc: {}, ...extra });
+const card = (id: string, extra: Partial<CardSummary> = {}): CardSummary => ({ id, title: id, kind: 'scene', words: 10, synopsis: '', status: 'not-started', aka: [], portrait: '', label: '', file: '', skipExport: false, dates: [], arc: {}, ...extra });
 const file = (path: string): TreeNode => ({ name: path.split('/').pop()!, path, kind: 'file' });
 const folder = (path: string, children: TreeNode[]): TreeNode => ({ name: path.split('/').pop()!, path, kind: 'folder', children });
 

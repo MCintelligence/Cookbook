@@ -169,6 +169,11 @@ export function relationshipsOf(fields: Record<string, unknown>): Relationship[]
 }
 
 /** Where the card's picture is, relative to the book folder. */
+/** The file a Research Item shows (a picture, PDF, web page…), as a path in the recipe, or null for a page of words. */
+export function fileOf(fields: Record<string, unknown>): string | null {
+  return typeof fields.file === 'string' && fields.file ? fields.file : null;
+}
+
 export function portraitOf(fields: Record<string, unknown>): string | null {
   return typeof fields.portrait === 'string' && fields.portrait ? fields.portrait : null;
 }

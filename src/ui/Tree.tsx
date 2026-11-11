@@ -5,6 +5,8 @@ import { LABELS, STATUSES, isCard } from '../storage/document';
 import { type CardSummary } from '../storage/index';
 import { allPaths, between } from './selection';
 import { StatusIcon } from './StatusIcon';
+import { Icon } from './Icon';
+import { kindName, researchKind } from '../storage/research';
 import { LiveWords } from './LiveCounts';
 import { docWords } from '../editor/docStats';
 import { altMove, pasteMove, placesOf, shownPaths } from './treeKeys';
@@ -470,7 +472,9 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
   };
 
   if (node.kind === 'file') {
-    const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
+    // A Research Item that shows a file has a mark of what kind of file in place of a status.
+    const file = card?.file ? researchKind(card.file) : null;
+    const status = card?.kind === 'scene' && !file ? STATUSES.find((s) => s.id === card.status)! : null;
     const colour = LABELS.find((l) => l.id === card?.label);
     const own = recipes?.get(node.path) ?? [];
     // Newest first, so the latest draft sits right under the Item.
@@ -482,12 +486,14 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
         ) : (
         <button
           {...rowProps}
-          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}${cut === node.path ? ' is-cut' : ''}${tagCards && isCard(card?.kind) ? ' from-pantry' : ''}`}
+          className={`tree-card${marker}${picked}${card?.skipExport ? ' no-export' : ''}${cut === node.path ? ' is-cut' : ''}${tagCards && isCard(card?.kind) ? ' from-pantry' : ''}${file ? ' is-file' : ''}`}
+          title={card?.file ? `${kindName(card.file)}: ${card.file.slice(card.file.lastIndexOf('/') + 1)}` : undefined}
           onClick={(e) => !justDragged.current && !mark(e, node.path) && onSelect(node.path)}
           onDoubleClick={() => !fixed && onStartRename(node.path)}
         >
           <span className="tree-card-top">
             {status && <StatusIcon status={status.id} />}
+            {file && <Icon name={FILE_ICON[file]} size={14} className="tree-file-icon" />}
             {card && isCard(card.kind) && !tagCards && <CardIcon name={label} kind={card.kind} portrait={card.portrait} loadPicture={loadPicture} />}
             <span className="tree-card-title">{label}</span>
             {tagCards && isCard(card?.kind) && <span className="tree-flag tree-from">Pantry</span>}
@@ -654,6 +660,8 @@ function FolderName({ name, onDone }: { name: string; onDone: (title: string | n
     />
   );
 }
+
+const FILE_ICON = { picture: 'picture', pdf: 'page', web: 'web', sound: 'sound', film: 'film', other: 'page' } as const;
 
 /** A Pantry card's portrait, or its initial on a colour picked from its name: round for characters, square for the rest. */
 function CardIcon({ name, kind, portrait, loadPicture }: { name: string; kind: string; portrait: string; loadPicture?: (path: string) => Promise<string> }) {

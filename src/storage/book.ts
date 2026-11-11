@@ -18,6 +18,8 @@ import { isDialect } from '../proofread/english';
  *       characters/
  *       settings/
  *       research/
+ *     research/          Research: notes, and pictures, PDFs, web pages and other files to look at
+ *     files/             the files Research shows, each named by an Item in research/
  *     archive/           Shelf and Pantry Items set aside, in any order
  *     .cookbook/         hidden index, undo history and trash; safe to delete once the trash is empty
  *
@@ -34,6 +36,18 @@ export const PANTRY = 'pantry';
  * time something is archived; Shelf Items and Pantry Items can lie in it in any order.
  */
 export const ARCHIVE = 'archive';
+/**
+ * Research, as in Scrivener: notes of the writer's own and files to look at (pictures, PDFs, web
+ * pages, sound and films) kept beside the book but never part of it. Nothing in it is exported,
+ * counted towards the book's words, or shown in Prep or Plan. Made the first time it is used.
+ * Not the Pantry's Materials (`pantry/research`), which are cards about the story.
+ */
+export const RESEARCH = 'research';
+/** Where Research keeps the files its Items show. Each file is named by an Item's `file` field. */
+export const FILES = 'files';
+/** Folders whose Items are kept beside the book rather than in it: the Archive and Research. */
+export const ASIDE = [ARCHIVE, RESEARCH] as const;
+export const isAside = (path: string): boolean => ASIDE.some((top) => path.startsWith(top + '/'));
 /** Recipes: each one names the page it belongs to, and is listed under that page on the Shelf. */
 export const RECIPES = 'recipes';
 /**

@@ -117,6 +117,7 @@ To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, o
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.
 - **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, Move to Archive, and Move to trash.
+- **Research**, at the foot of the Shelf, holds what you gather that isn't the book: notes, pictures, PDFs and web pages. Drop files onto it to keep them; click one to look at it beside your notes. None of it is exported or counted.
 - **Archive** anything you want to keep but set aside by dragging it onto the Archive at the foot of the Shelf. It leaves Prep and Plan until you put it back.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
 
@@ -411,7 +412,7 @@ Leave an Item out of every export by right-clicking it and unticking **Include i
 
 To bring writing in, File › **Import files** takes Word, Markdown and plain text files and turns them into Items.
 
-Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, and Characters, Places and Research go to the Pantry. Comments stay on the words they were on (right-click to read one), document notes go to the Pantry, snapshots come with their Items, and pictures and PDFs become Materials cards. The Scrivener project itself is never changed.
+Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, Characters and Places go to the Pantry, and Research comes into Research. Comments stay on the words they were on (right-click to read one), document notes come with their cards and Research, snapshots come with their Items, and pictures, PDFs and web pages can be looked at in Research. The Scrivener project itself is never changed.
 `,
         },
       ],

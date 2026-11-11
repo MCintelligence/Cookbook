@@ -67,6 +67,7 @@ import { DeskDropHint } from './ui/DeskDropHint';
 import { docWords } from './editor/docStats';
 import { useBookIndex } from './storage/useBookIndex';
 import { ownerOf, useBackups } from './storage/useBackups';
+import { BOARD_ZOOM } from './modes/boardZoom';
 import { Palette, type PaletteItem } from './ui/Palette';
 import { InsertMenu } from './ui/InsertMenu';
 import { TextSelection } from '@tiptap/pm/state';
@@ -2923,6 +2924,8 @@ export function App() {
       const dir = e.key === '=' || e.key === '+' ? 1 : e.key === '-' ? -1 : null;
       if (dir === null && e.key !== '0') return;
       e.preventDefault();
+      // A free board or the atlas on screen takes the zoom keys for itself.
+      if (!window.dispatchEvent(new CustomEvent(BOARD_ZOOM, { detail: dir ?? 0, cancelable: true }))) return;
       if (dir === null) updateBook({ page: { ...pageOf(book.page), zoom: 100 } });
       else zoomPage.current(dir);
       return;

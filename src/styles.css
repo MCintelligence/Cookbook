@@ -576,6 +576,8 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .cb-prose ul[data-type='taskList'] li[data-checked='true'] > div { color: var(--page-muted); text-decoration: line-through; }
 .cb-prose .cb-find { background: var(--find); border-radius: 2px; }
 .cb-prose .cb-find-current { background: var(--find-current); outline: 1px solid var(--amber-soft); }
+/* While Search has matches, everything but the matched words fades, so you can see how often a word is used. */
+.cb-prose .cb-find-dim { opacity: 0.28; }
 /* Notes, footnotes and dialogue focus on the page */
 .cb-prose { counter-reset: footnote; }
 .cb-prose .cb-note { background: var(--note); border-bottom: 2px solid var(--note-line); }

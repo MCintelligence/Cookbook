@@ -75,7 +75,7 @@ const TOUCH_PAGE: Page = {
   synopsis: 'Getting around with the bar at the bottom, what a right-click is, and carrying Items.',
   body: `# On a phone or tablet
 
-The rest of Learn to Cook was written with a mouse and a keyboard in mind. Everything in it works here too; a few things are simply reached another way.
+The pages after this one are shared with Cookbook on a computer, so they speak of clicks and of menus along the top. Everything in them works here; this page says where each thing is on a phone.
 
 - **The bar along the bottom** is how you get around: the **Shelf**, then this Item as **Cook** (the page), **Prep** (outline and board) and **Plan** (calendar and timeline), then the **Pantry**.
 - **The recipe's name** at the top of the Shelf opens everything about the recipe: Your Recipes, exporting, printing, backing up, Trash, Goals and the Manual. The cog beside it is Settings. Where a page here says "the File menu" or "the Recipe menu", look there.
@@ -93,10 +93,34 @@ The rest of Learn to Cook was written with a mouse and a keyboard in mind. Every
 `,
 };
 
+/** The first page of Learn to Cook as a phone reads it: the same welcome, with the things to try said the way they are done by hand. */
+const TOUCH_WELCOME = `# Welcome to Cookbook
+
+This is **Learn to Cook**, a recipe made for trying things out. Everything in it is yours to change: type anywhere, move things about, break it. Nothing here is precious.
+
+A *Recipe* is one piece of writing: a novel, a story, a thesis. Its **Shelf**, the first place in the bar at the bottom, is where the writing lives, in **Groups** (like folders or chapters) and **Items** (the pages you write on). Each Group on this Shelf shows one part of Cookbook. Read them in order, or jump to the one you need.
+
+Try these as you go:
+
+- [ ] Tap **Shelf** in the bar at the bottom, then the next Item, **On a phone or tablet**.
+- [ ] Tap **Pantry** in the bar and find Mama Lou.
+- [ ] Tap the sprig at the top of this page to open **Seasonings**, and let Salty Sam find a spelling mistake.
+- [ ] Tap this page's name at the top and turn on **Chef Mode** to write without distractions.
+- [ ] On the Shelf, press and hold an Item until you feel it lift, and carry it somewhere else.
+- [ ] Start a recipe of your own: on the Shelf, tap the recipe's name, then **Your Recipes**.
+
+Tick a box by tapping it. Cookbook saves as you type, so there is no Save button to remember.
+
+When you’re finished, delete this recipe like any other. Open a recipe of your own first, then in **Your Recipes** press and hold Learn to Cook and choose **Delete**. You can always have a fresh copy: tap the recipe's name on the Shelf, then **Learn to Cook**.
+`;
+
 /** The Shelf of Learn to Cook. On a touch screen (`touch`) it starts with a page on how the rest translates to fingers. */
 export function shelfOf(k: KeyLabel, touch = false): Group[] {
   const groups = shelfFor(k);
-  if (touch) groups[0]!.items.push(TOUCH_PAGE);
+  if (touch) {
+    groups[0]!.items[0]!.body = TOUCH_WELCOME;
+    groups[0]!.items.push(TOUCH_PAGE);
+  }
   return groups;
 }
 

@@ -7,6 +7,7 @@ import './fonts';
 import './styles.css';
 import './phone.css';
 import { watchBack, watchDevice } from './mobile';
+import { watchTouchDrag } from './touchDrag';
 
 // The theme is on the page before anything is drawn, so a dark theme never flashes light.
 watchLook();
@@ -14,6 +15,7 @@ matchWindowToBars();
 // Phones and tablets: bigger targets, sheets for menus, and a Back button that closes what is open.
 watchDevice();
 watchBack();
+watchTouchDrag();
 
 // The window itself never scrolls (styles.css pins the app to it). If something still scrolls it,
 // such as the caret being kept in view or a hard trackpad scroll, it goes straight back, so the top

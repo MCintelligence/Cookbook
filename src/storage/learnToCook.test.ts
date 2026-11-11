@@ -94,4 +94,11 @@ describe('Learn to Cook', () => {
     const page = await readDocument(fs, 'bookshelf/Start here/On a phone or tablet.md');
     expect(page.body).toContain('press and hold');
   });
+
+  it('on a touch screen, the welcome sends nobody to a menu a phone does not have', () => {
+    const welcome = shelfOf(() => '', true)[0]!.items[0]!.body;
+    expect(welcome).toContain('bar at the bottom');
+    expect(welcome).not.toMatch(/View menu|File ›|Help ›|right-click|[Cc]lick/);
+    expect(shelfOf(mac)[0]!.items[0]!.body).toContain('File › New Recipe');
+  });
 });

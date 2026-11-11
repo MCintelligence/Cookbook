@@ -5,6 +5,7 @@ import { eventsField } from '../storage/document';
 import { MONTHS, WEEKDAYS, type Ymd, dayNumber, daysInMonth, formatDay, fromDayNumber, movedTo, parseDay, sayWhen, weekday } from '../storage/storyDate';
 import { type MenuItem } from '../ui/Menu';
 import { useStore } from '../ui/store';
+import { usePhone } from '../ui/usePhone';
 import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, labelColor, pantryGroups, readDay, shelfGroups } from './model';
 import { prefsStore, setPrefs } from './prefs';
@@ -35,6 +36,8 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
   const start = starts.length > 0 ? fromDayNumber(Math.min(...starts.map((d) => d.first))) : null;
   const at = (prefs.calendar.at && parseDay(`${prefs.calendar.at}-01`)) || start || today();
   const [over, setOver] = useState<number | null>(null);
+  // On a phone the month is a list of its days, one to a row, so a title can be read and a day can be hit (phone.css).
+  const phone = usePhone();
   const go = (y: number, m: number) => {
     const months = y * 12 + (m - 1);
     const year = Math.floor(months / 12);
@@ -132,7 +135,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
           host.menu('Date', e.clientX, e.clientY, datedMenu(host, d, ask));
         }}
       >
-        {!long || day === d.first || weekday(fromDayNumber(day)) === 0 ? d.title : ' '}
+        {phone || !long || day === d.first || weekday(fromDayNumber(day)) === 0 ? d.title : ' '}
       </button>
     );
   };
@@ -141,6 +144,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
     const first = dayNumber({ y, m, d: 1 });
     const lead = weekday({ y, m, d: 1 });
     const cells = Math.ceil((lead + daysInMonth(y, m)) / 7) * 7;
+    const now = dayNumber(today());
     return (
       <div className={`cal-month${small ? ' small' : ''}`} role="grid" aria-label={`${MONTHS[m - 1]} ${y}`}>
         {WEEKDAYS.map((w) => (
@@ -164,7 +168,7 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
               key={n}
               role="gridcell"
               data-day={n}
-              className={`cal-day${inMonth ? '' : ' out'}${over === n ? ' drop-into' : ''}`}
+              className={`cal-day${inMonth ? '' : ' out'}${here.length > 0 ? ' busy' : ''}${n === now ? ' today' : ''}${over === n ? ' drop-into' : ''}`}
               onDragOver={(e) => {
                 if (!e.dataTransfer.types.includes(DRAG)) return;
                 e.preventDefault();
@@ -173,7 +177,10 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
               onDrop={(e) => drop(e, n)}
               onContextMenu={(e) => dayMenu(e, n)}
             >
-              <span className="cal-num">{day.d === 1 ? `${day.d} ${MONTHS[day.m - 1]!.slice(0, 3)}` : day.d}</span>
+              <span className="cal-num">
+                {day.d === 1 && !phone ? `${day.d} ${MONTHS[day.m - 1]!.slice(0, 3)}` : day.d}
+                {phone && <span className="cal-wd">{WEEKDAYS[i % 7]}</span>}
+              </span>
               {here.map((d) => chip(d, n))}
             </div>
           );

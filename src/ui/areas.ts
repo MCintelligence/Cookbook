@@ -32,7 +32,7 @@ export function areaRoot(area: Area): HTMLElement | null {
   return document.querySelector<HTMLElement>(ROOT[area]);
 }
 
-/** Whether an area is on screen now: closed panels and those Oven Mode hides are not. */
+/** Whether an area is on screen now: closed panels and those Chef Mode hides are not. */
 export function areaShown(area: Area): boolean {
   const el = areaRoot(area);
   return !!el && el.getClientRects().length > 0;

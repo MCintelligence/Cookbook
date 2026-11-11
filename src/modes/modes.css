@@ -113,7 +113,7 @@
 .cal-day { display: flex; flex-direction: column; gap: 3px; padding: 4px 0 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
 .cal-day.out { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
 .cal-day.out .cal-num { color: var(--faint); }
-.cal-day.drop-into { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.cal-day.drop-into, .cal-day.shelf-over { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .cal-num { padding: 0 8px 1px; font-family: var(--font-display); font-size: 13px; color: var(--muted); }
 .cal-chip { display: block; margin: 0 6px; padding: 2px 7px; min-height: 22px; border: 1px solid var(--line-strong); border-left: 3px solid var(--faint); border-radius: 4px; background: var(--card); color: var(--text); font-family: var(--font-text); font-size: 12.5px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; }
 .cal-chip:hover { border-color: var(--accent); }
@@ -124,10 +124,6 @@
 .cal-chip.long.first.last { border-radius: 4px; }
 /* The Pantry's dates are drawn dashed, so they read apart from the Shelf's Items. */
 .cal-chip.pantry { border-style: dashed; border-left-style: solid; border-left-color: var(--green); background: transparent; font-style: italic; }
-.cal-tray { flex: none; width: 208px; display: flex; flex-direction: column; gap: 5px; padding: 10px 8px 16px; border-left: 1px solid var(--line-strong); background: var(--sidebar); overflow-y: auto; }
-.cal-tray h3, .tl-tray h3 { margin: 0 6px 4px; font-family: var(--font-label); font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.cal-tray p, .tl-tray p { margin: 0 6px; font-size: 13px; color: var(--muted); line-height: 1.4; }
-.cal-tray .cal-chip { flex: none; }
 .cal-year { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; padding: 22px; overflow: auto; align-content: start; }
 .cal-year-month { display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); text-align: left; }
 .cal-year-month:hover { border-color: var(--accent); }
@@ -162,9 +158,6 @@
 .tl-bar.lifted { cursor: grabbing; z-index: 2; opacity: 0.85; }
 .tl-bar-end { position: absolute; right: -4px; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
 .tl-empty { position: absolute; left: 148px; right: 0; top: 90px; pointer-events: none; }
-.tl-tray { flex: none; max-height: 132px; padding: 9px 10px 10px; border-top: 1px solid var(--line-strong); background: var(--sidebar); overflow-y: auto; }
-.tl-tray > div { display: flex; flex-wrap: wrap; gap: 6px; }
-.tl-tray .cal-chip { margin: 0; max-width: 220px; }
 
 /* ---------- Arcs ---------- */
 .arcs { flex: 1; overflow: auto; display: flex; }
@@ -218,3 +211,5 @@
 .mode-form-note.wrong { color: var(--danger-text); }
 /* A single day is too small to hold its own handle, so the handle sits just past it. */
 .tl-bar:not(.long) .tl-bar-end { right: -10px; width: 9px; top: -4px; bottom: -4px; }
+/* A Shelf or Pantry row dragged over Prep or Plan: let go to bring it back, or to date it on the calendar and timeline. */
+.app.mode-drop .mode-desk { box-shadow: inset 0 0 0 2px var(--accent); }

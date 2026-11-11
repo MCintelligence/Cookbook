@@ -92,7 +92,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             <ToolButton label="Show only the open Item and what it is tied to" pressed={near} onClick={() => setPrefs({ atlas: { ...prefs.atlas, near: !near } })}>
               Close ties only
             </ToolButton>
-            <Zoomer k={pan.look.k} onZoom={pan.zoomBy} onFit={() => pan.fit(bounds())} />
+            <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />
             <ToolButton label="Lay the atlas out afresh" onClick={() => setPrefs((now) => ({ spots: { ...now.spots, atlas: {} } }))}>
               Tidy up
             </ToolButton>

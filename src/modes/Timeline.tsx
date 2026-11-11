@@ -6,13 +6,12 @@ import { BOOKSHELF } from '../storage/book';
 import { LABELS } from '../storage/document';
 import { MONTHS, type StoryDate, dayNumber, fromDayNumber, sayWhen, shifted } from '../storage/storyDate';
 import { useStore } from '../ui/store';
-import { type ViewProps } from './host';
-import { type Dated, datedOf, dayText, labelColor, packRows, pantryGroups, plotlineName, shelfGroups } from './model';
+import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
+import { type Dated, datedOf, dayText, labelColor, packRows, plotlineName, shelfGroups } from './model';
 import { MAX_PX, MIN_PX, prefsStore, setPrefs } from './prefs';
-import { Pick, Tally, ToolButton, datedMenu, itemMenu, redate } from './shared';
+import { Pick, Tally, ToolButton, datedMenu, redate } from './shared';
 import { dragFrom } from './usePanZoom';
 
-const DRAG = 'application/x-cookbook-dated';
 /** The width of the lane names down the left, and the height of one row of bars. */
 const HEAD = 148;
 const ROW = 30;
@@ -68,16 +67,12 @@ function rulerMarks(left: number, right: number, px: number): { majors: { n: num
  * plotline), and each dated Item a bar on its days. Bars are dragged to another day and
  * stretched from their right edge; the view is dragged, scrolled and zoomed from days to centuries.
  */
-export function Timeline({ host, side, tools, ask }: ViewProps) {
+export function Timeline({ host, tools, ask }: ViewProps) {
   const prefs = useStore(prefsStore);
   const { lanes: by, px } = prefs.timeline;
   const groups = useMemo(() => shelfGroups(host.tree, host.cards), [host.tree, host.cards]);
   const items = useMemo(() => groups.flatMap((g) => g.items), [groups]);
-  const dated = useMemo(() => {
-    const pantry = side === 'both' ? datedOf(pantryGroups(host.pantryTree, host.cards).flatMap((g) => g.items), true) : [];
-    return [...datedOf(items, false), ...pantry];
-  }, [items, side, host.pantryTree, host.cards]);
-  const undated = items.filter((i) => i.card.dates.length === 0);
+  const dated = useMemo(() => datedOf(items, false), [items]);
   // Fit all and Story start go by the Shelf's own dates when it has any, so one far-off birthday doesn't shrink the story to a dot.
   const story = dated.some((d) => d.event === null) ? dated.filter((d) => d.event === null) : dated;
   const first = story.length > 0 ? Math.min(...story.map((d) => d.first)) : null;
@@ -120,14 +115,25 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
     };
   }, []);
 
+  // A Shelf Item let go on the timeline gets the day it landed on.
+  const landRef = useRef<(drop: ShelfDrop) => void>(() => {});
+  landRef.current = ({ path, card, x: at }) => {
+    if (card?.kind === 'scene') void host.setField(path, 'when', dayText(dayAt(at)));
+  };
+  useEffect(() => {
+    const node = main.current;
+    if (!node) return;
+    const land = (e: Event) => landRef.current((e as CustomEvent<ShelfDrop>).detail);
+    node.addEventListener(SHELF_DROP, land);
+    return () => node.removeEventListener(SHELF_DROP, land);
+  }, []);
+
   const right = left + width / px;
   const lanes: Lane[] = useMemo(() => {
-    const own: Lane[] =
-      by === 'group'
+    return by === 'group'
         ? groups.map((g) => ({ id: g.path, title: g.title }))
         : [{ id: '', title: 'No plotline' }, ...LABELS.filter((l) => items.some((i) => i.card.label === l.id) || prefs.plotlines[l.id] !== undefined).map((l) => ({ id: l.id, title: plotlineName(l.id, prefs.plotlines), color: l.color }))];
-    return side === 'both' ? [...own, { id: PANTRY_LANE, title: 'Pantry' }] : own;
-  }, [by, groups, items, prefs.plotlines, side]);
+  }, [by, groups, items, prefs.plotlines]);
   const laneOf = (d: Dated) => (d.event !== null ? PANTRY_LANE : by === 'group' ? d.group : d.card.label);
   const { majors, minors } = rulerMarks(left, right, px);
   const x = (n: number) => HEAD + (n - left) * px;
@@ -179,9 +185,7 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
             <ToolButton label="Go to the first date in the story" disabled={first === null} onClick={() => first !== null && setLeft(first - 40 / px)}>
               Story start
             </ToolButton>
-            <Tally>
-              {dated.length} dated · {undated.length} not yet
-            </Tally>
+            <Tally>{dated.length} dated</Tally>
           </>,
           tools,
         )}
@@ -189,11 +193,6 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
         className="tl-main"
         ref={main}
         onPointerDown={pan}
-        onDragOver={(e) => e.dataTransfer.types.includes(DRAG) && e.preventDefault()}
-        onDrop={(e) => {
-          const item = undated.find((i) => i.path === e.dataTransfer.getData(DRAG));
-          if (item) void host.setField(item.path, 'when', dayText(dayAt(e.clientX)));
-        }}
       >
         <div className="tl-ruler">
           <div className="tl-corner" style={{ width: HEAD }} />
@@ -282,38 +281,9 @@ export function Timeline({ host, side, tools, ask }: ViewProps) {
               </div>
             );
           })}
-          {dated.length === 0 && <p className="mode-empty tl-empty">No Item has a story date yet. Drag one up from below, or {menuPress().toLowerCase()} a lane for a new Item on that day.</p>}
+          {dated.length === 0 && <p className="mode-empty tl-empty">No Item has a story date yet. Drag one in from the Shelf, or {menuPress().toLowerCase()} a lane for a new Item on that day.</p>}
         </div>
       </div>
-      <aside className="tl-tray" aria-label="Not dated yet">
-        <h3>Not dated yet</h3>
-        <div>
-          {undated.length === 0 ? (
-            <p>Every Item has its day.</p>
-          ) : (
-            undated.map((i) => (
-              <button
-                key={i.path}
-                className={`cal-chip${i.path === host.path ? ' chosen' : ''}`}
-                style={labelColor(i.card.label) ? { borderLeftColor: labelColor(i.card.label) } : undefined}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(DRAG, i.path);
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
-                onClick={() => i.path !== host.path && host.select(i.path)}
-                onDoubleClick={() => host.open(i.path)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  host.menu('Item', e.clientX, e.clientY, itemMenu(host, i, ask));
-                }}
-              >
-                {i.card.title}
-              </button>
-            ))
-          )}
-        </div>
-      </aside>
     </div>
   );
 }

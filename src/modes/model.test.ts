@@ -4,7 +4,7 @@ import { type CardSummary } from '../storage/index';
 import { boardRows, datedOf, dropPlace, layOut, packRows, pairTies, pantryGroups, readDay, readingOrder, shelfGroups, tiesOf, typedDate } from './model';
 import { DEFAULT_PREFS, readPrefs, sideOf, viewOf } from './prefs';
 
-const card = (id: string, extra: Partial<CardSummary> = {}): CardSummary => ({ id, title: id, kind: 'scene', words: 10, synopsis: '', status: 'not-started', aka: [], portrait: '', label: '', skipExport: false, dates: [], arc: {}, ...extra });
+const card = (id: string, extra: Partial<CardSummary> = {}): CardSummary => ({ id, title: id, kind: 'scene', words: 10, synopsis: '', status: 'not-started', aka: [], portrait: '', label: '', file: '', skipExport: false, dates: [], arc: {}, ...extra });
 const file = (path: string): TreeNode => ({ name: path.split('/').pop()!, path, kind: 'file' });
 const folder = (path: string, children: TreeNode[]): TreeNode => ({ name: path.split('/').pop()!, path, kind: 'folder', children });
 
@@ -125,17 +125,22 @@ describe('mode set-up', () => {
     expect(readPrefs('not json')).toEqual(DEFAULT_PREFS);
     expect(readPrefs('[]')).toEqual(DEFAULT_PREFS);
     const read = readPrefs(JSON.stringify({ together: true, board: { layout: 'free' }, timeline: { px: 9999 }, outline: { columns: ['words', 3] } }));
-    expect(read.together).toBe(true);
+    // The old "Shelf and Pantry together" switch is gone; a modes.json that still has it reads as if it didn't.
+    expect('together' in read).toBe(false);
     expect(read.board).toEqual({ layout: 'free', rows: 'none' });
     expect(read.timeline.px).toBe(96);
     expect(read.outline.columns).toEqual(['words']);
     expect(read.atlas).toEqual(DEFAULT_PREFS.atlas);
   });
 
-  it('shows the Pantry’s views for a Pantry Item, unless they are joined', () => {
-    expect(sideOf(false, false)).toBe('shelf');
-    expect(sideOf(false, true)).toBe('pantry');
-    expect(sideOf(true, true)).toBe('both');
+  it('reads which Items were removed from Prep and from Plan', () => {
+    expect(readPrefs('{}').hidden).toEqual({ prep: [], plan: [] });
+    expect(readPrefs(JSON.stringify({ hidden: { prep: ['a', 3], plan: 'b' } })).hidden).toEqual({ prep: ['a'], plan: [] });
+  });
+
+    it('shows the Pantry’s views for a Pantry Item, and the Shelf’s for anything else', () => {
+    expect(sideOf(false)).toBe('shelf');
+    expect(sideOf(true)).toBe('pantry');
   });
 
   it('opens the view last used on each side, or the first', () => {

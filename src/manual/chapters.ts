@@ -36,7 +36,7 @@ export const CHAPTERS: Chapter[] = [
 | **Seasonings** | The proofreader: four characters who each read for one thing. |
 | **Mise en Place** | A whole Group set out as one page. |
 | **Cook**, **Prep** and **Plan** | Three ways to look at a recipe: the page, the outline and board, and the calendar and timeline. |
-| **Stove Mode** and **Oven Mode** | The normal view, and focus mode. |
+| **Chef Mode** | Focus mode. |
 | **Plate** and **Serve** | Setting the finished book like a real one, and making the e-book or PDF. |
 
 ## Where to start
@@ -83,11 +83,32 @@ In the desktop app a recipe can live in any folder: Dropbox, iCloud, a USB stick
 - **Move** by dragging up or down, or onto a Group to put it inside. On a touch screen, press and hold first. From the keyboard, Alt+↑ and Alt+↓ move the focused row.
 - **Rename** with a double-click, or select it and press F2.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
-- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, and Move to trash.
+- **Right-click** an Item or Group for everything else: status, label, duplicate, put it in a new Group, export, snapshots, Draft this item, open beside this one, Move to Research, Move to Archive, and Move to trash.
 
 Each Item has a **status**, Not started, Simmering or Done, shown as a dot on the Shelf and in the bottom bar, never on the page. Hover over a Group to see the words inside it.
 
-Moving never renames a file unless the Group it lands in already has one of the same name.`,
+Moving never renames a file unless the Group it lands in already has one of the same name.
+
+## Research
+
+**Research**, at the foot of the Shelf, is for everything you gather while writing that isn't the book itself, as in Scrivener: notes, pictures, PDFs, web pages, sound and films. Click its name to open or close it.
+
+- **Add a note** by right-clicking Research and choosing **New note in Research**. Notes are pages like any other, with their own words, label and status.
+- **Bring in files** by dropping them from your computer onto Research, or right-click it and choose **Import files…**. Word, Markdown and text files become notes; anything else is kept as it is.
+- **Look at a file** by clicking it. A picture or PDF shows above a page of your own notes about it, with − and + to zoom. You can select and copy the words of a PDF. A web page shows as it was saved, Safari web archives included, without going online. Sound and films play. **Save a copy…** gives you the file back to open in another app.
+- **Arrange** Research as you like, in Groups of its own. Drag a Shelf Item or Group onto Research to move it there, or drag a note back onto the Shelf. Files stay in Research.
+
+Nothing in Research is exported, counted towards your words, or shown in Prep or Plan, and the Shelf's search leaves it out. The search in the top bar still finds it. A Scrivener project's Research folder comes in here, and so does any other folder Scrivener kept beside the Draft.
+
+Research isn't the Pantry's **Materials**: Materials are cards about the story itself, which can be named on the page and tied to Characters.
+
+## The Archive
+
+The **Archive**, at the foot of the Shelf, is for Items and Groups set aside without deleting them. Drag a row from the Shelf or the Pantry onto it, or right-click and choose **Move to Archive**. Click its name to open or close it.
+
+Pantry Items keep their own mark there, a **Pantry** tag, but otherwise lie wherever you like: drag them up and down, mix them in with Shelf Items, or gather any of them into Groups of the Archive's own.
+
+Nothing in the Archive shows in Prep or Plan, is exported, counted towards your words, linked by name on the page or found by the Shelf's and Pantry's searches. It can still be opened and edited, and the search in the top bar still finds it. To put something back, drag it onto the Shelf, or right-click it and choose **Put back**: a Pantry Item goes home to its own part of the Pantry, and a Shelf Item or Group goes where you pick.`
   },
   {
     id: 'writing',
@@ -145,9 +166,9 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 
 ## Drafts
 
-To write an Item again from scratch, right-click it on the Shelf and choose **Draft this item** (also in the Recipe menu and the command palette). The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on, and keeps pace a paragraph at a time as you write the new version.
+To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on. As you write the new version it keeps pace a sentence at a time: each sentence you write takes the place of one of the draft's, and the rest of that paragraph carries on just after the cursor.
 
-Draft again for Draft 2, and so on; click a draft to have it show through instead. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
+Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. {key:olderDraft|Recipe › Older draft as ghost text} shows an older draft through the Item and {key:newerDraft|Recipe › Newer draft as ghost text} a newer one, back up to the newest; clicking a draft does the same. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',
@@ -225,8 +246,8 @@ Type **@** after a space, or press {key:shelf|Edit › Name from the Pantry}, to
 
 | Seasoning | Reads for | Meter |
 | --- | --- | --- |
-| **Salty Sam** | Spelling, and near misses of Pantry names | Unsalted to Seawater: slips per 1,000 words |
-| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Plain to Smoking: slips per 1,000 words |
+| **Salty Sam** | Spelling, and near misses of Pantry names | Savoury to Seawater: slips per 1,000 words |
+| **Peppery Pete** | Grammar, punctuation, quotes left open, stray capitals | Zesty to Smoking: slips per 1,000 words |
 | **Drunk Daniel** | How much of the page is dialogue | Sober to Drunk |
 | **Spicy Sally** | Style: adverbs, clichés, passive voice, sticky sentences | Mild to Inferno: how hard the page is to read |
 
@@ -262,10 +283,14 @@ A **plotline** is a label colour with a name of your own. Right-click a row's na
 
 ## Plan
 
-Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item onto a day.
+Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item from the Shelf onto a day.
 
-- **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it. Items with no date wait at the side under **Not dated yet**.
-- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+- **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it, or drag one from the Shelf onto a day to date it. Drag a Pantry Item from the Pantry onto a day to give it a date of its own.
+- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer, or drag an Item from the Shelf onto the timeline to date it there. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+
+## Taking something out of a view
+
+**Remove**, in the right-click menu of anything in Prep or Plan, takes it out of that mode only. The Item itself is not touched, moved or deleted. To bring it back, drag it in from the Shelf or Pantry, or right-click it there and choose **Bring back**.
 
 ## The Pantry's own Prep and Plan
 
@@ -276,17 +301,13 @@ Open a Pantry Item and the same switch shows the Pantry's views, shared by the w
 - **Arcs** (Plan) runs the Shelf's Items left to right with a line for each Character. A ring marks each Item that names them. Click to set a **beat**: how things stand for them there, from Rock bottom to Flying, with a word or two on why.
 - **Calendar** (Plan) shows the Pantry's own dates: a birthday, the day a debt falls due. Right-click a day to add one.
 
-**Shelf and Pantry together**, at the foot of the switch's list, joins the two: one Prep with the outline, both boards and the atlas, and one Plan whose calendar and timeline show the Pantry's dates (dashed) beside the Shelf's Items.
-
 Everything here is kept in the recipe's own files. Story dates, Pantry dates and arcs are in each Item's front matter (\`when\`, \`events\`, \`arc\`); how the views are set up, and where the cards of a free board lie, is in \`modes.json\`.`,
   },
   {
     id: 'modes',
-    title: 'Stove Mode and Oven Mode',
-    summary: 'The normal view, focus mode, and other ways to see the page.',
-    body: `**Stove Mode** is the normal view, with the Shelf, toolbar and panels around the page.
-
-**Oven Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Oven Mode}, the page's right-click menu or the command palette. Press it again, press Escape, or click Oven Mode in the bottom bar to go back to Stove Mode.
+    title: 'Chef Mode',
+    summary: 'Focus mode, and other ways to see the page.',
+    body: `**Chef Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Chef Mode}, the page's right-click menu or the command palette. Press it again or press Escape to leave it.
 
 Also in the View menu:
 
@@ -331,12 +352,12 @@ File › **Export** makes a Word document, an EPUB or Markdown of the manuscript
 File › **Import Scrivener project…** turns a whole Scrivener 2 or 3 project into a new recipe. Choose the project’s .scriv folder (or the folder it sits in); a zip of it, such as one of Scrivener’s backups, works through **Import files…** too. Your recipe is backed up first, and the Scrivener project is only read, never changed.
 
 - The **Draft** (Manuscript) goes on the Shelf in Binder order: folders become Groups and documents become Items. A document with documents inside it becomes a Group whose first Item holds its own text.
-- A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Materials. The Trash is left behind.
+- A **Characters** folder goes to the Pantry’s Characters, a **Places**, Locations or Settings folder to Settings, and **Research** and every other folder to Research, in Binder order. The Trash is left behind.
 - Titles, synopses, status, label colours and Include in Compile come with each document, and so do bold, italic, underline, strikethrough, links, footnotes, headings and scene breaks. Fonts and sizes take your recipe’s look.
 - **Comments** and inline annotations are kept on the words they were on, which are highlighted; right-click one to read it. Linked and inline footnotes become footnotes.
-- Each document’s **notes** from the Inspector go at the end of its Pantry card. A Shelf Item’s or folder’s notes become a card in Materials › Notes from Scrivener, so they never print with your book.
+- Each document’s **notes** from the Inspector go at the end of its Pantry card or Research Item. A Shelf Item’s or folder’s notes become a card in Materials › Notes from Scrivener, so they never print with your book.
 - **Snapshots** come with their Items, ready to compare or go back to.
-- **Pictures** go on a Materials card, or become the portrait of a Character or Setting. **PDFs**, web pages and other files are kept with the recipe in its files folder, each with a Materials card that names it. Cookbook can’t open a PDF itself yet.
+- **Pictures**, **PDFs**, web pages, sound, films and other files go to Research, to be looked at there as they were in Scrivener. A picture in Characters or Places becomes that card’s portrait instead.
 - Keywords, custom metadata, collections and project notes stay in Scrivener.`,
   },
   {
@@ -358,7 +379,7 @@ Backups go to Cookbook's own folder, on the same disk as your recipes, unless yo
     id: 'finding',
     title: 'Finding your way',
     summary: 'Search, the command palette, and moving round by keyboard.',
-    body: `- **Command palette**: {key:palette|Help › Command palette} and type what you want, such as "oven", "export" or "manual".
+    body: `- **Command palette**: {key:palette|Help › Command palette} and type what you want, such as "chef", "export" or "manual".
 - **Go to an Item, Group or card**: {key:switcher|Edit › Go to an item or card} and type part of its name. A Group opens as one page.
 - **Search**: {key:find|Edit › Search} finds and replaces in the open Item, and lists every other Item and Pantry card that matches. Words match from their start and by stem, so "corn" finds "cornbread" and "run" finds "running".
 - **Search the Shelf**: the field under the Shelf's heading lists the Items whose name or text matches, like the Pantry's search does for cards. Escape empties it.
@@ -376,7 +397,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 
 - **General**: About you (your name, your English, what you write, your daily goal and the Seasonings new recipes start with, and Set the Table again), starting up, and how shortcuts are shown.
 - **Appearance**: theme (System, Light, Dark, Sepia), text size and motion. The page stays white paper in every theme, so text colours look the same in dark mode as they were picked.
-- **Writing**: curly quotes and dashes, Markdown and each of its rules, @ and / menus, Oven Mode's fade, typewriter scrolling and pasting.
+- **Writing**: curly quotes and dashes, Markdown and each of its rules, @ and / menus, Chef Mode's fade, typewriter scrolling and pasting.
 - **Saving and backups**: how soon a change is saved, backups and where they go, snapshots.
 - **Keyboard shortcuts**: every shortcut, and changing it.
 - **Updates and privacy**.
@@ -403,6 +424,9 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 | \`dictionary.txt\` | your own words, one a line |
 | \`bookshelf/\` | the Shelf: Items in nested Groups |
 | \`pantry/\` | Characters, Settings and Materials |
+| \`research/\` | Research: notes, and Items that show the files in \`files/\` |
+| \`files/\` | pictures, PDFs, web pages and other files kept in Research |
+| \`archive/\` | Shelf and Pantry Items set aside in the Archive |
 | \`pictures/\` | portraits for Pantry cards |
 | \`drafts/\` | earlier drafts of Items, one folder per Item |
 | \`.cookbook/\` | hidden: the search index, undo history, snapshots and the trash |

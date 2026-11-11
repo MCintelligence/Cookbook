@@ -37,6 +37,33 @@ function recompute(state: FindState, doc: PMNode, anchor: number): FindState {
   return { ...state, matches, current };
 }
 
+/**
+ * Built once per find state, not on every keystroke or caret move: the plugin
+ * keeps the same state object until the matches or the current one change.
+ */
+const decoCache = new WeakMap<FindState, DecorationSet>();
+
+/**
+ * Every match highlighted, the current one strongest, and all the text between
+ * them faded, so the page shows at a glance where and how often the words come up.
+ */
+export function findDecorations(doc: PMNode, find: FindState): DecorationSet | null {
+  if (find.matches.length === 0) return null;
+  const cached = decoCache.get(find);
+  if (cached) return cached;
+  const decos: Decoration[] = [];
+  let gap = 0;
+  find.matches.forEach((m, i) => {
+    if (m.from > gap) decos.push(Decoration.inline(gap, m.from, { class: 'cb-find-dim' }));
+    decos.push(Decoration.inline(m.from, m.to, { class: i === find.current ? 'cb-find cb-find-current' : 'cb-find' }));
+    gap = Math.max(gap, m.to);
+  });
+  if (doc.content.size > gap) decos.push(Decoration.inline(gap, doc.content.size, { class: 'cb-find-dim' }));
+  const set = DecorationSet.create(doc, decos);
+  decoCache.set(find, set);
+  return set;
+}
+
 export const FindExtension = Extension.create({
   name: 'find',
   addProseMirrorPlugins() {
@@ -63,13 +90,7 @@ export const FindExtension = Extension.create({
         props: {
           decorations(state) {
             const find = findKey.getState(state);
-            if (!find || find.matches.length === 0) return null;
-            return DecorationSet.create(
-              state.doc,
-              find.matches.map((m, i) =>
-                Decoration.inline(m.from, m.to, { class: i === find.current ? 'cb-find cb-find-current' : 'cb-find' }),
-              ),
-            );
+            return find ? findDecorations(state.doc, find) : null;
           },
         },
       }),

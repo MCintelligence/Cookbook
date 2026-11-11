@@ -77,6 +77,16 @@ export const ICONS = {
   starFull: art(24, f(`${STAR}M8.4 10.6l3-.4-.3.8-2.2.3z`)),
   /** A box with a solid lid. */
   archive: art(24, f('M3.6 4h16.8a1 1 0 0 1 1 1v3.4a1 1 0 0 1-1 1H3.6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z'), s('M4.6 11.5V20h14.8v-8.5M10 13.5h4')),
+  /** Research: a page with a solid magnifying glass over its corner. */
+  research: art(24, s('M13.5 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21H10'), f('M15.5 9.2a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 1 1 0-9.6zM15.5 11.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 1 0 0-5.6z'), s('m19.3 17.6 2.6 2.6', 2.8)),
+  /** A picture: a frame with a solid hill and sun. */
+  picture: art(24, s('M20.5 12V18.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4h10'), f('M3.6 17.6l5.2-6 3.8 4.2 2.4-2.6 5.4 5.6v.5H3.6zM17.8 5.2a2 2 0 1 1 0 4 2 2 0 1 1 0-4z')),
+  /** A web page: a globe, one half solid. */
+  web: art(24, s('M12 3a9 9 0 1 1-8.6 6.3'), f('M12 3a9 9 0 0 0 0 18c-2.2-2.4-3.4-5.6-3.4-9S9.8 5.4 12 3z'), s('M3.4 12h17.2', 2)),
+  /** Sound: a solid note. */
+  sound: art(24, f('M9 6.2 19.5 3.5v12.2a3 3 0 1 1-2-2.8V7.6L11 9.3v8.4a3 3 0 1 1-2-2.8z')),
+  /** A film: a strip with its holes cut out. */
+  film: art(24, f('M4.5 3.5h15a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1zM5.5 5.5v2h2v-2zM5.5 11v2h2v-2zM5.5 16.5v2h2v-2zM16.5 5.5v2h2v-2zM16.5 11v2h2v-2zM16.5 16.5v2h2v-2zM9.5 6v12h5V6z')),
   /** Books on a shelf, one leaning. */
   shelf: art(24, f('M3 3.5h4.2v17H3z'), s('M10.6 4.6v15.4', 3.6), s('m15.4 4.8 4-1 3.6 15.6-4 1z', 2)),
   more: art(24, f('M5 10a2 2 0 1 1 0 4 2 2 0 1 1 0-4zM12 10a2 2 0 1 1 0 4 2 2 0 1 1 0-4zM19 10a2 2 0 1 1 0 4 2 2 0 1 1 0-4z')),

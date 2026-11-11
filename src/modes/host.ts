@@ -5,6 +5,19 @@ import { type PantrySection } from '../storage/pantry';
 import { type MenuItem } from '../ui/Menu';
 import { type Side } from './prefs';
 
+/**
+ * Sent to the element under the pointer when a Shelf or Pantry row is let go over Prep or Plan,
+ * with a ShelfDrop as its detail. The mode brings the Item back if it was removed, and a view
+ * may do more with it: the calendar and timeline date it to the day it landed on.
+ */
+export const SHELF_DROP = 'cookbook:shelf-drop';
+export interface ShelfDrop {
+  path: string;
+  card: CardSummary | undefined;
+  x: number;
+  y: number;
+}
+
 /** What the Prep and Plan views ask of the app. They read the index and the Shelf, never the pages themselves. */
 export interface ModeHost {
   tree: TreeNode[];
@@ -30,7 +43,8 @@ export interface ModeHost {
   newCard(section: PantrySection, fields?: Record<string, unknown>): Promise<string | null>;
   newGroup(): void;
   rename(path: string): void;
-  trash(path: string): void;
+  /** Takes an Item out of the mode showing (Prep or Plan), leaving the Item itself alone. Set by the mode, not the app. */
+  remove(path: string): void;
   menu(label: string, x: number, y: number, items: MenuItem[]): void;
   loadPicture(path: string): Promise<string>;
   say(text: string): void;

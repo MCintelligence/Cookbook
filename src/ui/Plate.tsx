@@ -36,7 +36,6 @@ interface Props {
   /** The book's id, made the first time it's needed, so readers know a new e-book is the same book. */
   bookId: () => Promise<string>;
   onClose: () => void;
-  say: (text: string) => void;
   onError: (text: string) => void;
 }
 
@@ -57,7 +56,7 @@ function moveTo<T>(list: T[], from: number, to: number): T[] {
  * what goes in, the middle shows the pages as they'll print (or the e-book as
  * it reads), and the Style panel sets the type. Settings save as they change.
  */
-export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose, say, onError }: Props) {
+export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose, onError }: Props) {
   const [chapters, setChapters] = useState<Chapter[] | null>(null);
   const [pages, setPages] = useState<Page[] | null>(null);
   // Pages are being set from the start: first the chapters are gathered, then laid out.
@@ -266,7 +265,7 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
     setServeOpen(false);
     try {
       const data = plateEpub(book, s, await bookId());
-      if (await saveFile(title, data, KINDS.epub)) say(`Served “${title}” as an EPUB e-book.`);
+      await saveFile(title, data, KINDS.epub);
     } catch (e) {
       onError(`Couldn’t serve the e-book. ${e instanceof Error ? e.message : String(e)}`);
     }

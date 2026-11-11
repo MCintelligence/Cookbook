@@ -114,7 +114,7 @@ Try these as you go:
 - [ ] Click the name of the next Group, **The Shelf**, to read all of it as one page.
 - [ ] Open the **Pantry** from the View menu and find Mama Lou.
 - [ ] Open **Seasonings** and let Salty Sam find a spelling mistake.
-- [ ] Turn on **Oven Mode** to write without distractions.
+- [ ] Turn on **Chef Mode** to write without distractions.
 - [ ] Start a recipe of your own from File › New Recipe.
 - [ ] Look anything up in the **Manual**: ${press(k, 'manual', 'open it from Help › Manual')}.
 
@@ -141,7 +141,9 @@ To add one, use the buttons at the bottom of the Shelf, right-click the Shelf, o
 
 - **Move** anything by dragging it up or down the Shelf, or into another Group.
 - **Rename** with a double-click, or select it and press F2.
-- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, and Move to trash.
+- **Right-click** an Item or a Group for everything else: a label, a status, duplicate, move, export, snapshots, drafts, Move to Archive, and Move to trash.
+- **Research**, at the foot of the Shelf, holds what you gather that isn't the book: notes, pictures, PDFs and web pages. Drop files onto it to keep them; click one to look at it beside your notes. None of it is exported or counted.
+- **Archive** anything you want to keep but set aside by dragging it onto the Archive at the foot of the Shelf. It leaves Prep and Plan until you put it back.
 - **Pick several** with Ctrl-click (⌘-click on a Mac) or Shift-click, then right-click to label, move or delete them together.
 
 Each Item can carry a **status**: Not started, Simmering or Done. This page is Simmering; Welcome is Done.
@@ -155,11 +157,12 @@ Hover over a Group to see how many words it holds.
           synopsis: 'Writing an Item again, with the old version showing through.',
           body: `# Drafts
 
-Want to write a scene again from scratch? Right-click the Item on the Shelf and choose **Draft this item** (or Recipe › Draft this item, or type **Draft** in the command palette).
+Want to write a scene again from scratch? Press **Alt+X** (**⌥X** on a Mac), or right-click the Item on the Shelf and choose **Draft this item**.
 
-The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: the ghost keeps pace a paragraph at a time, always showing the next paragraph of the old one.
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: each sentence you write takes the place of one of the old ones, and the rest of the old paragraph carries on just after the cursor.
 
-- Draft again and you get **Draft 2**, and so on. Click a draft to have it show through instead.
+- Draft again and you get **Draft 2**, and so on. The newest draft is listed first, right under the Item.
+- **Alt+Z** (⌥Z) shows an older draft as the ghost text, and **Alt+C** (⌥C) a newer one, back up to the newest. Or click a draft.
 - Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
 - Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
 `,
@@ -345,27 +348,29 @@ Which checks run, and American or British spelling, are in App Settings › Seas
 You are in **Cook**: the page. A recipe can be looked at two more ways, and the switch is this Item’s name in the top bar. Click it and choose:
 
 - **Prep**${k('modePrep') ? ` (${k('modePrep')})` : ''} sets the Items out to be put in order. Its **Outline** lists them with their synopses; its **Board** shows them as cards, in a **Grid** with a column for each Group, or **Free** on a board with no edges.
-- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it onto a day.
+- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it from the Shelf onto a day.
 - **Cook**${k('modeCook') ? ` (${k('modeCook')})` : ''} brings you back to the page. So does a double-click on anything in Prep or Plan.
 
 Try it now: open Prep, choose Board, and drag a card to another Group. The Shelf follows. New things come from the right-click menu.
 
-Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan. **Shelf and Pantry together**, at the foot of the list, joins them with the Shelf’s.
+Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan.
+
+Right-click anything in Prep or Plan and choose **Remove** to take it out of that view. The Item itself stays as it is; drag it in from the Shelf to bring it back.
 `,
         },
       ],
     },
     {
-      title: 'Stove and Oven',
+      title: 'Chef Mode',
       items: [
         {
-          title: 'Oven Mode and views',
+          title: 'Chef Mode and views',
           synopsis: 'Writing without distractions, and other ways to see the page.',
-          body: `# Oven Mode and views
+          body: `# Chef Mode and views
 
-Cookbook has two modes. **Stove Mode** is the normal view, with the Shelf and panels around you. **Oven Mode** is for focus: it hides everything but the page and fades all but where you are writing. Turn it on from the View menu${k('focus') ? ` or with ${k('focus')}` : ''}, and the same way off again.
+**Chef Mode** is for focus: it hides everything but the page and fades all but where you are writing. Turn it on from the View menu${k('focus') ? ` or with ${k('focus')}` : ''}, and the same way off again.
 
-Nothing is gone in Oven Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape goes back to Stove Mode.
+Nothing is gone in Chef Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape leaves Chef Mode.
 
 Also in the View menu:
 
@@ -432,7 +437,7 @@ Leave an Item out of every export by right-clicking it and unticking **Include i
 
 To bring writing in, File › **Import files** takes Word, Markdown and plain text files and turns them into Items.
 
-Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, and Characters, Places and Research go to the Pantry. Comments stay on the words they were on (right-click to read one), document notes go to the Pantry, snapshots come with their Items, and pictures and PDFs become Materials cards. The Scrivener project itself is never changed.
+Coming from Scrivener? File › **Import Scrivener project** turns a whole project into a new recipe: the Draft goes on the Shelf, Characters and Places go to the Pantry, and Research comes into Research. Comments stay on the words they were on (right-click to read one), document notes come with their cards and Research, snapshots come with their Items, and pictures, PDFs and web pages can be looked at in Research. The Scrivener project itself is never changed.
 `,
         },
       ],
@@ -445,7 +450,7 @@ Coming from Scrivener? File › **Import Scrivener project** turns a whole proje
           synopsis: 'The command palette, search, and getting around by keyboard.',
           body: `# Search and shortcuts
 
-The fastest way to anything is the **command palette**: ${press(k, 'palette', 'open it from Help › Command palette')} and type what you want, such as “oven” or “export”.
+The fastest way to anything is the **command palette**: ${press(k, 'palette', 'open it from Help › Command palette')} and type what you want, such as “chef” or “export”.
 
 - **Go to an Item, a Group or a card**: ${press(k, 'switcher', 'Edit › Go to an item or card')} and type part of its name. A Group opens as one page.
 - **Search** the whole recipe: ${press(k, 'find', 'Edit › Search')}. Replace is there too.

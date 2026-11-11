@@ -173,7 +173,33 @@ describe('hidden index', () => {
     expect(index.search('   ')).toEqual([]);
   });
 
-  it('tells a save that only changed words from one the Shelf shows', async () => {
+  it('keeps what is in the Archive out of searches, ties and mentions, unless asked', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    await fs.makeFolder('archive');
+    const lou = await createDocument(fs, 'pantry/characters', 'Mama Lou', 'character');
+    const old = await createDocument(fs, 'archive', 'Old Lou', 'character');
+    const scene = await createDocument(fs, 'bookshelf', 'Sunday Dinner');
+    const cut = await createDocument(fs, 'archive', 'Cut scene');
+    const louDoc = await readDocument(fs, lou);
+    await writeDocument(fs, scene, { ...(await readDocument(fs, scene)), body: 'Lou stirred the greens.\n' });
+    await writeDocument(fs, cut, { ...(await readDocument(fs, cut)), body: 'Lou burned the greens.\n' });
+    await writeDocument(fs, old, { ...(await readDocument(fs, old)), fields: { relationships: [{ to: louDoc.id, as: 'Twin of' }] } });
+
+    const index = await BookIndex.open();
+    expect(await refreshIndex(fs, index)).toBe(4);
+    // Indexed, so the Archive's rows know their kinds and titles.
+    expect(index.cards().get(old)?.kind).toBe('character');
+    expect(index.search('lou').map((h) => h.path).sort()).toEqual([lou, scene].sort());
+    expect(index.search('lou', { aside: true }).map((h) => h.path).sort()).toEqual([cut, lou, old, scene].sort());
+    expect(index.scenesNaming(['Lou'], () => 1).map((m) => m.path)).toEqual([scene]);
+    expect(index.pageTexts()).toEqual(['Lou stirred the greens.']);
+    expect(index.links()).toEqual([]);
+    expect(index.incoming(louDoc.id)).toEqual([]);
+    index.close();
+  });
+
+    it('tells a save that only changed words from one the Shelf shows', async () => {
     const fs = new MemoryAdapter();
     await createBook(fs, 'Book');
     const scene = await createDocument(fs, 'bookshelf', 'Sunday Dinner');

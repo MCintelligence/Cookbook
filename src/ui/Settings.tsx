@@ -465,12 +465,12 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             ))}
           </Group>
           <Group title="While writing">
-            <Row title="Oven Mode" help={`Focus mode: hides the panels and fades everything but where you are. Stove Mode is the normal view. ${keys(binding('focus'))} turns it on and off.`}>
-              <Switch label="Oven Mode" on={s.focus} onChange={(focus) => set({ focus })} />
+            <Row title="Chef Mode" help={`Focus mode: hides the panels and fades everything but where you are. ${keys(binding('focus'))} turns it on and off.`}>
+              <Switch label="Chef Mode" on={s.focus} onChange={(focus) => set({ focus })} />
             </Row>
-            <Row title="Oven Mode keeps bright" help="The rest of the page fades.">
+            <Row title="Chef Mode keeps bright" help="The rest of the page fades.">
               <Select
-                label="Oven Mode keeps bright"
+                label="Chef Mode keeps bright"
                 value={s.fade}
                 options={[
                   ['paragraph', 'The paragraph'],
@@ -682,7 +682,7 @@ function Updates({ version, onCheck }: { version: string; onCheck: () => Promise
   return (
     <>
       <Group title="Updates">
-        <Row title="Check for updates automatically" help="A few seconds after starting, then every few hours. Updates install only when you say so.">
+        <Row title="Check for updates automatically" help="Shortly after starting, at midnight when the daily target resets, and when you come back to Cookbook after six hours. One small request, skipped when offline. Updates install only when you say so.">
           <Switch label="Check for updates automatically" on={s.checkUpdates} onChange={(checkUpdates) => setSettings({ checkUpdates })} />
         </Row>
         <Row title={`Cookbook ${version}`} help={status ?? 'Look for a newer version now.'}>

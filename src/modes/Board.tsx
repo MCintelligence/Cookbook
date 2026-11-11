@@ -110,7 +110,7 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
               />
             ) : (
               <>
-                <Zoomer k={pan.look.k} onZoom={pan.zoomBy} onFit={() => pan.fit(bounds())} />
+                <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />
                 <ToolButton label="Lay the cards out in rows again" onClick={tidy}>
                   Tidy up
                 </ToolButton>

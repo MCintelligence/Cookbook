@@ -1,8 +1,8 @@
 import type { Database, Sqlite3Static } from '@sqlite.org/sqlite-wasm';
 import { plainText } from '../editor/markdown';
 import { type StorageAdapter, joinPath } from './adapter';
-import { ARCHIVE, BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, readDocument, readTree, walkFiles } from './book';
-import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, arcOf, cardFieldsOf, datesOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
+import { ARCHIVE, ASIDE, BOOKSHELF, HIDDEN_FOLDER, NOTES_ON, PANTRY, RECIPES, RESEARCH, readDocument, readTree, walkFiles } from './book';
+import { type CookbookDocument, type DocumentKind, type Relationship, type SceneStatus, akaOf, arcOf, cardFieldsOf, datesOf, fileOf, includedInExport, isCard, labelOf, portraitOf, relationshipsOf, statusOf, synopsisOf } from './document';
 import { type ArcBeat } from './document';
 import { type StoryDate } from './storyDate';
 import { sketchText } from './sketch';
@@ -15,7 +15,7 @@ import { sketchText } from './sketch';
  * that changed since last time. Deleting it is always safe.
  */
 export const INDEX_FILE = joinPath(HIDDEN_FOLDER, 'index.sqlite');
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 export interface IndexedDocument {
   path: string;
@@ -31,6 +31,8 @@ export interface IndexedDocument {
   portrait: string;
   /** A colour label (see LABELS), or ''. */
   label: string;
+  /** The file a Research Item shows, or '' for a page of words. */
+  file: string;
   /** Left out when the book is exported. */
   skipExport: boolean;
   relationships: Relationship[];
@@ -44,7 +46,7 @@ export interface IndexedDocument {
 }
 
 /** What the Bookshelf shows on each card. */
-export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka' | 'portrait' | 'label' | 'skipExport' | 'dates' | 'arc'>;
+export type CardSummary = Pick<IndexedDocument, 'id' | 'title' | 'kind' | 'words' | 'synopsis' | 'status' | 'aka' | 'portrait' | 'label' | 'file' | 'skipExport' | 'dates' | 'arc'>;
 
 /** A tie from one Pantry Item to another, as the Atlas draws it. */
 export interface Link {
@@ -69,12 +71,12 @@ export interface IncomingRelationship {
 export interface SearchOptions {
   kinds?: DocumentKind[];
   limit?: number;
-  /** Looks in the Archive too, which searches leave out unless asked. */
-  archive?: boolean;
+  /** Looks in the Archive and Research too, which searches leave out unless asked. */
+  aside?: boolean;
 }
 
-/** Leaves out what is in the Archive, which is set aside from the rest of the recipe. */
-const LIVE = `d.path not like '${ARCHIVE}/%'`;
+/** Leaves out what is in the Archive and Research, which are kept beside the recipe rather than in it. */
+const LIVE = ASIDE.map((top) => `d.path not like '${top}/%'`).join(' and ');
 
 export interface SearchHit {
   path: string;
@@ -107,6 +109,7 @@ export function toIndexed(path: string, doc: CookbookDocument, stamp: string): I
     aka: akaOf(doc.fields),
     portrait: portraitOf(doc.fields) ?? '',
     label: labelOf(doc.fields) ?? '',
+    file: fileOf(doc.fields) ?? '',
     skipExport: !includedInExport(doc.fields),
     relationships: relationshipsOf(doc.fields).filter((r) => r.to),
     dates: datesOf(doc),
@@ -164,7 +167,7 @@ export class BookIndex {
     }
     const db = new sqlite3.oo1.DB(':memory:');
     db.exec(`
-      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, portrait text, label text, dates text, arc text, skip_export integer, stamp text);
+      create table docs (rowid integer primary key, path text unique not null, id text, title text, kind text, words integer, synopsis text, status text, aka text, portrait text, label text, file text, dates text, arc text, skip_export integer, stamp text);
       create table links (from_path text not null, to_id text not null, label text);
       create index links_to on links (to_id);
       create virtual table docs_fts using fts5(title, text, tokenize = 'porter unicode61 remove_diacritics 2');
@@ -177,8 +180,8 @@ export class BookIndex {
     this.db.transaction(() => {
       this.removeRow(doc.path);
       this.db.exec({
-        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, portrait, label, dates, arc, skip_export, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.portrait, doc.label, JSON.stringify(doc.dates), JSON.stringify(doc.arc), doc.skipExport ? 1 : 0, doc.stamp],
+        sql: 'insert into docs (path, id, title, kind, words, synopsis, status, aka, portrait, label, file, dates, arc, skip_export, stamp) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        bind: [doc.path, doc.id, doc.title, doc.kind, doc.words, doc.synopsis, doc.status, JSON.stringify(doc.aka), doc.portrait, doc.label, doc.file, JSON.stringify(doc.dates), JSON.stringify(doc.arc), doc.skipExport ? 1 : 0, doc.stamp],
       });
       const rowid = this.db.selectValue('select last_insert_rowid()') as number;
       this.db.exec({ sql: 'insert into docs_fts (rowid, title, text) values (?, ?, ?)', bind: [rowid, doc.title, doc.text] });
@@ -251,31 +254,17 @@ export class BookIndex {
 
   /** Every tie between Pantry Items: the path of the Item that has it, the id of the one it points to, and how it reads. */
   links(): Link[] {
-    const rows = this.db.selectArrays(`select from_path, to_id, label from links where from_path not like '${ARCHIVE}/%' order by from_path, to_id`) as [string, string, string][];
+    const rows = this.db.selectArrays(`select from_path, to_id, label from links where ${ASIDE.map((top) => `from_path not like '${top}/%'`).join(' and ')} order by from_path, to_id`) as [string, string, string][];
     return rows.map(([from, to, as]) => ({ from, to, as: as ?? '' }));
   }
 
   /** Path to what the Bookshelf shows, for every indexed file. */
   cards(): Map<string, CardSummary> {
-    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka, portrait, label, skip_export, dates, arc from docs') as [
-      string,
-      string,
-      string,
-      DocumentKind,
-      number,
-      string,
-      SceneStatus,
-      string,
-      string,
-      string,
-      number,
-      string,
-      string,
-    ][];
+    const rows = this.db.selectArrays('select path, id, title, kind, words, synopsis, status, aka, portrait, label, file, skip_export, dates, arc from docs') as [string, string, string, DocumentKind, number, string, SceneStatus, string, string, string, string, number, string, string][];
     return new Map(
-      rows.map(([path, id, title, kind, words, synopsis, status, aka, portrait, label, skip, dates, arc]) => [
+      rows.map(([path, id, title, kind, words, synopsis, status, aka, portrait, label, file, skip, dates, arc]) => [
         path,
-        { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[], portrait: portrait ?? '', label: label ?? '', skipExport: skip === 1, dates: JSON.parse(dates || '[]') as StoryDate[], arc: JSON.parse(arc || '{}') as Record<string, ArcBeat> },
+        { id, title, kind, words, synopsis, status, aka: JSON.parse(aka || '[]') as string[], portrait: portrait ?? '', label: label ?? '', file: file ?? '', skipExport: skip === 1, dates: JSON.parse(dates || '[]') as StoryDate[], arc: JSON.parse(arc || '{}') as Record<string, ArcBeat> },
       ]),
     );
   }
@@ -291,10 +280,10 @@ export class BookIndex {
   }
 
   /** Title matches count ten times as much as matches in the text. */
-  search(query: string, { kinds, limit = 50, archive = false }: SearchOptions = {}): SearchHit[] {
+  search(query: string, { kinds, limit = 50, aside = false }: SearchOptions = {}): SearchHit[] {
     const match = toFtsQuery(query);
     if (!match) return [];
-    const kindFilter = `${kinds ? `and d.kind in (${kinds.map(() => '?').join(', ')})` : ''}${archive ? '' : ` and ${LIVE}`}`;
+    const kindFilter = `${kinds ? `and d.kind in (${kinds.map(() => '?').join(', ')})` : ''}${aside ? '' : ` and ${LIVE}`}`;
     const rows = this.db.selectArrays(
       `select d.path, d.title, d.kind, snippet(docs_fts, 1, ?, ?, '…', 14)
             from docs_fts join docs d on d.rowid = docs_fts.rowid
@@ -331,7 +320,7 @@ export async function refreshIndex(fs: StorageAdapter, index: BookIndex): Promis
   const known = index.stamps();
   const seen = new Set<string>();
   let touched = 0;
-  for (const root of NOTES_ON ? [BOOKSHELF, PANTRY, RECIPES, ARCHIVE] : [BOOKSHELF, PANTRY, ARCHIVE]) {
+  for (const root of NOTES_ON ? [BOOKSHELF, PANTRY, RECIPES, RESEARCH, ARCHIVE] : [BOOKSHELF, PANTRY, RESEARCH, ARCHIVE]) {
     if (!(await fs.exists(root))) continue;
     for (const file of walkFiles(await readTree(fs, root))) {
       seen.add(file.path);

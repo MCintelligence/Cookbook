@@ -235,12 +235,12 @@ describe('importing a Scrivener project', () => {
     await expect(findProject(filesSource(two))).rejects.toThrow(/more than one/);
   });
 
-  it('lays the Draft out on the Shelf and the rest in the Pantry, in Binder order', async () => {
+  it('lays the Draft out on the Shelf, Characters and Places in the Pantry, and the rest in Research', async () => {
     const fs = new MemoryAdapter();
     const result = await importScrivener(filesSource(project()), fs);
     expect(result.info.title).toBe('Summer Kitchen');
     expect((await openBook(fs)).title).toBe('Summer Kitchen');
-    expect(result).toMatchObject({ items: 4, cards: 4, skipped: ['Old menu'], first: 'bookshelf/Chapter One/Sunday Dinner.md' });
+    expect(result).toMatchObject({ items: 4, cards: 2, research: 2, skipped: ['Old menu'], first: 'bookshelf/Chapter One/Sunday Dinner.md' });
 
     const order = await loadOrder(fs);
     const shelf = await readTree(fs, 'bookshelf', order);
@@ -256,11 +256,14 @@ describe('importing a Scrivener project', () => {
 
     expect(await readDocument(fs, 'pantry/characters/June.md')).toMatchObject({ kind: 'character', body: 'Twenty-six, a cook.\n' });
     expect(await readDocument(fs, 'pantry/settings/The Kitchen.md')).toMatchObject({ kind: 'setting' });
-    expect(await readDocument(fs, 'pantry/research/Cornbread history.md')).toMatchObject({ kind: 'research' });
-    expect(await readDocument(fs, 'pantry/research/Notes/Ideas.md')).toMatchObject({ kind: 'research', body: 'More pie.\n' });
+    // Research keeps Scrivener's order: its own documents, then the other top-level folders as Groups.
+    expect((await readTree(fs, 'research', order)).map((n) => n.name)).toEqual(['Cornbread history.md', 'Notes']);
+    expect(await readDocument(fs, 'research/Cornbread history.md')).toMatchObject({ kind: 'scene', body: 'Corn came first.\n' });
+    expect(await readDocument(fs, 'research/Notes/Ideas.md')).toMatchObject({ kind: 'scene', body: 'More pie.\n' });
+    expect(await fs.exists('pantry/research/Notes')).toBe(false);
     // The Trash stays behind.
     expect(await fs.exists('bookshelf/Gone.md')).toBe(false);
-    expect(await fs.exists('pantry/research/Trash')).toBe(false);
+    expect(await fs.exists('research/Trash')).toBe(false);
   });
 
   it('reads Scrivener 2 projects, which number their files', async () => {
@@ -368,28 +371,30 @@ describe('importing notes, comments, files and snapshots', () => {
     expect(result).toMatchObject({ notes: 1, snapshots: 3, files: 6, skipped: ['Missing scan'] });
   });
 
-  it('keeps pictures in pictures/ and other files in files/, each on a card', async () => {
+  it('keeps PDFs, pictures and web pages in files/, each shown by an Item in Research', async () => {
     const fs = new MemoryAdapter();
     await importScrivener(filesSource(files()), fs);
-    const menu = await readDocument(fs, 'pantry/research/Old menu.md');
-    expect(menu).toMatchObject({ kind: 'research', fields: { synopsis: 'Prices in 1952' } });
-    // A card's document notes follow its own words.
-    expect(menu.body).toBe('*A PDF brought from Scrivener, kept with this recipe as* `files/Old menu.pdf`*.*\n\n### Notes\n\nCheck the year.\n');
+    const menu = await readDocument(fs, 'research/Old menu.md');
+    expect(menu).toMatchObject({ kind: 'scene', fields: { synopsis: 'Prices in 1952', file: 'files/Old menu.pdf' } });
+    // Its document notes are its page.
+    expect(menu.body).toBe('Check the year.\n');
     expect(strFromU8(await fs.readBytes('files/Old menu.pdf'))).toBe('%PDF-1.4 menu');
 
-    // A picture with no FileExtension is still found, and shown on its card.
-    expect((await readDocument(fs, 'pantry/research/Farmhouse.md')).body).toBe('![Farmhouse](pictures/Farmhouse.jpeg)\n');
-    expect(await fs.readBytes('pictures/Farmhouse.jpeg')).toEqual(PNG);
+    // A picture with no FileExtension is still found.
+    expect((await readDocument(fs, 'research/Farmhouse.md')).fields).toEqual({ file: 'files/Farmhouse.jpeg' });
+    expect(await fs.readBytes('files/Farmhouse.jpeg')).toEqual(PNG);
     // In Characters it becomes the card's portrait.
     expect((await readDocument(fs, "pantry/characters/June's photo.md")).fields).toEqual({ portrait: "pictures/June's photo.jpg" });
-    // A picture in the Draft goes to Materials, not the Shelf.
-    expect(await fs.exists('pantry/research/Map in the draft.md')).toBe(true);
+    // A picture in the Draft goes to Research, not the Shelf.
+    expect((await readDocument(fs, 'research/Map in the draft.md')).fields).toEqual({ file: 'files/Map in the draft.png' });
     expect((await readTree(fs, 'bookshelf')).map((n) => n.name)).toEqual(['Part One']);
 
-    expect((await readDocument(fs, 'pantry/research/Cornbread article.md')).body).toContain('Saved from [https://example.com/cornbread](https://example.com/cornbread)');
-    expect((await readDocument(fs, 'pantry/research/Saved page.md')).body).toContain('Corn\n\nGrind it fine.\n');
-    // A file that isn't in the project keeps its card for its notes, and is named in the message.
-    expect((await readDocument(fs, 'pantry/research/Missing scan.md')).body).toBe('Ask the library.\n');
+    // Web pages are kept whole, to be shown as they were saved.
+    expect((await readDocument(fs, 'research/Cornbread article.md')).fields).toEqual({ file: 'files/Cornbread article.webarchive' });
+    expect((await readDocument(fs, 'research/Saved page.md')).fields).toEqual({ file: 'files/Saved page.html' });
+    // A file that isn't in the project keeps its Item for its notes, and is named in the message.
+    expect(await readDocument(fs, 'research/Missing scan.md')).toMatchObject({ body: 'Ask the library.\n', fields: {} });
+    expect(await fs.exists('pantry/research/Old menu.md')).toBe(false);
   });
 
   it('finds Scrivener 2 pictures and notes beside the text in Files/Docs', async () => {
@@ -408,7 +413,7 @@ describe('importing notes, comments, files and snapshots', () => {
     const result = await importScrivener(filesSource(f), fs);
     const one = await readDocument(fs, 'bookshelf/One.md');
     expect((await readDocument(fs, 'pantry/research/Notes from Scrivener/One.md')).body).toBe('Say it louder.\n');
-    expect((await readDocument(fs, 'pantry/research/Barn.md')).body).toBe('![Barn](pictures/Barn.png)\n');
+    expect((await readDocument(fs, 'research/Barn.md')).fields).toEqual({ file: 'files/Barn.png' });
     expect((await listSnapshots(fs, one.id))[0]).toMatchObject({ body: 'Hi.\n', reason: 'From Scrivener' });
     expect(result).toMatchObject({ files: 1, snapshots: 1, skipped: [] });
   });

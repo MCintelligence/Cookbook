@@ -81,7 +81,7 @@
 
 /* In dark mode only the frame goes dark: the page stays white paper, so picked text colours show as they are.
    Whatever sits on the page or a Pantry card's details (marks, highlights, little controls) takes the light theme's colours. */
-:root[data-theme='dark'] :is(.cb-page, .pantry-card) {
+:root[data-theme='dark'] :is(.cb-page, .pantry-card, .research-viewer) {
   --text: #1c1c1b;
   --muted: #6b6b67;
   --faint: #8e8e89;
@@ -147,7 +147,7 @@
   color-scheme: dark;
 }
 /* What sits on the parchment page (and a Pantry card's details) takes ink-coloured controls, not the frame's light ones. */
-:root[data-theme='sepia'] :is(.cb-page, .pantry-card) {
+:root[data-theme='sepia'] :is(.cb-page, .pantry-card, .research-viewer) {
   --text: #241c15;
   --muted: #5c4e40;
   --faint: #7d6b56;
@@ -1634,21 +1634,57 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 /* In Prep and Plan the page and its toolbar are put away (still there, so nothing is lost) and the mode's own take their places. */
 .app.in-mode > .toolbar:not(.mode-toolbar), .app.in-mode > .desk { display: none; }
 
-/* The Archive: a compartment at the foot of the Shelf for Items set aside. */
-.archive { flex: none; position: sticky; bottom: 32px; z-index: 1; margin: 4px -8px 0; padding: 4px 8px 4px; border-top: 1px solid var(--line); background: var(--sidebar); }
-.archive-body { max-height: 38vh; overflow-y: auto; }
-.archive-head { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; cursor: pointer; }
-.archive-head:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
-.archive-chevron { flex: none; transition: transform 0.15s ease; }
-.archive.is-open .archive-chevron { transform: rotate(90deg); }
-.archive-name { flex: 1; }
-.archive-count { flex: none; min-width: 18px; padding: 0 5px; border-radius: 9px; background: color-mix(in srgb, var(--text) 8%, transparent); font-size: 11px; letter-spacing: 0; text-align: center; }
-.archive-body > .tree { padding-left: 0; }
-.archive-empty { margin: 4px 8px 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
-.archive.is-drop { background: color-mix(in srgb, var(--accent) 10%, var(--sidebar)); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
-.archive.is-drop .archive-head { color: var(--accent); }
+/* Research and the Archive: compartments at the foot of the Shelf for what is kept beside the book. */
+.compartments { flex: none; position: sticky; bottom: 32px; z-index: 1; margin: 4px -8px 0; background: var(--sidebar); }
+.compartment { padding: 4px 8px; border-top: 1px solid var(--line); }
+.compartment-body { max-height: 30vh; overflow-y: auto; }
+.compartment-head { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; text-align: left; cursor: pointer; }
+.compartment-head:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+.compartment-chevron { flex: none; transition: transform 0.15s ease; }
+.compartment.is-open .compartment-chevron { transform: rotate(90deg); }
+.compartment-name { flex: 1; }
+.compartment-count { flex: none; min-width: 18px; padding: 0 5px; border-radius: 9px; background: color-mix(in srgb, var(--text) 8%, transparent); font-size: 11px; letter-spacing: 0; text-align: center; }
+.compartment-body > .tree { padding-left: 0; }
+.compartment-empty { margin: 4px 8px 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.compartment.is-drop { background: color-mix(in srgb, var(--accent) 10%, var(--sidebar)); box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
+.compartment.is-drop .compartment-head { color: var(--accent); }
 .archive .tree-card .tree-card-title { color: var(--muted); }
 .archive .tree-card.from-pantry { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
 .tree-flag.tree-from { margin-left: auto; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .sidebar.put-back > .tree { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 8px; }
 .archive .tree-card.from-pantry .tree-card-top { padding-left: 19px; }
+/* A Research Item that shows a file: a small mark of what kind, where a Shelf Item has its status. */
+.tree-file-icon { flex: none; color: var(--muted); }
+.tree-card.is-file .tree-card-top { gap: 6px; }
+
+/* Research: a file shown above its page of notes, as one card, the way a Pantry card sits above its page. */
+.research-viewer { width: 816px; max-width: 100%; flex: none; display: flex; flex-direction: column; border: 1px solid var(--line); border-bottom: none; border-radius: 8px 8px 0 0; background: var(--paper); overflow: hidden; }
+.research-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 10px 6px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.research-bar > svg { flex: none; color: var(--accent); }
+.research-kind { flex: none; font-weight: 700; color: var(--text); }
+.research-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.research-zoom { flex: none; display: inline-flex; align-items: center; gap: 2px; }
+.research-zoom-label { min-width: 46px; height: 26px; padding: 0 4px; border: none; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.research-zoom-label:hover { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.research-save { flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--field); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+.research-save:disabled { opacity: 0.5; cursor: default; }
+.research-from { margin: 0; padding: 6px 14px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.research-from span { color: var(--text); user-select: text; }
+.research-body { display: flex; flex-direction: column; }
+.research-note { margin: 0; padding: 28px 24px; color: var(--muted); font-size: 14px; line-height: 1.5; text-align: center; }
+/* PDFs and web pages scroll inside the card, so the notes below stay one scroll away. */
+.research-pdf { height: min(78vh, 1100px); overflow: auto; display: flex; flex-direction: column; align-items: safe center; gap: 12px; padding: 16px; background: color-mix(in srgb, var(--text) 7%, var(--paper)); }
+.research-pdf-page { position: relative; flex: none; background: #fff; box-shadow: 0 1px 3px rgba(var(--shadow), 0.18); }
+.research-pdf-page canvas { display: block; }
+.research-picture { max-height: min(78vh, 1100px); overflow: auto; display: flex; justify-content: safe center; align-items: flex-start; padding: 12px; background: color-mix(in srgb, var(--text) 4%, var(--paper)); }
+.research-picture img { display: block; max-width: none; height: auto; }
+.research-web { display: block; width: 100%; height: min(78vh, 1100px); border: none; background: #fff; }
+.research-audio { width: calc(100% - 32px); margin: 20px 16px; }
+.research-video { display: block; width: 100%; max-height: 70vh; background: #000; }
+/* A PDF page's words, laid invisibly over it so they can be selected and copied (from pdf.js's own viewer). */
+.research-pdf-page .textLayer { position: absolute; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-align: initial; -webkit-text-size-adjust: none; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 0; --min-font-size: 1; --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size)); --min-font-size-inv: calc(1 / var(--min-font-size)); }
+.research-pdf-page .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.research-pdf-page .textLayer > :not(.markedContent), .research-pdf-page .textLayer .markedContent span:not(.markedContent) { z-index: 1; --font-height: 0; font-size: calc(var(--text-scale-factor) * var(--font-height)); --scale-x: 1; --rotate: 0deg; transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv)); }
+.research-pdf-page .textLayer .markedContent { display: contents; }
+.research-pdf-page .textLayer ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.research-pdf-page .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }

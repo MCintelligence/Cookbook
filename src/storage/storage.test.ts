@@ -191,7 +191,7 @@ describe('hidden index', () => {
     // Indexed, so the Archive's rows know their kinds and titles.
     expect(index.cards().get(old)?.kind).toBe('character');
     expect(index.search('lou').map((h) => h.path).sort()).toEqual([lou, scene].sort());
-    expect(index.search('lou', { archive: true }).map((h) => h.path).sort()).toEqual([cut, lou, old, scene].sort());
+    expect(index.search('lou', { aside: true }).map((h) => h.path).sort()).toEqual([cut, lou, old, scene].sort());
     expect(index.scenesNaming(['Lou'], () => 1).map((m) => m.path)).toEqual([scene]);
     expect(index.pageTexts()).toEqual(['Lou stirred the greens.']);
     expect(index.links()).toEqual([]);

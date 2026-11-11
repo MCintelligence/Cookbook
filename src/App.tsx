@@ -3,6 +3,8 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import { type StorageAdapter, baseName, joinPath, parentOf } from './storage/adapter';
 import {
   ARCHIVE,
+  RESEARCH,
+  isAside,
   BOOKSHELF,
   PANTRY,
   NOTES_ON,
@@ -30,7 +32,7 @@ import {
   saveBookInfo,
   writeDocument,
 } from './storage/book';
-import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, isCard, newId, serializeDocument, statusOf, withField } from './storage/document';
+import { type CookbookDocument, type SceneStatus, LABELS, STATUSES, akaOf, fileOf, isCard, newId, serializeDocument, statusOf, withField } from './storage/document';
 import { applyRescue, dropRescue, keepRescue, takeRescue } from './storage/rescue';
 import { type TrashItem, deleteFromTrash, emptyTrash, listTrash, restoreFromTrash } from './storage/trash';
 import { backupZip } from './storage/backup';
@@ -161,7 +163,9 @@ import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
-import { ArchiveShelf } from './ui/ArchiveShelf';
+import { Compartment } from './ui/Compartment';
+import { addResearchFile, kindName, mimeOf } from './storage/research';
+const ResearchViewer = lazy(() => import('./ui/ResearchViewer').then((m) => ({ default: m.ResearchViewer })));
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
 import { PantryPanel } from './ui/PantryPanel';
@@ -220,6 +224,7 @@ const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), 
 /** Where an Item of each kind belongs when it comes out of the Archive. */
 const HOME_OF: Record<string, string> = { scene: BOOKSHELF, ...Object.fromEntries(PANTRY_SECTIONS.map((s) => [SECTION_KIND[s], joinPath(PANTRY, s)])) };
 const inArchive = (p: string) => p.startsWith(ARCHIVE + '/');
+const inResearch = (p: string) => p.startsWith(RESEARCH + '/');
 
 const NOT_A_BOOK = 'This folder is not a Cookbook recipe.';
 /** The undo log is bigger than the scene, so it is written at most this often while typing. */
@@ -306,6 +311,8 @@ export function App() {
   const [pantryTree, setPantryTree] = useState<TreeNode[]>([]);
   /** The Archive: Shelf and Pantry Items set aside, in whatever order the writer likes. */
   const [archiveTree, setArchiveTree] = useState<TreeNode[]>([]);
+  /** Research: notes and files to look at, kept beside the book as Scrivener keeps them. */
+  const [researchTree, setResearchTree] = useState<TreeNode[]>([]);
   const [recipes, setRecipes] = useState<Map<string, Recipe[]>>(new Map());
   /** Each Item's drafts by number, by Item id; read from folder names when the Shelf is read. */
   const [draftIds, setDraftIds] = useState<Map<string, number[]>>(new Map());
@@ -724,6 +731,7 @@ export function App() {
     // A Recipe folder with no Pantry yet (its folder deleted by hand, say) shows an empty one.
     setPantryTree((await fs.exists(PANTRY)) ? await readTree(fs, PANTRY, ordered) : []);
     setArchiveTree((await fs.exists(ARCHIVE)) ? await readTree(fs, ARCHIVE, ordered) : []);
+    setResearchTree((await fs.exists(RESEARCH)) ? await readTree(fs, RESEARCH, ordered) : []);
     // Recipes are listed under the page they name, so they follow it wherever it moves.
     const byPage = new Map<string, Recipe[]>();
     if (NOTES_ON && (await fs.exists(RECIPES))) {
@@ -745,7 +753,7 @@ export function App() {
   }, [refreshTree, indexVersion > 0]);
 
   /** The tree a path's top folder holds. */
-  const treeOf = (top: string) => (top === PANTRY ? pantryTree : top === ARCHIVE ? archiveTree : tree);
+  const treeOf = (top: string) => (top === PANTRY ? pantryTree : top === ARCHIVE ? archiveTree : top === RESEARCH ? researchTree : tree);
 
   const [undoLog, setUndoLog] = useState<UndoLog | null>(null);
   /** Words written each day. Kept in a store, so a save that adds to today redraws the Goals pop-up, not the whole app. */
@@ -935,12 +943,13 @@ export function App() {
       await fs.writeText(target, text);
       savedText.current = text;
       const indexed = toIndexed(target, next, '');
-      // Count words written, unless the change only moved words between scenes.
+      // Count words written, unless the change only moved words between scenes. Research and the
+      // Archive are kept beside the book, so what is typed there isn't counted towards today's words.
       changedSinceBackup.current = true;
       const words = indexed.words;
       const pasted = pastedWords.current;
       pastedWords.current = 0;
-      if (!movingWords.current && savedWords.current !== null) {
+      if (!movingWords.current && savedWords.current !== null && !isAside(target)) {
         let delta = words - savedWords.current;
         // Pasting a chapter in isn't writing it, unless the book counts pasted words.
         if (delta > 0 && !bookRef.current?.countPasted) delta -= Math.min(delta, pasted);
@@ -1138,7 +1147,7 @@ export function App() {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
     const top = topOf(p);
-    if (top === BOOKSHELF || top === PANTRY) order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
+    if (top === BOOKSHELF || top === PANTRY || top === RESEARCH) order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
@@ -1617,7 +1626,8 @@ export function App() {
 
   /**
    * Brings Word, Markdown and text files in as new scenes (or Pantry cards),
-   * after the open one or at the end of `into`.
+   * after the open one or at the end of `into`. In Research, any other file
+   * (a PDF, picture, web page, sound or film) comes in to be looked at.
    */
   const importFiles = async (files: File[], into: string | null) => {
     if (!fs || files.length === 0) return;
@@ -1627,21 +1637,27 @@ export function App() {
     const top = folder.split('/')[0]!;
     const section = sectionOf(folder + '/x');
     const kind = top === PANTRY && section ? SECTION_KIND[section] : 'scene';
+    const research = top === RESEARCH;
+    if (research) await fs.makeFolder(RESEARCH);
     // A zipped Scrivener project, such as one of Scrivener's backups, becomes a recipe of its own.
     const zip = files.find((f) => f.name.toLowerCase().endsWith('.zip'));
-    if (zip && files.length === 1) {
+    if (zip && files.length === 1 && !research) {
       const bytes = new Uint8Array(await zip.arrayBuffer());
       if (isScrivenerZip(bytes)) return importScrivenerFrom(zipSource(bytes)!);
     }
-    const problems: string[] = files.filter((f) => !canImport(f.name)).map((f) => `${f.name} isn’t a Word, Markdown or text file`);
+    const problems: string[] = research ? [] : files.filter((f) => !canImport(f.name)).map((f) => `${f.name} isn’t a Word, Markdown or text file`);
     let after = path && parentOf(path) === folder ? path : null;
     let first: string | null = null;
     let count = 0;
-    for (const file of files.filter((f) => canImport(f.name))) {
+    for (const file of research ? files : files.filter((f) => canImport(f.name))) {
       try {
-        const imported = importFile(file.name, new Uint8Array(await file.arrayBuffer()));
-        const p = await createDocument(fs, folder, imported.title, kind);
-        await writeDocument(fs, p, { ...(await readDocument(fs, p)), body: imported.body });
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let p: string;
+        if (canImport(file.name)) {
+          const imported = importFile(file.name, bytes);
+          p = await createDocument(fs, folder, imported.title, kind);
+          await writeDocument(fs, p, { ...(await readDocument(fs, p)), body: imported.body });
+        } else p = await addResearchFile(fs, folder, file.name, bytes);
         const shelf = await readTree(fs, top, ORDERED(order.current));
         order.current = await placeNew(fs, order.current, shelf, top, p, after);
         after = p;
@@ -1656,7 +1672,7 @@ export function App() {
     if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
     if (first) {
       await select(first);
-      const where = folder === top ? (top === BOOKSHELF ? 'the Shelf' : 'the Pantry') : `“${baseName(folder)}”`;
+      const where = folder === top ? (top === BOOKSHELF ? 'the Shelf' : top === RESEARCH ? 'Research' : 'the Pantry') : `“${baseName(folder)}”`;
       say(`Imported ${count === 1 ? 'one file' : `${count} files`} into ${where}.`);
     }
   };
@@ -1706,8 +1722,8 @@ export function App() {
       ].filter(Boolean);
       const brought = also.length > 0 ? ` It also brought ${also.length > 1 ? `${also.slice(0, -1).join(', ')} and ${also[also.length - 1]}` : also[0]}.` : '';
       const n = result.skipped.length;
-      const missing = n === 0 ? '' : n === 1 ? ` One file (“${result.skipped[0]}”) wasn’t in the project, so only its card came.` : ` ${n} files weren’t in the project, so only their cards came.`;
-      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf and ${count(result.cards, 'card', 'cards')} in the Pantry.${brought}${missing}`);
+      const missing = n === 0 ? '' : n === 1 ? ` One file (“${result.skipped[0]}”) wasn’t in the project, so only its notes came.` : ` ${n} files weren’t in the project, so only their notes came.`;
+      say(`Imported “${title}” from Scrivener: ${count(result.items, 'Item', 'Items')} on the Shelf, ${count(result.research, 'Item', 'Items')} in Research and ${count(result.cards, 'card', 'cards')} in the Pantry.${brought}${missing}`);
     } catch (e) {
       setError(`Couldn’t import the Scrivener project. ${friendlyError(e)}`);
     }
@@ -1725,13 +1741,17 @@ export function App() {
 
   const chooseImport = (into: string | null) => {
     importInto.current = into;
-    importInput.current?.click();
+    const input = importInput.current;
+    if (!input) return;
+    // Research takes any file; the Shelf and Pantry take words.
+    input.accept = into && topOf(into) === RESEARCH ? '' : [...IMPORTABLE, '.zip'].join(',');
+    input.click();
   };
 
   /** Where files dropped on the Shelf go: the book under the pointer, or the book a page is in. */
   const dropFolder = (target: EventTarget | null): string => {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-tree-path]');
-    if (!row) return BOOKSHELF;
+    if (!row) return (target as Element | null)?.closest?.('.research') ? RESEARCH : BOOKSHELF;
     const p = row.dataset.treePath!;
     return row.dataset.treeKind === 'folder' ? p : parentOf(p);
   };
@@ -2151,6 +2171,128 @@ export function App() {
       { label: 'Collapse all', disabled: archiveTree.length === 0, onPick: () => setFolding({ open: false, under: ARCHIVE, at: Date.now() }) },
     ]);
 
+  /** Whether anything at or under `p` in Research shows a file, which only Research can hold. */
+  const holdsFiles = (p: string) => [...(cards as Map<string, CardSummary>)].some(([q, c]) => (q === p || q.startsWith(p + '/')) && !!c.file);
+
+  /** The right-click menu for a row in Research: much the same as the Shelf's, as in Scrivener's Binder. */
+  const researchMenu = (node: TreeNode, x: number, y: number) => {
+    const p = node.path;
+    const card = cards.get(p);
+    const within: MenuItem[] = [
+      ...(parentOf(p) !== RESEARCH ? [{ label: 'Top of Research', onPick: () => void moveInto(p, RESEARCH) }] : []),
+      ...groupTargets(researchTree, (f) => void moveInto(p, f), p),
+    ];
+    const rearrange: MenuItem = { label: 'Move within Research', items: within.length > 0 ? within : [{ label: 'No other groups', onPick: () => {}, disabled: true }] };
+    // Files stay in Research: the Shelf is the book's own words.
+    const toShelf: MenuItem = holdsFiles(p)
+      ? { label: 'Move to the Shelf', onPick: () => {}, disabled: true, hint: node.kind === 'folder' ? 'Holds files' : 'Files stay here' }
+      : { label: 'Move to the Shelf', items: [{ label: 'Top of the Shelf', onPick: () => void fromResearch(p, BOOKSHELF) }, ...groupTargets(tree, (f) => void fromResearch(p, f))] };
+    const label: MenuItem = {
+      label: 'Label',
+      items: [
+        { label: 'None', checked: !card?.label, onPick: () => void setFieldOf(p, 'label', undefined) },
+        ...LABELS.map((l) => ({ label: l.name, checked: card?.label === l.id, onPick: () => void setFieldOf(p, 'label', l.id) })),
+      ],
+    };
+    const trash: MenuItem[] = [{ separator: true }, { label: 'Move to trash', hint: 'Delete', danger: true, onPick: () => void trashPath(p) }];
+    if (node.kind === 'folder') {
+      const kids = childrenOf(researchTree, RESEARCH, p);
+      showMenu('Research group', x, y, [
+        { label: 'New note inside', onPick: () => void addFrom(SCENE_TEMPLATES[0]!, p, NAME_IT) },
+        { label: 'New group inside', onPick: () => void addFolderIn(p) },
+        { label: 'Import files here…', onPick: () => chooseImport(p) },
+        { separator: true },
+        { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+        rearrange,
+        toShelf,
+        {
+          label: 'Sort contents',
+          disabled: kids.length < 2,
+          items: [
+            { label: 'A to Z', onPick: () => void sortContents(p, false) },
+            { label: 'Z to A', onPick: () => void sortContents(p, true) },
+          ],
+        },
+        { label: 'Expand all inside', onPick: () => setFolding({ open: true, under: p, at: Date.now() }) },
+        { label: 'Collapse all inside', onPick: () => setFolding({ open: false, under: p, at: Date.now() }) },
+        ...trash,
+      ]);
+      return;
+    }
+    const file = card?.file;
+    showMenu(file ? kindName(file) : 'Research note', x, y, [
+      { label: 'Open', onPick: () => void select(p) },
+      ...(!file && path && p !== path ? [{ label: 'Open beside this one', onPick: () => setBeside(p) }] : []),
+      ...(file ? [{ label: 'Save a copy…', onPick: () => void saveResearchCopy(p) }] : []),
+      { separator: true },
+      { label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) },
+      label,
+      ...(!file ? [{ label: 'Duplicate', onPick: () => void duplicate(p) }] : []),
+      rearrange,
+      { label: 'Put in a new group', onPick: () => void groupIntoFolder(p) },
+      toShelf,
+      ...trash,
+    ]);
+  };
+
+  /** The right-click menu for the space around Research's rows. */
+  const researchSpaceMenu = (x: number, y: number) =>
+    showMenu('Research', x, y, [
+      { label: 'New note in Research', onPick: () => void (async () => fs && (await fs.makeFolder(RESEARCH), addFrom(SCENE_TEMPLATES[0]!, RESEARCH, NAME_IT)))() },
+      { label: 'New group in Research', onPick: () => void (async () => fs && (await fs.makeFolder(RESEARCH), addFolderIn(RESEARCH)))() },
+      { label: 'Import files…', hint: 'PDFs, pictures, web pages…', onPick: () => chooseImport(RESEARCH) },
+      { separator: true },
+      { label: 'Expand all', disabled: researchTree.length === 0, onPick: () => setFolding({ open: true, under: RESEARCH, at: Date.now() }) },
+      { label: 'Collapse all', disabled: researchTree.length === 0, onPick: () => setFolding({ open: false, under: RESEARCH, at: Date.now() }) },
+    ]);
+
+  /** Moves Shelf Items and Groups into Research, at its end, in the order they are shown. */
+  const toResearch = async (paths: string[]) => {
+    if (!fs) return;
+    const list = topmost(paths).filter((p) => topOf(p) === BOOKSHELF);
+    if (list.length === 0) return;
+    await flushSave();
+    await saveUndoNow();
+    try {
+      await fs.makeFolder(RESEARCH);
+      for (const p of list) await moveAcross(p, RESEARCH);
+      setShelfMarked(new Set());
+      const name = (p: string) => cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '');
+      say(list.length === 1 ? `Moved “${name(list[0]!)}” to Research.` : `Moved ${list.length} to Research.`);
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+    await refreshTree();
+  };
+
+  /** Moves a note or Group from Research onto the Shelf, at the end of `folder`. Files stay in Research. */
+  const fromResearch = async (p: string, folder: string = BOOKSHELF) => {
+    if (!fs || !inResearch(p)) return;
+    if (holdsFiles(p)) return say('Files stay in Research. Only notes can go on the Shelf.');
+    await flushSave();
+    await saveUndoNow();
+    try {
+      await moveAcross(p, folder);
+      say(`Moved “${cards.get(p)?.title ?? baseName(p).replace(/\.md$/, '')}” to the Shelf.`);
+    } catch (e) {
+      setError(friendlyError(e));
+    }
+    await refreshTree();
+  };
+
+  /** Saves a copy of the file a Research Item shows, wherever the writer picks. */
+  const saveResearchCopy = async (p: string) => {
+    const file = cards.get(p)?.file;
+    if (!fs || !file) return;
+    try {
+      const name = baseName(file);
+      const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : '';
+      await saveFile(name, await fs.readBytes(file), { label: kindName(file), extension: ext, mime: mimeOf(file) });
+    } catch (e) {
+      setError(`Couldn’t save a copy. ${friendlyError(e)}`);
+    }
+  };
+
   const rowMenu = (node: TreeNode, x: number, y: number) => {
     const p = node.path;
     const top = topOf(p);
@@ -2174,6 +2316,7 @@ export function App() {
       return;
     }
     if (top === ARCHIVE) return archiveMenu(node, x, y);
+    if (top === RESEARCH) return researchMenu(node, x, y);
     const common = {
       label: {
         label: 'Label',
@@ -2185,6 +2328,7 @@ export function App() {
       duplicate: { label: 'Duplicate', onPick: () => void duplicate(p) },
       move: { label: 'Move to', items: moveTargets(p) },
       archive: { label: 'Move to Archive', onPick: () => void archivePaths([p]) },
+      ...(onShelf && { research: { label: 'Move to Research', onPick: () => void toResearch([p]) } }),
     };
     // An Item removed from Prep or Plan can come back from here as well as by dragging it in.
     const removedFrom = card ? (['prep', 'plan'] as const).filter((m) => prefsStore.get().hidden[m].includes(card.id)) : [];
@@ -2205,7 +2349,7 @@ export function App() {
         { label: 'New group inside', onPick: () => void addFolderIn(p) },
         ...(onShelf ? [{ label: 'Import files here…', onPick: () => chooseImport(p) }] : []),
         { separator: true },
-        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move, common.archive]),
+        ...(fixed ? [] : [{ label: 'Rename', hint: 'F2', onPick: () => setRenaming(p) }, common.duplicate, common.move, ...(common.research ? [common.research] : []), common.archive]),
         {
           label: 'Sort contents',
           disabled: kids.length < 2,
@@ -2232,6 +2376,7 @@ export function App() {
         { separator: true },
         common.duplicate,
         common.move,
+        ...(common.research ? [common.research] : []),
         common.archive,
         ...bringBack,
         ...trash,
@@ -2261,6 +2406,7 @@ export function App() {
       },
       { separator: true },
       common.move,
+      ...(common.research ? [common.research] : []),
       common.archive,
       ...bringBack,
       { label: 'Put in a new group', onPick: () => void groupIntoFolder(p) },
@@ -2740,8 +2886,8 @@ export function App() {
   // indexVersion changes whenever the index does, so results stay fresh while the writer types a query.
   // Cards are read from the index, so they follow it like search does.
   const cards = useMemo(() => index.current?.index.cards() ?? new Map(), [indexVersion]);
-  /** Every card but those in the Archive, which is set aside from the rest of the recipe: its names, ties, Prep and Plan. */
-  const liveCards = useMemo(() => new Map([...(cards as Map<string, CardSummary>)].filter(([p]) => !inArchive(p))), [cards]);
+  /** Every card but those in the Archive and Research, which are kept beside the recipe: out of its names, ties, Prep and Plan. */
+  const liveCards = useMemo(() => new Map([...(cards as Map<string, CardSummary>)].filter(([p]) => !isAside(p))), [cards]);
   /** The drafts listed under each Shelf Item, by its path. Worked out when the Shelf or the drafts change, not as the writer types. */
   const draftRows = useMemo(() => {
     const rows = new Map<string, number[]>();
@@ -2773,6 +2919,11 @@ export function App() {
     },
     [fs],
   );
+  /** A Research file's bytes, read from the recipe. */
+  const loadResearchBytes = useCallback(async (p: string) => {
+    if (!fs) throw new Error('No recipe is open.');
+    return fs.readBytes(p);
+  }, [fs]);
   useEffect(() => {
     // Pictures written into scenes as ![…](path) are read from the book.
     setPictureLoader(fs ? loadPicture : null);
@@ -3346,7 +3497,7 @@ export function App() {
       .map(([p, c]) => {
         const top = p.split('/')[0];
         const folder = parentOf(p) === top ? '' : ` · ${baseName(parentOf(p))}`;
-        const group = top === PANTRY ? 'Pantry' : top === RECIPES ? 'Notes' : top === ARCHIVE ? 'Archive' : 'Shelf';
+        const group = top === PANTRY ? 'Pantry' : top === RECIPES ? 'Notes' : top === ARCHIVE ? 'Archive' : top === RESEARCH ? 'Research' : 'Shelf';
         return { id: `open:${p}`, label: c.title || 'Untitled', hint: `${group}${folder}`, group: scenesOnly ? 'Go to' : group, words: c.aka.join(' '), run: () => void select(p) };
       })
       .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, 'en', { numeric: true }));
@@ -3442,7 +3593,7 @@ export function App() {
     ];
   };
 
-  const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8, archive: true }) ?? [], [indexVersion]);
+  const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8, aside: true }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
   const css = useMemo(() => stylesToCss(sheet), [sheet]);
@@ -3772,10 +3923,15 @@ export function App() {
     if (!box) return null;
     const zone = deskZone(box, x, y, !!doc && !!path && !miseShown);
     // The open Item dropped on itself goes nowhere.
-    return zone && p === path && !miseShown ? null : zone;
+    if (zone && p === path && !miseShown) return null;
+    // A file from Research is looked at on its own, never beside another page.
+    return zone && cards.get(p)?.file ? 'open' : zone;
   };
-  /** What a drag out of a list is over: the Archive (from the Shelf or Pantry), or the Shelf or Pantry (from the Archive). */
-  const [archiveDrop, setArchiveDrop] = useState<'in' | 'out' | 'mode' | null>(null);
+  /**
+   * What a drag out of a list is over: the Archive (from the Shelf or Pantry), Research (from the
+   * Shelf), Prep or Plan, or the Shelf or Pantry (from the Archive or Research).
+   */
+  const [archiveDrop, setArchiveDrop] = useState<'in' | 'research' | 'out' | 'mode' | null>(null);
   const deskOver = useStable((p: string | null, x: number, y: number) => {
     // Only an Item opens on the page; a Group dragged over it is going nowhere.
     const zone = p && p.endsWith('.md') ? zoneAt(p, x, y) : null;
@@ -3803,32 +3959,42 @@ export function App() {
     const marks = topOf(p) === PANTRY ? pantryMarked : shelfMarked;
     void archivePaths(marks.has(p) && marks.size > 1 ? [...marks] : [p]);
   });
+  const researchDragged = useStable((p: string) => void toResearch(shelfMarked.has(p) && shelfMarked.size > 1 ? [...shelfMarked] : [p]));
   const putBackDragged = useStable((p: string) => void unarchive(p));
+  const shelveDragged = useStable((p: string) => void fromResearch(p));
   const overArchive = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest('.archive');
+  const overResearch = (x: number, y: number) => !!document.elementFromPoint(x, y)?.closest('.research');
   const overShelfOrPantry = (x: number, y: number) => {
     const el = document.elementFromPoint(x, y);
-    return !!el && !el.closest('.archive') && !!el.closest('.sidebar, .pantry-panel');
+    return !!el && !el.closest('.compartments') && !!el.closest('.sidebar, .pantry-panel');
+  };
+  const overShelf = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y);
+    return !!el && !el.closest('.compartments') && !!el.closest('.sidebar');
   };
   // From the Shelf or the Pantry: into the Archive (every picked row, if this is one), or onto the page.
   const intoArchive = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
         const into = !!p && !PANTRY_FOLDERS.has(p) && overArchive(x, y);
-        const mode = !into && !!p && p.endsWith('.md') && !!modeAt(x, y);
+        // Only the Shelf's own Items and Groups go into Research; the Pantry's are cards about the story.
+        const research = !into && !!p && topOf(p) === BOOKSHELF && overResearch(x, y);
+        const mode = !into && !research && !!p && p.endsWith('.md') && !!modeAt(x, y);
         // The day under the pointer lights up, as it does for a drag within the calendar.
         const day = mode ? document.elementFromPoint(x, y)?.closest('[data-day]') : null;
         document.querySelectorAll('.cal-day.shelf-over').forEach((el) => el !== day && el.classList.remove('shelf-over'));
         day?.classList.add('shelf-over');
-        setArchiveDrop((was) => (into ? 'in' : mode ? 'mode' : was === 'in' || was === 'mode' ? null : was));
-        return into || mode || deskOver(into || mode ? null : p, x, y);
+        setArchiveDrop((was) => (into ? 'in' : research ? 'research' : mode ? 'mode' : was === 'in' || was === 'research' || was === 'mode' ? null : was));
+        return into || research || mode || deskOver(into || research || mode ? null : p, x, y);
       },
       drop: (p: string, x: number, y: number) => {
         if (modeAt(x, y)) return intoMode(p, x, y);
+        if (overResearch(x, y)) return topOf(p) === BOOKSHELF ? researchDragged(p) : undefined;
         if (!overArchive(x, y)) return deskLand(p, x, y);
         archiveDragged(p);
       },
     }),
-    [deskOver, deskLand, archiveDragged, intoMode],
+    [deskOver, deskLand, archiveDragged, researchDragged, intoMode],
   );
   // From the Archive: back to the Shelf or the Pantry, or onto the page.
   const outOfArchive = useMemo(
@@ -3841,6 +4007,18 @@ export function App() {
       drop: (p: string, x: number, y: number) => (overShelfOrPantry(x, y) ? putBackDragged(p) : deskLand(p, x, y)),
     }),
     [deskOver, deskLand, putBackDragged],
+  );
+  // From Research: onto the Shelf (notes and Groups of notes; files stay), or onto the page.
+  const outOfResearch = useMemo(
+    () => ({
+      over: (p: string | null, x: number, y: number) => {
+        const out = !!p && overShelf(x, y) && !holdsFiles(p);
+        setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
+        return out || deskOver(out ? null : p, x, y);
+      },
+      drop: (p: string, x: number, y: number) => (overShelf(x, y) ? shelveDragged(p) : deskLand(p, x, y)),
+    }),
+    [deskOver, deskLand, shelveDragged, cards],
   );
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
@@ -3996,8 +4174,8 @@ export function App() {
         }}
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setFileDrop(null)}
         onContextMenu={(e) => {
-          // Rows have their own menu; this one is for the space around them. The Archive has its own too.
-          if ((e.target as Element).closest('[data-tree-path], [data-draft-of], .pantry-results button, input, .menu, .archive')) return;
+          // Rows have their own menu; this one is for the space around them. Research and the Archive have their own too.
+          if ((e.target as Element).closest('[data-tree-path], [data-draft-of], .pantry-results button, input, .menu, .compartment')) return;
           e.preventDefault();
           shelfMenu(e.clientX, e.clientY);
         }}
@@ -4038,26 +4216,68 @@ export function App() {
           outside={intoArchive}
         />
         </ShelfSearch>
-        <ArchiveShelf count={archiveTree.length} dropping={archiveDrop === 'in'} openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`} onMenu={archiveSpaceMenu}>
-          <Tree
-            nodes={archiveTree}
-            root={ARCHIVE}
-            selected={path}
-            cards={cards}
-            live={shelfLive}
-            collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
-            renaming={renaming}
-            onSelect={onSelect}
-            onMove={onTreeMove}
-            onStartRename={setRenaming}
-            onRename={onTreeRename}
-            onMenu={onRowMenu}
-            onTrash={onTreeTrash}
-            folding={folding}
-            tagCards
-            outside={outOfArchive}
-          />
-        </ArchiveShelf>
+        <div className="compartments">
+          <Compartment
+            name="Research"
+            icon="research"
+            className="research"
+            count={researchTree.length}
+            dropping={archiveDrop === 'research' || fileDrop === RESEARCH}
+            openKey={`cookbook.researchOpen:${JSON.stringify(location)}`}
+            empty="Notes, pictures, PDFs and web pages to look at while you write. Drop files here, or right-click to add a note. Nothing here is part of the book."
+            emptyDrop="Let go to keep it in Research."
+            onMenu={researchSpaceMenu}
+          >
+            <Tree
+              nodes={researchTree}
+              root={RESEARCH}
+              selected={path}
+              cards={cards}
+              live={shelfLive}
+              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${RESEARCH}`}
+              renaming={renaming}
+              onSelect={onSelect}
+              onMove={onTreeMove}
+              onStartRename={setRenaming}
+              onRename={onTreeRename}
+              onMenu={onRowMenu}
+              onTrash={onTreeTrash}
+              dropTarget={fileDrop}
+              folding={folding}
+              outside={outOfResearch}
+            />
+          </Compartment>
+          <Compartment
+            name="Archive"
+            icon="archive"
+            className="archive"
+            count={archiveTree.length}
+            dropping={archiveDrop === 'in'}
+            openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`}
+            empty="Set Items aside here: drag them in, or right-click and pick Move to Archive. They leave Prep and Plan until they are put back."
+            emptyDrop="Let go to archive it."
+            onMenu={archiveSpaceMenu}
+          >
+            <Tree
+              nodes={archiveTree}
+              root={ARCHIVE}
+              selected={path}
+              cards={cards}
+              live={shelfLive}
+              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
+              renaming={renaming}
+              onSelect={onSelect}
+              onMove={onTreeMove}
+              onStartRename={setRenaming}
+              onRename={onTreeRename}
+              onMenu={onRowMenu}
+              onTrash={onTreeTrash}
+              folding={folding}
+              tagCards
+              outside={outOfArchive}
+            />
+          </Compartment>
+        </div>
         {shelfBar()}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
@@ -4107,6 +4327,11 @@ export function App() {
           </div>
         ) : (
           <>
+          {doc && path && fileOf(doc.fields) && (
+            <Suspense fallback={null}>
+              <ResearchViewer style={cardStyle} file={fileOf(doc.fields)!} loadBytes={loadResearchBytes} onSave={() => void saveResearchCopy(path)} />
+            </Suspense>
+          )}
           {doc && path && isCard(doc.kind) && (
             <PantryCard
               style={cardStyle}
@@ -4128,7 +4353,7 @@ export function App() {
           <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
           {doc && path ? (
             <article
-              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) || fileOf(doc.fields) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
               key={path}
               style={pageStyle}
               onContextMenu={pageMenu}
@@ -4434,7 +4659,7 @@ export function App() {
               onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
             />
           )}
-          {doc && doc.kind === 'scene' && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
+          {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
           <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
           <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
             <Icon name="gear" size={18} />

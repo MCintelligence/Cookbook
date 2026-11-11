@@ -473,7 +473,8 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
     const status = card?.kind === 'scene' ? STATUSES.find((s) => s.id === card.status)! : null;
     const colour = LABELS.find((l) => l.id === card?.label);
     const own = recipes?.get(node.path) ?? [];
-    const versions = drafts?.get(node.path) ?? [];
+    // Newest first, so the latest draft sits right under the Item.
+    const versions = [...(drafts?.get(node.path) ?? [])].reverse();
     return (
       <li role="treeitem" aria-selected={selected === node.path} className={dragging === node.path ? 'is-dragging' : undefined}>
         {renaming === node.path ? (

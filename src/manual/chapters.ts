@@ -153,9 +153,9 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 
 ## Drafts
 
-To write an Item again from scratch, right-click it on the Shelf and choose **Draft this item** (also in the Recipe menu and the command palette). The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on, and keeps pace a paragraph at a time as you write the new version.
+To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on. As you write the new version it keeps pace a sentence at a time: each sentence you write takes the place of one of the draft's, and the rest of that paragraph carries on just after the cursor.
 
-Draft again for Draft 2, and so on; click a draft to have it show through instead. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
+Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. {key:olderDraft|Recipe › Older draft as ghost text} shows an older draft through the Item and {key:newerDraft|Recipe › Newer draft as ghost text} a newer one, back up to the newest; clicking a draft does the same. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',

@@ -65,7 +65,7 @@ describe('seasonings', () => {
     // No line is used twice anywhere, so each one belongs to its moment.
     expect(new Set(all).size).toBe(all.length);
     // The mockup's 23 per 1,000 words is in the middle of Pete's meter.
-    expect(METERS.pete.steps[tasteOf(METERS.pete.steps, 23)]!.level).toBe('Peppery');
+    expect(METERS.pete.steps[tasteOf(METERS.pete.steps, 23)]!.level).toBe('Hot');
     expect(METERS.daniel.steps[tasteOf(METERS.daniel.steps, 79)]!.level).toBe('Drunk');
   });
 

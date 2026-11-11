@@ -52,8 +52,9 @@ import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { createPortal } from 'react-dom';
 import { PhoneBar } from './ui/PhoneBar';
 import { PhoneFab } from './ui/PhoneFab';
+import { PhoneNav, type PhoneTab } from './ui/PhoneNav';
 import { usePhone } from './ui/usePhone';
-import { ANDROID_APP, fromTouch, isPhone, isTouch, onBack } from './mobile';
+import { ANDROID_APP, fromTouch, haptic, isPhone, isTouch, onBack } from './mobile';
 import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
@@ -196,6 +197,7 @@ interface KeptCaret {
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
 const SetTheTable = lazy(() => import('./ui/SetTheTable').then((m) => ({ default: m.SetTheTable })));
+const PhoneTable = lazy(() => import('./ui/PhoneTable').then((m) => ({ default: m.PhoneTable })));
 const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.Manual })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
@@ -206,7 +208,7 @@ const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
 /** How large the page's words are on a phone, against a computer's: larger, though not as much as the buttons. */
 const PHONE_PAGE = { small: 1, medium: 1.1, large: 1.22 } as const;
 /** A window narrow enough for the phone layout, where side panels slide over the page (styles.css, 900px). */
-const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches;
+const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches || isPhone();
 /** Fit width's zoom: the page, plus the desk's 24px sides, fills the desk. */
 const fitZoom = (deskWidth: number, pageInches: number) => Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageInches * 96)));
 /** Below this the page is shown as Draft, since a whole sheet of paper won't fit. */
@@ -446,6 +448,8 @@ export function App() {
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   /** Set the Table, the welcome questions: on the very first start, or again from App Settings or Help. */
   const [table, setTable] = useState<'first' | 'again' | null>(null);
+  /** The first recipe has been opened, or failed to: until then a phone shows only the wordmark, never a half-built app. */
+  const [booted, setBooted] = useState(false);
   /** The manual, open at a chapter. */
   const [manualAt, setManualAt] = useState<{ chapter: string; at: number } | null>(null);
   const lastSection = useRef<SettingsSection>('general');
@@ -733,8 +737,19 @@ export function App() {
         }
       }
       await openAt(await defaultLocation());
-    })().catch((e: unknown) => setError(friendlyError(e)));
+    })()
+      .catch((e: unknown) => setError(friendlyError(e)))
+      .finally(() => setBooted(true));
   }, []);
+  // The Item the writer left open comes a moment after its recipe. A phone waits for it (though not for long,
+  // since a recipe may have nothing open) so that the first thing drawn is the page, not an empty screen.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!booted || settled) return;
+    if (doc) return setSettled(true);
+    const wait = window.setTimeout(() => setSettled(true), 800);
+    return () => window.clearTimeout(wait);
+  }, [booted, doc, settled]);
 
   const refreshTree = useCallback(async () => {
     if (!fs) return;
@@ -1006,9 +1021,12 @@ export function App() {
       await flushSave();
       await saveUndoNow();
     }
+    // On a phone the Shelf and the Pantry are places of their own: opening something from one goes to the page it opens on.
+    if (isPhone() && !getSettings().focus && (sideOpen || panelNow.current.panel === 'pantry')) {
+      setPanel((open) => (open === 'pantry' ? null : open));
+      goToMode('cook');
+    }
     setSideOpen(false);
-    // On a phone the Pantry fills the screen, so it steps aside for the card it was asked to open.
-    if (isPhone() && !getSettings().focus) setPanel((open) => (open === 'pantry' ? null : open));
     docRef.current = opened;
     bodyFrom.current = null;
     savedText.current = serializeDocument(opened);
@@ -1859,6 +1877,9 @@ export function App() {
               { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
               { label: 'Expand the Shelf', onPick: () => setFolding({ open: true, at: Date.now() }) },
               { label: 'Collapse the Shelf', onPick: () => setFolding({ open: false, at: Date.now() }) },
+              { separator: true },
+              { label: 'Manual', onPick: () => setManualAt({ chapter: '', at: Date.now() }) },
+              { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
             ] as MenuItem[])
           : []),
       ],
@@ -3790,8 +3811,8 @@ export function App() {
   /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
   /**
    * On a phone, the open Item's name in the top bar opens one sheet with everything about it:
-   * which way to look (Cook, Prep, Plan), what can be done to the Item (its row's own menu on
-   * the Shelf, and its drafts and snapshots), and how the page behaves.
+   * what can be done to the Item (its row's own menu on the Shelf, and its drafts and
+   * snapshots), and how the page behaves. Cook, Prep and Plan are in the bar along the bottom.
    */
   const phoneItemSheet = (opener: HTMLElement) => {
     const recipe = topMenus.find((m) => m.label === 'Recipe')!.items();
@@ -3805,11 +3826,12 @@ export function App() {
       0,
       0,
       [
-        { heading: 'Look at it as' },
-        ...modeItems(sideOf(isCard(doc?.kind))),
-        ...(own.length > 0 ? ([{ separator: true }, { heading: 'This Item' }] as MenuItem[]) : []),
+        ...(own.length > 0 ? ([{ heading: 'This Item' }] as MenuItem[]) : []),
         // Open is where the writer already is.
-        ...own.filter((i, n, all) => !('separator' in i && (n === 0 || n === all.length - 1)) && !('label' in i && i.label === 'Open')),
+        ...own
+          .filter((i, n, all) => !('separator' in i && (n === 0 || n === all.length - 1)) && !('label' in i && i.label === 'Open'))
+          // A name is changed where it is listed, so Rename goes to the Shelf (or the Pantry) first.
+          .map((i) => ('label' in i && i.label === 'Rename' && 'onPick' in i ? { ...i, onPick: () => ((isCard(doc?.kind) ? setPanel('pantry') : setSideOpen(true)), i.onPick()) } : i)),
         ...(drafts.length > 0 || snaps ? ([{ separator: true }, ...drafts, ...(snaps ? [snaps] : [])] as MenuItem[]) : []),
         ...(doc && editor && !inMode
           ? ([
@@ -4066,10 +4088,45 @@ export function App() {
     const el = document.elementFromPoint(x, y);
     return !!el && !el.closest('.compartments') && !!el.closest('.sidebar');
   };
+  /**
+   * On a phone the Shelf and the Pantry fill the screen, so a row lifted from one has nowhere to
+   * go but the bottom bar: held over Prep or Plan there for a moment, the list steps aside, that
+   * mode shows, and the row can be set down on its board, timeline or calendar. The row's own
+   * drag (Tree.tsx) keeps running throughout; when it ends, the writer is left where they dropped it.
+   */
+  const spring = useRef<{ tab: string | null; timer: number }>({ tab: null, timer: 0 });
+  const [carriedAway, setCarriedAway] = useState(false);
+  const springTab = useStable((p: string | null, x: number, y: number) => {
+    if (!phone) return;
+    const state = spring.current;
+    // Tree.tsx ends every drag with over(null, 0, 0).
+    if (p === null && x === 0 && y === 0) {
+      window.clearTimeout(state.timer);
+      state.tab = null;
+      if (carriedAway) {
+        setCarriedAway(false);
+        setSideOpen(false);
+        setPanel((open) => (open === 'pantry' ? null : open));
+      }
+      return;
+    }
+    const tab = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-phone-tab]')?.dataset.phoneTab ?? null;
+    if (tab === state.tab) return;
+    window.clearTimeout(state.timer);
+    state.tab = tab;
+    if (tab !== 'prep' && tab !== 'plan') return;
+    state.timer = window.setTimeout(() => {
+      haptic('tick');
+      goToMode(tab);
+      setCarriedAway(true);
+    }, 350);
+  });
+
   // From the Shelf or the Pantry: into the Archive (every picked row, if this is one), or onto the page.
   const intoArchive = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
+        springTab(p, x, y);
         const into = !!p && !PANTRY_FOLDERS.has(p) && overArchive(x, y);
         // Only the Shelf's own Items and Groups go into Research; the Pantry's are cards about the story.
         const research = !into && !!p && topOf(p) === BOOKSHELF && overResearch(x, y);
@@ -4088,31 +4145,33 @@ export function App() {
         archiveDragged(p);
       },
     }),
-    [deskOver, deskLand, archiveDragged, researchDragged, intoMode],
+    [deskOver, deskLand, archiveDragged, researchDragged, intoMode, springTab],
   );
   // From the Archive: back to the Shelf or the Pantry, or onto the page.
   const outOfArchive = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
+        springTab(p, x, y);
         const out = !!p && overShelfOrPantry(x, y);
         setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
         return out || deskOver(out ? null : p, x, y);
       },
       drop: (p: string, x: number, y: number) => (overShelfOrPantry(x, y) ? putBackDragged(p) : deskLand(p, x, y)),
     }),
-    [deskOver, deskLand, putBackDragged],
+    [deskOver, deskLand, putBackDragged, springTab],
   );
   // From Research: onto the Shelf (notes and Groups of notes; files stay), or onto the page.
   const outOfResearch = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
+        springTab(p, x, y);
         const out = !!p && overShelf(x, y) && !holdsFiles(p);
         setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
         return out || deskOver(out ? null : p, x, y);
       },
       drop: (p: string, x: number, y: number) => (overShelf(x, y) ? shelveDragged(p) : deskLand(p, x, y)),
     }),
-    [deskOver, deskLand, shelveDragged, cards],
+    [deskOver, deskLand, shelveDragged, cards, springTab],
   );
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
@@ -4208,6 +4267,31 @@ export function App() {
     say,
       };
 
+  /** Where the writer is on a phone: the Shelf, the Pantry, or the open Item seen as Cook, Prep or Plan. */
+  const phoneTab: PhoneTab = carriedAway ? mode : sideOpen ? 'shelf' : panel === 'pantry' ? 'pantry' : mode;
+  const onPhoneTab = useStable((tab: PhoneTab) => {
+    haptic('tick');
+    setSideOpen(tab === 'shelf');
+    setPanel(tab === 'pantry' ? 'pantry' : null);
+    if (tab === 'cook' || tab === 'prep' || tab === 'plan') goToMode(tab);
+  });
+
+  // A phone shows one thing at a time, and builds nothing it isn't showing: the wordmark until the
+  // first recipe is open, then the welcome questions on their own, and only then the app.
+  if (phone && (!booted || !settled || table)) {
+    const splash = (
+      <div className="phone-splash" role="status" aria-label="Cookbook is opening">
+        <span className="brand">cookbook</span>
+      </div>
+    );
+    if (!booted || !settled || !table) return splash;
+    return (
+      <Suspense fallback={splash}>
+        <PhoneTable first={table === 'first'} onDone={() => setTable(null)} />
+      </Suspense>
+    );
+  }
+
   // On a phone today's words sit at the head of the Shelf (see phoneFooter); everywhere else, along the foot.
   const footerEl = (
         <footer className="footer">
@@ -4267,7 +4351,7 @@ export function App() {
 
   return (
     <div
-      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}`}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}${carriedAway ? ' carried-away' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>
@@ -4356,68 +4440,37 @@ export function App() {
           void importFiles(Array.from(e.dataTransfer.files), dropFolder(e.target));
         }}
       >
-        {phone ? (
-          <div className="phone-shelf-head">
-            <button className="phone-recipe" aria-haspopup="menu" onClick={bookMenu}>
-              <span className="phone-recipe-label">Recipe</span>
-              <span className="phone-recipe-name">{book?.title ?? 'Your Recipes'}</span>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-            <div className="phone-today" ref={setPhoneFooter} />
-          </div>
-        ) : (
-          <h2 className="panel-h shelf-h">Shelf</h2>
-        )}
-        <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
-        <Tree
-          nodes={tree}
-          root={BOOKSHELF}
-          selected={path}
-          cards={cards}
-          live={shelfLive}
-          collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
-          renaming={renaming}
-          onSelect={onSelect}
-          onMove={onTreeMove}
-          onStartRename={setRenaming}
-          onRename={onTreeRename}
-          onMenu={onRowMenu}
-          onTrash={onTreeTrash}
-          dropTarget={fileDrop}
-          folding={folding}
-          recipes={recipes}
-          marked={shelfMarked}
-          onMark={onShelfMark}
-          onOpenGroup={onOpenGroup}
-          shownGroups={miseShown?.groups}
-          drafts={draftRows}
-          ghost={path && ghostN !== null ? { path, n: ghostN } : null}
-          onDraft={onDraftRow}
-          onDraftMenu={onDraftMenuRow}
-          outside={intoArchive}
-        />
-        </ShelfSearch>
-        <div className="compartments">
-          <Compartment
-            name="Research"
-            icon="research"
-            className="research"
-            count={researchTree.length}
-            dropping={archiveDrop === 'research' || fileDrop === RESEARCH}
-            openKey={`cookbook.researchOpen:${JSON.stringify(location)}`}
-            empty="Notes, pictures, PDFs and web pages to look at while you write. Drop files here, or right-click to add a note. Nothing here is part of the book."
-            emptyDrop="Let go to keep it in Research."
-            onMenu={researchSpaceMenu}
-          >
+        {(!phone || sideOpen) && (
+          <>
+            {phone ? (
+              <div className="phone-shelf-head">
+                <div className="phone-shelf-top">
+                  <button className="phone-recipe" aria-haspopup="menu" onClick={bookMenu}>
+                    <span className="phone-recipe-label">Recipe</span>
+                    <span className="phone-recipe-name">
+                      {book?.title ?? 'Your Recipes'}
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+                  <button className="phone-icon" aria-label="Settings" onClick={() => openSettings()}>
+                    <Icon name="gear" size={22} />
+                  </button>
+                </div>
+                <div className="phone-today" ref={setPhoneFooter} />
+              </div>
+            ) : (
+              <h2 className="panel-h shelf-h">Shelf</h2>
+            )}
+            <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
             <Tree
-              nodes={researchTree}
-              root={RESEARCH}
+              nodes={tree}
+              root={BOOKSHELF}
               selected={path}
               cards={cards}
               live={shelfLive}
-              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${RESEARCH}`}
+              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
               renaming={renaming}
               onSelect={onSelect}
               onMove={onTreeMove}
@@ -4427,85 +4480,111 @@ export function App() {
               onTrash={onTreeTrash}
               dropTarget={fileDrop}
               folding={folding}
-              outside={outOfResearch}
+              recipes={recipes}
+              marked={shelfMarked}
+              onMark={onShelfMark}
+              onOpenGroup={onOpenGroup}
+              shownGroups={miseShown?.groups}
+              drafts={draftRows}
+              ghost={path && ghostN !== null ? { path, n: ghostN } : null}
+              onDraft={onDraftRow}
+              onDraftMenu={onDraftMenuRow}
+              outside={intoArchive}
             />
-          </Compartment>
-          <Compartment
-            name="Archive"
-            icon="archive"
-            className="archive"
-            count={archiveTree.length}
-            dropping={archiveDrop === 'in'}
-            openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`}
-            empty="Set Items aside here: drag them in, or right-click and pick Move to Archive. They leave Prep and Plan until they are put back."
-            emptyDrop="Let go to archive it."
-            onMenu={archiveSpaceMenu}
-          >
-            <Tree
-              nodes={archiveTree}
-              root={ARCHIVE}
-              selected={path}
-              cards={cards}
-              live={shelfLive}
-              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
-              renaming={renaming}
-              onSelect={onSelect}
-              onMove={onTreeMove}
-              onStartRename={setRenaming}
-              onRename={onTreeRename}
-              onMenu={onRowMenu}
-              onTrash={onTreeTrash}
-              folding={folding}
-              tagCards
-              outside={outOfArchive}
-            />
-          </Compartment>
-        </div>
-        {phone ? (
-          <>
-            <ul className="phone-places" aria-label="Cookbook">
-              <li>
-                <button onClick={() => (setSideOpen(false), openSettings())}>
-                  <Icon name="gear" size={22} />
-                  Settings
-                </button>
-              </li>
-              <li>
-                <button onClick={() => (setSideOpen(false), setManualAt({ chapter: '', at: Date.now() }))}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />
-                  </svg>
-                  Manual
-                </button>
-              </li>
-            </ul>
-            {book && (
-              <PhoneFab
-                label="New"
-                onPick={(opener) => {
-                  const group = pickedGroup(shelfMarked, tree);
-                  showMenu(
-                    'New',
-                    0,
-                    0,
-                    [
-                      { label: 'New Item', onPick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
-                      { label: 'New Group', onPick: () => void (group ? addFolderIn(group) : addFolder()) },
-                      { separator: true },
-                      { label: 'Import files…', onPick: () => chooseImport(null) },
-                    ],
-                    opener,
-                  );
-                }}
-              />
+            </ShelfSearch>
+            <div className="compartments">
+              <Compartment
+                name="Research"
+                icon="research"
+                className="research"
+                count={researchTree.length}
+                dropping={archiveDrop === 'research' || fileDrop === RESEARCH}
+                openKey={`cookbook.researchOpen:${JSON.stringify(location)}`}
+                empty="Notes, pictures, PDFs and web pages to look at while you write. Drop files here, or right-click to add a note. Nothing here is part of the book."
+                emptyDrop="Let go to keep it in Research."
+                onMenu={researchSpaceMenu}
+              >
+                <Tree
+                  nodes={researchTree}
+                  root={RESEARCH}
+                  selected={path}
+                  cards={cards}
+                  live={shelfLive}
+                  collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${RESEARCH}`}
+                  renaming={renaming}
+                  onSelect={onSelect}
+                  onMove={onTreeMove}
+                  onStartRename={setRenaming}
+                  onRename={onTreeRename}
+                  onMenu={onRowMenu}
+                  onTrash={onTreeTrash}
+                  dropTarget={fileDrop}
+                  folding={folding}
+                  outside={outOfResearch}
+                />
+              </Compartment>
+              <Compartment
+                name="Archive"
+                icon="archive"
+                className="archive"
+                count={archiveTree.length}
+                dropping={archiveDrop === 'in'}
+                openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`}
+                empty="Set Items aside here: drag them in, or right-click and pick Move to Archive. They leave Prep and Plan until they are put back."
+                emptyDrop="Let go to archive it."
+                onMenu={archiveSpaceMenu}
+              >
+                <Tree
+                  nodes={archiveTree}
+                  root={ARCHIVE}
+                  selected={path}
+                  cards={cards}
+                  live={shelfLive}
+                  collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
+                  renaming={renaming}
+                  onSelect={onSelect}
+                  onMove={onTreeMove}
+                  onStartRename={setRenaming}
+                  onRename={onTreeRename}
+                  onMenu={onRowMenu}
+                  onTrash={onTreeTrash}
+                  folding={folding}
+                  tagCards
+                  outside={outOfArchive}
+                />
+              </Compartment>
+            </div>
+            {phone ? (
+              <>
+                {book && (
+                  <PhoneFab
+                    label="New"
+                    onPick={(opener) => {
+                      const group = pickedGroup(shelfMarked, tree);
+                      showMenu(
+                        'New',
+                        0,
+                        0,
+                        [
+                          { label: 'New Item', onPick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
+                          { label: 'New Group', onPick: () => void (group ? addFolderIn(group) : addFolder()) },
+                          { separator: true },
+                          { label: 'Import files…', onPick: () => chooseImport(null) },
+                        ],
+                        opener,
+                      );
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              shelfBar()
             )}
           </>
-        ) : (
-          shelfBar()
         )}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
-      {(sideOpen || (settings.focus && ovenSide)) && (
+      {!phone && (sideOpen || (settings.focus && ovenSide)) && (
         <div
           className="side-backdrop"
           onClick={() => {
@@ -4854,6 +4933,7 @@ export function App() {
       )}
 
       {phone ? phoneFooter && createPortal(footerEl, phoneFooter) : footerEl}
+      {phone && book && <PhoneNav tab={phoneTab} onTab={onPhoneTab} />}
 
       {settingsAt && (
         <Suspense fallback={<div className="settings" aria-busy="true" />}>

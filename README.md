@@ -248,8 +248,10 @@ Click the recipe's title in the top bar for Your recipes…, to start a new one 
 
 The Android app is the same Cookbook, from the same code, arranged for a phone (`src/mobile.ts`, `src/phone.css`, `src-tauri/gen/android`). It needs Android 7 or newer.
 
-- **No menu bar.** The top bar holds the Shelf, the open Item's name (tap it for everything about the Item, and Cook, Prep or Plan), Search, the Pantry and Seasonings. The recipe's own actions (Your Recipes, exports, backups, Trash, Goals) are under its name at the head of the Shelf, with Settings and the Manual at the end. Menus rise from the bottom of the screen.
-- **New things** come from a round + button in the corner of the Shelf and the Pantry; panels have no toolbars.
+- **One place at a time, from a bar along the bottom:** the Shelf, the open Item as Cook, Prep and Plan, and the Pantry. Nothing is built until it is shown, and at launch only the wordmark shows until the page is ready. The first-run questions are screens of their own, before the app (`src/ui/PhoneTable.tsx`).
+- **No menu bar.** The Item's name at the top of the page opens a sheet with everything about the Item; the recipe's name at the top of the Shelf opens everything about the recipe (Your Recipes, exports, backups, Trash, Goals, the Manual), with Settings beside it. Menus rise from the bottom; windows are full screens with a back arrow.
+- **New things** come from a round + in the corner of the Shelf and the Pantry.
+- **Carrying:** press and hold a row on the Shelf or the Pantry to lift it. Hold it over Prep or Plan in the bar and the list steps aside, so it can be set down on the board, the timeline or a calendar day.
 - **Sized for fingers.** The whole interface is drawn larger (Settings › Interface size steps it further), rows are about 50px tall, and the page's words are larger too.
 - **The writing bar** rides on top of the keyboard while you type: undo, redo, bold, italic, underline, the paragraph's style, inserts, and Aa for fonts and spacing.
 - **Boards and the Atlas**: one finger moves the board, two pinch it. Press and hold a card to lift it (with a tap felt in the hand), carry it, and let go to put it down; near an edge the board moves along.

@@ -72,21 +72,23 @@ const press = (k: KeyLabel, id: string, otherwise: string) => (k(id) ? `press ${
 /** The page that Learn to Cook gains on a touch screen, where the rest of it speaks of clicks, right-clicks and menus along the top. */
 const TOUCH_PAGE: Page = {
   title: 'On a phone or tablet',
-  synopsis: 'Where the menus are, what a right-click is, and the bar above the keyboard.',
+  synopsis: 'Getting around with the bar at the bottom, what a right-click is, and carrying Items.',
   body: `# On a phone or tablet
 
 The rest of Learn to Cook was written with a mouse and a keyboard in mind. Everything in it works here too; a few things are simply reached another way.
 
-- **The Shelf** slides out from the **☰** button at the top left. Its head is the recipe: tap the recipe's name for Your Recipes, exporting, printing, backing up, Trash and Goals. Settings and the Manual are at the end of the Shelf.
-- **New things** come from the round **+** button in the corner of the Shelf and the Pantry.
-- **The Item's name** in the top bar opens everything about it: Cook, Prep or Plan, renaming, labels, drafts, snapshots and how the page behaves. Where a page here says "the View menu" or "the Recipe menu", look there or at the recipe's name.
-- **The Pantry and Seasonings** are the two buttons beside Search, and each fills the screen. The arrow at the top left, or Back, returns to the page.
-- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf or a card on the Board to pick it up (you'll feel it), then move your finger to carry it. Let go without moving to see what you can do with it.
-- **On the Board and the Atlas**, one finger moves the board and two fingers pinch to zoom.
-- **In the page**, press and hold picks a word, with your device's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
+- **The bar along the bottom** is how you get around: the **Shelf**, then this Item as **Cook** (the page), **Prep** (outline and board) and **Plan** (calendar and timeline), then the **Pantry**.
+- **The recipe's name** at the top of the Shelf opens everything about the recipe: Your Recipes, exporting, printing, backing up, Trash, Goals and the Manual. The cog beside it is Settings. Where a page here says "the File menu" or "the Recipe menu", look there.
+- **The Item's name** at the top of the page opens everything about the Item: renaming, labels, drafts, snapshots, and how the page behaves.
+- **New things** come from the round **+** in the corner of the Shelf and the Pantry.
+- **Seasonings** is the button beside Search at the top of the page.
+- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf to pick it up (you'll feel it), then move your finger to carry it. Let go without moving to see what you can do with it.
+- **To put an Item on the board or the calendar**, pick it up on the Shelf and hold it over **Prep** or **Plan** in the bar: the Shelf steps aside, and you can set it down where you want it.
+- **On the Board and the Atlas**, one finger moves the board and two fingers pinch to zoom. Press and hold a card to carry it.
+- **In the page**, press and hold picks a word, with your phone's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
 - **The writing bar** sits on top of the keyboard while you type: undo and redo, **B**, *I* and U, the paragraph's style (¶), things to insert (+), and **Aa** for fonts and spacing. Its last button puts the keyboard away.
-- **Back** closes whatever is open, and only then leaves Cookbook. Your words are saved as you type, so leaving never loses them.
-- **Bigger or smaller**: Settings › Appearance › Interface size makes everything larger or smaller.
+- **Back** closes whatever is open, then returns to the page, and only then leaves Cookbook. Your words are saved as you type.
+- **Bigger or smaller**: Settings › Appearance › Interface size.
 - **Your recipes are kept inside the app**, not in a folder you can browse. To keep a copy somewhere else, tap the recipe's name, then **Back up as a zip…**, or one of the exports.
 `,
 };

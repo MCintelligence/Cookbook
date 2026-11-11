@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { keysFor } from '../shortcuts';
 import { type MenuItem } from '../ui/Menu';
 import { useStore } from '../ui/store';
-import { MODES, type Mode, type Side, modeStore, prefsStore, setPrefs, sideOf } from './prefs';
+import { MODES, type Mode, type Side, modeStore, sideOf } from './prefs';
 
 const svg = (children: ReactNode, size = 16) => (
   <svg className="mode-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -49,12 +49,7 @@ export function goToMode(mode: Mode): void {
 /** The modes as a menu's items, for the top bar's switch and the View menu. */
 export function modeItems(side: Side): MenuItem[] {
   const mode = modeStore.get();
-  const prefs = prefsStore.get();
-  return [
-    ...MODES.map((m) => ({ label: m.name, hint: [m.hint[side], keysFor(m.shortcut)].filter(Boolean).join('   '), icon: <ModeIcon mode={m.id} />, checked: m.id === mode, onPick: () => goToMode(m.id) })),
-    { separator: true as const },
-    { label: 'Shelf and Pantry together', checked: prefs.together, onPick: () => setPrefs({ together: !prefs.together }) },
-  ];
+  return MODES.map((m) => ({ label: m.name, hint: [m.hint[side], keysFor(m.shortcut)].filter(Boolean).join('   '), icon: <ModeIcon mode={m.id} />, checked: m.id === mode, onPick: () => goToMode(m.id) }));
 }
 
 interface Props {
@@ -71,8 +66,7 @@ interface Props {
  */
 export function ModeSwitch({ title, openIsCard, showMenu, expanded }: Props) {
   const mode = useStore(modeStore);
-  const { together } = useStore(prefsStore);
-  const side = sideOf(together, openIsCard);
+  const side = sideOf(openIsCard);
   const name = MODES.find((m) => m.id === mode)!.name;
   return (
     <button

@@ -12,14 +12,14 @@ import { createStore } from '../ui/store';
  * recipe in modes.json, so it travels with the folder and its backups.
  */
 export type Mode = 'cook' | 'prep' | 'plan';
-/** Whose views are showing: the Shelf's, the Pantry's, or both together when the writer joins them. */
-export type Side = 'shelf' | 'pantry' | 'both';
+/** Whose views are showing: the Shelf's, or the Pantry's while a Pantry Item is open. */
+export type Side = 'shelf' | 'pantry';
 export type ViewId = 'outline' | 'board' | 'atlas' | 'pboard' | 'calendar' | 'timeline' | 'arcs' | 'pcalendar';
 
 export const MODES: { id: Mode; name: string; hint: Record<Side, string>; shortcut: string }[] = [
-  { id: 'cook', name: 'Cook', hint: { shelf: 'The page', pantry: 'The page', both: 'The page' }, shortcut: 'modeCook' },
-  { id: 'prep', name: 'Prep', hint: { shelf: 'Outline and board', pantry: 'Atlas and board', both: 'Outline, boards and atlas' }, shortcut: 'modePrep' },
-  { id: 'plan', name: 'Plan', hint: { shelf: 'Calendar and timeline', pantry: 'Arcs and calendar', both: 'Calendar, timeline and arcs' }, shortcut: 'modePlan' },
+  { id: 'cook', name: 'Cook', hint: { shelf: 'The page', pantry: 'The page' }, shortcut: 'modeCook' },
+  { id: 'prep', name: 'Prep', hint: { shelf: 'Outline and board', pantry: 'Atlas and board' }, shortcut: 'modePrep' },
+  { id: 'plan', name: 'Plan', hint: { shelf: 'Calendar and timeline', pantry: 'Arcs and calendar' }, shortcut: 'modePlan' },
 ];
 
 export const VIEWS: Record<Exclude<Mode, 'cook'>, Record<Side, { id: ViewId; name: string }[]>> = {
@@ -32,12 +32,6 @@ export const VIEWS: Record<Exclude<Mode, 'cook'>, Record<Side, { id: ViewId; nam
       { id: 'atlas', name: 'Atlas' },
       { id: 'pboard', name: 'Board' },
     ],
-    both: [
-      { id: 'outline', name: 'Outline' },
-      { id: 'board', name: 'Shelf board' },
-      { id: 'atlas', name: 'Atlas' },
-      { id: 'pboard', name: 'Pantry board' },
-    ],
   },
   plan: {
     shelf: [
@@ -48,19 +42,12 @@ export const VIEWS: Record<Exclude<Mode, 'cook'>, Record<Side, { id: ViewId; nam
       { id: 'arcs', name: 'Arcs' },
       { id: 'pcalendar', name: 'Calendar' },
     ],
-    both: [
-      { id: 'calendar', name: 'Calendar' },
-      { id: 'timeline', name: 'Timeline' },
-      { id: 'arcs', name: 'Arcs' },
-    ],
   },
 };
 
 export type Spot = [number, number];
 
 export interface ModePrefs {
-  /** One Prep and one Plan for Shelf and Pantry together, rather than one each. */
-  together: boolean;
   /** The view last used, by "prep:shelf", "plan:pantry" and so on. */
   view: Record<string, ViewId>;
   outline: { columns: string[] };
@@ -74,6 +61,11 @@ export interface ModePrefs {
   arcs: { kinds: string[]; quiet: boolean };
   /** The writer's names for the label colours when they stand for plotlines. */
   plotlines: Record<string, string>;
+  /**
+   * Items taken out of Prep or out of Plan with Remove, by id. Only the view leaves them out: the
+   * Item itself is untouched, and dragging it in from the Shelf or Pantry brings it back.
+   */
+  hidden: { prep: string[]; plan: string[] };
 }
 
 export const OUTLINE_COLUMNS = [
@@ -85,7 +77,6 @@ export const OUTLINE_COLUMNS = [
 ] as const;
 
 export const DEFAULT_PREFS: ModePrefs = {
-  together: false,
   view: {},
   outline: { columns: ['synopsis', 'label', 'status', 'when', 'words'] },
   board: { layout: 'grid', rows: 'none' },
@@ -96,10 +87,12 @@ export const DEFAULT_PREFS: ModePrefs = {
   timeline: { lanes: 'group', px: 18 },
   arcs: { kinds: ['character'], quiet: false },
   plotlines: {},
+  hidden: { prep: [], plan: [] },
 };
 
 export const MODES_FILE = 'modes.json';
 
+const ids = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 /** What a modes.json says, with anything missing or damaged filled in from the defaults. */
@@ -114,7 +107,6 @@ export function readPrefs(text: string): ModePrefs {
   const part = <K extends keyof ModePrefs>(key: K): ModePrefs[K] => (isRecord(raw[key]) && isRecord(DEFAULT_PREFS[key]) ? ({ ...(DEFAULT_PREFS[key] as object), ...(raw[key] as object) } as ModePrefs[K]) : DEFAULT_PREFS[key]);
   const px = Number(part('timeline').px);
   return {
-    together: raw.together === true,
     view: part('view'),
     outline: { columns: Array.isArray(part('outline').columns) ? part('outline').columns.filter((c) => typeof c === 'string') : DEFAULT_PREFS.outline.columns },
     board: part('board'),
@@ -125,6 +117,7 @@ export function readPrefs(text: string): ModePrefs {
     timeline: { ...part('timeline'), px: Number.isFinite(px) ? Math.max(MIN_PX, Math.min(MAX_PX, px)) : DEFAULT_PREFS.timeline.px },
     arcs: part('arcs'),
     plotlines: part('plotlines'),
+    hidden: { prep: ids(part('hidden').prep), plan: ids(part('hidden').plan) },
   };
 }
 
@@ -177,8 +170,8 @@ export function setPrefs(change: Partial<ModePrefs> | ((now: ModePrefs) => Parti
 }
 
 /** Whose views show for the file that is open: a Pantry Item brings up the Pantry's, anything else the Shelf's. */
-export function sideOf(together: boolean, openIsCard: boolean): Side {
-  return together ? 'both' : openIsCard ? 'pantry' : 'shelf';
+export function sideOf(openIsCard: boolean): Side {
+  return openIsCard ? 'pantry' : 'shelf';
 }
 
 /** The view to show: the one last used here, if this side still has it. */

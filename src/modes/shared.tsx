@@ -44,16 +44,16 @@ export function ToolButton({ label, onClick, children, pressed, disabled }: { la
 }
 
 /** Closer, further and everything at once, for the endless boards. */
-export function Zoomer({ k, onZoom, onFit }: { k: number; onZoom(factor: number): void; onFit(): void }) {
+export function Zoomer({ k, onZoom, onFit }: { k: number; onZoom(dir: 1 | -1): void; onFit(): void }) {
   return (
     <span className="mode-zoom">
-      <ToolButton label="Zoom out" onClick={() => onZoom(1 / 1.25)}>
+      <ToolButton label="Zoom out" onClick={() => onZoom(-1)}>
         −
       </ToolButton>
       <span className="mode-zoom-now" aria-live="off">
         {Math.round(k * 100)}%
       </span>
-      <ToolButton label="Zoom in" onClick={() => onZoom(1.25)}>
+      <ToolButton label="Zoom in" onClick={() => onZoom(1)}>
         +
       </ToolButton>
       <ToolButton label="Show everything" onClick={onFit}>
@@ -165,7 +165,7 @@ export function itemMenu(host: ModeHost, item: Item, ask: (form: Form) => void):
     },
     { label: 'Rename', onPick: () => host.rename(item.path) },
     { separator: true },
-    { label: 'Move to trash', danger: true, onPick: () => host.trash(item.path) },
+    { label: 'Remove', onPick: () => host.remove(item.path) },
   ];
 }
 
@@ -183,7 +183,7 @@ export function cardMenu(host: ModeHost, item: Item, extra: MenuItem[] = []): Me
     },
     { label: 'Rename', onPick: () => host.rename(item.path) },
     { separator: true },
-    { label: 'Move to trash', danger: true, onPick: () => host.trash(item.path) },
+    { label: 'Remove', onPick: () => host.remove(item.path) },
   ];
 }
 

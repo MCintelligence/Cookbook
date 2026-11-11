@@ -681,7 +681,7 @@ function Updates({ version, onCheck }: { version: string; onCheck: () => Promise
   return (
     <>
       <Group title="Updates">
-        <Row title="Check for updates automatically" help="A few seconds after starting, then every few hours. Updates install only when you say so.">
+        <Row title="Check for updates automatically" help="Shortly after starting, at midnight when the daily target resets, and when you come back to Cookbook after six hours. One small request, skipped when offline. Updates install only when you say so.">
           <Switch label="Check for updates automatically" on={s.checkUpdates} onChange={(checkUpdates) => setSettings({ checkUpdates })} />
         </Row>
         <Row title={`Cookbook ${version}`} help={status ?? 'Look for a newer version now.'}>

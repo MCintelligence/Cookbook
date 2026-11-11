@@ -144,7 +144,7 @@ Help › **Manual** (F1) opens the manual: a chapter for each part of Cookbook, 
 
 ## Learn to Cook
 
-After Set the Table, Cookbook opens **Learn to Cook**, a recipe made for trying things out: one group for each part of Cookbook (the Shelf, writing, the Pantry, Seasonings, Stove and Oven, goals, keeping it safe, finding your way), an example Pantry, and pages full of things to try. Its shortcuts are your own, so it says ⌘O on a Mac and Ctrl+O elsewhere, or the menu way if you've taken a shortcut off. It is an ordinary recipe: change it, or delete it from Your Recipes when you're done. Help › Learn to Cook opens it again, or makes a fresh copy if it was deleted.
+After Set the Table, Cookbook opens **Learn to Cook**, a recipe made for trying things out: one group for each part of Cookbook (the Shelf, writing, the Pantry, Seasonings, Chef Mode, goals, keeping it safe, finding your way), an example Pantry, and pages full of things to try. Its shortcuts are your own, so it says ⌘O on a Mac and Ctrl+O elsewhere, or the menu way if you've taken a shortcut off. It is an ordinary recipe: change it, or delete it from Your Recipes when you're done. Help › Learn to Cook opens it again, or makes a fresh copy if it was deleted.
 
 ## Starting points and goals
 
@@ -152,13 +152,13 @@ A new recipe can start as a novel (a group of items, plus a main character and s
 
 The footer also has the zoom (click the percentage for a slider), whether the item is saved, and App Settings. It shows today's words against your daily goal, your streak, and the open item's words against its own goal if it has one. History opens the last two weeks and the last four months, where you can set both goals and export the history as CSV. Splitting and merging items move words without counting them as written.
 
-## Oven Mode and Stove Mode
+## Chef Mode
 
-Stove Mode is the normal view, with the Shelf, toolbar and panels around the page. Oven Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with ⌘⇧F (Ctrl+Shift+F), the page's right-click menu or the command palette, and press ⌘⇧F or Escape, or click Oven Mode in the footer, to go back to Stove Mode.
+Chef Mode is focus mode: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). Turn it on with ⌥F (Alt+F), the page's right-click menu or the command palette, and press ⌥F or Escape to leave it.
 
 The desktop app opens full screen. On Windows and Linux, F11 (or View › Full screen) leaves full screen and comes back; on a Mac use Window › Enter Full Screen or ⌃⌘F.
 
-Nothing is out of reach in Oven Mode: the Shelf, the Pantry, Seasonings and pinned cards start tucked away and slide in over the page when you want them, without moving the text. Rest the pointer on the left edge of the window (or click it) for the Shelf, or the right edge for the Pantry (Seasonings, if that was the last one open). The Shelf button and the Pantry and Seasonings buttons in the top bar, View › Pantry and Seasonings, ⌘2 to ⌘4 (Ctrl+2 to Ctrl+4) and F6 slide them in too. Click the page, pick an item on the Shelf, or press Escape to tuck them away again; the next Escape leaves Oven Mode. Settings › Appearance › Reduce motion (or your computer's reduce-motion setting) shows them without the slide.
+Nothing is out of reach in Chef Mode: the Shelf, the Pantry, Seasonings and pinned cards start tucked away and slide in over the page when you want them, without moving the text. Rest the pointer on the left edge of the window (or click it) for the Shelf, or the right edge for the Pantry (Seasonings, if that was the last one open). The Shelf button and the Pantry and Seasonings buttons in the top bar, View › Pantry and Seasonings, ⌘2 to ⌘4 (Ctrl+2 to Ctrl+4) and F6 slide them in too. Click the page, pick an item on the Shelf, or press Escape to tuck them away again; the next Escape leaves Chef Mode. Settings › Appearance › Reduce motion (or your computer's reduce-motion setting) shows them without the slide.
 
 ## Plate: the finished book
 
@@ -209,7 +209,7 @@ The Seasonings button in the top bar opens four characters who each read the pag
 
 Each seasoning is one card: a remark in the character's voice, a five-step meter, its own Check and a Report button. Sam's meter (Unsalted to Seawater) and Pete's (Plain to Smoking) count slips per 1,000 words on the open page. Turning a seasoning's Check off takes its underlines off the page while its meter keeps counting; which Checks are on is saved in `book.json`, once for the whole Recipe, so every Item, Mise en Place and split view follow the same switches. Daniel's Drunk Check starts off; the others start on. The checks keep running when Seasonings is closed: the underlines of every picked seasoning whose Check is on stay on the page while you write. Only the open page is checked, a paragraph at a time as it changes, and Pete's and Sally's grammar engine stays asleep while neither of them is picked with their Check on. A slip is fixed from its underline, or with F7 to step through them.
 
-A number beside the Seasonings button says how many picked seasonings with their Check on have something to say about the open page, so you know to look without opening the panel. A seasoning has something to say when its meter is off the step it's happy at: any slip for Sam or Pete, anything but Medium for Sally, anything but Tipsy for Daniel. The number goes away when they're all happy or when Seasonings are turned off, and it stays in Oven Mode, in the dimmed top bar. Screen readers hear it as part of the button, for example "Seasonings, 2 seasonings have something to say".
+A number beside the Seasonings button says how many picked seasonings with their Check on have something to say about the open page, so you know to look without opening the panel. A seasoning has something to say when its meter is off the step it's happy at: any slip for Sam or Pete, anything but Medium for Sally, anything but Tipsy for Daniel. The number goes away when they're all happy or when Seasonings are turned off, and it stays in Chef Mode, in the dimmed top bar. Screen readers hear it as part of the button, for example "Seasonings, 2 seasonings have something to say".
 
 **Report** opens a window over the page with the seasoning's verdict, its numbers, up to three things to try first, and everything it found; click anything found to select it on the page. Each report is also saved as a card in Pantry › Materials › Seasoning Reports, named after the seasoning and the time (for example `Salty Sam · 31 Oct ’26 · 15.11`). Reports read only the open Item.
 

@@ -308,7 +308,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const seasoningsOpen = panel === 'seasonings';
-  /** In Oven Mode the Shelf (sideOpen) and the right-hand panel (ovenSide) stay tucked away until asked for. */
+  /** In Chef Mode the Shelf (sideOpen) and the right-hand panel (ovenSide) stay tucked away until asked for. */
   const [sideOpen, setSideOpen] = useState(false);
   const [ovenSide, setOvenSide] = useState(false);
   const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
@@ -319,13 +319,13 @@ export function App() {
       if (narrowWindow()) setSideOpen(false);
       return setPanel((open) => (open === p ? null : p));
     }
-    // Oven Mode: the panel slides in over the page, or back out if it is the one showing.
+    // Chef Mode: the panel slides in over the page, or back out if it is the one showing.
     setSideOpen(false);
     if (panelNow.current.ovenSide && panelNow.current.panel === p) return setOvenSide(false);
     setPanel(p);
     setOvenSide(true);
   };
-  /** A panel's own close button: in Oven Mode it only slides away, so Stove Mode keeps it. */
+  /** A panel's own close button: in Chef Mode it only slides away, so it stays open outside Chef Mode. */
   const closePanel = () => (getSettings().focus ? setOvenSide(false) : setPanel(null));
   const docRef = useRef<CookbookDocument | null>(null);
   /**
@@ -410,7 +410,7 @@ export function App() {
   /** The sidebar folder files are being dragged over, for the drop highlight. */
   const [fileDrop, setFileDrop] = useState<string | null>(null);
   const settings = useSettings();
-  // On a phone (and in Oven Mode) the sidebar slides out over the page: sideOpen, above.
+  // On a phone (and in Chef Mode) the sidebar slides out over the page: sideOpen, above.
   const [shelfWidth, setShelfWidth] = useShelfWidth();
   const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
@@ -2013,7 +2013,7 @@ export function App() {
       { separator: true },
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
-      { label: 'Oven Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
+      { label: 'Chef Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
     ];
     if (words) {
       const short = words.length > 24 ? `${words.slice(0, 23)}…` : words;
@@ -2766,7 +2766,7 @@ export function App() {
   );
   /**
    * Puts the keyboard in a part of the window, opening it first if it's closed (or hidden by
-   * Oven Mode). The page keeps its cursor where it was; a list lands on its current row.
+   * Chef Mode). The page keeps its cursor where it was; a list lands on its current row.
    */
   const goToArea = (area: Area) => {
     if (area === 'page') {
@@ -2780,7 +2780,7 @@ export function App() {
       return;
     }
     if (area === 'seasonings' && !doc) return say('Seasonings needs an open item.');
-    // Oven Mode keeps its quiet: the Shelf and panels slide in over the page. Only the toolbar needs Stove Mode.
+    // Chef Mode keeps its quiet: the Shelf and panels slide in over the page. Only the toolbar needs Chef Mode off.
     const oven = getSettings().focus;
     if (oven && area === 'toolbar') setSettings({ focus: false });
     if (area === 'pantry' && panel !== 'pantry') setPanel('pantry');
@@ -2875,7 +2875,7 @@ export function App() {
   const cycleArea = (dir: 1 | -1) => {
     const go = () => {
       const from = areaOf(document.activeElement);
-      // In Oven Mode the Shelf and panels wait off screen, so F6 slides each in as it gets there.
+      // In Chef Mode the Shelf and panels wait off screen, so F6 slides each in as it gets there.
       const oven = getSettings().focus;
       const shown = (a: Area) => {
         if (a === 'page') return (!!editor && !!doc) || !!document.querySelector('.mise-blank');
@@ -2985,29 +2985,29 @@ export function App() {
   const toggleFocus = () => {
     const focus = !getSettings().focus;
     setSettings({ focus });
-    say(focus ? `Oven Mode. ${keysFor('focus')} or Escape goes back to Stove Mode.` : 'Stove Mode.');
+    say(focus ? `Chef Mode. ${keysFor('focus')} or Escape leaves it.` : 'Chef Mode off.');
   };
   useEffect(() => {
-    // Escape leaves Oven Mode (focus mode) for Stove Mode, unless something else (a menu, Search) wanted it first.
+    // Escape leaves Chef Mode (focus mode), unless something else (a menu, Search) wanted it first.
     if (!settings.focus) return;
     const onKey = (e: KeyboardEvent) => {
       // ProseMirror marks every Escape on the page as handled, so that one doesn't count.
       const handled = e.defaultPrevented && !(e.target instanceof Element && e.target.closest('.ProseMirror'));
       if (e.key !== 'Escape' || handled || document.querySelector('.menu, .shelf, .settings, .palette, .goals-pop, .issue-card')) return;
-      // A panel slid in over the page goes first; the next Escape leaves Oven Mode.
+      // A panel slid in over the page goes first; the next Escape leaves Chef Mode.
       if (sideOpen || ovenSide) {
         setSideOpen(false);
         setOvenSide(false);
         return;
       }
       setSettings({ focus: false });
-      say('Stove Mode.');
+      say('Chef Mode off.');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [settings.focus, sideOpen, ovenSide]);
   useEffect(() => {
-    // Oven Mode starts with everything tucked away, and Stove Mode has its own columns.
+    // Chef Mode starts with everything tucked away, and the normal view has its own columns.
     setSideOpen(false);
     setOvenSide(false);
   }, [settings.focus]);
@@ -3156,9 +3156,9 @@ export function App() {
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
   const drawerOpen = (seasoningsOpen && !!doc) || panel === 'pantry' || pins.length > 0;
-  // What the Pantry and Seasonings buttons show as on: in Oven Mode, only a panel slid in counts.
+  // What the Pantry and Seasonings buttons show as on: in Chef Mode, only a panel slid in counts.
   const pantryShown = panel === 'pantry' && (!settings.focus || ovenSide);
-  /** In Oven Mode a slid-in panel slides away once the pointer leaves it; the keyboard goes back to the page if it was in there. */
+  /** In Chef Mode a slid-in panel slides away once the pointer leaves it; the keyboard goes back to the page if it was in there. */
   const tuckAway = () => {
     if (areaOf(document.activeElement) && areaOf(document.activeElement) !== 'page') goToArea('page');
     setSideOpen(false);
@@ -3235,7 +3235,7 @@ export function App() {
           ]
         : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
-      cmd('focus', settings.focus ? 'Stove Mode (leave Oven Mode)' : 'Oven Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study oven stove'),
+      cmd('focus', settings.focus ? 'Leave Chef Mode' : 'Chef Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study chef oven'),
       ...(book
         ? [
             cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits insert'),
@@ -3490,8 +3490,7 @@ export function App() {
         const page = pageOf(book?.page);
         return [
           ...(book ? [...modeItems(modeSide).map((m) => ('hint' in m && m.hint ? { ...m, hint: keysFor(MODES.find((x) => x.name === m.label)!.shortcut), binding: binding(MODES.find((x) => x.name === m.label)!.shortcut), icon: undefined } : m)), { separator: true as const }] : []),
-          { label: 'Stove Mode', checked: !settings.focus, onPick: () => settings.focus && toggleFocus() },
-          { label: 'Oven Mode (focus)', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: () => !settings.focus && toggleFocus() },
+          { label: 'Chef Mode', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: toggleFocus },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
           { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
           { separator: true },
@@ -3647,11 +3646,11 @@ export function App() {
   const modeSide = sideOf(modesTogether, isCard(doc?.kind));
   const inMode = mode !== 'cook' && !!book && !!fs;
   useEffect(() => {
-    // Prep and Plan need the Shelf and their toolbar, which Oven Mode puts away.
+    // Prep and Plan need the Shelf and their toolbar, which Chef Mode puts away.
     if (mode !== 'cook' && getSettings().focus) setSettings({ focus: false });
   }, [mode]);
   useEffect(() => {
-    // Oven Mode is for the page: going into it goes back to Cook.
+    // Chef Mode is for the page: going into it goes back to Cook.
     if (settings.focus && modeStore.get() !== 'cook') goToMode('cook');
   }, [settings.focus]);
   /** A new file for a board, a day or a lane: made with its fields already set, and its name ready to type. */
@@ -4177,14 +4176,6 @@ export function App() {
               editor={miseActive ? editor : null}
               savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
             />
-          )}
-          {settings.focus && (
-            <button className="oven-exit" title={`Back to Stove Mode (${keysFor('focus')} or Escape)`} onClick={toggleFocus}>
-              Oven Mode
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
           )}
           {book?.suggest && (
             <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>

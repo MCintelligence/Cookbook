@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePhone } from './usePhone';
 import { type WritingHistory, dayKey, netWords } from '../storage/history';
 import { type HistoryView, historyRows, historyStats, streakOf, wordsADay } from '../storage/goals';
 
@@ -85,6 +86,8 @@ function useToday(): string {
  */
 export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWords, onExport, request }: Props) {
   const [open, setOpen] = useState(false);
+  // On a phone the goals are a page of their own, with the way back at its top left.
+  const phone = usePhone();
   const [tab, setTab] = useState<Tab>('targets');
   const [view, setView] = useState<HistoryView>('days');
   const box = useRef<HTMLSpanElement>(null);
@@ -143,6 +146,7 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
       </button>
       {open && (
         <section className="goals-pop" role="dialog" aria-label="Writing goals">
+          {phone && <button type="button" className="goals-back" aria-label="Back" onClick={() => setOpen(false)} />}
           <div className="goals-tabs" role="tablist">
             {(['targets', 'history'] as const).map((t) => (
               <button

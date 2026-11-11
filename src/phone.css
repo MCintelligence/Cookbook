@@ -39,6 +39,8 @@ html.phone { --nav-h: 56px; --phone-back: url("data:image/svg+xml,%3Csvg xmlns='
 @keyframes phone-fade-in { from { opacity: 0; } }
 @keyframes phone-sheet-in { from { transform: translateY(100%); } }
 @keyframes phone-page-in { from { transform: translateX(28px); opacity: 0; } }
+/* A whole page arriving over another slides in solid, so the one before never shows through it. */
+@keyframes phone-push-in { from { transform: translateX(100%); } }
 @keyframes phone-page-back { from { transform: translateX(-28px); opacity: 0; } }
 
 /* While Cookbook opens: the wordmark alone, on the colour Android shows before the app draws, so nothing flashes. */
@@ -61,9 +63,9 @@ html.phone .app.focus { grid-template-columns: minmax(0, 1fr) !important; }
 .phone-nav { display: none; }
 html.phone .phone-nav { grid-area: nav; position: relative; z-index: 10; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: var(--nav-h); padding: 0 4px; border-top: 1px solid var(--line); background: var(--bar); }
 .phone-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: none; background: transparent; color: var(--muted); font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
-.phone-nav-pill { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 26px; border-radius: 13px; transition: background-color 0.15s ease-out; }
-.phone-nav button[aria-current='page'] { color: var(--text); }
-.phone-nav button[aria-current='page'] .phone-nav-pill { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.phone-nav-pill { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 26px; border-radius: var(--radius-row); transition: background-color 0.15s ease-out; }
+/* Where the writer is: the words and the picture take the accent. Nothing is ever filled in to say so. */
+.phone-nav button[aria-current='page'] { color: var(--accent); }
 .phone-nav button:active .phone-nav-pill { background: color-mix(in srgb, var(--text) 10%, transparent); }
 /* The keyboard takes the bar's place: while something is being typed, it is out of the way, and what sat above it reaches the keys. */
 html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus), html.phone .app.focus { --nav-h: 0px; }
@@ -77,14 +79,14 @@ html.phone :is(.brand, .menubar, .crumb-book, .side-toggle, .side-backdrop, .she
 html.phone .top-actions > .panel-btn[title='Pantry'] { display: none; }
 html.phone .brand-wrap { gap: 0; flex: 1 1 auto; min-width: 0; }
 html.phone .crumb { flex: 1 1 auto; min-width: 0; }
-html.phone .crumb-mode { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 38px; padding: 0 10px; border-radius: 19px; font-family: var(--font-display); font-size: 17px; color: var(--text); }
+html.phone .crumb-mode { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 38px; padding: 0 10px; border-radius: var(--radius-control); font-family: var(--font-display); font-size: 17px; color: var(--text); }
 html.phone .crumb-mode .mode-icon { display: none; }
 html.phone .crumb-mode-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html.phone .top-actions { gap: 0; flex: none; }
-html.phone .panel-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: 20px; font-size: 0; position: relative; }
+html.phone .panel-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: var(--radius-control); font-size: 0; position: relative; }
 html.phone .panel-btn svg { width: 22px; height: 22px; }
 html.phone .panel-btn .badge { position: absolute; top: 4px; right: 2px; margin: 0; font-size: 9px; }
-html.phone .find > button:first-child, html.phone .find-toggle { width: 40px; height: 40px; border-radius: 20px; }
+html.phone .find > button:first-child, html.phone .find-toggle { width: 40px; height: 40px; border-radius: var(--radius-control); }
 
 /* The full format row waits behind the writing bar's Aa button. */
 html.phone .app:not(.phone-tools):not(.in-mode) .toolbar { display: none; }
@@ -104,11 +106,11 @@ html.phone .app.side-open .sidebar { display: flex; position: fixed; z-index: 9;
 html.phone .app.side-open .sidebar > * { animation: phone-fade-in 0.14s ease-out; }
 .phone-shelf-head { display: flex; flex-direction: column; margin: 0 -8px 8px; padding: 6px 8px 4px; background: var(--bar); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 3; }
 .phone-shelf-top { display: flex; align-items: center; gap: 4px; }
-.phone-recipe { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 2px 10px; border: none; border-radius: 12px; background: transparent; color: var(--text); text-align: left; }
+.phone-recipe { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 2px 10px; border: none; border-radius: var(--radius-row); background: transparent; color: var(--text); text-align: left; }
 .phone-recipe-label { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .phone-recipe-name { display: flex; align-items: center; gap: 4px; min-width: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .phone-recipe-name svg { flex: none; color: var(--muted); }
-.phone-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: 21px; background: transparent; color: var(--muted); }
+.phone-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); }
 /* Today's words and the saved tick, here because a phone has no bar along the foot for them. */
 .phone-today:empty { display: none; }
 html.phone .phone-today .footer { position: static; display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 6px; border: none; background: transparent; font-size: 13px; }
@@ -116,11 +118,11 @@ html.phone .phone-today :is(.zoom, .gear, .status-control) { display: none; }
 html.phone .phone-today .footer-end { margin-left: auto; gap: 6px; }
 html.phone .phone-today .goals-button { min-height: 38px; font-size: 13px; }
 
-html.phone .panel-search { flex: none; height: 42px; margin: 0 2px 8px; border-radius: 21px; padding: 0 14px; }
+html.phone .panel-search { flex: none; height: 42px; margin: 0 2px 8px; border-radius: var(--radius-control); padding: 0 14px; }
 html.phone .panel-search input { font-size: 15px; }
 
 /* Rows: 44px (55 on the glass) with their words in the middle of them, top to bottom. */
-html.phone .tree button { justify-content: center; min-height: 44px; padding: 4px 10px; font-size: 15px; border-radius: 12px; }
+html.phone .tree button { justify-content: center; min-height: 44px; padding: 4px 10px; font-size: 15px; border-radius: var(--radius-row); }
 html.phone .tree .tree-folder { align-items: center; }
 html.phone .tree .tree-card-row, html.phone .tree .tree-card > :first-child { align-items: center; }
 html.phone .tree .tree-card-title { font-size: 15px; line-height: 1.3; }
@@ -128,26 +130,28 @@ html.phone .tree .tree-card-synopsis { font-size: 12.5px; line-height: 1.35; }
 html.phone .tree .tree-words { font-size: 11.5px; }
 html.phone .tree .tree-recipe { min-height: 38px; line-height: 38px; }
 html.phone .sidebar .tree-folder .chevron { width: 28px; height: 36px; margin-left: -6px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
-html.phone .tree-ghost { max-width: 240px; padding: 10px 14px; font-size: 15px; border-radius: 14px; box-shadow: 0 12px 30px rgba(var(--shadow), 0.3); }
+html.phone .tree-ghost { max-width: 240px; padding: 10px 14px; font-size: 15px; border-radius: var(--radius-pop); box-shadow: 0 12px 30px rgba(var(--shadow), 0.3); }
 html.phone .compartments { position: static; margin: 10px -8px 0; }
 html.phone .compartment > button, html.phone .compartment-head { min-height: 44px; font-size: 12px; }
 
 /* The round button for something new, in the corner where a thumb rests. */
-.phone-fab { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(var(--nav-h, 0px) + 16px + env(safe-area-inset-bottom)); z-index: 11; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; padding: 0; border: none; border-radius: 16px; background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px rgba(var(--shadow), 0.28); }
+.phone-fab { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(var(--nav-h, 0px) + 16px + env(safe-area-inset-bottom)); z-index: 11; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; padding: 0; border: none; border-radius: var(--radius-pop); background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px rgba(var(--shadow), 0.28); }
 .phone-fab:active { filter: brightness(0.92); transform: scale(0.96); }
 /* While the search has the keyboard, the bar is gone and the button sits just above the keys. */
 html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea):focus) .phone-fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
 
+/* While a row is carried, the bar says where it can go: the three ways of seeing the recipe light up, and touching one clears the list away. */
+html.carrying .phone-nav button:is([data-phone-tab='cook'], [data-phone-tab='prep'], [data-phone-tab='plan']) { color: var(--accent); }
+html.carrying .phone-nav button:is([data-phone-tab='shelf'], [data-phone-tab='pantry']) { opacity: 0.4; }
 /* A row lifted from the Shelf or the Pantry and held over Prep or Plan: the list steps off the screen (its row's drag carries on) so the board or the calendar is there to set it down on. */
 html.phone .app.carried-away :is(.sidebar, .drawer) { left: -300% !important; right: 300% !important; z-index: 30 !important; }
 html.phone .app.carried-away .phone-fab { display: none; }
-html.phone .phone-nav button.spring .phone-nav-pill { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 
 /* ---- The Pantry (a place) and Seasonings (a page over Cook) ---- */
 html.phone .app:not(.panel-open) .drawer { display: none; }
 html.phone .drawer { position: fixed; z-index: 6; inset: 0; width: auto; box-shadow: none; border: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 html.phone .app.at-pantry .drawer { bottom: var(--nav-h); z-index: 9; }
-html.phone .app:not(.at-pantry) .drawer { z-index: 12; animation: phone-page-in 0.2s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .app:not(.at-pantry) .drawer { z-index: 12; animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
 html.phone .drawer > .panel { padding: 0 12px 96px; position: relative; }
 html.phone .drawer .panel-bar { display: none; }
 html.phone .panel-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 4px; height: 50px; margin: 0 -12px 6px; padding: 0 8px 0 16px; background: var(--bar); border-bottom: 1px solid var(--line); }
@@ -158,40 +162,40 @@ html.phone .panel-head .panel-tools { display: inline-flex; align-items: center;
 html.phone .pantry-panel .panel-head .icon-btn[aria-label^='Close'] { display: none; }
 /* Seasonings is a page over the writing: Close is an arrow back, first in its heading. */
 html.phone .seasonings .panel-head { padding-left: 50px; }
-html.phone .seasonings .panel-head .icon-btn[aria-label^='Close'] { position: absolute; left: 4px; top: 4px; width: 42px; height: 42px; border-radius: 21px; }
+html.phone .seasonings .panel-head .icon-btn[aria-label^='Close'] { position: absolute; left: 4px; top: 4px; width: 42px; height: 42px; border-radius: var(--radius-control); }
 html.phone .seasonings .panel-head .icon-btn[aria-label^='Close'] svg { display: none; }
 html.phone .seasonings .panel-head .icon-btn[aria-label^='Close']::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
-html.phone .segmented { height: 42px; margin-bottom: 8px; padding: 3px; border-radius: 21px; }
-html.phone .segmented button { min-height: 36px; border-radius: 18px; font-size: 14px; }
+html.phone .segmented { height: 42px; margin-bottom: 8px; }
+html.phone .segmented button { min-height: 42px; font-size: 14px; }
 html.phone .pantry-panel .tree button { min-height: 48px; }
 html.phone .pantry-panel .card-icon { width: 28px; height: 28px; font-size: 13px; }
 
 /* Seasonings: the switch in the heading, cards with room to breathe, adding one at the end of the list. */
 .phone-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 6px; font-size: 13px; color: var(--muted); }
 html.phone .seasonings .panel-list { display: flex; flex-direction: column; gap: 10px; }
-html.phone .seasonings .sc { padding: 12px 14px; border-radius: 16px; }
+html.phone .seasonings .sc { padding: 12px 14px; }
 html.phone .sc-head .sub-h { font-size: 12px; }
 html.phone .sc-remark { font-size: 14px; line-height: 1.45; }
 html.phone .gauge-level { font-size: 14px; }
 html.phone .gauge-ends { font-size: 11px; }
-html.phone .sc .handle { width: 36px; height: 36px; border-radius: 18px; }
+html.phone .sc .handle { width: 36px; height: 36px; border-radius: var(--radius-control); }
 html.phone .sc-foot { gap: 10px; }
 html.phone .sc-check { min-height: 40px; font-size: 14px; }
-.phone-add-row { order: 99; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px dashed var(--line-strong); border-radius: 16px; background: transparent; color: var(--accent); font-size: 14px; font-weight: 700; }
+.phone-add-row { order: 99; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px dashed var(--line-strong); border-radius: var(--radius-pop); background: transparent; color: var(--accent); font-size: 14px; font-weight: 700; }
 .phone-add-row span { font-size: 20px; line-height: 1; }
 html.phone .seasonings .pick { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-html.phone .seasonings .tile { min-height: 120px; border-radius: 16px; }
+html.phone .seasonings .tile { min-height: 120px; }
 
 /* The suggestion card rises from the bottom, within reach of a thumb. */
-html.phone .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: 22px 22px 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+html.phone .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: var(--radius-pop) var(--radius-pop) 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
 
 /* ---- Set the Table on a phone (PhoneTable.tsx): the whole screen, one question at a time ---- */
 .phone-table { position: fixed; inset: 0; display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: var(--bg); color: var(--text); overflow: hidden; }
 .pt-top { flex: none; display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 6px; }
-.pt-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: 21px; background: transparent; color: var(--text); }
+.pt-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
 .pt-progress { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
 .pt-progress span { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.25s cubic-bezier(0.2, 0, 0, 1); }
-.pt-skip { flex: none; min-width: 64px; min-height: 42px; padding: 0 10px; border: none; border-radius: 21px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 700; text-align: right; }
+.pt-skip { flex: none; min-width: 64px; min-height: 42px; padding: 0 10px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 14px; font-weight: 700; text-align: right; }
 .pt-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 14px; padding: 10px 20px 20px; }
 .pt-main.pt-on { animation: phone-page-in 0.24s cubic-bezier(0.2, 0, 0, 1); }
 .pt-main.pt-back { animation: phone-page-back 0.24s cubic-bezier(0.2, 0, 0, 1); }
@@ -200,48 +204,48 @@ html.phone .issue-card { left: 0 !important; right: 0; top: auto !important; bot
 .pt-lead { margin: 0 0 6px; font-size: 16px; line-height: 1.5; color: var(--muted); }
 .pt-field { display: flex; flex-direction: column; gap: 8px; }
 .pt-label { font-family: var(--font-label); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
-html.phone .pt-input { height: 50px; padding: 0 16px; border: 1.5px solid var(--line-strong); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 17px; outline: none; }
+html.phone .phone-table input.pt-input { height: 50px; padding: 0 16px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 17px; outline: none; }
 .pt-input:focus { border-color: var(--accent); }
 .pt-hint { font-size: 13px; line-height: 1.4; color: var(--muted); }
 .pt-list { display: flex; flex-direction: column; gap: 8px; }
-.pt-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); text-align: left; }
-.pt-row[aria-checked='true'] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.pt-row { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); text-align: left; }
+.pt-row[aria-checked='true'] .pt-row-name { color: var(--accent); }
 .pt-row:active { background: color-mix(in srgb, var(--text) 6%, var(--surface)); }
 .pt-face { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; }
 .pt-row-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pt-row-name { font-size: 16px; font-weight: 700; }
 .pt-row-blurb { font-size: 13.5px; line-height: 1.35; color: var(--muted); }
-.pt-dot, .pt-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 2px solid var(--line-strong); border-radius: 13px; color: var(--on-accent); }
-.pt-box { border-radius: 8px; }
-.pt-row[aria-checked='true'] :is(.pt-dot, .pt-box) { border-color: var(--accent); background: var(--accent); }
+.pt-dot, .pt-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 2px solid var(--line-strong); border-radius: 50%; color: var(--on-accent); }
+.pt-box { border-radius: var(--radius-row); }
+.pt-row[aria-checked='true'] :is(.pt-dot, .pt-box) { border-color: var(--accent); color: var(--accent); }
 .pt-check { width: 18px; height: 18px; }
 .pt-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.pt-theme { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; border: 1.5px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700; }
+.pt-theme { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700; }
 .pt-theme[aria-checked='true'] { border-color: var(--accent); color: var(--accent); }
-.pt-theme-pic { display: flex; align-items: flex-end; justify-content: center; height: 64px; border-radius: 10px; border: 1px solid var(--line); overflow: hidden; }
-.pt-theme-pic span { width: 56%; height: 78%; border-radius: 6px 6px 0 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08); }
-.pt-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: 26px; background: color-mix(in srgb, var(--text) 7%, transparent); }
-.pt-seg button { min-height: 44px; border: none; border-radius: 22px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 700; }
-.pt-seg button[aria-checked='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(var(--shadow), 0.18); }
+.pt-theme-pic { display: flex; align-items: flex-end; justify-content: center; height: 64px; border-radius: var(--radius-control); border: 1px solid var(--line); overflow: hidden; }
+.pt-theme-pic span { width: 56%; height: 78%; border-radius: 3px 3px 0 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08); }
+.pt-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: var(--radius-control); background: color-mix(in srgb, var(--text) 7%, transparent); }
+.pt-seg button { min-height: 44px; border: none; border-radius: var(--radius-row); background: transparent; color: var(--muted); font-size: 15px; font-weight: 700; }
+.pt-seg button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
 .pt-goal { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 18px 0 10px; }
-html.phone .pt-goal input { width: 100%; border: none; outline: none; background: transparent; color: var(--accent); font-family: var(--font-display); font-size: 54px; line-height: 1.1; text-align: center; font-variant-numeric: tabular-nums; }
+html.phone .phone-table .pt-goal input { width: 100%; border: none; outline: none; background: transparent; color: var(--accent); font-family: var(--font-display); font-size: 54px; line-height: 1.1; text-align: center; font-variant-numeric: tabular-nums; }
 .pt-goal span { font-size: 15px; color: var(--muted); }
 .pt-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.pt-chips button { min-height: 46px; border: 1.5px solid var(--line); border-radius: 23px; background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pt-chips button[aria-checked='true'] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
-.pt-summary { margin: 4px 0 0; display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+.pt-chips button { min-height: 46px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pt-chips button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.pt-summary { margin: 4px 0 0; display: flex; flex-direction: column; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); overflow: hidden; }
 .pt-summary > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-height: 50px; padding: 12px 16px; }
 .pt-summary > div + div { border-top: 1px solid var(--line); }
 .pt-summary dt { flex: none; font-size: 14px; color: var(--muted); }
 .pt-summary dd { margin: 0; font-size: 15px; font-weight: 700; text-align: right; }
 .pt-foot { flex: none; padding: 10px 20px calc(16px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 70%, transparent); }
-.pt-next { width: 100%; min-height: 52px; border: none; border-radius: 26px; background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 700; }
+.pt-next { width: 100%; min-height: 52px; border: none; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 700; }
 .pt-next:active { filter: brightness(0.93); }
 
 /* ---- Switches, buttons and fields everywhere on a phone ---- */
 html.phone input.switch { width: 40px; height: 22px; }
-html.phone .btn { min-height: 38px; padding: 0 14px; border-radius: 19px; font-size: 14px; }
-html.phone .icon-btn { min-width: 38px; height: 38px; border-radius: 19px; }
+html.phone .btn { min-height: 38px; padding: 0 14px; border-radius: var(--radius-control); font-size: 14px; }
+html.phone .icon-btn { min-width: 38px; height: 38px; border-radius: var(--radius-control); }
 html.phone :is(input[type='text'], input[type='search'], input[type='number'], input:not([type]), select, textarea) { font-size: max(1em, 14px); }
 
 /* ---- The writing bar: one row on top of the keyboard while the page has the cursor ---- */
@@ -250,10 +254,10 @@ html.phone .phone-bar { grid-area: pbar; align-items: stretch; height: 42px; bor
 html.phone .app:has(.cb-page .ProseMirror-focused) .phone-bar { display: flex; }
 .pb-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
 .pb-scroll::-webkit-scrollbar { display: none; }
-.pb-btn { flex: 1 0 30px; max-width: 44px; display: inline-flex; align-items: center; justify-content: center; height: 42px; padding: 0; border: none; border-radius: 10px; background: transparent; color: var(--text); }
+.pb-btn { flex: 1 0 30px; max-width: 44px; display: inline-flex; align-items: center; justify-content: center; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
 .pb-btn svg { width: 20px; height: 20px; }
 .pb-btn:disabled { color: var(--faint); opacity: 0.5; }
-.pb-btn[aria-pressed='true'] { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pb-btn[aria-pressed='true'] { color: var(--accent); }
 .pb-letter { font-family: var(--font-display); font-size: 18px; line-height: 1; font-style: normal; text-decoration: none; }
 i.pb-letter { font-style: italic; font-family: var(--font-text); font-size: 20px; }
 u.pb-letter { text-decoration: underline; text-underline-offset: 3px; }
@@ -263,26 +267,26 @@ u.pb-letter { text-decoration: underline; text-underline-offset: 3px; }
 .phone-bar > .pb-btn { flex: none; border-left: 1px solid var(--line); border-radius: 0; width: 42px; }
 
 /* Messages sit clear of the writing bar and the gesture bar. */
-html.phone .notice { left: 12px; right: 12px; bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom)); transform: none; max-width: none; min-height: 46px; padding: 4px 6px 4px 16px; border-radius: 14px; font-size: 14px; box-shadow: 0 6px 20px rgba(var(--shadow), 0.28); }
+html.phone .notice { left: 12px; right: 12px; bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom)); transform: none; max-width: none; min-height: 46px; padding: 4px 6px 4px 16px; border-radius: var(--radius-pop); font-size: 14px; box-shadow: 0 6px 20px rgba(var(--shadow), 0.28); }
 html.phone .notice span { flex: 1 1 auto; white-space: normal; line-height: 1.35; }
-html.phone .notice-undo { height: 38px; padding: 0 12px; border-radius: 19px; font-size: 14px; }
-html.phone .notice-close { width: 38px; height: 38px; border-radius: 19px; }
+html.phone .notice-undo { height: 38px; padding: 0 12px; border-radius: var(--radius-control); font-size: 14px; }
+html.phone .notice-close { width: 38px; height: 38px; border-radius: var(--radius-control); }
 html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus) .notice { bottom: calc(54px + env(safe-area-inset-bottom)); }
 
 /* ---- Menus are sheets that rise from the bottom (Menu.tsx): tall rows, a drill-down for submenus ---- */
 .menu-sheet-wrap { position: fixed; inset: 0; z-index: 40; }
 .menu-sheet-shade { position: absolute; inset: 0; background: rgba(var(--shadow), 0.42); animation: phone-fade-in 0.2s ease-out; }
-.menu.menu-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: auto; min-width: 0; max-width: none; max-height: 80%; overflow-y: auto; overscroll-behavior: contain; padding: 0 8px calc(10px + env(safe-area-inset-bottom)); border: none; border-radius: 22px 22px 0 0; box-shadow: 0 -8px 32px rgba(var(--shadow), 0.24); animation: phone-sheet-in 0.24s cubic-bezier(0.2, 0, 0, 1); }
-.menu.menu-sheet button { min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: 12px; }
+.menu.menu-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: auto; min-width: 0; max-width: none; max-height: 80%; overflow-y: auto; overscroll-behavior: contain; padding: 0 8px calc(10px + env(safe-area-inset-bottom)); border: none; border-radius: var(--radius-pop) var(--radius-pop) 0 0; box-shadow: 0 -8px 32px rgba(var(--shadow), 0.24); animation: phone-sheet-in 0.24s cubic-bezier(0.2, 0, 0, 1); }
+.menu.menu-sheet button { min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: var(--radius-row); }
 .menu.menu-sheet .menu-sep { margin: 4px 14px; }
 .menu.menu-sheet .menu-heading { padding: 10px 14px 2px; font-size: 10px; }
 /* A phone has no keys for the shortcuts a menu lists; the arrow that marks a submenu stays. */
 .menu.menu-sheet .menu-hint:not([aria-hidden]) { display: none; }
 .menu.menu-sheet .menu-hint[aria-hidden] { font-size: 18px; }
-.menu-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 -8px 2px; padding: 8px 8px 0; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: 22px 22px 0 0; }
+.menu-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 -8px 2px; padding: 8px 8px 0; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: var(--radius-pop) var(--radius-pop) 0 0; }
 .menu-sheet-grip { position: absolute; top: 6px; left: 50%; width: 32px; height: 4px; margin-left: -16px; border-radius: 2px; background: var(--line-strong); }
 .menu-sheet-title { padding: 6px 14px 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu.menu-sheet .menu-sheet-back { width: 40px; min-height: 40px; flex: none; padding: 0; justify-content: center; border-radius: 20px; }
+.menu.menu-sheet .menu-sheet-back { width: 40px; min-height: 40px; flex: none; padding: 0; justify-content: center; border-radius: var(--radius-control); }
 .menu-sheet-back + .menu-sheet-title { padding: 0 4px; }
 
 /* ---- Pop-ups that hang off a button on a computer fill the width here ---- */
@@ -292,10 +296,13 @@ html.phone .palette-input { height: 46px; }
 html.phone .palette-hint { display: none; }
 html.phone .tb-popover { max-width: calc(100% - 16px); }
 html.phone .insert-menu { width: min(260px, calc(100% - 16px)); }
-/* Goals: a sheet over everything, with the rest dimmed behind it. */
+/* Goals: a page of their own, over everything, with the way back at the top left. */
 html.phone .app.side-open .sidebar:has(.goals-pop) { z-index: 45; bottom: 0; }
 html.phone .app:has(.goals-pop) .phone-fab { display: none; }
-html.phone .goals-pop { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; height: auto; max-width: none; max-height: 86%; overflow: auto; border: none; border-radius: 22px 22px 0 0; padding-bottom: calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 0 0 200vmax rgba(var(--shadow), 0.42); animation: phone-sheet-in 0.24s cubic-bezier(0.2, 0, 0, 1); z-index: 41; }
+html.phone .goals-pop { position: fixed; inset: 0; width: auto; height: auto; max-width: none; max-height: none; overflow: auto; border: none; border-radius: 0; box-shadow: none; padding: env(safe-area-inset-top) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left)); animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); z-index: 41; }
+html.phone .goals-tabs { padding-left: 52px; }
+.goals-back { position: absolute; left: calc(6px + env(safe-area-inset-left)); top: calc(3px + env(safe-area-inset-top)); z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.goals-back::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
 html.phone .goals-tabs button { min-height: 46px; font-size: 14px; }
 html.phone :is(.issue-card, .name-peek) { max-width: calc(100% - 16px); }
 
@@ -305,7 +312,7 @@ html.phone :is(.issue-card, .name-peek) { max-width: calc(100% - 16px); }
 
 /* ---- Whole screens: windows that float in the middle of a computer screen ---- */
 html.phone .lib-backdrop { padding: 0; align-items: stretch; background: var(--surface); z-index: 30; }
-html.phone .lib, html.phone .lib.recipes, html.phone .lib.new-recipe { width: 100%; height: auto; max-height: none; border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); animation: phone-page-in 0.2s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .lib, html.phone .lib.recipes, html.phone .lib.new-recipe { width: 100%; height: auto; max-height: none; border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
 html.phone .recipes-head { min-height: 46px; padding: 0 10px; }
 html.phone .recipes-head .sub-h { font-size: 12px; }
 html.phone .recipes-nav, html.phone .tpl-nav { max-height: none; }
@@ -319,7 +326,7 @@ html.phone .new-foot { min-height: 56px; padding: 8px 12px calc(8px + env(safe-a
 html.phone .lib input[type='checkbox'] { width: 20px; height: 20px; }
 
 /* Settings: one long page, its sections a row of chips that scrolls sideways under the header. */
-html.phone .settings { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; font-size: 14px; animation: phone-page-in 0.2s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .settings { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; font-size: 14px; animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
 html.phone .set-body { padding: 10px 12px 40%; }
 html.phone .set-main { max-width: 100%; }
 html.phone .set-top { flex-wrap: nowrap; min-height: 46px; padding: 4px 8px; }
@@ -328,7 +335,7 @@ html.phone .set-top-actions { flex: 1 1 auto; }
 html.phone .set-btn { min-height: 36px; }
 html.phone .set-nav { position: sticky; top: 46px; z-index: 1; flex-wrap: nowrap; align-items: center; overflow-x: auto; max-width: 100%; gap: 6px; padding: 6px 0; background: var(--bg); scrollbar-width: none; }
 html.phone .set-nav::-webkit-scrollbar { display: none; }
-html.phone .set-nav .set-nav-item { flex: none; min-height: 34px; padding: 0 12px; border-radius: 17px; font-size: 14px; white-space: nowrap; }
+html.phone .set-nav .set-nav-item { flex: none; min-height: 34px; padding: 0 12px; border-radius: var(--radius-control); font-size: 14px; white-space: nowrap; }
 html.phone .set-scope { flex: none; width: auto; padding: 0 2px 0 6px; white-space: nowrap; }
 html.phone .set-section { scroll-margin-top: 100px; }
 html.phone .set-h2 { scroll-margin-top: 104px; }
@@ -345,14 +352,14 @@ html.phone .tally { display: none; }
 .plate-panes { display: none; }
 html.phone .plate { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 html.phone .plate-panes { display: flex; flex: none; padding: 4px 8px; gap: 6px; background: var(--bar); border-bottom: 1px solid var(--line); }
-html.phone .plate-panes button { flex: 1; min-height: 34px; border: none; border-radius: 17px; background: transparent; color: var(--muted); font-size: 14px; }
-html.phone .plate-panes button[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); font-weight: 700; }
+html.phone .plate-panes button { flex: 1; min-height: 34px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 14px; }
+html.phone .plate-panes button[aria-selected='true'] { color: var(--accent); font-weight: 700; }
 html.phone .plate-main > * { display: none; }
 html.phone .plate-main.show-pages > .plate-stage { display: flex; }
 html.phone .plate-main.show-book > .plate-book, html.phone .plate-main.show-style > .plate-style { display: block; flex: 1 1 auto; width: auto; max-width: none; padding: 14px 20px 14px 14px; font-size: 14px; }
 html.phone .plate-top { gap: 8px; padding: 0 8px; height: 46px; }
 html.phone .plate-brand { display: none; }
-html.phone .plate-btn { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 14px; }
+html.phone .plate-btn { height: 36px; padding: 0 14px; border-radius: var(--radius-control); font-size: 14px; }
 html.phone .plate-menu { top: 40px; width: min(240px, calc(100% - 16px)); }
 html.phone .plate-menu button { min-height: 40px; font-size: 14px; }
 html.phone .plate-stagebar { height: auto; min-height: 40px; flex-wrap: wrap; gap: 6px 12px; padding: 4px 8px; }
@@ -377,22 +384,22 @@ html.phone .outline tr.chosen { box-shadow: inset 4px 0 0 var(--accent); }
 html.phone .lib > .recipes-head { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px 10px 52px; min-height: 46px; }
 html.phone .lib > .recipes-head > .panel-h { flex: 1 1 auto; margin: 0; font-size: 19px; line-height: 34px; }
 html.phone .lib > .recipes-head > .recipes-spacer { display: none; }
-html.phone .lib > .recipes-head > .recipes-search { order: 5; flex: 1 0 100%; margin: 0 0 0 -40px; height: 40px; border-radius: 20px; }
+html.phone .lib > .recipes-head > .recipes-search { order: 5; flex: 1 0 100%; margin: 0 0 0 -40px; height: 40px; border-radius: var(--radius-control); }
 html.phone .lib > .recipes-head > :is(.recipes-sort, .recipes-views) { order: 6; }
 html.phone .lib > .recipes-head > .btn-primary { order: 2; min-height: 34px; }
-html.phone .lib > .recipes-head > .icon-btn:last-child { position: absolute; left: 6px; top: 6px; width: 40px; height: 40px; border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; }
+html.phone .lib > .recipes-head > .icon-btn:last-child { position: absolute; left: 6px; top: 6px; width: 40px; height: 40px; border-radius: var(--radius-control); display: inline-flex; align-items: center; justify-content: center; }
 html.phone .lib > .recipes-head > .icon-btn:last-child svg { display: none; }
 html.phone .lib > .recipes-head > .icon-btn:last-child::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
 html.phone .lib > .recipes-head > .recipes-views + .recipes-spacer + .btn-primary { order: 2; }
 html.phone .recipes-nav { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 8px 12px; scrollbar-width: none; }
 html.phone .lib.recipes:not(.manual) .recipes-nav > :is(.sub-h, p, .text-link) { display: none; }
-html.phone .lib.recipes:not(.manual) .recipes-nav button { flex: none; min-height: 34px; padding: 0 12px; border-radius: 17px; white-space: nowrap; }
+html.phone .lib.recipes:not(.manual) .recipes-nav button { flex: none; min-height: 34px; padding: 0 12px; border-radius: var(--radius-control); white-space: nowrap; }
 html.phone .lib.recipes:not(.manual) .recipes-body { flex-direction: column; }
 html.phone .manual .recipes-nav { display: block; }
 /* Recent, All, Favourites, Archived and Trash: a row of chips above the recipes. */
 html.phone .lib.recipes:not(.manual) .recipes-body { display: flex; flex-direction: column; }
 html.phone .lib.recipes:not(.manual) .recipes-nav { order: -1; flex: none; flex-direction: row; width: auto; border: none; border-bottom: 1px solid var(--line); background: transparent; }
-html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item { flex: none; width: auto; min-height: 34px; margin: 0; padding: 0 12px; gap: 6px; border: 1px solid var(--line-strong); border-radius: 17px; white-space: nowrap; }
+html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item { flex: none; width: auto; min-height: 34px; margin: 0; padding: 0 12px; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); white-space: nowrap; }
 html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item[aria-current], html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item.on { border-color: var(--accent); }
 html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-label { flex: none; }
 html.phone .lib.recipes:not(.manual) .recipes-main { flex: 1 1 auto; overflow: auto; }
@@ -403,7 +410,7 @@ html.phone .recipe-meta, html.phone .recipe-goal { font-size: 12px; }
 html.phone .lib { padding-left: 16px; padding-right: 16px; }
 html.phone .lib > .lib-head { position: sticky; top: 0; z-index: 2; justify-content: flex-start; min-height: 50px; margin: 0 -16px 10px; padding: 0 16px 0 52px; background: var(--bar); border-bottom: 1px solid var(--line); }
 html.phone .lib > .lib-head h2 { font-size: 20px; font-weight: 400; }
-html.phone .lib > .lib-head .lib-close { position: absolute; left: 4px; top: 4px; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 21px; font-size: 0; color: var(--text); }
+html.phone .lib > .lib-head .lib-close { position: absolute; left: 4px; top: 4px; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: var(--radius-control); font-size: 0; color: var(--text); }
 html.phone .lib > .lib-head .lib-close::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
 html.phone .lib.recipes, html.phone .lib.new-recipe { padding-left: 0; padding-right: 0; }
 html.phone .trash-empty, html.phone .lib p { font-size: 14px; line-height: 1.45; }
@@ -418,13 +425,13 @@ html.phone .cal-month:not(.small) .cal-num { grid-column: 1; grid-row: 1 / span 
 html.phone .cal-month:not(.small) .cal-day:not(.busy) .cal-num { color: var(--muted); }
 html.phone .cal-month:not(.small) .cal-day.today .cal-num { color: var(--accent); }
 html.phone .cal-wd { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-html.phone .cal-month:not(.small) .cal-chip, html.phone .cal-month:not(.small) .cal-chip.long { grid-column: 2; margin: 3px 0; padding: 8px 12px; min-height: 40px; border-width: 1px 1px 1px 3px; border-radius: 8px; font-size: 15px; white-space: normal; }
+html.phone .cal-month:not(.small) .cal-chip, html.phone .cal-month:not(.small) .cal-chip.long { grid-column: 2; margin: 3px 0; padding: 8px 12px; min-height: 40px; border-width: 1px 1px 1px 3px; border-radius: var(--radius-pop); font-size: 15px; white-space: normal; }
 html.phone .cal-year { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 12px; }
 
 /* ---------- Carrying by finger ---------- */
 /* What a finger has lifted (touchDrag.ts): a copy rides under the finger and the thing itself waits, faded, where it was. */
 :where(.touch-ghost) { background-color: var(--card); }
-.touch-ghost { transform-origin: 0 0; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); border-radius: 8px; will-change: transform; }
+.touch-ghost { transform-origin: 0 0; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); border-radius: var(--radius-pop); will-change: transform; }
 [data-touch-lifted] { opacity: 0.35; }
 .touch-ghost[data-touch-lifted] { opacity: 1; }
 /* Where a carried row of the Outline would land: one line across the row, not one for each of its parts. */

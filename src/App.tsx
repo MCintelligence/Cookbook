@@ -4094,15 +4094,15 @@ export function App() {
    * mode shows, and the row can be set down on its board, timeline or calendar. The row's own
    * drag (Tree.tsx) keeps running throughout; when it ends, the writer is left where they dropped it.
    */
-  const spring = useRef<{ tab: string | null; timer: number }>({ tab: null, timer: 0 });
+  const spring = useRef<{ tab: string | null }>({ tab: null });
   const [carriedAway, setCarriedAway] = useState(false);
   const springTab = useStable((p: string | null, x: number, y: number) => {
     if (!phone) return;
     const state = spring.current;
     // Tree.tsx ends every drag with over(null, 0, 0).
     if (p === null && x === 0 && y === 0) {
-      window.clearTimeout(state.timer);
       state.tab = null;
+      document.documentElement.classList.remove('carrying');
       if (carriedAway) {
         setCarriedAway(false);
         setSideOpen(false);
@@ -4111,15 +4111,15 @@ export function App() {
       return;
     }
     const tab = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-phone-tab]')?.dataset.phoneTab ?? null;
+    // While something is carried the bar shows where it can go (phone.css); the class is set here and not through React, so lifting a row draws nothing again.
+    document.documentElement.classList.add('carrying');
     if (tab === state.tab) return;
-    window.clearTimeout(state.timer);
     state.tab = tab;
-    if (tab !== 'prep' && tab !== 'plan') return;
-    state.timer = window.setTimeout(() => {
-      haptic('tick');
-      goToMode(tab);
-      setCarriedAway(true);
-    }, 350);
+    // The moment the finger reaches Cook, Prep or Plan the list is out of the way: no waiting over the tab, which a finger hides anyway.
+    if (tab !== 'cook' && tab !== 'prep' && tab !== 'plan') return;
+    haptic('tick');
+    goToMode(tab);
+    setCarriedAway(true);
   });
 
   // From the Shelf or the Pantry: into the Archive (every picked row, if this is one), or onto the page.

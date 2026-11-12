@@ -1,28 +1,24 @@
 import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { parentOf } from '../storage/adapter';
-import { BOOKSHELF, PANTRY_SECTIONS, childrenOf } from '../storage/book';
-import { LABELS, STATUSES } from '../storage/document';
-import { type PantrySection } from '../storage/pantry';
+import { BOOKSHELF, PANTRY_SECTIONS } from '../storage/book';
+import { LABELS } from '../storage/document';
 import { type MenuItem } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
 import { useStore } from '../ui/store';
+import { CardFace, SINGULAR, cardStyle, menuOf, sectionOfGroup } from './BoardCards';
+import { snap } from './diagram';
+import { FreeBoard } from './FreeBoard';
 import { type Form, type ModeHost, type ViewProps } from './host';
-import { type Group, type Item, boardRows, dropPlace, labelColor, pantryGroups, readingOrder, rowOf, shelfGroups } from './model';
+import { type Group, type Item, boardRows, dropPlace, pantryGroups, rowOf, shelfGroups } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
-import { Face, Pick, Seg, Synopsis, Tally, ToolButton, Zoomer, cardMenu, itemMenu, shortWhen } from './shared';
-import { dragFrom, usePanZoom } from './usePanZoom';
+import { Pick, Seg, Tally } from './shared';
 
 const DRAG = 'application/x-cookbook-item';
-/** A card on a free board, and the room each takes when they are laid out in rows. */
-const CARD = { w: 224, h: 160, dx: 252, dy: 196, across: 6 };
-const SINGULAR: Record<PantrySection, string> = { characters: 'Character', settings: 'Setting', research: 'Material' };
-const sectionOfGroup = (group: string) => group.slice('pantry/'.length) as PantrySection;
 
 /**
  * The board: the Shelf's Items (or the Pantry's) as cards. As a grid, the columns are the Groups
  * and the rows can be plotlines or statuses, and dragging a card moves the Item on the Shelf.
- * As a free board the cards lie wherever they are put, on a surface with no edges.
+ * As a free board (FreeBoard.tsx) the cards lie wherever they are put, for a mindmap or a flowchart.
  */
 export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolean }) {
   const prefs = useStore(prefsStore);
@@ -42,189 +38,50 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
     }
     return count;
   }, [pantry, items, host.indexVersion]);
-  const pan = usePanZoom();
-
-  /** Where each card lies on the free board: where it was put, or its turn in rows, a new row for each Group. */
-  const spots = useMemo(() => {
-    const saved = prefs.spots[name] ?? {};
-    const at = new Map<string, Spot>();
-    let row = 0;
-    for (const g of groups) {
-      g.items.forEach((item, i) => at.set(item.card.id, saved[item.card.id] ?? [(i % CARD.across) * CARD.dx, (row + Math.floor(i / CARD.across)) * CARD.dy]));
-      row += Math.max(1, Math.ceil(g.items.length / CARD.across));
-    }
-    return at;
-  }, [groups, prefs.spots, name]);
-  const bounds = (): [number, number, number, number] | null => {
-    const all = [...spots.values()];
-    return all.length === 0 ? null : [Math.min(...all.map((s) => s[0])), Math.min(...all.map((s) => s[1])), Math.max(...all.map((s) => s[0])) + CARD.w, Math.max(...all.map((s) => s[1])) + CARD.h];
-  };
-  const put = (id: string, spot: Spot) => setPrefs((now) => ({ spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: spot } } }));
-  const tidy = () => setPrefs((now) => ({ spots: { ...now.spots, [name]: {} } }));
-
-  /** The Shelf, put in the order the cards lie in on the free board, Group by Group. */
-  const orderFromBoard = async () => {
-    for (const g of groups) {
-      const folder = g.path;
-      const direct = g.items.filter((i) => parentOf(i.path) === folder);
-      if (direct.length !== g.items.length || childrenOf(host.tree, BOOKSHELF, folder).length !== direct.length) continue;
-      const ordered = readingOrder(direct, (i) => spots.get(i.card.id)!, CARD.dy);
-      for (let n = 0; n < ordered.length; n++) if (ordered[n] !== direct[n]) await host.move(ordered[n]!.path, folder, n);
-    }
-  };
-
   const here = host.path && host.cards.get(host.path)?.kind === 'scene' ? groups.find((g) => g.items.some((i) => i.path === host.path))?.path : undefined;
   const home = here ?? groups.find((g) => g.path !== BOOKSHELF)?.path ?? BOOKSHELF;
   const newHere = (spot?: Spot): MenuItem[] => {
-    const place = (id: string | null) => id && spot && put(id, spot);
+    const place = (id: string | null) => id && spot && setPrefs((now) => ({ spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: conf.snap ? snap(spot) : spot } } }));
     if (pantry) return PANTRY_SECTIONS.map((s) => ({ label: `New ${SINGULAR[s]}${spot ? ' here' : ''}`, onPick: () => void host.newCard(s).then(place) }));
     return [{ label: spot ? 'New Item here' : 'New Item', onPick: () => void host.newItem(home).then(place) }];
   };
 
   const total = items.length;
+  const lead = (
+    <Seg
+      label="Layout"
+      value={conf.layout}
+      options={[
+        { id: 'grid', name: 'Grid' },
+        { id: 'free', name: 'Free' },
+      ]}
+      onPick={(layout) => set({ layout })}
+    />
+  );
+  const tally = <Tally>{pantry ? `${total} in the Pantry` : `${total} ${total === 1 ? 'Item' : 'Items'} · ${groups.filter((g) => g.path !== BOOKSHELF).length} Groups`}</Tally>;
+  if (conf.layout === 'free') return <FreeBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} ties={ties} conf={conf} set={set} newHere={newHere} tools={tools} lead={lead} tally={tally} />;
   return (
     <>
       {tools &&
         createPortal(
           <>
-            <Seg
-              label="Layout"
-              value={conf.layout}
+            {lead}
+            <Pick
+              label="Rows"
+              value={conf.rows}
               options={[
-                { id: 'grid', name: 'Grid' },
-                { id: 'free', name: 'Free' },
+                { id: 'none', name: 'One row' },
+                { id: 'label', name: pantry ? 'Rows by label' : 'Rows by plotline' },
+                ...(pantry ? [] : [{ id: 'status' as const, name: 'Rows by status' }]),
               ]}
-              onPick={(layout) => set({ layout })}
+              onPick={(rows) => set({ rows })}
             />
-            {conf.layout === 'grid' ? (
-              <Pick
-                label="Rows"
-                value={conf.rows}
-                options={[
-                  { id: 'none', name: 'One row' },
-                  { id: 'label', name: pantry ? 'Rows by label' : 'Rows by plotline' },
-                  ...(pantry ? [] : [{ id: 'status' as const, name: 'Rows by status' }]),
-                ]}
-                onPick={(rows) => set({ rows })}
-              />
-            ) : (
-              <>
-                <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />
-                <ToolButton label="Lay the cards out in rows again" onClick={tidy}>
-                  Tidy up
-                </ToolButton>
-              </>
-            )}
-            <Tally>{pantry ? `${total} in the Pantry` : `${total} ${total === 1 ? 'Item' : 'Items'} · ${groups.filter((g) => g.path !== BOOKSHELF).length} Groups`}</Tally>
+            {tally}
           </>,
           tools,
         )}
-      {conf.layout === 'grid' ? (
-        <GridBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} rows={conf.rows} ties={ties} newHere={newHere} />
-      ) : (
-        <div
-          className="free-board"
-          ref={pan.ref}
-          onPointerDown={pan.onPointerDown}
-          style={{ '--k': pan.look.k, backgroundPosition: `${-pan.look.x * pan.look.k}px ${-pan.look.y * pan.look.k}px`, backgroundSize: `${28 * pan.look.k}px ${28 * pan.look.k}px` } as CSSProperties}
-          onContextMenu={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.preventDefault();
-            const [x, y] = pan.toBoard(e.clientX, e.clientY);
-            host.menu('Board', e.clientX, e.clientY, [
-              ...newHere([Math.round(x - CARD.w / 2), Math.round(y - 20)]),
-              { separator: true },
-              { label: 'Fit all', onPick: () => pan.fit(bounds()) },
-              { label: 'Tidy up', onPick: tidy },
-              ...(pantry ? [] : [{ label: 'Put the Shelf in the board’s order', onPick: () => void orderFromBoard() }]),
-            ]);
-          }}
-        >
-          <div className="free-layer" style={{ transform: `scale(${pan.look.k}) translate(${-pan.look.x}px, ${-pan.look.y}px)` }}>
-            {items.map((item) => {
-              const [x, y] = spots.get(item.card.id)!;
-              // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten.
-              const [w, h] = pan.size;
-              if (x + CARD.w < pan.look.x - 80 || y + CARD.h * 2 < pan.look.y - 80 || x > pan.look.x + w / pan.look.k + 80 || y > pan.look.y + h / pan.look.k + 80) return null;
-              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} k={pan.look.k} onPut={(spot) => put(item.card.id, spot)} />;
-            })}
-          </div>
-          {total === 0 && <p className="mode-empty">{pantry ? 'The Pantry is empty. Right-click here for a new Character, Setting or Material.' : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
-        </div>
-      )}
+      <GridBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} rows={conf.rows} ties={ties} newHere={newHere} />
     </>
-  );
-}
-
-interface CardProps {
-  host: ModeHost;
-  ask(form: Form): void;
-  item: Item;
-  pantry: boolean;
-  ties: Map<string, number>;
-}
-
-function menuOf({ host, ask, item, pantry }: CardProps): MenuItem[] {
-  return pantry ? cardMenu(host, item) : itemMenu(host, item, ask);
-}
-
-/** What a card says: the name, the synopsis (written in place), and a line of where it stands. */
-function CardFace({ host, item, pantry, ties }: CardProps) {
-  const { card } = item;
-  const tied = ties.get(card.id) ?? 0;
-  return (
-    <>
-      <header>
-        {pantry && <Face host={host} item={item} size={26} />}
-        <h3>{card.title}</h3>
-      </header>
-      <Synopsis key={card.synopsis} value={card.synopsis} label={`Synopsis of ${card.title}`} placeholder={pantry ? 'Who or what, in a line' : 'What happens here?'} onSave={(text) => void host.setField(item.path, 'synopsis', text || undefined)} />
-      <footer>
-        {pantry ? (
-          <span>{[tied > 0 ? `${tied} ${tied === 1 ? 'tie' : 'ties'}` : '', card.dates.length > 0 ? `${card.dates.length} ${card.dates.length === 1 ? 'date' : 'dates'}` : ''].filter(Boolean).join(' · ') || ' '}</span>
-        ) : (
-          <>
-            <span className="prep-card-status">
-              <StatusIcon status={card.status} decorative /> {STATUSES.find((s) => s.id === card.status)!.label}
-            </span>
-            <span>{card.dates[0] ? shortWhen(card.dates[0]) : `${card.words.toLocaleString('en')} words`}</span>
-          </>
-        )}
-      </footer>
-    </>
-  );
-}
-
-const cardStyle = (item: Item): CSSProperties => ({ '--label': labelColor(item.card.label) ?? 'transparent' }) as CSSProperties;
-
-function FreeCard(props: CardProps & { x: number; y: number; k: number; onPut(spot: Spot): void }) {
-  const { host, item, x, y, k, onPut } = props;
-  const [moved, setMoved] = useState<Spot | null>(null);
-  const [px, py] = moved ?? [x, y];
-  return (
-    <article
-      className={`prep-card free${item.path === host.path ? ' chosen' : ''}${moved ? ' lifted' : ''}`}
-      style={{ ...cardStyle(item), left: px, top: py, width: CARD.w }}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        dragFrom(
-          e,
-          (dx, dy) => setMoved([Math.round(x + dx / k), Math.round(y + dy / k)]),
-          (did, up) => {
-            setMoved(null);
-            if (did) onPut([Math.round(x + (up.clientX - e.clientX) / k), Math.round(y + (up.clientY - e.clientY) / k)]);
-            else if (item.path !== host.path) host.select(item.path);
-          },
-        );
-      }}
-      onDoubleClick={() => host.open(item.path)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        host.menu('Item', e.clientX, e.clientY, menuOf(props));
-      }}
-    >
-      <CardFace {...props} />
-    </article>
   );
 }
 

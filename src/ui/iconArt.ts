@@ -114,6 +114,22 @@ export const ICONS = {
   colWidth: art(24, s('M3.5 4v16M20.5 4v16', 2.6), s('M8.5 12h7', 2), s('M10.4 9.2 7.6 12l2.8 2.8M13.6 9.2l2.8 2.8-2.8 2.8', 2)),
   /** Leave: an open door frame and an arrow going out of it. */
   leave: art(24, s('M10 3.8H6A1.8 1.8 0 0 0 4.2 5.6v12.8A1.8 1.8 0 0 0 6 20.2h4'), s('M14.2 7.6 18.6 12l-4.4 4.4M18.4 12H9', 2.6)),
+  /** Board tools: the shapes a card can take. */
+  shapeBox: art(24, s('M4 6h16v12H4z', 2.2)),
+  shapeRounded: art(24, s('M8 6h8a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4z', 2.2)),
+  shapeOval: art(24, s('M12 6c4.6 0 8.5 2.7 8.5 6s-3.9 6-8.5 6-8.5-2.7-8.5-6 3.9-6 8.5-6z', 2.2)),
+  shapeDiamond: art(24, s('M12 3.5 20.5 12 12 20.5 3.5 12z', 2.2)),
+  /** Board tools: the ways a line runs between cards, each ending in an arrowhead. */
+  lineStraight: art(24, s('M4.5 19.5 16 8', 2.2), f('M20 4l-2.2 8.2-6-6z')),
+  lineElbow: art(24, s('M3.5 19h8V7.5H15', 2.2), f('M21 7.5l-6.5 4v-8z')),
+  lineCurved: art(24, s('M3.5 19.5c7.5 0 6-12 11.5-12', 2.2), f('M21 7.5l-6.5 4v-8z')),
+  /** Board tools: a new card joined on after the chosen one, or below it beside its fellows. */
+  addChild: art(24, f('M2.5 8h8.5v8H2.5z'), s('M11 12h3.5', 2), s('M18.5 8.5v7M15 12h7', 2.6)),
+  addSibling: art(24, f('M6 2.5h12v7.5H6z'), s('M12 10v3', 2), s('M12 15.5v7M8.5 19h7', 2.6)),
+  /** Board tools: laying the cards out along their lines. */
+  arrange: art(24, f('M2.5 9.5h6v5h-6z'), s('M8.5 12h3M11.5 6v12M11.5 6h3M11.5 18h3', 2), s('M15.5 3.8h6v4.4h-6zM15.5 15.8h6v4.4h-6z', 2)),
+  /** Board tools: cards settle on the board's dots. */
+  snap: art(24, f('M5 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM12 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM19 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM5 10.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM5 17.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8z'), s('M10.5 10.5h9v9h-9z', 2.2)),
 } satisfies Record<string, IconArt>;
 
 export type IconName = keyof typeof ICONS;

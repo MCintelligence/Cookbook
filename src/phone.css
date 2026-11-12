@@ -244,7 +244,6 @@ html.phone .issue-card { left: 0 !important; right: 0; top: auto !important; bot
 .pt-tile-icon { display: inline-flex; margin-bottom: 4px; color: var(--muted); transition: color 0.15s; }
 .pt-tile-name { font-size: 15px; font-weight: 700; }
 .pt-tile-blurb { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
-.pt-tile[aria-checked='true'] { border-color: var(--accent); }
 .pt-tile[aria-checked='true'] :is(.pt-tile-icon, .pt-tile-name) { color: var(--accent); }
 
 /* The name on a title page */
@@ -263,7 +262,6 @@ html.phone .phone-table input.pt-input { height: 52px; padding: 0 16px; border: 
 .pt-specimen b { font-weight: inherit; color: var(--accent); }
 .pt-list { display: flex; flex-direction: column; gap: 8px; }
 .pt-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); text-align: left; transition: border-color 0.15s, transform 0.12s; }
-.pt-row[aria-checked='true'] { border-color: var(--accent); }
 .pt-row > .pt-row-name { flex: none; }
 .pt-row > .pt-row-blurb { flex: 1 1 auto; min-width: 0; text-align: right; }
 .pt-row[aria-checked='true'] .pt-row-name { color: var(--accent); }
@@ -286,7 +284,7 @@ html.phone .phone-table input.pt-input { height: 52px; padding: 0 16px; border: 
 .pt-swatch[aria-checked='true'] .pt-swatch-pic { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
 .pt-sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .pt-sizes button { display: flex; align-items: center; justify-content: center; height: 56px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--muted); font-family: var(--font-display); }
-.pt-sizes button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); }
+.pt-sizes button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
 
 /* Words a day: a big number with − and +, quick picks, and what the pace makes */
 .pt-goal { display: flex; align-items: center; gap: 8px; padding: 12px 0 4px; }
@@ -296,7 +294,7 @@ html.phone .phone-table .pt-goal-n input { width: 100%; border: none; outline: n
 .pt-goal-n span { font-size: 14px; color: var(--muted); }
 .pt-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 .pt-chips button { min-height: 44px; padding: 0; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; transition: transform 0.12s; }
-.pt-chips button[aria-checked='true'] { border-color: var(--accent); color: var(--accent); }
+.pt-chips button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
 .pt-payoff { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; padding: 14px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: var(--font-text); font-size: 15px; line-height: 1.5; }
 .pt-payoff svg { flex: none; color: var(--accent); }
 
@@ -484,7 +482,7 @@ html.phone .manual .recipes-nav { display: block; }
 html.phone .lib.recipes:not(.manual) .recipes-body { display: flex; flex-direction: column; }
 html.phone .lib.recipes:not(.manual) .recipes-nav { order: -1; flex: none; flex-direction: row; width: auto; border: none; border-bottom: 1px solid var(--line); background: transparent; }
 html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item { flex: none; width: auto; min-height: 34px; margin: 0; padding: 0 12px; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); white-space: nowrap; }
-html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item[aria-current], html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item.on { border-color: var(--accent); }
+html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item[aria-current], html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item.on { color: var(--accent); }
 html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-label { flex: none; }
 html.phone .lib.recipes:not(.manual) .recipes-main { flex: 1 1 auto; overflow: auto; }
 html.phone .recipe-title { font-size: 15px; }

@@ -5,6 +5,7 @@ import { SEASONINGS, type SeasoningId } from '../proofread/remarks';
 import { WRITERS, type WriterKind, rulesFor, writerOf } from '../writers';
 import { haptic, onBack } from '../mobile';
 import { Face } from './Faces';
+import { Says } from './Says';
 import { THEMES } from './Settings';
 import { rememberTableSet } from './tableSet';
 import {
@@ -97,22 +98,6 @@ function TableArt({ seated, mark }: { seated: readonly string[]; mark: ReactNode
           <Face id={x.id} size={56} />
         </span>
       ))}
-    </div>
-  );
-}
-
-/** A Seasoning saying something: their face and a speech bubble that pops when the line changes. */
-function Says({ who, line }: { who: SeasoningId; line: string }) {
-  const name = SEASONINGS.find((x) => x.id === who)!.name;
-  return (
-    <div className="pt-says">
-      <span className="pt-says-face">
-        <Face id={who} size={46} />
-      </span>
-      <p key={line} className="pt-bubble" aria-live="polite">
-        <span className="pt-bubble-who">{name}</span>
-        {line}
-      </p>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePhone } from './usePhone';
+import { PhoneGoals } from './PhoneGoals';
 import { type WritingHistory, dayKey, netWords } from '../storage/history';
 import { type HistoryView, historyRows, historyStats, streakOf, wordsADay } from '../storage/goals';
 
@@ -60,7 +61,7 @@ function Ring({ ratio, size, stroke, label }: { ratio: number; size: number; str
  * comes back after the computer slept through it), so the counts reset
  * without waiting for the next keystroke.
  */
-function useToday(): string {
+export function useToday(): string {
   const [day, setDay] = useState(() => dayKey(new Date()));
   useEffect(() => {
     const check = () => setDay(dayKey(new Date()));
@@ -144,9 +145,22 @@ export function GoalsPopup({ history, goals, onGoals, scene, onSceneGoal, bookWo
           {scene && (scene.goal ? ` · Item ${fmt(scene.words)} / ${fmt(scene.goal)}` : '')}
         </span>
       </button>
-      {open && (
+      {open && phone && (
+        <PhoneGoals
+          history={history}
+          goals={goals}
+          onGoals={onGoals}
+          scene={scene}
+          onSceneGoal={onSceneGoal}
+          bookWords={bookWords}
+          onExport={onExport}
+          tab={tab}
+          onTab={setTab}
+          onClose={() => setOpen(false)}
+        />
+      )}
+      {open && !phone && (
         <section className="goals-pop" role="dialog" aria-label="Writing goals">
-          {phone && <button type="button" className="goals-back" aria-label="Back" onClick={() => setOpen(false)} />}
           <div className="goals-tabs" role="tablist">
             {(['targets', 'history'] as const).map((t) => (
               <button
@@ -326,7 +340,7 @@ function History({
 }
 
 /** A number field that only saves when the writer leaves it or presses Enter. */
-function NumberInput({
+export function NumberInput({
   value,
   placeholder,
   label,

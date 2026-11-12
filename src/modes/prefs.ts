@@ -1,5 +1,6 @@
 import { type StorageAdapter } from '../storage/adapter';
 import { createStore } from '../ui/store';
+import { type BoardLine, type CardLook, type CardSize, type Ends, type Flow, type Route, readLines, readLooks } from './diagram';
 
 /**
  * Cook, Prep and Plan: the three ways to look at a recipe. Cook is the page being written;
@@ -51,10 +52,14 @@ export interface ModePrefs {
   /** The view last used, by "prep:shelf", "plan:pantry" and so on. */
   view: Record<string, ViewId>;
   outline: { columns: string[] };
-  board: { layout: 'grid' | 'free'; rows: 'none' | 'label' | 'status' };
-  pboard: { layout: 'grid' | 'free'; rows: 'none' | 'label' };
+  board: BoardSetUp & { rows: 'none' | 'label' | 'status' };
+  pboard: BoardSetUp & { rows: 'none' | 'label' };
   /** Where things lie on the free boards and the atlas, by board and then by the Item's id. */
   spots: Record<string, Record<string, Spot>>;
+  /** The lines drawn between cards on the free boards, by board. */
+  lines: Record<string, BoardLine[]>;
+  /** The shapes and colours given to cards on the free boards, by board and then by the Item's id. */
+  looks: Record<string, Record<string, CardLook>>;
   atlas: { kinds: string[]; near: boolean };
   calendar: { span: 'month' | 'year'; at: string | null };
   timeline: { lanes: 'group' | 'label'; px: number };
@@ -68,6 +73,22 @@ export interface ModePrefs {
   hidden: { prep: string[]; plan: string[] };
 }
 
+/** How a board is set up. Everything after `layout` is for the free board, as a mindmap or flowchart. */
+export interface BoardSetUp {
+  layout: 'grid' | 'free';
+  /** Whole cards, or only their names (smaller, for a mindmap). */
+  cards: CardSize;
+  /** Whether cards dropped on the free board settle on its dots. */
+  snap: boolean;
+  /** How new lines are drawn. */
+  route: Route;
+  ends: Ends;
+  /** Which way elbow and curved lines leave their cards; set by the last Tree laid out. */
+  flow: Flow;
+}
+
+const BOARD_SET_UP: BoardSetUp = { layout: 'grid', cards: 'full', snap: false, route: 'curved', ends: 'end', flow: 'auto' };
+
 export const OUTLINE_COLUMNS = [
   { id: 'synopsis', name: 'Synopsis' },
   { id: 'label', name: 'Plotline' },
@@ -79,9 +100,11 @@ export const OUTLINE_COLUMNS = [
 export const DEFAULT_PREFS: ModePrefs = {
   view: {},
   outline: { columns: ['synopsis', 'label', 'status', 'when', 'words'] },
-  board: { layout: 'grid', rows: 'none' },
-  pboard: { layout: 'grid', rows: 'none' },
+  board: { ...BOARD_SET_UP, rows: 'none' },
+  pboard: { ...BOARD_SET_UP, rows: 'none' },
   spots: {},
+  lines: {},
+  looks: {},
   atlas: { kinds: ['character', 'setting', 'research'], near: false },
   calendar: { span: 'month', at: null },
   timeline: { lanes: 'group', px: 18 },
@@ -112,6 +135,8 @@ export function readPrefs(text: string): ModePrefs {
     board: part('board'),
     pboard: part('pboard'),
     spots: part('spots'),
+    lines: readLines(raw.lines),
+    looks: readLooks(raw.looks),
     atlas: part('atlas'),
     calendar: part('calendar'),
     timeline: { ...part('timeline'), px: Number.isFinite(px) ? Math.max(MIN_PX, Math.min(MAX_PX, px)) : DEFAULT_PREFS.timeline.px },

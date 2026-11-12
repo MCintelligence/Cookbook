@@ -127,7 +127,6 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
           className="free-board"
           ref={pan.ref}
           onPointerDown={pan.onPointerDown}
-          style={{ '--k': pan.look.k, backgroundPosition: `${-pan.look.x * pan.look.k}px ${-pan.look.y * pan.look.k}px`, backgroundSize: `${28 * pan.look.k}px ${28 * pan.look.k}px` } as CSSProperties}
           onContextMenu={(e) => {
             if (e.target !== e.currentTarget) return;
             e.preventDefault();
@@ -141,13 +140,15 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
             ]);
           }}
         >
-          <div className="free-layer" style={{ transform: `scale(${pan.look.k}) translate(${-pan.look.x}px, ${-pan.look.y}px)` }}>
+          <div className="free-layer" ref={pan.layer}>
             {items.map((item) => {
               const [x, y] = spots.get(item.card.id)!;
-              // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten.
-              const [w, h] = pan.size;
-              if (x + CARD.w < pan.look.x - 80 || y + CARD.h * 2 < pan.look.y - 80 || x > pan.look.x + w / pan.look.k + 80 || y > pan.look.y + h / pan.look.k + 80) return null;
-              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} k={pan.look.k} pan={pan} onPut={(spot) => put(item.card.id, spot)} />;
+              // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten. The board isn't drawn
+              // again while it moves (usePanZoom), so a screen's worth on every side is drawn too, ready for a swipe or a pinch out.
+              const { x: lx, y: ly, k } = pan.look;
+              const [w, h] = [pan.size[0] / k, pan.size[1] / k];
+              if (x + CARD.w < lx - w || y + CARD.h * 2 < ly - h || x > lx + w * 2 || y > ly + h * 2) return null;
+              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} pan={pan} onPut={(spot) => put(item.card.id, spot)} />;
             })}
           </div>
           {total === 0 && <p className="mode-empty">{pantry ? `The Pantry is empty. ${menuPress()} here for a new Character, Setting or Material.` : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
@@ -206,20 +207,21 @@ type Pan = ReturnType<typeof usePanZoom>;
  * board, a press and hold lifts the card with a tap in the hand, and a tap picks it, or opens it
  * when it is already picked.
  */
-function FreeCard(props: CardProps & { x: number; y: number; k: number; pan: Pan; onPut(spot: Spot): void }) {
-  const { host, item, x, y, k, pan, onPut } = props;
+function FreeCard(props: CardProps & { x: number; y: number; pan: Pan; onPut(spot: Spot): void }) {
+  const { host, item, x, y, pan, onPut } = props;
   const [moved, setMoved] = useState<Spot | null>(null);
   const [lifted, setLifted] = useState(false);
   const [px, py] = moved ?? [x, y];
   const chosen = item.path === host.path;
 
-  const byTouch = (e: ReactPointerEvent<HTMLElement>) =>
+  const byTouch = (e: ReactPointerEvent<HTMLElement>, field: Element | null) =>
     carryByTouch(e, pan, [x, y], {
       onLift: setLifted,
       onMove: setMoved,
       onDrop: (spot) => (setMoved(null), onPut(spot)),
       onMenu: (cx, cy) => host.menu('Item', cx, cy, menuOf(props)),
-      onTap: () => (chosen ? host.open(item.path) : host.select(item.path)),
+      // A tap on the synopsis opens it for typing; anywhere else it picks the card, or opens a picked one.
+      onTap: () => (field instanceof HTMLElement ? field.focus() : chosen ? host.open(item.path) : host.select(item.path)),
     });
 
   return (
@@ -228,10 +230,12 @@ function FreeCard(props: CardProps & { x: number; y: number; k: number; pan: Pan
       style={{ ...cardStyle(item), left: px, top: py, width: CARD.w }}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
-        // The synopsis is written in place; a finger there types rather than carries.
-        if ((e.target as Element).closest('textarea, input, [contenteditable="true"]')) return;
-        if (e.pointerType === 'touch') return byTouch(e);
-        const scale = scaleOf(e.currentTarget.closest('.free-board')) * k;
+        // The synopsis is written in place. A mouse there types; a finger there types only once the synopsis is open for
+        // typing (a tap opens it), and otherwise does what it does anywhere on the card, so a swipe that lands on it still moves the board.
+        const field = (e.target as Element).closest('textarea, input, [contenteditable="true"]');
+        if (e.pointerType === 'touch') return field && field === document.activeElement ? undefined : byTouch(e, field);
+        if (field) return;
+        const scale = scaleOf(e.currentTarget.closest('.free-board')) * pan.live().k;
         dragFrom(
           e,
           (dx, dy) => setMoved([Math.round(x + dx / scale), Math.round(y + dy / scale)]),

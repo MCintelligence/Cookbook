@@ -143,12 +143,6 @@ html.phone .compartment > button, html.phone .compartment-head { min-height: 44p
 /* While the search has the keyboard, the bar is gone and the button sits just above the keys. */
 html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea):focus) .phone-fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
 
-/* While a row is carried, the bar says where it can go: the three ways of seeing the recipe light up, and touching one clears the list away. */
-html.carrying .phone-nav button:is([data-phone-tab='cook'], [data-phone-tab='prep'], [data-phone-tab='plan']) { color: var(--accent); }
-html.carrying .phone-nav button:is([data-phone-tab='shelf'], [data-phone-tab='pantry']) { opacity: 0.4; }
-/* A row lifted from the Shelf or the Pantry and held over Prep or Plan: the list steps off the screen (its row's drag carries on) so the board or the calendar is there to set it down on. */
-html.phone .app.carried-away :is(.sidebar, .drawer) { left: -300% !important; right: 300% !important; z-index: 30 !important; }
-html.phone .app.carried-away .phone-fab { display: none; }
 
 /* ---- The Pantry (a place) and Seasonings (a page over Cook) ---- */
 html.phone .app:not(.panel-open) .drawer { display: none; }
@@ -442,3 +436,5 @@ html.phone .outline tr.drop-before > * { box-shadow: none; }
 html.phone .outline tr.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 html.phone .outline tr.touch-ghost { background: var(--card); }
 html.touch [draggable='true'] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* A synopsis on a card is written in place, but only once a tap opens it: before that a press and hold lifts the card rather than picking words. */
+html.touch .mode-synopsis:not(:focus) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -82,8 +82,8 @@ The pages after this one are shared with Cookbook on a computer, so they speak o
 - **The Item's name** at the top of the page opens everything about the Item: renaming, labels, drafts, snapshots, and how the page behaves.
 - **New things** come from the round **+** in the corner of the Shelf and the Pantry.
 - **Seasonings** is the button beside Search at the top of the page.
-- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf to pick it up (you'll feel it), then move your finger to carry it. Let go without moving to see what you can do with it.
-- **To put an Item on the board or the calendar**, pick it up on the Shelf and hold it over **Prep** or **Plan** in the bar: the Shelf steps aside, and you can set it down where you want it.
+- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf to pick it up (you'll feel it), then move your finger to put it somewhere else on the Shelf. Let go without moving to see what you can do with it.
+- **To put an Item on a day**, go to **Plan**, press and hold the day on the calendar (or a lane on the timeline) and choose **Add from the Shelf** or **Add from the Pantry**. Every Item is on the board already.
 - **On the Board and the Atlas**, one finger moves the board and two fingers pinch to zoom. Press and hold a card to carry it.
 - **In the page**, press and hold picks a word, with your phone's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
 - **The writing bar** sits on top of the keyboard while you type: undo and redo, **B**, *I* and U, the paragraph's style (¶), things to insert (+), and **Aa** for fonts and spacing. Its last button puts the keyboard away.
@@ -106,7 +106,7 @@ Try these as you go:
 - [ ] Tap **Pantry** in the bar and find Mama Lou.
 - [ ] Tap the sprig at the top of this page to open **Seasonings**, and let Salty Sam find a spelling mistake.
 - [ ] Tap this page's name at the top and turn on **Chef Mode** to write without distractions.
-- [ ] On the Shelf, press and hold an Item until you feel it lift, and carry it somewhere else.
+- [ ] On the Shelf, press and hold an Item until you feel it lift, and move it somewhere else on the Shelf.
 - [ ] Start a recipe of your own: on the Shelf, tap the recipe's name, then **Your Recipes**.
 
 Tick a box by tapping it. Cookbook saves as you type, so there is no Save button to remember.

@@ -162,3 +162,16 @@ export function watchBack(): void {
 
 /** How a row's menu is opened here, to start a hint with: "Right-click" with a mouse, "Press and hold" with a finger. */
 export const menuPress = () => (isTouch() ? 'Press and hold' : 'Right-click');
+
+/**
+ * Swallows the click a finger makes as it comes up after a press and hold, which would otherwise
+ * land on whatever that hold just opened (a menu's backdrop) and close it again.
+ */
+export function swallowClick(): void {
+  const quiet = (c: Event) => {
+    c.preventDefault();
+    c.stopPropagation();
+  };
+  window.addEventListener('click', quiet, { capture: true, once: true });
+  window.setTimeout(() => window.removeEventListener('click', quiet, true), 400);
+}

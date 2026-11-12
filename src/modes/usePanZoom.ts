@@ -1,5 +1,5 @@
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { haptic } from '../mobile';
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { haptic, swallowClick } from '../mobile';
 import { BOARD_ZOOM } from './boardZoom';
 
 /** How much the interface size (and a phone's larger interface) scales `el`: screen pixels per CSS pixel. */
@@ -24,6 +24,8 @@ const STEP = 0.1;
 const GLIDE = 140;
 /** How long a pinch must pause before it settles on the nearest step. */
 const SETTLE = 160;
+/** How long the board must be still before the cards are told where it went (for which of them to draw). */
+const REST = 120;
 
 const clamp = (k: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, k));
 /** The nearest 10% step, inside the limits. */
@@ -58,18 +60,48 @@ function zoomAround(look: Look, k: number, px: number, py: number): Look {
  *
  * On a touch screen one finger on the bare surface moves it and two fingers, wherever they
  * land, pinch and move it together; `pinching` tells the cards to let go while they do.
+ *
+ * Moving and zooming never draw the board again: nothing on it changes, only where it is seen
+ * from. Each frame writes the surface's grid and the layer's transform straight to the page
+ * (`layer` takes the layer), and the cards hear where the board went once it has been still
+ * for REST (`look` and `zoom`), which is when the ones that came into sight are drawn. Anything
+ * that needs where the board is at this very moment asks `live()`.
  */
 export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   const [look, setLook] = useState<Look>(start);
   const [size, setSize] = useState<[number, number]>([0, 0]);
   // The surface, as state: the free board can appear long after the view does (Grid to Free).
   const [node, setNode] = useState<HTMLDivElement | null>(null);
+  // Where the board is now, which runs ahead of `look` while it moves.
   const now = useRef(look);
-  now.current = look;
+  const surface = useRef<HTMLDivElement | null>(null);
+  const layered = useRef<HTMLElement | null>(null);
+  const rest = useRef(0);
+  /** Draws the board where it is now: two styles on the surface and one on the layer, and nothing else. */
+  const paint = () => {
+    const { x, y, k } = now.current;
+    const s = surface.current;
+    if (s) {
+      s.style.backgroundPosition = `${-x * k}px ${-y * k}px`;
+      s.style.backgroundSize = `${28 * k}px ${28 * k}px`;
+      s.style.setProperty('--k', String(k));
+    }
+    if (layered.current) layered.current.style.transform = `scale(${k}) translate(${-x}px, ${-y}px)`;
+  };
+  /** How many fingers or pointers are moving the board, or carrying something on it: the cards hear nothing until they all let go. */
+  const holds = useRef(0);
+  // Once the board is still, the cards are told where it is.
+  const settled = () => {
+    if (holds.current > 0) return;
+    setLook(now.current);
+    setZoom(goal.current.k);
+  };
   // Several wheel turns can come in one frame, so each one starts from the last, not from the last render.
   const put = (to: Look) => {
     now.current = to;
-    setLook(to);
+    paint();
+    window.clearTimeout(rest.current);
+    rest.current = window.setTimeout(settled, REST);
   };
   // Where the zoom is heading, and the point it zooms around.
   const goal = useRef({ k: start.k, px: 0, py: 0 });
@@ -86,7 +118,6 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   /** Glides from where the board is now to the goal zoom. */
   const glideTo = (k: number, px: number, py: number) => {
     goal.current = { k, px, py };
-    setZoom(k);
     stopGlide();
     const from = now.current;
     if (Math.abs(from.k - k) < 1e-6) return;
@@ -111,14 +142,24 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
   const jump = (to: Look) => {
     stopGlide();
     goal.current = { k: to.k, px: 0, py: 0 };
-    setZoom(to.k);
     put(to);
   };
 
   const ref = useCallback((n: HTMLDivElement | null) => {
+    surface.current = n;
     setNode(n);
-    if (n) setSize([n.clientWidth, n.clientHeight]);
+    if (n) {
+      setSize([n.clientWidth, n.clientHeight]);
+      paint();
+    }
   }, []);
+  /** For the layer the cards lie on: the hook moves and scales it. */
+  const layer = useCallback((n: HTMLElement | null) => {
+    layered.current = n;
+    if (n) paint();
+  }, []);
+  useLayoutEffect(paint, [node]);
+  useEffect(() => () => window.clearTimeout(rest.current), []);
 
   useEffect(() => {
     if (!node) return;
@@ -147,7 +188,6 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
           stopGlide();
           const k = clamp(now.current.k * Math.exp(-dy * 0.01));
           goal.current = { k, px, py };
-          setZoom(k);
           put(zoomAround(now.current, k, px, py));
           settle = window.setTimeout(() => glideTo(snapZoom(now.current.k), px, py), SETTLE);
         }
@@ -177,6 +217,7 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
         stopGlide();
         window.clearTimeout(settle);
         pinching.current = true;
+        hold(true);
         const box = node.getBoundingClientRect();
         const scale = scaleOf(node);
         const { d, mx, my } = spread();
@@ -195,7 +236,6 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
       const k = clamp(pinch.look.k * (d / pinch.d));
       const zoomed = zoomAround(pinch.look, k, pinch.mx, pinch.my);
       goal.current = { k, px, py };
-      setZoom(k);
       put({ k, x: zoomed.x - (px - pinch.mx) / k, y: zoomed.y - (py - pinch.my) / k });
     };
     const onFingerUp = (e: PointerEvent) => {
@@ -203,6 +243,7 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
       if (pinch && fingers.size < 2) {
         const { px, py } = goal.current;
         pinch = null;
+        hold(false);
         glideTo(snapZoom(now.current.k), px, py);
       }
       if (fingers.size === 0) pinching.current = false;
@@ -244,6 +285,7 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
       // The pointer is already gone.
     }
     el.classList.add('panning');
+    hold(true);
     const move = (m: PointerEvent) => {
       if (m.pointerId !== e.pointerId) return;
       const [lx, ly] = last;
@@ -254,6 +296,7 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
     };
     const up = (u: PointerEvent) => {
       if (u.pointerId !== e.pointerId) return;
+      hold(false);
       el.classList.remove('panning');
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
@@ -286,7 +329,18 @@ export function usePanZoom(start: Look = { x: -40, y: -40, k: 1 }) {
     put({ k, x: x + dx / scale / k, y: y + dy / scale / k });
   };
 
-  return { look, setLook, size, ref, onPointerDown, panFrom, pinching, nudge, toBoard, zoom, zoomStep, fit, node };
+  /** Holds back the cards' news of where the board is (`true`) while something is still moving it, and lets it go (`false`). */
+  const hold = (on: boolean) => {
+    holds.current = Math.max(0, holds.current + (on ? 1 : -1));
+    if (!on) {
+      window.clearTimeout(rest.current);
+      rest.current = window.setTimeout(settled, REST);
+    }
+  };
+  /** Where the board is at this moment, which `look` only catches up with once it is still. */
+  const live = () => now.current;
+
+  return { look, setLook: jump, live, hold, size, ref, layer, onPointerDown, panFrom, pinching, nudge, toBoard, zoom, zoomStep, fit, node };
 }
 
 /** Follows a drag from a press until the button comes up, wherever the pointer goes. */
@@ -345,9 +399,12 @@ export function carryByTouch(e: ReactPointerEvent<HTMLElement>, pan: ReturnType<
   let at: [number, number] = [from[0], from[1]];
   let last: [number, number] = [x0, y0];
   let edge = 0;
-  const per = () => scaleOf(board) * pan.look.k;
+  let carrying = false;
+  const per = () => scaleOf(board) * pan.live().k;
 
   const finish = () => {
+    if (carrying) pan.hold(false);
+    carrying = false;
     window.clearTimeout(timer);
     cancelAnimationFrame(edge);
     window.removeEventListener('pointermove', move, true);
@@ -390,6 +447,8 @@ export function carryByTouch(e: ReactPointerEvent<HTMLElement>, pan: ReturnType<
     }
     if (state === 'lift' && far) {
       state = 'carry';
+      carrying = true;
+      pan.hold(true);
       edge = requestAnimationFrame(follow);
     }
     if (state !== 'carry') return;
@@ -403,6 +462,7 @@ export function carryByTouch(e: ReactPointerEvent<HTMLElement>, pan: ReturnType<
     const was = state;
     state = 'done';
     finish();
+    if (was === 'carry' || was === 'lift') swallowClick();
     if (was === 'carry') {
       haptic('drop');
       on.onDrop([Math.round(at[0]), Math.round(at[1])]);

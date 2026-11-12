@@ -108,7 +108,6 @@ export function Atlas({ host, tools, ask }: ViewProps) {
         className="free-board atlas"
         ref={pan.ref}
         onPointerDown={pan.onPointerDown}
-        style={{ backgroundPosition: `${-pan.look.x * pan.look.k}px ${-pan.look.y * pan.look.k}px`, backgroundSize: `${28 * pan.look.k}px ${28 * pan.look.k}px` }}
         onContextMenu={(e) => {
           if (e.target !== e.currentTarget) return;
           e.preventDefault();
@@ -120,7 +119,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
           ]);
         }}
       >
-        <div className="free-layer" style={{ transform: `scale(${pan.look.k}) translate(${-pan.look.x}px, ${-pan.look.y}px)` }}>
+        <div className="free-layer" ref={pan.layer}>
           <svg className="atlas-lines" width="1" height="1" aria-hidden="true">
             {ties.map((t) => {
               const [x1, y1] = at(t.a);
@@ -180,7 +179,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
                       onMenu: (cx, cy) => el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: cx, clientY: cy })),
                       onTap: () => (item.path === host.path ? host.open(item.path) : host.select(item.path)),
                     });
-                  const per = scaleOf(pan.node) * pan.look.k;
+                  const per = scaleOf(pan.node) * pan.live().k;
                   dragFrom(
                     e,
                     (dx, dy) => setMoved({ id, spot: [Math.round(from[0] + dx / per), Math.round(from[1] + dy / per)] }),

@@ -16,8 +16,7 @@ const TABS: { id: PhoneTab; name: string }[] = [
 /**
  * The bar along the bottom of a phone: where the writer is, and one tap to anywhere else, under
  * the thumb. It never hides while there is something to navigate; it only gives its place to the
- * keyboard. A row carried from the Shelf or the Pantry and held over Prep or Plan goes there
- * (App.tsx, springTab), which is what `data-phone-tab` is for.
+ * keyboard.
  */
 export const PhoneNav = memo(function PhoneNav({ tab, onTab }: { tab: PhoneTab; onTab: (tab: PhoneTab) => void }) {
   return (

@@ -28,6 +28,8 @@ export interface AppSettings {
   /** How shortcuts are written: as this computer does, or always ⌘ or always Ctrl. */
   shortcutStyle: 'auto' | 'mac' | 'pc';
   theme: Theme;
+  /** The page in the dark theme: white paper (as it always was), or dark like the rest with light words. */
+  paper: 'white' | 'dark';
   size: 'small' | 'medium' | 'large';
   reduceMotion: boolean;
   curlyQuotes: boolean;
@@ -109,6 +111,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reopenLast: true,
   shortcutStyle: 'auto',
   theme: 'system',
+  paper: 'white',
   size: 'medium',
   reduceMotion: false,
   curlyQuotes: true,
@@ -142,6 +145,7 @@ const TYPED_MARKS: MarkdownRule[] = ['bold', 'italic', 'underline', 'strike', 'c
 const CHOICES: { [K in keyof AppSettings]?: readonly unknown[] } = {
   shortcutStyle: ['auto', 'mac', 'pc'],
   theme: ['system', 'light', 'dark', 'sepia'],
+  paper: ['white', 'dark'],
   size: ['small', 'medium', 'large'],
   fade: ['paragraph', 'sentence'],
   saveDelay: [600, 1000, 5000],
@@ -234,6 +238,7 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   const theme = s.theme === 'system' ? (systemDark ? 'dark' : 'light') : s.theme;
   root.dataset.theme = theme;
   root.dataset.size = s.size;
+  root.dataset.paper = s.paper;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   root.toggleAttribute('data-hyphenate', s.hyphenate);
   root.toggleAttribute('data-even-lines', s.evenLines);

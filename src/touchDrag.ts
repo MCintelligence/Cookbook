@@ -1,4 +1,4 @@
-import { haptic } from './mobile';
+import { haptic, swallowClick } from './mobile';
 
 /**
  * Dragging by finger for everything built on the browser's own drag and drop.
@@ -128,12 +128,7 @@ export function watchTouchDrag(): void {
         finish();
         if (!carried) return;
         // The tap the system makes of a finger coming up is not one: nothing was tapped, something was carried.
-        const quiet = (c: Event) => {
-          c.preventDefault();
-          c.stopPropagation();
-        };
-        window.addEventListener('click', quiet, { capture: true, once: true });
-        window.setTimeout(() => window.removeEventListener('click', quiet, true), 400);
+        swallowClick();
         if (took && target) {
           target.dispatchEvent(event('drop', carried, e.clientX, e.clientY));
           haptic('drop');

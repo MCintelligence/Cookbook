@@ -94,11 +94,17 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
       items.push({ label: `New Item on ${sayWhen({ on: formatDay(on) })}`, onPick: () => void host.newItem(openItem && open!.kind === 'scene' ? host.path!.slice(0, host.path!.lastIndexOf('/')) : home, { when: formatDay(on) }) });
       if (openItem && open!.kind === 'scene') items.push({ label: `Set “${open!.title}” on this day`, onPick: () => void host.setField(openItem.path, 'when', formatDay(on)) });
     }
-    if (showPantry) {
-      if (openItem && open!.kind !== 'scene') items.push({ label: `New date for ${open!.title}…`, onPick: () => addEvent(openItem, on) });
-      const others = pantry.filter((i) => i.path !== host.path).slice(0, 24);
-      if (others.length > 0) items.push({ label: 'New date for', items: others.map((i) => ({ label: i.card.title, onPick: () => addEvent(i, on) })) });
-    }
+    if (showPantry && openItem && open!.kind !== 'scene') items.push({ label: `New date for ${open!.title}…`, onPick: () => addEvent(openItem, on) });
+    // Anything on the Shelf or in the Pantry, by its Group, put on this day: the way to a day that needs no dragging.
+    const fromShelf = shelfGroups(host.tree, host.cards)
+      .map((g) => ({ label: g.title, items: g.items.filter((i) => i.card.kind === 'scene').map((i) => ({ label: i.card.title, onPick: () => void host.setField(i.path, 'when', formatDay(on)) })) }))
+      .filter((g) => g.items.length > 0);
+    const fromPantry = pantryGroups(host.pantryTree, host.cards)
+      .map((g) => ({ label: g.title, items: g.items.map((i) => ({ label: i.card.title, onPick: () => addEvent(i, on) })) }))
+      .filter((g) => g.items.length > 0);
+    if (items.length > 0) items.push({ separator: true });
+    items.push({ label: 'Add from the Shelf', disabled: fromShelf.length === 0, items: fromShelf });
+    items.push({ label: 'Add from the Pantry', disabled: fromPantry.length === 0, items: fromPantry });
     if (items.length > 0) host.menu('Day', e.clientX, e.clientY, items);
   };
 

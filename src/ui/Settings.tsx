@@ -401,6 +401,19 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
               </div>
             )}
           </div>
+          <Group title="Page">
+            <Row title="Page in the dark theme" help="White paper with dark words, or a dark page with light words. A colour you gave words yourself stays as you picked it.">
+              <Seg
+                label="Page in the dark theme"
+                value={s.paper}
+                options={[
+                  ['white', 'White'],
+                  ['dark', 'Dark'],
+                ]}
+                onChange={(paper) => set({ paper })}
+              />
+            </Row>
+          </Group>
           <Group title="Interface">
             <Row title="Interface size" help="Menus, sidebar and buttons. The page has its own zoom, in Layout.">
               <Seg

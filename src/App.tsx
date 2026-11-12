@@ -4089,45 +4089,10 @@ export function App() {
     const el = document.elementFromPoint(x, y);
     return !!el && !el.closest('.compartments') && !!el.closest('.sidebar');
   };
-  /**
-   * On a phone the Shelf and the Pantry fill the screen, so a row lifted from one has nowhere to
-   * go but the bottom bar: held over Prep or Plan there for a moment, the list steps aside, that
-   * mode shows, and the row can be set down on its board, timeline or calendar. The row's own
-   * drag (Tree.tsx) keeps running throughout; when it ends, the writer is left where they dropped it.
-   */
-  const spring = useRef<{ tab: string | null }>({ tab: null });
-  const [carriedAway, setCarriedAway] = useState(false);
-  const springTab = useStable((p: string | null, x: number, y: number) => {
-    if (!phone) return;
-    const state = spring.current;
-    // Tree.tsx ends every drag with over(null, 0, 0).
-    if (p === null && x === 0 && y === 0) {
-      state.tab = null;
-      document.documentElement.classList.remove('carrying');
-      if (carriedAway) {
-        setCarriedAway(false);
-        setSideOpen(false);
-        setPanel((open) => (open === 'pantry' ? null : open));
-      }
-      return;
-    }
-    const tab = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-phone-tab]')?.dataset.phoneTab ?? null;
-    // While something is carried the bar shows where it can go (phone.css); the class is set here and not through React, so lifting a row draws nothing again.
-    document.documentElement.classList.add('carrying');
-    if (tab === state.tab) return;
-    state.tab = tab;
-    // The moment the finger reaches Cook, Prep or Plan the list is out of the way: no waiting over the tab, which a finger hides anyway.
-    if (tab !== 'cook' && tab !== 'prep' && tab !== 'plan') return;
-    haptic('tick');
-    goToMode(tab);
-    setCarriedAway(true);
-  });
-
   // From the Shelf or the Pantry: into the Archive (every picked row, if this is one), or onto the page.
   const intoArchive = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
-        springTab(p, x, y);
         const into = !!p && !PANTRY_FOLDERS.has(p) && overArchive(x, y);
         // Only the Shelf's own Items and Groups go into Research; the Pantry's are cards about the story.
         const research = !into && !!p && topOf(p) === BOOKSHELF && overResearch(x, y);
@@ -4146,33 +4111,31 @@ export function App() {
         archiveDragged(p);
       },
     }),
-    [deskOver, deskLand, archiveDragged, researchDragged, intoMode, springTab],
+    [deskOver, deskLand, archiveDragged, researchDragged, intoMode],
   );
   // From the Archive: back to the Shelf or the Pantry, or onto the page.
   const outOfArchive = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
-        springTab(p, x, y);
         const out = !!p && overShelfOrPantry(x, y);
         setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
         return out || deskOver(out ? null : p, x, y);
       },
       drop: (p: string, x: number, y: number) => (overShelfOrPantry(x, y) ? putBackDragged(p) : deskLand(p, x, y)),
     }),
-    [deskOver, deskLand, putBackDragged, springTab],
+    [deskOver, deskLand, putBackDragged],
   );
   // From Research: onto the Shelf (notes and Groups of notes; files stay), or onto the page.
   const outOfResearch = useMemo(
     () => ({
       over: (p: string | null, x: number, y: number) => {
-        springTab(p, x, y);
         const out = !!p && overShelf(x, y) && !holdsFiles(p);
         setArchiveDrop((was) => (out ? 'out' : was === 'out' ? null : was));
         return out || deskOver(out ? null : p, x, y);
       },
       drop: (p: string, x: number, y: number) => (overShelf(x, y) ? shelveDragged(p) : deskLand(p, x, y)),
     }),
-    [deskOver, deskLand, shelveDragged, cards, springTab],
+    [deskOver, deskLand, shelveDragged, cards],
   );
   const onTreeRename = useStable((p: string, title: string | null) => renameInTree(p, title));
   const onRowMenu = useStable(rowMenu);
@@ -4269,7 +4232,7 @@ export function App() {
       };
 
   /** Where the writer is on a phone: the Shelf, the Pantry, or the open Item seen as Cook, Prep or Plan. */
-  const phoneTab: PhoneTab = carriedAway ? mode : sideOpen ? 'shelf' : panel === 'pantry' ? 'pantry' : mode;
+  const phoneTab: PhoneTab = sideOpen ? 'shelf' : panel === 'pantry' ? 'pantry' : mode;
   const onPhoneTab = useStable((tab: PhoneTab) => {
     haptic('tick');
     setSideOpen(tab === 'shelf');
@@ -4352,7 +4315,7 @@ export function App() {
 
   return (
     <div
-      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}${carriedAway ? ' carried-away' : ''}`}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
     >
       <style>{css}</style>

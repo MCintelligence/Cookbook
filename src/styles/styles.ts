@@ -262,14 +262,14 @@ function cssValue(v: string): string {
   return v.replace(/[;{}<>]/g, '');
 }
 
-/** The Body style's ink; the Sepia theme swaps it for its own (see onSepiaPage). */
+/** The Body style's ink; Sepia and a dark page swap it for their own (see onTintedPage). */
 const DEFAULT_INK = '#1C1C1B';
 
-/** A selector list that only applies in the Sepia theme. */
-const onSepiaPage = (selector: string) =>
+/** A selector list that only applies on a page that isn't white: Sepia's parchment, or the dark theme's page when the writer chose a dark one. */
+const onTintedPage = (selector: string) =>
   selector
     .split(',')
-    .map((part) => `:root[data-theme="sepia"] ${part.trim()}`)
+    .flatMap((part) => [`:root[data-theme="sepia"] ${part.trim()}`, `:root[data-theme="dark"][data-paper="dark"] ${part.trim()}`])
     .join(', ');
 
 /**
@@ -298,8 +298,8 @@ export function stylesToCss(sheet: StyleSheet, scope = '.cb-page'): string {
         ` font-style: ${s.italic ? 'italic' : 'normal'};` +
         ` }`,
     );
-    // Sepia's parchment page writes the default black ink in its own chocolate brown.
-    if (s.color.toUpperCase() === DEFAULT_INK) rules.push(`${onSepiaPage(selector)} { color: var(--page-text); }`);
+    // Sepia's parchment page writes the default black ink in its own chocolate brown, and a dark page in light grey.
+    if (s.color.toUpperCase() === DEFAULT_INK) rules.push(`${onTintedPage(selector)} { color: var(--page-text); }`);
   }
   for (const c of sheet.character) {
     const props: string[] = [];

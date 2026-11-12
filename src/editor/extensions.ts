@@ -9,12 +9,14 @@ import { type Mark as PMMark, type Node as PMNode, type NodeType } from '@tiptap
 import { liftListItem } from '@tiptap/pm/schema-list';
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
-import { type AppSettings, type MarkdownRule, getSettings, markdownOn } from '../settings';
+import { type AppSettings, type MarkdownRule, getSettings, markdownTyped } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, fontStack } from '../styles/styles';
 import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
 import { DropCaps } from './dropCaps';
+import { ChefNotes } from '../chef/notes';
+import { ChefMarkdownPaste } from '../chef/markdownPaste';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { KeptSelection } from './keptSelection';
@@ -36,7 +38,7 @@ type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash'>;
 
 /** An extension whose typing shortcuts only work while a setting (or a Markdown rule) is on; it is read on each key. */
 function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | MarkdownRule): T {
-  const on = setting === 'curlyQuotes' || setting === 'emDash' ? () => getSettings()[setting] : () => markdownOn(setting);
+  const on = setting === 'curlyQuotes' || setting === 'emDash' ? () => getSettings()[setting] : () => markdownTyped(setting);
   return extension.extend({
     addInputRules() {
       return (this.parent?.() ?? []).map(
@@ -111,7 +113,7 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const { $from, empty } = editor.state.selection;
         // Only top-level paragraphs; lists keep their own Enter behaviour.
         if (!empty || $from.depth !== 1 || $from.parent.type.name !== this.name) return false;
-        if (markdownOn('sceneBreak') && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
+        if (markdownTyped('sceneBreak') && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
           return editor.commands.command(({ tr, state }) => {
             const start = $from.before();
             tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
@@ -550,6 +552,8 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Image,
     BlockShortcuts,
     DropCaps,
+    // Before PasteCleanup, so Markdown pasted in Chef Mode comes in formatted.
+    ChefMarkdownPaste,
     PasteCleanup,
     whenOn(
       BulletList.extend({
@@ -622,6 +626,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     DialogueFocus,
     SeasoningChecks,
     FocusMode,
+    ChefNotes,
     LinkedNames,
     Proofread,
   ];

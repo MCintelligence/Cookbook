@@ -347,6 +347,12 @@ Right-click anything in Prep or Plan and choose **Remove** to take it out of tha
 
 Nothing is gone in Chef Mode, only tucked away. Rest the pointer on the **left edge** of the window (or click it) and the Shelf slides in over the page; the **right edge** brings in the Pantry, or Seasonings if that was open. The Pantry and Seasonings buttons in the top bar work too${k('goShelf') ? `, and so do ${[k('goShelf'), k('goPantry'), k('goSeasonings')].filter(Boolean).join(', ')}` : ''}. Click the page or press Escape and it slides away again; a second Escape leaves Chef Mode.
 
+The top bar folds away too: rest the pointer at the very top of the window to bring it down. With no toolbar, type Markdown to format: **two stars** for bold, # for a heading, - for a list.
+
+The **reader bar** at the bottom sets the paper, ink, font, size and spacing, like an e-book reader. It only changes how Chef Mode shows the page, never the recipe. Its sprig shows the Seasonings’ faces; click one to turn its Check on or off.
+
+Select some words and press ${k('chefNote') || 'the note button on the reader bar'} for a **Chef note** in the margin, as a comment in Word. Chef notes only show in Chef Mode, are kept with the recipe for next time, and are never plated.
+
 Also in the View menu:
 
 - **Typewriter scrolling** keeps the line you’re typing in the middle of the window.

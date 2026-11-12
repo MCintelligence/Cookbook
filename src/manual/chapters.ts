@@ -309,6 +309,14 @@ Everything here is kept in the recipe's own files. Story dates, Pantry dates and
     summary: 'Focus mode, and other ways to see the page.',
     body: `**Chef Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Chef Mode}, the page's right-click menu or the command palette. Press it again or press Escape to leave it.
 
+Every bar folds away in Chef Mode, the top bar too: rest the pointer at the top edge of the window and it comes down. With no toolbar, Markdown does the formatting: every Markdown rule works as you type, even one switched off in App Settings, and Markdown pasted as plain text comes in formatted.
+
+**The reader bar** along the bottom sets how the page looks to you, like an e-book reader: the paper, the ink, one font for every word, text size (⌘= and ⌘− change it too), line height, the space between paragraphs and the column's width. **Reset** puts the page back as styled. These only change how Chef Mode shows the page on this computer, never the recipe, its styles or what you plate. The arrow at its end folds it away to a small tab.
+
+The sprig on the reader bar shows the Seasonings as their faces: a lit face has its Check on, a dot means it has something to say, and a click turns it on or off.
+
+**Chef notes** are notes in the right-hand margin, as comments are in Word. Select some words (or put the cursor in one) and press {key:chefNote|the note button on the reader bar}, or right-click and choose **New Chef note**. Each note can be edited, answered, resolved or deleted from its card. Chef notes are only made and seen in Chef Mode, but they are kept with the recipe (in \`chef-notes.json\`), so they are there again each time you come back. They are never part of the text: plating, export and search leave them out.
+
 Also in the View menu:
 
 - **Typewriter scrolling** keeps the line you're typing in the middle of the window.

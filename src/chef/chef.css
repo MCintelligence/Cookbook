@@ -1,0 +1,174 @@
+/*
+ * Chef Mode as a reader: no bars around the page, the page as one sheet of paper filling the window,
+ * a reader bar along the bottom, and Chef notes in the right-hand margin.
+ */
+
+/* ---------- Every bar folds away ---------- */
+.app.focus { grid-template-rows: 0 0 minmax(0, 1fr) 0 !important; }
+.app.focus .footer { display: none; }
+/* The top bar waits above the window: resting the pointer at the top edge brings it down, and it stays while it is in use. */
+.app.focus .topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9; opacity: 1;
+  transform: translateY(-100%); visibility: hidden;
+  transition: transform 0.2s ease-in, visibility 0s linear 0.2s;
+  box-shadow: 0 8px 24px rgba(var(--shadow), 0.14);
+}
+.app.focus:has(.oven-edge.top:hover) .topbar { transform: none; visibility: visible; transition: transform 0.2s ease-out 0.35s, visibility 0s linear 0.35s; }
+.app.focus .topbar:hover, .app.focus .topbar:focus-within, .app.focus.top-held .topbar { transform: none; visibility: visible; transition: transform 0.2s ease-out; }
+.oven-edge.top { top: 0; left: 14px; right: 14px; bottom: auto; width: auto; height: 10px; justify-content: center; align-items: flex-start; }
+.oven-edge.top .oven-edge-tab { width: 56px; height: 4px; }
+.app.focus .oven-edge.left, .app.focus .oven-edge.right { top: 24px; bottom: 64px; }
+@media (prefers-reduced-motion: reduce) { .app.focus .topbar { transition: none !important; } }
+
+/* ---------- The page as a reader shows it ---------- */
+:root .app.focus .desk { padding: 56px 32px 120px; background: var(--paper); }
+:root .app.focus.chef-paper .desk { background: var(--chef-paper); }
+.app.focus .desk > .page-row > .cb-page,
+.app.focus .desk > .page-row > .cb-page.draft {
+  width: min(var(--chef-w), 100%) !important; min-height: 0 !important; padding: 0 !important; zoom: 1 !important;
+  border: none; box-shadow: none; background: transparent !important; border-radius: 0;
+}
+.app.focus .cb-page .cb-prose { zoom: var(--chef-size, 1); min-height: 60vh; }
+.app.focus.chef-paper .cb-page, .app.focus.chef-ink .cb-page { --paper: var(--chef-paper, var(--paper)); }
+.app.focus.chef-ink .cb-page { --page-text: var(--chef-ink); --page-muted: color-mix(in srgb, var(--chef-ink) 38%, var(--chef-paper, var(--paper))); }
+.app.focus.chef-ink .cb-page .cb-prose :is(p, li, h1, h2, h3, h4, blockquote, td, th, span[data-char]) { color: var(--chef-ink); }
+.app.focus.chef-ink .cb-page .cb-prose { caret-color: var(--chef-ink); }
+/* What focus mode fades and keeps bright still wins over the ink. */
+.app.focus .cb-page .cb-prose .cb-faded, .app.focus .cb-page .cb-prose .cb-faded * { color: var(--page-muted) !important; }
+.app.focus .cb-page .cb-prose .cb-faded .cb-lit, .app.focus .cb-page .cb-prose .cb-faded .cb-lit * { color: var(--page-text) !important; }
+/* One font for every word, but code keeps its own. */
+.app.focus.chef-font .cb-page .cb-prose :is(p, li, h1, h2, h3, h4, blockquote, td, th, span, strong, em, a) { font-family: var(--chef-font) !important; }
+.app.focus.chef-line .cb-page .cb-prose :is(p, li) { line-height: var(--chef-line) !important; }
+.app.focus.chef-para .cb-page .cb-prose > p, .app.focus.chef-para .cb-page .cb-prose > blockquote > p { margin-top: 0 !important; margin-bottom: var(--chef-para) !important; }
+/* On a dark paper, the little things on the page go dark too. */
+.app.focus.chef-dark .cb-page {
+  --sidebar: rgba(255, 255, 255, 0.07); --line: rgba(255, 255, 255, 0.12); --line-strong: rgba(255, 255, 255, 0.2);
+  --note: rgba(233, 185, 73, 0.22); --find: rgba(245, 192, 87, 0.35); --find-current: rgba(245, 192, 87, 0.6);
+  color-scheme: dark;
+}
+.app.focus.chef-dark .cb-page .cb-prose ::selection { background: rgba(232, 105, 47, 0.38); }
+
+/* ---------- The reader bar ---------- */
+.chef-bar {
+  position: fixed; left: 50%; bottom: 14px; z-index: 6; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; max-width: calc(100vw - 32px); padding: 6px 8px;
+  background: color-mix(in srgb, var(--bar) 92%, transparent); color: var(--text);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 6px 24px rgba(var(--shadow), 0.16);
+  font-family: var(--font-text); font-size: 13px;
+  animation: chef-up 0.2s ease-out;
+}
+@keyframes chef-up { from { transform: translate(-50%, 12px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .chef-bar { animation: none; } }
+.chef-group { display: flex; align-items: center; gap: 2px; flex: none; }
+.chef-sep { width: 1px; height: 22px; background: var(--line); flex: none; margin: 0 2px; }
+.chef-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; min-width: 32px; padding: 0 8px; border: none; border-radius: 8px; background: transparent; color: var(--text); font: inherit; flex: none; justify-content: center; position: relative; }
+.chef-btn.small { height: 28px; min-width: 26px; padding: 0 4px; font-size: 16px; color: var(--muted); }
+.chef-btn:hover:not(:disabled), .chef-btn[aria-expanded='true'] { background: var(--sidebar); color: var(--accent); }
+.chef-btn:disabled { color: var(--disabled-text); }
+.chef-label { white-space: nowrap; }
+.chef-font-btn .chef-label { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.chef-dot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line-strong); flex: none; }
+.chef-dot.page, .chef-swatch.page { background: linear-gradient(135deg, var(--paper) 50%, var(--bg) 50%); }
+.chef-ink-a { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line-strong); font-family: var(--font-display); font-weight: 700; font-size: 13px; line-height: 1; }
+.chef-aa { font-size: 16px; line-height: 1; }
+.chef-step { display: inline-flex; align-items: center; gap: 0; }
+.chef-step-face { display: inline-flex; color: var(--text); padding: 0 1px; }
+.chef-size { height: 28px; min-width: 46px; border: none; background: transparent; color: var(--text); font: inherit; font-variant-numeric: tabular-nums; border-radius: 6px; }
+.chef-size:hover { background: var(--sidebar); }
+.chef-a-small { font-family: var(--font-display); font-size: 12px; font-weight: 700; }
+.chef-a-big { font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.chef-reset { color: var(--muted); font-size: 12.5px; }
+.chef-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; }
+.chef-tab {
+  position: fixed; left: 50%; bottom: 0; z-index: 6; transform: translateX(-50%);
+  width: 64px; height: 20px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong); border-bottom: none; border-radius: 10px 10px 0 0;
+  background: color-mix(in srgb, var(--bar) 92%, transparent); color: var(--muted); opacity: 0.55; transition: opacity 0.2s, height 0.2s;
+}
+.chef-tab:hover, .chef-tab:focus-visible { opacity: 1; height: 26px; color: var(--accent); }
+@media (max-width: 760px) {
+  .chef-bar { flex-wrap: wrap; justify-content: center; border-radius: 12px; }
+  .chef-label, .chef-sep, .chef-wide-only { display: none; }
+}
+
+/* Pop-ups that rise from the bar */
+.chef-pop {
+  position: absolute; bottom: calc(100% + 8px); left: 8px; z-index: 1;
+  padding: 10px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-pop);
+  box-shadow: 0 8px 28px rgba(var(--shadow), 0.2);
+}
+.chef-swatches { display: flex; gap: 8px; flex-wrap: wrap; max-width: 320px; }
+.chef-swatch { position: relative; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line-strong); padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--muted); background: var(--field); }
+.chef-swatch[aria-pressed='true'] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.chef-swatch.ink.auto::after { content: ''; position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+.chef-swatch.own input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: none; padding: 0; }
+.chef-swatch.own.empty { border-style: dashed; font-family: var(--font-text); font-weight: 400; font-size: 18px; }
+.chef-fonts { display: flex; flex-direction: column; min-width: 200px; padding: 6px; left: 120px; }
+.chef-font { text-align: left; border: none; background: transparent; color: var(--text); font-size: 17px; padding: 7px 12px; border-radius: var(--radius-row); }
+.chef-font:hover { background: var(--sidebar); }
+.chef-font[aria-pressed='true'] { color: var(--accent); }
+.chef-faces { display: flex; gap: 6px; left: auto; right: 90px; padding: 8px; }
+.chef-face { position: relative; width: 48px; height: 48px; border: none; border-radius: 10px; background: transparent; color: var(--faint); display: inline-flex; align-items: center; justify-content: center; }
+.chef-face:hover { background: var(--sidebar); }
+.chef-face.on { color: var(--accent); }
+.chef-face.unpicked { opacity: 0.45; }
+.chef-faces.paused .chef-face { opacity: 0.45; }
+.chef-face-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface); }
+
+/* ---------- Chef notes ---------- */
+.cb-prose .chef-mark { background: color-mix(in srgb, var(--accent) 16%, transparent); border-bottom: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 2px; cursor: pointer; }
+.cb-prose .chef-mark.on { background: color-mix(in srgb, var(--accent) 30%, transparent); border-bottom-color: var(--accent); }
+.cb-prose .chef-pin { display: inline-block; width: 0; height: 1em; border-left: 2px solid var(--accent); margin: 0 -1px; vertical-align: text-bottom; }
+.cb-prose .chef-pin.on { border-left-width: 3px; }
+/* The page makes room for the margin beside it. */
+.app.focus .desk > .page-row > .cb-page:has(> .chef-margin) { margin-right: 300px; }
+.chef-margin { position: absolute; top: 0; left: calc(100% + 36px); width: 264px; font-family: var(--font-text); }
+.chef-card {
+  position: absolute; top: 0; left: 0; right: 0; padding: 9px 11px 10px; border-radius: 8px;
+  background: var(--card); color: var(--text); border: 1px solid var(--line-strong); box-shadow: 0 1px 3px rgba(var(--shadow), 0.08);
+  font-size: 13.5px; line-height: 1.4; text-align: left; text-indent: 0; transition: transform 0.16s ease-out, box-shadow 0.16s;
+}
+.chef-card::before { content: ''; position: absolute; left: -1px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--accent) 50%, transparent); }
+.chef-card.on { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong)); box-shadow: 0 4px 16px rgba(var(--shadow), 0.14); z-index: 1; }
+.chef-card.on::before { background: var(--accent); }
+.chef-card.resolved { opacity: 0.6; }
+.chef-card.resolved::before { background: var(--line-strong); }
+.chef-card.resolved .chef-text { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .chef-card { transition: none; } }
+.chef-card-head { display: flex; align-items: center; gap: 7px; min-height: 22px; }
+.chef-avatar { width: 22px; height: 22px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--on-accent); font-family: var(--font-display); font-weight: 700; font-size: 12px; }
+.chef-avatar.small { width: 18px; height: 18px; font-size: 10px; }
+.chef-who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chef-when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.chef-more { margin-left: auto; width: 24px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 5px; background: transparent; color: var(--muted); font-size: 15px; opacity: 0; flex: none; }
+.chef-card:hover .chef-more, .chef-card.on .chef-more, .chef-more:focus-visible { opacity: 1; }
+.chef-more:hover { background: var(--sidebar); color: var(--text); }
+.chef-text { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chef-gone { margin: 5px 0 0; color: var(--muted); font-size: 12px; font-style: italic; }
+.chef-reply { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); }
+.chef-reply .chef-text { margin-top: 3px; }
+.chef-edit { margin-top: 7px; }
+.chef-field { display: block; width: 100%; box-sizing: border-box; resize: none; overflow: hidden; min-height: 30px; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: var(--field); color: var(--text); font: inherit; outline: none; }
+.chef-field:focus { border-color: var(--accent); }
+.chef-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 7px; }
+.chef-actions.start { justify-content: flex-start; margin-top: 8px; }
+.chef-act { height: 26px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: transparent; color: var(--text); font: inherit; font-size: 12.5px; }
+.chef-act:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.chef-act.main { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chef-act.main:hover:not(:disabled) { color: var(--on-accent); filter: brightness(1.05); }
+.chef-act:disabled { opacity: 0.5; }
+/* A narrow window has no room beside the page: the cards sit over its right edge, the picked one on top. */
+@media (max-width: 1100px) {
+  .app.focus .desk > .page-row > .cb-page:has(> .chef-margin) { margin-right: 0; }
+  .chef-margin { left: auto; right: -24px; width: 240px; }
+  .chef-card:not(.on) { opacity: 0.94; }
+}
+/* The whole window is the paper, edge to edge. */
+.app.focus { background: var(--paper); }
+.app.focus.chef-paper { background: var(--chef-paper); }
+/* On a dark paper the cards go dark too. */
+.app.focus.chef-dark .chef-margin {
+  --card: #26272b; --text: #e6e2da; --muted: #a29e96; --field: #2e2f34; --sidebar: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.12); --line-strong: rgba(255, 255, 255, 0.22); --shadow: 0, 0, 0;
+}

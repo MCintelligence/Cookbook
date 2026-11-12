@@ -3,7 +3,7 @@ import { type Mark as PMMark, type MarkType } from '@tiptap/pm/model';
 import { Plugin } from '@tiptap/pm/state';
 import { HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { cleanPastedHtml } from './paste';
-import { type MarkdownRule, markdownOn } from '../settings';
+import { type MarkdownRule, markdownTyped } from '../settings';
 
 /**
  * Plain formatting (bold, italic, underline, strikethrough, code and links),
@@ -134,11 +134,11 @@ export const PlainMarkRules = Extension.create({
     const schema = () => this.editor.schema;
     const plain = (t: MarkType) => t.create();
     return [
-      markRule(span('**'), plain, () => schema().marks.bold!, () => markdownOn('bold')),
-      markRule(span('*'), plain, () => schema().marks.italic!, () => markdownOn('italic')),
-      markRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, plain, () => schema().marks.underline!, () => markdownOn('underline')),
-      markRule(span('~~'), plain, () => schema().marks.strike!, () => markdownOn('strike')),
-      markRule(span('`'), plain, () => schema().marks.code!, () => markdownOn('code')),
+      markRule(span('**'), plain, () => schema().marks.bold!, () => markdownTyped('bold')),
+      markRule(span('*'), plain, () => schema().marks.italic!, () => markdownTyped('italic')),
+      markRule(/(?:^|[\s([{“‘"'])(_([^_\s](?:[^_]*[^_\s])?)_)$/, plain, () => schema().marks.underline!, () => markdownTyped('underline')),
+      markRule(span('~~'), plain, () => schema().marks.strike!, () => markdownTyped('strike')),
+      markRule(span('`'), plain, () => schema().marks.code!, () => markdownTyped('code')),
     ];
   },
 });
@@ -286,7 +286,7 @@ export const BlockShortcuts = Extension.create({
       new InputRule({
         find,
         handler: ({ state, range, match }) => {
-          if (!markdownOn(setting)) return null;
+          if (!markdownTyped(setting)) return null;
           const $from = state.doc.resolve(range.from);
           if ($from.depth !== 1 || $from.parent.type.name !== 'paragraph') return null;
           state.tr.delete(range.from, range.to).setNodeMarkup($from.before(), undefined, { ...$from.parent.attrs, style: style(match) });

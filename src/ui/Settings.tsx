@@ -613,6 +613,29 @@ function Shortcuts() {
   const [recording, setRecording] = useState<string | null>(null);
   const [clash, setClash] = useState<string | null>(null);
   const query = useContext(Query);
+  // While recording, every key press goes to the recorder first, wherever the focus is, and no
+  // other shortcut runs: the Mac app's engine may not send the keys to the button at all.
+  useEffect(() => {
+    if (!recording) return;
+    const id = recording;
+    const label = SHORTCUTS.find((o) => o.id === id)?.label ?? '';
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.key === 'Escape') return setRecording(null);
+      const b = bindingOf(e);
+      if (!b) return;
+      // A shortcut needs ⌘/Ctrl or Alt, or it would type a letter.
+      if (!/(^|-)(Mod|Alt|Ctrl)-/.test(b) && !/^F\d+$/.test(b)) return setClash('Use ⌘ or Ctrl (or Alt) with a key.');
+      const other = SHORTCUTS.find((o) => o.id !== id && binding(o.id).toLowerCase() === b.toLowerCase());
+      setClash(other ? `${keys(b)} was ${other.label}; that has no shortcut now.` : `${label} is now ${keys(b)}.`);
+      if (other) setBinding(other.id, '');
+      setBinding(id, b);
+      setRecording(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [recording]);
   const shown = SHORTCUTS.filter((c) => matches(query, c.label, keys(binding(c.id)), 'keyboard shortcut'));
   return (
     <>
@@ -633,23 +656,13 @@ function Shortcuts() {
                   <button
                     className={`set-btn set-key${recording === c.id ? ' set-recording' : ''}`}
                     aria-label={recording === c.id ? `Press the new shortcut for ${c.label}, or Escape to keep it` : `Change shortcut for ${c.label}`}
-                    onClick={() => setRecording(recording === c.id ? null : c.id)}
-                    onBlur={() => recording === c.id && setRecording(null)}
-                    onKeyDown={(e) => {
-                      if (recording !== c.id) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (e.key === 'Escape') return setRecording(null);
-                      const b = bindingOf(e.nativeEvent);
-                      if (!b) return;
-                      // A shortcut needs ⌘/Ctrl or Alt, or it would type a letter.
-                      if (!/(^|-)(Mod|Alt|Ctrl)-/.test(b) && !/^F\d+$/.test(b)) return setClash('Use ⌘ or Ctrl (or Alt) with a key.');
-                      const other = SHORTCUTS.find((o) => o.id !== c.id && binding(o.id).toLowerCase() === b.toLowerCase());
-                      setClash(other ? `${keys(b)} was ${other.label}; that has no shortcut now.` : null);
-                      if (other) setBinding(other.id, '');
-                      setBinding(c.id, b);
-                      setRecording(null);
+                    onClick={(e) => {
+                      // Safari's engine (the Mac app) doesn't focus a button on a click, so it is focused here
+                      // to show where the keys go and to stop recording when the focus moves away.
+                      e.currentTarget.focus();
+                      setRecording(recording === c.id ? null : c.id);
                     }}
+                    onBlur={() => recording === c.id && setRecording(null)}
                   >
                     <span className="set-kbd">{recording === c.id ? 'Press keys…' : binding(c.id) ? keys(binding(c.id)) : 'None'}</span>
                   </button>

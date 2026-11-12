@@ -523,8 +523,9 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .shelf-preview { flex: 1; min-width: 0; overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 
 /* Group names in Mise en Place are not drawn (the Shelf already shows them), only read out by screen
-   readers. They stay in the flow, one pixel tall, so the page can still open at a Group. */
-.ms-folder { height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+   readers. They sit out of the flow at their place, so the page can still open at a Group, but take
+   no room: a Group inside a Group never pushes its first Item down. */
+.ms-folder { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* A rule between the last Item of one Group and the first of the next, like between Items. */
 .mise-item ~ .ms-folder + .mise-item { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--page-line); }
 

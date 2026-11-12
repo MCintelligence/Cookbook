@@ -1891,7 +1891,7 @@ export function App() {
           const basic = BASIC_KEYS[st.id];
           return {
             label: st.name,
-            hint: basic && keys(basic.key),
+            hint: basic && binding(st.id) ? keys(binding(st.id)) : undefined,
             checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
             onPick: () => {
               ed.commands.focus();

@@ -1,3 +1,4 @@
+import { pressed } from '../shortcuts';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon as Art } from './Icon';
 import {
@@ -153,7 +154,7 @@ export function BookLibrary(props: Props) {
     const onKey = (e: KeyboardEvent) => {
       // Escape closes a menu or the window on top first, and Your Recipes only after.
       if (e.key === 'Escape' && !document.querySelector('.menu') && !making && !savingTemplate && renaming === null) onClose();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !making) {
+      if (pressed(e, 'find') && !making) {
         e.preventDefault();
         search.current?.focus();
       }

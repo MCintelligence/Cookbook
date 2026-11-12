@@ -83,6 +83,13 @@ export const ICONS = {
   picture: art(24, s('M20.5 12V18.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4h10'), f('M3.6 17.6l5.2-6 3.8 4.2 2.4-2.6 5.4 5.6v.5H3.6zM17.8 5.2a2 2 0 1 1 0 4 2 2 0 1 1 0-4z')),
   /** A web page: a globe, one half solid. */
   web: art(24, s('M12 3a9 9 0 1 1-8.6 6.3'), f('M12 3a9 9 0 0 0 0 18c-2.2-2.4-3.4-5.6-3.4-9S9.8 5.4 12 3z'), s('M3.4 12h17.2', 2)),
+  /** Back and Forward through a web page's history: a bold chevron each way. */
+  back: art(24, s('M14.6 5.4 8 12l6.6 6.6', 2.8)),
+  forward: art(24, s('M9.4 5.4 16 12l-6.6 6.6', 2.8)),
+  /** Reload: a circle left open at the top, with a solid arrowhead. */
+  reload: art(24, s('M18.6 13.2a6.8 6.8 0 1 1-2.2-6.2', 2.4), f('M20.4 3.6v6.6h-6.6z')),
+  /** Open in your browser: a box open at one corner, an arrow leaving through it. */
+  outside: art(24, s('M10.2 4.8H6.4a1.6 1.6 0 0 0-1.6 1.6v11.2a1.6 1.6 0 0 0 1.6 1.6h11.2a1.6 1.6 0 0 0 1.6-1.6v-3.8'), s('M12.4 11.6 18.8 5.2', 2.6), f('M13.6 3.4h7v7z')),
   /** Sound: a solid note. */
   sound: art(24, f('M9 6.2 19.5 3.5v12.2a3 3 0 1 1-2-2.8V7.6L11 9.3v8.4a3 3 0 1 1-2-2.8z')),
   /** A film: a strip with its holes cut out. */

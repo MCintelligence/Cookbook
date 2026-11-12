@@ -1696,6 +1696,25 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 .research-picture { max-height: min(78vh, 1100px); overflow: auto; display: flex; justify-content: safe center; align-items: flex-start; padding: 12px; background: color-mix(in srgb, var(--text) 4%, var(--paper)); }
 .research-picture img { display: block; max-width: none; height: auto; }
 .research-web { display: block; width: 100%; height: min(78vh, 1100px); border: none; background: #fff; }
+/* A Research note's live web page: the desktop app lays its own browser view over .research-live. */
+.research-web-bar { gap: 4px; }
+.research-web-bar > svg { margin-right: 4px; }
+.research-web-bar .research-save { margin-left: 4px; }
+.research-outside { display: inline-flex; align-items: center; gap: 6px; }
+.research-outside svg { color: var(--accent); }
+.research-web-where { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; margin-left: 6px; overflow: hidden; white-space: nowrap; }
+.research-web-where b { flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; }
+.research-web-address { min-width: 0; overflow: hidden; text-overflow: ellipsis; user-select: text; }
+.research-web-where.is-loading .research-web-address { animation: research-web-loading 1.2s ease-in-out infinite alternate; }
+@keyframes research-web-loading { from { opacity: 1; } to { opacity: 0.45; } }
+.research-live { background: #fff; }
+.research-web-tip { margin: 0; padding: 6px 14px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.5; }
+.research-web-tip .text-link { font-size: inherit; }
+.research-web-off { height: auto; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 24px; background: var(--paper); color: var(--muted); text-align: center; }
+.research-web-off > svg { color: var(--accent); }
+.research-web-off p { margin: 0; max-width: 46ch; font-size: 14px; line-height: 1.5; }
+.research-web-off b { color: var(--text); }
+.research-web-off .research-web-tip { border: none; padding: 0; font-size: 13px; }
 .research-audio { width: calc(100% - 32px); margin: 20px 16px; }
 .research-video { display: block; width: 100%; max-height: 70vh; background: #000; }
 /* A PDF page's words, laid invisibly over it so they can be selected and copied (from pdf.js's own viewer). */

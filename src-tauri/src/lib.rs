@@ -173,6 +173,9 @@ mod durable {
 #[cfg(desktop)]
 mod fonts;
 
+#[cfg(desktop)]
+mod webpage;
+
 /// A Scrivener project picked as a file: on a Mac the .scriv folder is a package, which the
 /// folder picker won't choose, so it is picked as a file instead, or the .scrivx inside it is.
 /// The picker lets the page read only what was picked, so this lets it read the whole project
@@ -213,10 +216,32 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         // Folders the writer picks stay readable after the app restarts.
         .plugin(tauri_plugin_persisted_scope::init())
-        .invoke_handler(tauri::generate_handler![read_clipboard, system_fonts, commit_write, open_scrivener])
+        .invoke_handler(tauri::generate_handler![
+            read_clipboard,
+            system_fonts,
+            commit_write,
+            open_scrivener,
+            #[cfg(desktop)]
+            webpage::web_show,
+            #[cfg(desktop)]
+            webpage::web_place,
+            #[cfg(desktop)]
+            webpage::web_shown,
+            #[cfg(desktop)]
+            webpage::web_go,
+            #[cfg(desktop)]
+            webpage::web_close,
+            #[cfg(desktop)]
+            webpage::web_open_outside
+        ])
         .setup(|app| {
             #[cfg(desktop)]
             menu::install(app)?;
+            // Room over the page for a Research note's live web page (src/webpage.rs).
+            #[cfg(target_os = "linux")]
+            if let Some(window) = tauri::Manager::get_webview_window(app, "main") {
+                webpage::gtk_layer::install(&window)?;
+            }
             // Signed updates from the project's GitHub releases, on the desktop only;
             // the phone apps update through their stores.
             #[cfg(desktop)]

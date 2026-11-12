@@ -165,7 +165,8 @@ import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { Compartment } from './ui/Compartment';
-import { addResearchFile, kindName, mimeOf } from './storage/research';
+import { addResearchFile, keepResearchFile, kindName, mimeOf, titleOfAddress, titleOfFile } from './storage/research';
+import { ResearchAdd } from './ui/ResearchAdd';
 const ResearchViewer = lazy(() => import('./ui/ResearchViewer').then((m) => ({ default: m.ResearchViewer })));
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
@@ -290,6 +291,8 @@ function folderName(location: BookLocation): string {
 interface AddOptions {
   /** Open the new row's name box straight away. */
   name?: boolean;
+  /** The row the new one goes just after; by default the open Item. */
+  after?: string | null;
 }
 /** For the panel bars' New buttons, which would otherwise keep focus, so a typed name pressed them again. */
 const NAME_IT: AddOptions = { name: true };
@@ -1125,10 +1128,19 @@ export function App() {
     }
   };
 
+  /**
+   * Where a new Group or Item goes on the Shelf: beside the row picked on the Shelf, at the same depth
+   * and just after it, or else beside the open Item. With nothing picked or open, at the end of the Shelf.
+   */
+  const shelfSpot = (): { folder: string; after: string | null } => {
+    const picked = shelfMarked.size === 1 ? [...shelfMarked][0]! : null;
+    const here = picked && findNode(tree, picked) ? picked : path && path.startsWith(BOOKSHELF + '/') ? path : null;
+    return here ? { folder: parentOf(here), after: here } : { folder: BOOKSHELF, after: null };
+  };
+
   const addScene = (template?: DocTemplate, opts?: AddOptions) => {
-    // New pages go in the book of the one being written, so they land in the same chapter.
-    const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, opts);
+    const { folder, after } = shelfSpot();
+    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, { ...opts, after });
   };
 
   /** A new card in the Pantry group being shown, or in the folder of the open card if it is in that group. */
@@ -1143,11 +1155,13 @@ export function App() {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
     const top = topOf(p);
-    if (top === BOOKSHELF || top === PANTRY || top === RESEARCH) order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
+    if (top === BOOKSHELF || top === PANTRY || top === RESEARCH) order.current = await placeNew(fs, order.current, treeOf(top), top, p, opts?.after !== undefined ? opts.after : path);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
     await refreshTree();
+    // The new row becomes the one picked, so the next new one goes after it.
+    if (top === BOOKSHELF) setShelfMarked(new Set([p]));
     await select(p);
     if (opts?.name) setRenaming(p);
   };
@@ -1631,7 +1645,7 @@ export function App() {
    * after the open one or at the end of `into`. In Research, any other file
    * (a PDF, picture, web page, sound or film) comes in to be looked at.
    */
-  const importFiles = async (files: File[], into: string | null) => {
+  const importFiles = async (files: File[], into: string | null, opts: { open?: boolean } = {}) => {
     if (!fs || files.length === 0) return;
     await flushSave();
     await saveUndoNow();
@@ -1672,7 +1686,7 @@ export function App() {
     await reindex();
     await refreshTree();
     if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
-    if (first) {
+    if (first && opts.open !== false) {
       await select(first);
     }
   };
@@ -2570,15 +2584,14 @@ export function App() {
   const shelfBar = () => {
     const all = allPaths(tree);
     const everything = all.length > 0 && shelfMarked.size === all.length;
-    const group = pickedGroup(shelfMarked, tree);
     return (
       <PanelBar
         label="Shelf tools"
         status={shelfMarked.size > 1 ? `${shelfMarked.size} picked` : undefined}
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => (everything ? setShelfMarked(new Set()) : onShelfMark(new Set(all), true)) },
-          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
-          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
+          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void addFolder() },
+          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void addScene(undefined, NAME_IT) },
           { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
         ]}
       />
@@ -2791,14 +2804,14 @@ export function App() {
     await refreshTree();
   };
 
-  /** A new book goes beside the book of the page being written, and its name is ready to type. */
+  /** A new Group goes beside the row picked on the Shelf (or the open Item), and its name is ready to type. */
   const addFolder = async () => {
     if (!fs) return;
-    const here = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    const parent = here === BOOKSHELF ? BOOKSHELF : parentOf(here);
-    const created = await createFolder(fs, parent);
-    order.current = await placeNew(fs, order.current, tree, BOOKSHELF, created, here === BOOKSHELF ? path : here);
+    const { folder, after } = shelfSpot();
+    const created = await createFolder(fs, folder);
+    order.current = await placeNew(fs, order.current, tree, BOOKSHELF, created, after);
     await refreshTree();
+    setShelfMarked(new Set([created]));
     setRenaming(created);
   };
 
@@ -2827,6 +2840,8 @@ export function App() {
       order.current = renamed.order;
       followMove(from, renamed.path);
       landed = renamed.path;
+      // A Group picked on the Shelf stays picked under its new name, so what is added next goes beside it.
+      setShelfMarked((m) => (m.has(from) ? new Set([...m].map((x) => (x === from ? landed : x))) : m));
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -2917,6 +2932,50 @@ export function App() {
     // Pictures written into scenes as ![…](path) are read from the book.
     setPictureLoader(fs ? loadPicture : null);
   }, [fs, loadPicture]);
+  /** A Research note still called what it was made as, so what is added to it can name it. */
+  const unnamed = (title: string) => !title.trim() || SCENE_TEMPLATES.some((t) => t.title === title) || title === 'Untitled';
+  /**
+   * Files picked or dropped on a Research note's page. The first shows in the note itself (or, if it
+   * is words and the note is empty, becomes its text); any more come in as Items just after it.
+   */
+  const addToResearchNote = async (files: File[]) => {
+    const p = path;
+    const base = currentDoc() ?? doc;
+    if (!fs || !p || !base || topOf(p) !== RESEARCH || fileOf(base.fields) || files.length === 0) return;
+    const [first, ...rest] = files;
+    const blank = !base.body.trim();
+    try {
+      const bytes = new Uint8Array(await first!.arrayBuffer());
+      const title = unnamed(base.title) ? titleOfFile(first!.name) : base.title;
+      if (canImport(first!.name)) {
+        if (!blank || !editor) rest.unshift(first!);
+        else {
+          const imported = importFile(first!.name, bytes);
+          const next = { ...base, title: unnamed(base.title) ? imported.title : base.title };
+          setDoc(next);
+          scheduleSave(next);
+          editor.chain().focus().setContent(parseMarkdown(imported.body), { emitUpdate: true }).run();
+        }
+      } else {
+        const kept = await keepResearchFile(fs, first!.name, title, bytes);
+        const next = { ...base, title, fields: { ...base.fields, file: kept } };
+        setDoc(next);
+        scheduleSave(next);
+      }
+    } catch (e) {
+      setError(`Couldn’t add ${first!.name}. ${friendlyError(e)}`);
+    }
+    if (rest.length > 0) await importFiles(rest, parentOf(p), { open: false });
+  };
+  /** A web address kept in a Research note, which names it if it hasn't a name yet. */
+  const addAddressToNote = (href: string) => {
+    const base = currentDoc() ?? doc;
+    if (!base || !path || topOf(path) !== RESEARCH) return;
+    const next = { ...base, title: unnamed(base.title) ? titleOfAddress(href) : base.title, fields: { ...base.fields, url: href } };
+    setDoc(next);
+    scheduleSave(next);
+  };
+
   const pickPortrait = async (file: File) => {
     const base = currentDoc() ?? doc;
     if (!fs || !base) return;
@@ -4325,6 +4384,16 @@ export function App() {
           </div>
         ) : (
           <>
+          {doc && path && topOf(path) === RESEARCH && !fileOf(doc.fields) && (
+            <ResearchAdd
+              key={path}
+              style={cardStyle}
+              url={typeof doc.fields.url === 'string' && doc.fields.url ? doc.fields.url : null}
+              onFiles={(files) => void addToResearchNote(files)}
+              onAddress={addAddressToNote}
+              onForgetAddress={() => setCardField('url', undefined)}
+            />
+          )}
           {doc && path && fileOf(doc.fields) && (
             <Suspense fallback={null}>
               <ResearchViewer style={cardStyle} file={fileOf(doc.fields)!} loadBytes={loadResearchBytes} onSave={() => void saveResearchCopy(path)} />

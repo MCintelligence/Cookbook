@@ -3,7 +3,7 @@ import { strFromU8, strToU8 } from 'fflate';
 import { MemoryAdapter } from './memory';
 import { createBook, createDocument, readDocument, writeDocument } from './book';
 import { BookIndex, refreshIndex } from './index';
-import { addResearchFile, kindName, mimeOf, readBinaryPlist, readWebArchive, researchKind } from './research';
+import { addResearchFile, keepResearchFile, kindName, mimeOf, readBinaryPlist, readWebArchive, researchKind, titleOfAddress, titleOfFile, webAddress } from './research';
 
 /** A small binary property list writer, enough to make a Safari web archive for the tests. */
 type Value = string | number | boolean | Uint8Array | Value[] | { [key: string]: Value };
@@ -75,6 +75,26 @@ describe('Research files', () => {
     expect(await readDocument(fs, a)).toMatchObject({ title: 'Old menu', kind: 'scene', fields: { file: 'files/Old menu.pdf' } });
     expect(await readDocument(fs, b)).toMatchObject({ fields: { file: 'files/Old menu 2.pdf' }, body: 'Check the year.\n' });
     expect(strFromU8(await fs.readBytes('files/Old menu 2.pdf'))).toBe('%PDF-1.7');
+  });
+
+  it('keeps a file added to a note, named after the note', async () => {
+    const fs = new MemoryAdapter();
+    await createBook(fs, 'Book');
+    expect(titleOfFile('Harbour map.JPG')).toBe('Harbour map');
+    expect(titleOfFile('.jpg')).toBe('Untitled');
+    expect(await keepResearchFile(fs, 'IMG_1.jpg', 'Harbour', strToU8('x'))).toBe('files/Harbour.jpg');
+    expect(await keepResearchFile(fs, 'IMG_2.jpg', 'Harbour', strToU8('y'))).toBe('files/Harbour 2.jpg');
+  });
+
+  it('reads a web address as typed, pasted or dropped', () => {
+    expect(webAddress('example.com/a/b')).toBe('https://example.com/a/b');
+    expect(webAddress('  http://example.org  ')).toBe('http://example.org/');
+    expect(webAddress('javascript:alert(1)')).toBeNull();
+    expect(webAddress('file:///etc/passwd')).toBeNull();
+    expect(webAddress('just words')).toBeNull();
+    expect(webAddress('word')).toBeNull();
+    expect(titleOfAddress('https://www.example.com/wiki/Salt_cod.html')).toBe('example.com · Salt cod');
+    expect(titleOfAddress('https://example.com/')).toBe('example.com');
   });
 
   it('reads a Safari web archive with the pictures saved in it', () => {

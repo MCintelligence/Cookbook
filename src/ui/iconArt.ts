@@ -104,6 +104,16 @@ export const ICONS = {
     s('M8 26H3.5M40 26h4.5', 3),
     f('M5.5 18.5h37a1.5 1.5 0 0 1 0 3h-37a1.5 1.5 0 0 1 0-3z'),
   ),
+  /** A Chef note: a solid speech card, two lines of writing cut out of it and a gloss down its side. */
+  chefNote: art(24, f('M4.5 3.5h15A1.5 1.5 0 0 1 21 5v10a1.5 1.5 0 0 1-1.5 1.5H11.4L6.5 20.6V16.5h-2A1.5 1.5 0 0 1 3 15V5a1.5 1.5 0 0 1 1.5-1.5zM8 7.6h9v1.8H8zM8 11h6v1.8H8zM4.9 5.4h1.2v8.8H4.9z')),
+  /** Line height: lines with an arrow up and down beside them. */
+  lineHeight: art(24, s('M11 6h9.5M11 12h9.5M11 18h9.5'), s('M3.6 8.4 6 5.8l2.4 2.6M3.6 15.6 6 18.2l2.4-2.6', 2), s('M6 6.4v11.2', 2)),
+  /** Space between paragraphs: two short paragraphs with a gap. */
+  paraSpace: art(24, s('M3.5 4.5h17M3.5 8.5h11'), s('M3.5 15.5h17M3.5 19.5h11'), f('M10.6 11h2.8v2h-2.8z')),
+  /** Column width: two walls with arrows out to them. */
+  colWidth: art(24, s('M3.5 4v16M20.5 4v16', 2.6), s('M8.5 12h7', 2), s('M10.4 9.2 7.6 12l2.8 2.8M13.6 9.2l2.8 2.8-2.8 2.8', 2)),
+  /** Leave: an open door frame and an arrow going out of it. */
+  leave: art(24, s('M10 3.8H6A1.8 1.8 0 0 0 4.2 5.6v12.8A1.8 1.8 0 0 0 6 20.2h4'), s('M14.2 7.6 18.6 12l-4.4 4.4M18.4 12H9', 2.6)),
 } satisfies Record<string, IconArt>;
 
 export type IconName = keyof typeof ICONS;

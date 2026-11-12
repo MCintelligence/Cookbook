@@ -21,6 +21,8 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'shelf', label: 'Name from the Pantry', key: 'Mod-J' },
   { id: 'seasonings', label: 'Seasonings', key: 'Mod-Shift-S' },
   { id: 'focus', label: 'Chef Mode (focus)', key: 'Alt-F' },
+  // Word's key for a new comment.
+  { id: 'chefNote', label: 'New Chef note (in Chef Mode)', key: 'Mod-Alt-M' },
   // The desktop app starts full screen; F11 leaves and comes back, as in most Windows and Linux apps.
   // A Mac has it already as Window › Enter Full Screen (⌃⌘F), and a browser keeps F11 for itself.
   ...(isTauri() && !IS_MAC ? [{ id: 'fullscreen', label: 'Full screen', key: 'F11' }] : []),

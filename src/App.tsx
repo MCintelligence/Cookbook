@@ -160,6 +160,10 @@ import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { OvenEdges, useSlideAway } from './ui/OvenEdges';
+import { ChefBar } from './chef/ChefBar';
+import { ChefMargin } from './chef/ChefMargin';
+import { type ChefLook, SIZE, lookVars } from './chef/look';
+import { addChefNote, chefNotesRead, flushChefNotes, loadChefNotes, putNotesOn } from './chef/notes';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
@@ -371,6 +375,11 @@ export function App() {
   useEffect(() => {
     void loadPrefs(fs);
     return flushPrefs;
+  }, [fs]);
+  // Chef notes are kept with the recipe, like the views' set-up.
+  useEffect(() => {
+    void loadChefNotes(fs);
+    return flushChefNotes;
   }, [fs]);
   /** What the Shelf and Pantry show of the open Item as last indexed (see shownOf), to tell a save that only changed words. */
   const shownBefore = useRef<{ path: string; shown: string } | null>(null);
@@ -2039,6 +2048,7 @@ export function App() {
       { separator: true },
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
+      ...(settings.focus ? [{ label: 'New Chef note', hint: keysFor('chefNote'), onPick: newChefNote }] : []),
       { label: 'Chef Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
     ];
     if (words) {
@@ -3222,7 +3232,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan', 'draft', 'olderDraft', 'newerDraft']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan', 'draft', 'olderDraft', 'newerDraft', 'chefNote']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -3246,6 +3256,11 @@ export function App() {
       e.preventDefault();
       // A free board or the atlas on screen takes the zoom keys for itself.
       if (!window.dispatchEvent(new CustomEvent(BOARD_ZOOM, { detail: dir ?? 0, cancelable: true }))) return;
+      // In Chef Mode they change the reader's text size instead of the page's zoom.
+      if (getSettings().focus) {
+        const now = getSettings().chef.size;
+        return setLook({ size: dir === null ? 100 : Math.min(SIZE.max, Math.max(SIZE.min, now + dir * SIZE.step)) });
+      }
       if (dir === null) updateBook({ page: { ...pageOf(book.page), zoom: 100 } });
       else zoomPage.current(dir);
       return;
@@ -3257,6 +3272,7 @@ export function App() {
     else if (id === 'shelf') setShelf({ at: null });
     else if (id === 'seasonings') doc && togglePanel('seasonings');
     else if (id === 'focus') toggleFocus();
+    else if (id === 'chefNote') newChefNote();
     else if (id === 'newScene') void addScene();
     else if (id === 'settings') openSettings();
     else if (id === 'nextArea' || id === 'prevArea') cycleArea(id === 'nextArea' ? 1 : -1);
@@ -3337,7 +3353,20 @@ export function App() {
   useEffect(() => {
     // The page redraws its fading when focus mode or what it keeps bright changes.
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(focusKey, true));
-  }, [editor, settings.focus, settings.fade]);
+  }, [editor, settings.focus, settings.fade, settings.chef.notes]);
+  // The open Item's Chef notes go on its page once it opens, and once the recipe's notes are read.
+  const notesRead = useStore(chefNotesRead);
+  useEffect(() => {
+    if (editor && doc?.id) putNotesOn(editor, doc.id);
+  }, [editor, doc?.id, notesRead]);
+  const setLook = (change: Partial<ChefLook>) => setSettings({ chef: { ...getSettings().chef, ...change } });
+  /** A Chef note on the words selected, or the word at the cursor. Only in Chef Mode, where notes are seen. */
+  const newChefNote = () => {
+    if (!getSettings().focus) return say('Chef notes are written in Chef Mode.');
+    if (!editor || !doc) return say('Open an Item to write a Chef note on it.');
+    if (!getSettings().chef.notes) setLook({ notes: true });
+    addChefNote(editor);
+  };
   useEffect(() => {
     // Typewriter scrolling keeps the line being typed in the middle of the window.
     if (!editor || !settings.typewriter) return;
@@ -3491,6 +3520,7 @@ export function App() {
   const sideAway = useSlideAway(settings.focus && ovenSide, tuckAway);
   const seasoningsShown = seasoningsOpen && (!settings.focus || ovenSide);
   const saveEverything = useCallback(async () => {
+    flushChefNotes();
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
@@ -3565,6 +3595,7 @@ export function App() {
         : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Leave Chef Mode' : 'Chef Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study chef oven'),
+      ...(settings.focus ? [cmd('chefNote', 'New Chef note', newChefNote, 'View', keysFor('chefNote'), 'comment note chef margin')] : []),
       ...(book
         ? [
             cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits insert'),
@@ -3723,6 +3754,9 @@ export function App() {
         {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
         <PageFootnotes editor={editor} />
         <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
+        {settings.focus && settings.chef.notes && editor && !miseShown && !beside && (
+          <ChefMargin editor={editor} writer={settings.writerName.trim() || 'You'} showResolved={settings.chef.resolved} onMenu={showMenu} />
+        )}
       </>
     );
   };
@@ -4088,10 +4122,11 @@ export function App() {
     say,
       };
 
+  const chefLook = settings.focus ? lookVars(settings.chef) : null;
   return (
     <div
-      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}`}
-      style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${chefLook ? ' ' + chefLook.classes.join(' ') : ''}${settings.focus && menu && (menu.label === 'Recipe' || menu.label === 'Mode') ? ' top-held' : ''}`}
+      style={{ '--shelf-w': `${shelfWidth}px`, ...chefLook?.vars } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
@@ -4285,6 +4320,24 @@ export function App() {
         />
       )}
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
+      {settings.focus && book && (
+        <ChefBar
+          look={settings.chef}
+          onLook={setLook}
+          editor={doc ? editor : null}
+          chosen={chosen}
+          unchecked={unchecked}
+          paused={paused}
+          onCheck={(id, on) => (id === 'daniel' ? setSeasonings({ drunk: on || undefined }) : setSeasonings({ unchecked: on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])] }))}
+          onPick={(id) => setSeasonings({ chosen: [...chosen, id], ...(id === 'daniel' ? { drunk: true } : { unchecked: unchecked.filter((u) => u !== id) }) })}
+          onPaused={(on) => setSeasonings({ paused: on || undefined })}
+          onMenu={showMenu}
+          onAddNote={newChefNote}
+          noteKey={keysFor('chefNote')}
+          onLeave={() => setSettings({ focus: false })}
+          leaveKey={keysFor('focus')}
+        />
+      )}
 
       <main className={`desk${beside && doc ? ' split' : ''}${deskDrop ? ' drop-' + deskDrop : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         {error && (

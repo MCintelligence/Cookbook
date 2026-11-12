@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { type BookLocation } from './storage/platform';
 import { type English, isEnglish } from './proofread/english';
 import { type WriterKind, isWriterKind } from './writers';
+import { type ChefLook, DEFAULT_LOOK, parseLook } from './chef/look';
 
 /**
  * Settings for the app on this device, kept in the browser's storage (or the
@@ -47,6 +48,8 @@ export interface AppSettings {
   /** What focus mode leaves bright. */
   fade: Exclude<Fade, 'off'>;
   focus: boolean;
+  /** How Chef Mode shows the page: paper, ink, font, size and spacing, set from its reader bar. */
+  chef: ChefLook;
   typewriter: boolean;
   /** What ⌘V does: keep formatting, or paste plain text. */
   pastePlain: boolean;
@@ -99,6 +102,14 @@ export function markdownOn(rule: MarkdownRule, s: AppSettings = current): boolea
   return s.markdown && s.markdownRules[rule];
 }
 
+/**
+ * Whether typing a Markdown rule formats the text now. Chef Mode has no toolbar, so there every rule
+ * typed works, whatever the switches say. (How a recipe is read and plated still follows markdownOn.)
+ */
+export function markdownTyped(rule: MarkdownRule, s: AppSettings = current): boolean {
+  return s.focus || markdownOn(rule, s);
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   writerName: '',
   english: 'auto',
@@ -121,6 +132,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   slashMenu: true,
   fade: 'paragraph',
   focus: false,
+  chef: DEFAULT_LOOK,
   typewriter: false,
   pastePlain: false,
   saveDelay: 600,
@@ -180,6 +192,7 @@ export function parseSettings(raw: string | null): AppSettings {
   out.writer = isWriterKind(saved.writer) ? saved.writer : '';
   if (!((out.dailyGoal as number) > 0)) out.dailyGoal = DEFAULT_SETTINGS.dailyGoal;
   out.newSeasonings = Array.isArray(saved.newSeasonings) ? saved.newSeasonings.filter((id): id is string => SEASONING_IDS.includes(id as string)) : [];
+  out.chef = parseLook(saved.chef);
   out.shortcuts = Object.fromEntries(Object.entries(out.shortcuts as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
   return out as unknown as AppSettings;
 }

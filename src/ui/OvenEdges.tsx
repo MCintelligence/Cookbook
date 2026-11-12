@@ -36,6 +36,10 @@ export function OvenEdges({ seasonings, onShelf, onSide }: { seasonings: boolean
     <>
       {edge('left', 'Shelf', onShelf)}
       {edge('right', seasonings ? 'Seasonings' : 'Pantry', onSide)}
+      {/* The top edge brings the top bar down; CSS does it (see chef.css), so it needs no handler. */}
+      <div className="oven-edge top" aria-hidden="true">
+        <span className="oven-edge-tab" />
+      </div>
     </>
   );
 }

@@ -80,11 +80,14 @@ export function ModeSwitch({ title, openIsCard, showMenu, expanded }: Props) {
         showMenu('Mode', box.left, box.bottom + 4, modeItems(side), e.currentTarget);
       }}
     >
-      <ModeIcon mode={mode} />
+      {/* The mode's picture carries the pulldown mark under it, so the name needs no arrow of its own. */}
+      <span className="crumb-mode-pic">
+        <ModeIcon mode={mode} />
+        <svg className="crumb-mode-caret" width="8" height="5" viewBox="0 0 8 5" aria-hidden="true">
+          <path d="M0.5 0.5h7L4 4.5z" fill="currentColor" />
+        </svg>
+      </span>
       <span className="crumb-mode-name">{title ?? name}</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M6 9l6 6 6-6" />
-      </svg>
     </button>
   );
 }

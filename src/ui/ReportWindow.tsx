@@ -12,8 +12,6 @@ interface Props {
   report: Report;
   /** The Item the report reads. */
   item: string;
-  /** Where the report was saved in the Pantry, once it has been; null while saving, or if it couldn't be. */
-  saved: string | null;
   onClose: () => void;
 }
 
@@ -27,7 +25,7 @@ const SHOWN_ROWS = 100;
  * meter, a few numbers, what to try first, and what they found. Clicking
  * anything found closes the window and selects it on the page.
  */
-export function ReportWindow({ editor, report, item, saved, onClose }: Props) {
+export function ReportWindow({ editor, report, item, onClose }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const before = useRef(document.activeElement as HTMLElement | null);
   const jumped = useRef(false);
@@ -105,10 +103,6 @@ export function ReportWindow({ editor, report, item, saved, onClose }: Props) {
         {report.sections.map((s) => (
           <ReportSection key={s.title} section={s} onJump={jump} />
         ))}
-
-        <p className="report-saved" aria-live="polite">
-          {saved ? `Saved to Materials › Seasoning Reports as “${saved}”.` : 'Saving to Materials › Seasoning Reports…'}
-        </p>
       </div>
     </div>,
     document.body,

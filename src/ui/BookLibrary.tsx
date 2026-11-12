@@ -31,7 +31,7 @@ interface Props {
   startNew?: boolean;
   onOpen: (location: BookLocation) => void;
   onOpenFolder: () => void;
-  /** Opens Learn to Cook, making a fresh one if it was deleted. */
+  /** Opens How to Cook, making a fresh one if it was deleted. */
   onLearn: () => void;
   onCreate: (choice: NewRecipeChoice) => void;
   onAdopt: (location: BookLocation) => void;
@@ -592,7 +592,7 @@ export function BookLibrary(props: Props) {
                 <div className="recipes-empty">
                   <span className="recipes-pot">{Icon.pot}</span>
                   <p className="recipes-empty-line">The kitchen’s ready when you are.</p>
-                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have. New to Cookbook? Learn to Cook is a recipe that shows you round.</p>
+                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have. New to Cookbook? How to Cook is a recipe that shows you round.</p>
                   <div className="lib-row">
                     <button className="btn btn-primary" onClick={() => setMaking(true)}>
                       New Recipe
@@ -603,7 +603,7 @@ export function BookLibrary(props: Props) {
                       </button>
                     )}
                     <button className="btn" onClick={onLearn} disabled={busy}>
-                      Learn to Cook
+                      How to Cook
                     </button>
                   </div>
                 </div>

@@ -532,7 +532,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .desk { grid-area: desk; overflow: auto; scrollbar-gutter: stable; padding: 32px 24px 64px; display: flex; flex-direction: column; align-items: safe center; }
 .cb-page { width: 816px; max-width: 100%; min-height: 1056px; flex: none; background: var(--paper); color: var(--page-text); border: 1px solid var(--page-line); border-radius: 2px; padding: 96px; box-shadow: 0 1px 0 var(--line), 0 12px 28px rgba(var(--shadow), 0.08); }
 .cb-page { position: relative; }
-/* Zooming eases, except under Fit width, which follows the window as it's dragged. */
+/* Zooming eases. */
 .cb-page.eased { transition: zoom 140ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .cb-page.eased { transition: none; } }
 .break-actions { position: absolute; right: 84px; display: flex; gap: 4px; font-family: var(--font-label); z-index: 1; }
@@ -540,7 +540,7 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cb-prose { outline: none; -webkit-hyphens: manual; hyphens: manual; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
-/* Line breaking, as in Scrivener: words wrap whole unless the writer turns hyphenation on in App Settings › Writing,
+/* Line breaking, as in Scrivener: words wrap whole unless the writer turns hyphenation on in Cookbook Settings › Writing,
    and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
    Even lines (text-wrap: pretty) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
    that under ProseMirror's white-space: break-spaces, so it sets pre-wrap, which only lets a space typed at a line's end hang. */
@@ -1152,7 +1152,6 @@ button.seas-quote:hover { color: var(--accent); }
 .report-strip-cell span { display: block; width: 100%; border-radius: 2px 2px 0 0; background: var(--line-strong); }
 .report-strip-cell span.is-spoken { background: var(--accent); }
 .report-strip-cell:hover span { filter: brightness(0.9); outline: 1px solid var(--accent); }
-.report-saved { margin: 0; font-size: 12px; color: var(--faint); }
 @media (max-width: 560px) {
   .report-stats { grid-template-columns: repeat(2, 1fr); }
 }
@@ -1630,6 +1629,9 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 .crumb-mode { display: inline-flex; align-items: center; gap: 6px; min-width: 0; border: none; background: transparent; padding: 4px 6px; border-radius: 8px; color: inherit; font-size: inherit; }
 .crumb-mode:hover, .crumb-mode[aria-expanded='true'] { background: var(--sidebar); color: var(--text); }
 .crumb-mode .mode-icon { flex: none; color: var(--accent); }
+.crumb-mode-pic { flex: none; display: inline-flex; flex-direction: column; align-items: center; gap: 1px; line-height: 0; }
+.crumb-mode-caret { color: var(--muted); }
+.crumb-mode:hover .crumb-mode-caret, .crumb-mode[aria-expanded='true'] .crumb-mode-caret { color: var(--text); }
 .crumb-mode-name { overflow: hidden; text-overflow: ellipsis; }
 .menu .mode-icon { margin-right: 8px; vertical-align: -3px; color: var(--accent); }
 /* In Prep and Plan the page and its toolbar are put away (still there, so nothing is lost) and the mode's own take their places. */

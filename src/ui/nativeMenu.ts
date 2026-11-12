@@ -70,13 +70,14 @@ export async function setMacMenu(menus: BarMenu[], latest: () => BarMenu[], app:
     items: [
       { item: { About: null } },
       { item: 'Separator' },
-      { id: 'app-settings', text: 'App Settings…', accelerator: 'CmdOrCtrl+,', action: app.settings },
-      { item: 'Separator' },
       { item: 'Services' },
       { item: 'Separator' },
       { item: 'Hide' },
       { item: 'HideOthers' },
       { item: 'ShowAll' },
+      { item: 'Separator' },
+      // The one way into Settings from the menu bar, near the bottom.
+      { id: 'app-settings', text: 'Cookbook Settings…', accelerator: 'CmdOrCtrl+,', action: app.settings },
       { item: 'Separator' },
       // Quitting closes the window first, so the page saves the last words typed.
       { id: 'app-quit', text: 'Quit Cookbook', accelerator: 'CmdOrCtrl+Q', action: app.quit },

@@ -29,8 +29,8 @@ export const MARGINS: Record<Margins, { label: string; inches: number }> = {
   wide: { label: 'Wide', inches: 1.4 },
 };
 
-/** The steps for ⌘= and ⌘−, and the menu; the slider in the footer goes anywhere between the ends. 0 is Fit width. */
-export const ZOOMS = [75, 100, 125, 150, 0] as const;
+/** The steps in the View › Zoom menu; the slider in the footer goes anywhere between the ends, and Reset goes back to 100%. */
+export const ZOOMS = [75, 100, 125, 150] as const;
 export const MIN_ZOOM = 50;
 export const MAX_ZOOM = 200;
 /** How far one press of ⌘=, ⌘−, a wheel notch or the zoom pop-up's − and + moves. */
@@ -51,10 +51,11 @@ export function pageOf(saved: unknown): PageSettings {
     size: typeof p.size === 'string' && p.size in PAGE_SIZES ? (p.size as PageSize) : DEFAULT_PAGE.size,
     margins: typeof p.margins === 'string' && p.margins in MARGINS ? (p.margins as Margins) : DEFAULT_PAGE.margins,
     view: p.view === 'draft' ? 'draft' : 'page',
-    zoom: typeof p.zoom === 'number' && (p.zoom === 0 || (p.zoom >= MIN_ZOOM && p.zoom <= MAX_ZOOM)) ? Math.round(p.zoom) : DEFAULT_PAGE.zoom,
+    // A recipe saved with the old Fit width (0) opens at 100%.
+    zoom: typeof p.zoom === 'number' && p.zoom >= MIN_ZOOM && p.zoom <= MAX_ZOOM ? Math.round(p.zoom) : DEFAULT_PAGE.zoom,
   };
 }
 
 export function zoomLabel(zoom: number): string {
-  return zoom === 0 ? 'Fit width' : `${zoom}%`;
+  return `${zoom}%`;
 }

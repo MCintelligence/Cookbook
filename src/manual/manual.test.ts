@@ -16,8 +16,8 @@ describe('the manual', () => {
 
   it('uses the names the app uses now', () => {
     const all = CHAPTERS.map((c) => c.body).join('\n');
-    expect(all).not.toMatch(/Read the recipe|Pantry › Research|Places and Research|(?<!App |Recipe )Settings › |\bStudy mode/);
-    expect(all).toMatch(/App Settings › Writing/);
+    expect(all).not.toMatch(/Read the recipe|Pantry › Research|Places and Research|(?<!Cookbook )Settings › |\bStudy mode/);
+    expect(all).toMatch(/Cookbook Settings › Writing/);
   });
 
   it('has a unique id for every chapter', () => {

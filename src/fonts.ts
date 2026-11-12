@@ -9,6 +9,8 @@ import '@fontsource/caudex/latin-700.css';
 import '@fontsource/caudex/latin-700-italic.css';
 // The interface's own Crimson Pro, drawn larger to match the old Literata sizes (see fonts-ui.css).
 import './fonts-ui.css';
+// Merriweather, which takes Crimson Pro's place on a phone.
+import './fonts-phone.css';
 import '@fontsource/eb-garamond/latin-400.css';
 import '@fontsource/eb-garamond/latin-400-italic.css';
 import '@fontsource/eb-garamond/latin-700.css';

@@ -47,7 +47,7 @@ function Ring({ ratio, size, stroke, label }: { ratio: number; size: number; str
         opacity={ratio === 0 ? 0 : 1}
       />
       {size > 40 && (
-        <text x={size / 2} y={size / 2 + 5} textAnchor="middle" fontSize="14" fontWeight="800" fill="var(--text)" fontFamily="'Crimson Pro UI', Georgia, serif">
+        <text x={size / 2} y={size / 2 + 5} textAnchor="middle" fontSize="14" fontWeight="800" fill="var(--text)" style={{ fontFamily: 'var(--font-text)' }}>
           {Math.round(ratio * 100)}%
         </text>
       )}

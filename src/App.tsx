@@ -3664,7 +3664,8 @@ export function App() {
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8, aside: true }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
-  const css = useMemo(() => stylesToCss(sheet), [sheet]);
+  // On a phone, what a style sets in Crimson Pro is drawn in Merriweather (fonts-phone.css). Only the drawing: the style, and what is exported or printed, are untouched.
+  const css = useMemo(() => (phone ? stylesToCss(sheet).replaceAll("'Crimson Pro'", "'Merriweather Page'") : stylesToCss(sheet)), [sheet, phone]);
 
   const page = pageOf(book?.page);
   const goals: Goals = { dailyGoal: book?.dailyGoal ?? settings.dailyGoal, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };

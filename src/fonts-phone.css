@@ -1,0 +1,89 @@
+/*
+ * On a phone, everything Crimson Pro draws on a computer is drawn in Merriweather: the interface
+ * (phone.css points --font-text and --font-label here) and the words of a page whose style asks
+ * for Crimson Pro (App.tsx). Merriweather is a large face where Crimson Pro is a small one, so each
+ * is drawn smaller by the amount that keeps the lowercase the height it was, and every size in
+ * the stylesheets and in a recipe's styles stays as written. The interface's Crimson Pro is already
+ * drawn 20% larger (fonts-ui.css), which is why the two differ. A font is only fetched when
+ * something is drawn in it, so a computer never loads these.
+ */
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-700-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather UI';
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  size-adjust: 93%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-800-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather Page';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 78%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather Page';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 78%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather Page';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 78%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Merriweather Page';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  size-adjust: 78%;
+  src: url('../node_modules/@fontsource/merriweather/files/merriweather-latin-700-italic.woff2') format('woff2');
+}

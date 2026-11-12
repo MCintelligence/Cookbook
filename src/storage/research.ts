@@ -90,6 +90,47 @@ export function kindName(name: string): string {
   }
 }
 
+/** A file's name without its extension, as a title. */
+export function titleOfFile(fileName: string): string {
+  const ext = extensionOf(fileName);
+  return (ext ? fileName.slice(0, -(ext.length + 1)) : fileName).trim() || 'Untitled';
+}
+
+/** Keeps a file's bytes in files/, named after `title`, and returns where it was kept. */
+export async function keepResearchFile(fs: StorageAdapter, fileName: string, title: string, bytes: Uint8Array): Promise<string> {
+  const ext = extensionOf(fileName);
+  await fs.makeFolder(FILES);
+  const dot = ext ? `.${ext}` : '';
+  const kept = joinPath(FILES, await freeName(fs, FILES, `${fileNameFor(title)}${dot}`, dot || undefined));
+  await fs.writeBytes(kept, bytes);
+  return kept;
+}
+
+/**
+ * A web address as typed or pasted: "example.com/page" gains https://. Null if it can't be one.
+ */
+export function webAddress(typed: string): string | null {
+  const t = typed.trim();
+  if (!t || /\s/.test(t)) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (!u.hostname.includes('.') && u.hostname !== 'localhost') return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+/** A short title for a web address: its site and last part, such as "example.com · history". */
+export function titleOfAddress(href: string): string {
+  const u = new URL(href);
+  const host = u.hostname.replace(/^www\./, '');
+  const last = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? '').replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').trim();
+  return last ? `${host} · ${last}` : host;
+}
+
 /**
  * Keeps a file in files/ and makes the Research Item that shows it, in `folder`. The Item is
  * titled after the file unless a title is given; `fields` and `body` (its notes) are added to it.
@@ -102,13 +143,8 @@ export async function addResearchFile(
   bytes: Uint8Array,
   extra: { title?: string; fields?: Record<string, unknown>; body?: string; itemName?: string } = {},
 ): Promise<string> {
-  const ext = extensionOf(fileName);
-  const stem = ext ? fileName.slice(0, -(ext.length + 1)) : fileName;
-  const title = extra.title ?? (stem.trim() || 'Untitled');
-  await fs.makeFolder(FILES);
-  const dot = ext ? `.${ext}` : '';
-  const kept = joinPath(FILES, await freeName(fs, FILES, `${fileNameFor(title)}${dot}`, dot || undefined));
-  await fs.writeBytes(kept, bytes);
+  const title = extra.title ?? titleOfFile(fileName);
+  const kept = await keepResearchFile(fs, fileName, title, bytes);
   await fs.makeFolder(folder);
   const name = extra.itemName ?? (await freeName(fs, folder, `${fileNameFor(title)}.md`, '.md'));
   const path = joinPath(folder, name);

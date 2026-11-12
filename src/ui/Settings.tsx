@@ -254,7 +254,7 @@ export function Settings(props: Props) {
       className="settings"
       role="dialog"
       aria-modal="true"
-      aria-label="App Settings"
+      aria-label="Cookbook Settings"
       ref={box}
       // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
       tabIndex={-1}
@@ -262,7 +262,7 @@ export function Settings(props: Props) {
       <header className="set-top">
         <div className="set-brand">
           <span className="brand">cookbook</span>
-          <span className="set-crumb">· App Settings</span>
+          <span className="set-crumb">· Cookbook Settings</span>
         </div>
         <div className="set-top-actions">
           <label className="set-search">
@@ -275,16 +275,16 @@ export function Settings(props: Props) {
         </div>
       </header>
       <div className="set-body">
-        <nav className="set-nav" aria-label="App Settings sections">
-          <div className="set-scope">App Settings</div>
+        <nav className="set-nav" aria-label="Cookbook Settings sections">
+          <div className="set-scope">On this device</div>
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
-          <div className="set-scope">Recipe Settings</div>
+          <div className="set-scope">This recipe</div>
           {BOOK_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
-          <p className="set-note">Recipe settings are saved in the recipe’s folder, so they travel with it. App settings stay on this device.</p>
+          <p className="set-note">This recipe’s settings are saved in its folder, so they travel with it. The rest stay on this device.</p>
         </nav>
         <main className="set-main">
           <Query.Provider value={query}>
@@ -325,7 +325,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Your name" help="Optional. New recipes put it on their title page when they’re plated." words="author">
               <input className="set-text" aria-label="Your name" placeholder="Not set" defaultValue={s.writerName} onBlur={(e) => e.target.value !== s.writerName && set({ writerName: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
             </Row>
-            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Recipe Settings › Seasonings)." words="language spelling dialect american british canadian australian">
+            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Cookbook Settings › Seasonings)." words="language spelling dialect american british canadian australian">
               <Select label="Your English" value={s.english} options={[['auto', 'As my system'], ...ENGLISHES.map((e): [string, string] => [e.id, e.name])] as [AppSettings['english'], string][]} onChange={(english) => set({ english })} />
             </Row>
             <Row title="What you write" help="Picks the template New Recipe offers first." words="writer novelist template">
@@ -756,7 +756,7 @@ function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'on
           />
         </Row>
         <Row title="Zoom" help={`${keys('Mod-=')} and ${keys('Mod--')} also zoom the page.`}>
-          <ZoomSlider zoom={page.zoom} fitted={100} onZoom={(zoom) => set({ zoom })} />
+          <ZoomSlider zoom={page.zoom} onZoom={(zoom) => set({ zoom })} />
         </Row>
       </Group>
     </>
@@ -910,7 +910,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
   return (
     <>
       <Group title="Language">
-        <Row title="Spelling" help="Saved with the recipe, so a co-author gets the same. A recipe that never chose follows your English in App Settings › General.">
+        <Row title="Spelling" help="Saved with the recipe, so a co-author gets the same. A recipe that never chose follows your English in Cookbook Settings › General.">
           <Seg label="Spelling" value={proof.dialect} options={DIALECTS.map((d) => [d.id, d.name])} onChange={proof.setDialect} />
         </Row>
         <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the recipe.`} words={proof.words.join(' ')}>

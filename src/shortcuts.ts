@@ -44,7 +44,7 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'draft', label: 'Draft this item', key: 'Alt-X' },
   { id: 'olderDraft', label: 'Older draft as ghost text', key: 'Alt-Z' },
   { id: 'newerDraft', label: 'Newer draft as ghost text', key: 'Alt-C' },
-  { id: 'settings', label: 'App Settings', key: 'Mod-,' },
+  { id: 'settings', label: 'Cookbook Settings', key: 'Mod-,' },
   { id: 'manual', label: 'Manual', key: 'F1' },
   // Cookbook saves as you type; this saves anything still waiting straight away and says so.
   { id: 'save', label: 'Save now', key: 'Mod-S' },

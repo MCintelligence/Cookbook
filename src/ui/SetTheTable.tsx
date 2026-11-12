@@ -9,7 +9,7 @@ import { rememberTableSet } from './tableSet';
 /**
  * Set the Table: a few questions the first time Cookbook starts, before Learn
  * to Cook. Every one can be skipped, everything is kept on this device, and
- * App Settings › General changes any of it later. Each answer is saved when
+ * Cookbook Settings › General changes any of it later. Each answer is saved when
  * the writer moves past its question, so leaving halfway keeps what was said.
  */
 
@@ -71,7 +71,7 @@ export function SetTheTable({ first, onDone }: { first: boolean; onDone: () => v
   const body: Record<Step, { title: string; lead?: ReactNode; content?: ReactNode }> = {
     welcome: {
       title: 'Welcome to Cookbook',
-      lead: 'A few quick questions to set your table before Learn to Cook shows you round. Skip any of them: everything stays on this device, there’s no account, and App Settings › General changes it all later.',
+      lead: 'A few quick questions to set your table before How to Cook shows you round. Skip any of them: everything stays on this device, there’s no account, and Cookbook Settings › General changes it all later.',
       content: (
         <label className="new-field">
           <span className="sub-h">
@@ -188,7 +188,7 @@ export function SetTheTable({ first, onDone }: { first: boolean; onDone: () => v
     },
     ready: {
       title: first_name ? `Your table is set, ${first_name}` : 'Your table is set',
-      lead: first ? 'Next is Learn to Cook: a recipe made for trying things out. Change it, or delete it from Your Recipes when you’re done.' : 'Change any of this in App Settings › General.',
+      lead: first ? 'Next is How to Cook: a recipe made for trying things out. Change it, or delete it from Your Recipes when you’re done.' : 'Change any of this in Cookbook Settings › General.',
       content: (
         <dl className="table-summary">
           <dt>English</dt>
@@ -255,7 +255,7 @@ export function SetTheTable({ first, onDone }: { first: boolean; onDone: () => v
               </button>
             )}
             <button type="submit" className="btn btn-primary">
-              {step === 'welcome' ? 'Let’s start' : step === 'ready' ? (first ? 'Open Learn to Cook' : 'Back to writing') : 'Next'}
+              {step === 'welcome' ? 'Let’s start' : step === 'ready' ? (first ? 'Open How to Cook' : 'Back to writing') : 'Next'}
             </button>
           </span>
         </div>

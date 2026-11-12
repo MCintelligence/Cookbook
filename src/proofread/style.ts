@@ -19,7 +19,7 @@ export const STYLE_RULES: { id: string; label: string; why: string }[] = [
   { id: 'cliche', label: 'Clichés', why: 'A phrase readers have seen many times slides past them. Something of your own will stick.' },
   { id: 'redundancy', label: 'Redundancies', why: 'Part of this phrase repeats the rest. The shorter version means the same.' },
   { id: 'OxfordComma', label: 'Oxford comma', why: 'A comma before the “and” that ends a list: “bread, butter, and jam”. Some house styles want it and some don’t, so this starts off.' },
-  { id: 'own-pattern', label: 'Your own list', why: 'You put this on your own list in Recipe Settings › Seasonings.' },
+  { id: 'own-pattern', label: 'Your own list', why: 'You put this on your own list in Cookbook Settings › Seasonings.' },
 ];
 
 const WHY = Object.fromEntries(STYLE_RULES.map((r) => [r.id, r.why]));

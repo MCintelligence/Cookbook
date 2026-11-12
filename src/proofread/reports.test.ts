@@ -5,10 +5,9 @@ import { type Node as PMNode } from '@tiptap/pm/model';
 import { cookbookExtensions } from '../editor/extensions';
 import { parseMarkdown } from '../editor/markdown';
 import { nameMatcher } from '../editor/names';
-import { fileNameFor } from '../storage/book';
 import { type IssueKind } from './check';
 import { type FoundIssue } from './plugin';
-import { drunkReport, pepperReport, reportMarkdown, reportName, saltReport, spiceReport } from './reports';
+import { drunkReport, pepperReport, saltReport, spiceReport } from './reports';
 
 let editor: Editor | null = null;
 afterEach(() => {
@@ -44,13 +43,6 @@ const SCENE = [
 ].join('\n\n');
 
 describe('Seasonings reports', () => {
-  it('names a saved report briefly, with no character a file name can’t hold', () => {
-    const name = reportName('sam', new Date(2026, 9, 31, 15, 11));
-    expect(name).toBe('Salty Sam · 31 Oct ’26 · 15.11');
-    expect(fileNameFor(name)).toBe(name);
-    expect(reportName('daniel', new Date(2027, 0, 5, 9, 4))).toBe('Drunk Daniel · 5 Jan ’27 · 09.04');
-  });
-
   it('Sam groups the same slip and finds name near-misses', () => {
     const doc = open('Teh boat came in. Teh gulls followed. Mraa waved from the pier, and a crab scutled away.');
     const report = saltReport({
@@ -132,16 +124,4 @@ describe('Seasonings reports', () => {
     expect(spot && doc.textBetween(spot.from, spot.to)).toBe('whispered softly');
   });
 
-  it('saves as Markdown that reads back as a page', () => {
-    const doc = open(SCENE);
-    const when = new Date(2026, 9, 31, 15, 11);
-    for (const report of [saltReport({ doc, issues: [] }), drunkReport({ doc, issues: [] }), spiceReport({ doc, issues: [] })]) {
-      const md = reportMarkdown(report, 'Item 1', when);
-      expect(md).toMatch(/## Try this first/);
-      expect(md).toContain('On “Item 1”');
-      const back = parseMarkdown(md);
-      expect(JSON.stringify(back)).toContain('Try this first');
-    }
-    expect(reportMarkdown(drunkReport({ doc, issues: [] }), 'Item 1', when)).toMatch(/`[ ▁▂▃▄▅▆▇█]{3}`/);
-  });
 });

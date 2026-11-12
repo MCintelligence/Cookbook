@@ -6,17 +6,17 @@ import { saveOrder } from './order';
 import { saveDictionary } from '../proofread/store';
 
 /**
- * Learn to Cook: the recipe a new writer opens first. It is an ordinary
+ * How to Cook: the recipe a new writer opens first. It is an ordinary
  * recipe, one Group for each part of Cookbook, so it can be read, changed and
  * deleted like any other, and Help makes a fresh one whenever it is wanted.
  * Only what Cookbook does today is in it; nothing here runs after it is made.
  */
 
-export const LEARN_TO_COOK = 'Learn to Cook';
+export const LEARN_TO_COOK = 'How to Cook';
 
 const KEY = 'cookbook.learnToCook';
 
-/** Where the last Learn to Cook was made, if one ever was. Kept on this device, like the list of recipes. */
+/** Where the last How to Cook was made, if one ever was. Kept on this device, like the list of recipes. */
 export function learnToCookLocation(storage: Pick<Storage, 'getItem'> = localStorage): BookLocation | null {
   try {
     const parsed = JSON.parse(storage.getItem(KEY) ?? 'null') as { location?: BookLocation } | null;
@@ -26,7 +26,7 @@ export function learnToCookLocation(storage: Pick<Storage, 'getItem'> = localSto
   }
 }
 
-/** Whether Cookbook has made Learn to Cook on this device before, so it is only opened by itself once. */
+/** Whether Cookbook has made How to Cook on this device before, so it is only opened by itself once. */
 export function learnedBefore(storage: Pick<Storage, 'getItem'> = localStorage): boolean {
   try {
     return storage.getItem(KEY) !== null;
@@ -76,11 +76,11 @@ export function shelfOf(k: KeyLabel): Group[] {
       items: [
         {
           title: 'Welcome',
-          synopsis: 'What Learn to Cook is, and how to put it away when you’re done.',
+          synopsis: 'What How to Cook is, and how to put it away when you’re done.',
           status: 'done',
           body: `# Welcome to Cookbook
 
-This is **Learn to Cook**, a recipe made for trying things out. Everything in it is yours to change: type anywhere, move things about, break it. Nothing here is precious.
+This is **How to Cook**, a recipe made for trying things out. Everything in it is yours to change: type anywhere, move things about, break it. Nothing here is precious.
 
 A *Recipe* is one piece of writing: a novel, a story, a thesis. On the left is its **Shelf**, where the writing lives, in **Groups** (like folders or chapters) and **Items** (the pages you write on). Each Group on this Shelf shows one part of Cookbook. Read them in order, or jump to the one you need.
 
@@ -95,7 +95,7 @@ Try these as you go:
 
 Tick a box by clicking it. Cookbook saves as you type, so there is no Save button to remember.
 
-When you’re finished, delete this recipe like any other. Open a recipe of your own first, then open **Your Recipes** from the File menu, right-click Learn to Cook and choose **Delete**. You can always have a fresh copy from **Help › Learn to Cook**.
+When you’re finished, delete this recipe like any other. Open a recipe of your own first, then open **Your Recipes** from the File menu, right-click How to Cook and choose **Delete**. You can always have a fresh copy from **Help › How to Cook**.
 `,
         },
       ],
@@ -153,7 +153,7 @@ A draft rarely falls into Items the first time. Below is a section break, the th
 
 Right-click the break and choose **Split into a new item here**. Everything after it moves into a new Item, just below this one on the Shelf.
 
-To join them again, open the first and right-click it on the Shelf: **Merge with next**. Cookbook takes a snapshot before splitting or merging, so you can always go back (App Settings › Saving and backups can turn this off).
+To join them again, open the first and right-click it on the Shelf: **Merge with next**. Cookbook takes a snapshot before splitting or merging, so you can always go back (Cookbook Settings › Saving and backups can turn this off).
 `,
         },
         {
@@ -191,9 +191,9 @@ Markdown works too, if you know it. Try each on an empty line below:
 - \`- \` for a bulleted list, \`-1 \` for a numbered one, \`-TD \` for a checklist
 - \`!\` before a word, as in \`!Sword\`, makes its first letter a drop cap, like the !Dragon here. At the start of a paragraph it drops two lines deep. Click into the word to see the ! again.
 
-Don't want some of these? App Settings › Writing turns Markdown off, or any one rule on its own.
+Don't want some of these? Cookbook Settings › Writing turns Markdown off, or any one rule on its own.
 
-Words wrap whole, as in Scrivener, and a paragraph won't end on one lonely word when a better break is close by. App Settings › Writing › **Line breaks** turns hyphenation on, for long words only, or lets lines break wherever they fall. Plate keeps at least two lines of a paragraph together at the foot and top of every printed page.
+Words wrap whole, as in Scrivener, and a paragraph won't end on one lonely word when a better break is close by. Cookbook Settings › Writing › **Line breaks** turns hyphenation on, for long words only, or lets lines break wherever they fall. Plate keeps at least two lines of a paragraph together at the foot and top of every printed page.
 
 Type **/** at the start of a line for the **insert menu**: styles, lists, a table, a section break or a footnote. Or use the Insert and Format menus at the top.
 
@@ -211,14 +211,14 @@ Type here:
 Every paragraph has a **style**. This one is Body text; the line above is a Chapter title. Change a paragraph’s style from the Format menu, or right-click it.
 
 ::: letter
-Dear writer, this paragraph is in the Letter style. Change how Letter looks once, in App Settings › Styles, and every letter in the recipe follows.
+Dear writer, this paragraph is in the Letter style. Change how Letter looks once, in Cookbook Settings › Styles, and every letter in the recipe follows.
 :::
 
 Character styles work the same way for words inside a paragraph: [Strong]{.strong} and [Emphasis]{.emphasis} are two. ${k('strong') ? `${k('strong')}, ${k('emphasis')} and ${k('underline')} apply them.` : ''}
 
 Footnotes sit in the text like this one.^[Footnotes are edited at the foot of the page. Click the number to change this one.] Add one from Insert › **Footnote**${k('footnote') ? ` or with ${k('footnote')}` : ''}.
 
-The page itself, its size, margins and indents, is set in **Recipe › Configure this recipe**.
+The page itself, its size, margins and indents, is set in **Cookbook Settings › Layout**.
 `,
         },
         {
@@ -283,7 +283,7 @@ Cookbook checks your writing on this device, with no account and nothing sent an
 - **Salty Sam** checks spelling, and near misses of names in the Pantry. A new word with a capital in mid-sentence is probably a name, so he marks it with a soft dotted line instead.
 - **Peppery Pete** checks grammar and punctuation, and right spellings of the wrong word, like "form" for "from". He reads whole sentences too, for fragments, openers that dangle and slips from past to present.
 - **Drunk Daniel** measures how much of the open page is dialogue.
-- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness. Give her your own list in Recipe Settings › Seasonings: phrases to watch for, and with a - in front, ones she should never mark.
+- **Spicy Sally** tastes for style: adverbs, tired phrases, wordiness. Give her your own list in Cookbook Settings › Seasonings: phrases to watch for, and with a - in front, ones she should never mark.
 
 Salty Sam is already picked for this recipe. Click the **+** at the bottom of Seasonings to add the other three, then watch what they find below:
 
@@ -299,15 +299,15 @@ She went form the cellar to the kitchen.
 
 She very quickly and really suddenly ran, and at the end of the day the end result was a free gift.
 
-Each seasoning's card has a meter for this page, a Check that shows or hides its underlines (Daniel's dims the narration instead), and a **Report** button: try Sam's report on this page. Reports are kept in the Pantry, under Materials › Seasoning Reports.
+Each seasoning's card has a meter for this page, a Check that shows or hides its underlines (Daniel's dims the narration instead), and a **Report** button: try Sam's report on this page.
 
-A Check is one switch for the whole recipe: turn it on or off once and every Item follows, in Mise en Place too. Each kind of check can also be switched on or off in App Settings › Seasonings › Checks. One starts off: run-on sentences and comma splices, since novelists use them on purpose.
+A Check is one switch for the whole recipe: turn it on or off once and every Item follows, in Mise en Place too. Each kind of check can also be switched on or off in Cookbook Settings › Seasonings › Checks. One starts off: run-on sentences and comma splices, since novelists use them on purpose.
 
 Close Seasonings and keep writing: the underlines stay, and every picked seasoning with its Check on keeps tasting the page. The number beside the **Seasonings** button says how many of them have something to say; close the panel now and watch it go down as you fix the slips above.
 
 Click an underlined word for a suggestion. Right-click it to add a word to your dictionary or remove the mark for good. On a dotted name, **Add all likely names** adds every name on the page at once. ${k('nextIssue') ? `${k('nextIssue')} jumps to the next issue.` : ''}
 
-Which checks run, and American or British spelling, are in App Settings › Seasonings.
+Which checks run, and American or British spelling, are in Cookbook Settings › Seasonings.
 `,
         },
       ],
@@ -375,7 +375,7 @@ In Goals, set:
 - **Whole recipe**: the words you’re aiming for in total.
 - **Deadline**, and Cookbook works out the words a day you need.
 
-**Writing history** shows what you wrote each day. Pasted text doesn’t count, unless you say so in App Settings › Goals.
+**Writing history** shows what you wrote each day. Pasted text doesn’t count, unless you say so in Cookbook Settings › Goals.
 
 You can also give an Item a goal of its own; the bottom bar then shows how close it is.
 `,
@@ -394,7 +394,7 @@ Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so
 
 - **Snapshots** keep earlier versions of one Item. Take one from Recipe › Snapshots of this item, then compare and roll back whenever you like.
 - **Drafts** set an Item’s text aside to write it again, with the old version showing through (see Drafts, under The Shelf).
-- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. App Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
+- **Backups** are zips of the whole recipe, made every half hour while you write and when you close. Each one is opened again as it is made, to check it is whole. File › **Back up now** makes one at once. Cookbook Settings › Saving and backups says where they go; choosing a folder on another drive, or one that syncs to the cloud, keeps them safe if this computer is lost.
 - **Trash** keeps whatever you delete until you empty it: File › Trash.
 - **Undo** reaches back past closing the app.
 `,
@@ -406,7 +406,7 @@ Cookbook saves as you type. A recipe is an ordinary folder of Markdown files, so
 
 When it’s ready for readers, Recipe › **Plate and serve** sets it like a real book: pick a template and a trim size, add a title page, a dedication and contents, and watch the pages change. **Serve** then makes an EPUB e-book or a print-ready PDF.
 
-For a plain copy, File › **Export** makes a Word document, an EPUB e-book or Markdown, and **Print or save as PDF** does what it says. One Group or Item can be exported alone from its right-click menu.
+For a plain copy of one Group or Item, right-click it and choose **Export** for Word, Markdown or printing.
 
 Leave an Item out of every export by right-clicking it and unticking **Include in export**.
 
@@ -449,9 +449,9 @@ When you’re ready to write, choose File › **New Recipe**. Pick a template, N
 
 **Your Recipes**, in the File menu, lists them all. Star the ones you love, archive the finished ones, or keep a series together.
 
-App Settings has everything else, from the theme to how your words are saved${k('settings') ? `: ${k('settings')}` : ''}.
+Cookbook Settings has everything else, from the theme to how your words are saved${k('settings') ? `: ${k('settings')}` : ''}.
 
-When you no longer need Learn to Cook, open your own recipe, then right-click Learn to Cook in Your Recipes and choose **Delete**. **Help › Learn to Cook** brings back a fresh copy whenever you want one.
+When you no longer need How to Cook, open your own recipe, then right-click How to Cook in Your Recipes and choose **Delete**. **Help › How to Cook** brings back a fresh copy whenever you want one.
 
 Happy cooking.
 `,
@@ -519,11 +519,11 @@ export const PANTRY_CARDS: Card[] = [
   },
 ];
 
-/** The Item Learn to Cook opens at. */
+/** The Item How to Cook opens at. */
 export const FIRST_ITEM = joinPath(BOOKSHELF, 'Start here', 'Welcome.md');
 const SEASONINGS_ITEM = joinPath(BOOKSHELF, 'Seasonings', 'Meet the seasonings.md');
 
-/** Lays out Learn to Cook in an empty folder. Run inside makeBookOrUndo. */
+/** Lays out How to Cook in an empty folder. Run inside makeBookOrUndo. */
 export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel): Promise<BookInfo> {
   const info: BookInfo = {
     ...(await createBook(fs, LEARN_TO_COOK)),

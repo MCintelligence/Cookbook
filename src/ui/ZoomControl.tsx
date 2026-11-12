@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_ZOOM, MIN_ZOOM, zoomLabel, zoomStep } from '../storage/page';
 
-/** The page's zoom in the footer: a slider that opens from it, with − and + at its ends and Fit width. */
-export function ZoomControl({ zoom, fitted, label, onZoom }: { zoom: number; /** The zoom Fit width works out to now. */ fitted: number; label: string; onZoom: (zoom: number) => void }) {
+/** The page's zoom in the footer: a slider that opens from it, with − and + at its ends and Reset. */
+export function ZoomControl({ zoom, label, onZoom }: { zoom: number; label: string; onZoom: (zoom: number) => void }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -26,16 +26,16 @@ export function ZoomControl({ zoom, fitted, label, onZoom }: { zoom: number; /**
       </button>
       {open && (
         <div className="zoom-pop" role="dialog" aria-label="Zoom">
-          <ZoomSlider zoom={zoom} fitted={fitted} onZoom={onZoom} />
+          <ZoomSlider zoom={zoom} onZoom={onZoom} />
         </div>
       )}
     </div>
   );
 }
 
-/** The slider itself, with − and + at its ends and Fit width; the footer and Settings share it. */
-export function ZoomSlider({ zoom, fitted, onZoom }: { zoom: number; fitted: number; onZoom: (zoom: number) => void }) {
-  const now = zoom === 0 ? fitted : zoom;
+/** The slider itself, with − and + at its ends and Reset to 100%; the footer and Settings share it. */
+export function ZoomSlider({ zoom, onZoom }: { zoom: number; onZoom: (zoom: number) => void }) {
+  const now = zoom;
   const set = (z: number) => onZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(z))));
   return (
     <span className="zoom-slider">
@@ -47,8 +47,8 @@ export function ZoomSlider({ zoom, fitted, onZoom }: { zoom: number; fitted: num
         +
       </button>
       <span className="zoom-value">{now}%</span>
-      <button className="btn" aria-pressed={zoom === 0} onClick={() => onZoom(0)}>
-        Fit width
+      <button className="btn" title="Back to 100%" disabled={zoom === 100} onClick={() => onZoom(100)}>
+        Reset
       </button>
     </span>
   );

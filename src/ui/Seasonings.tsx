@@ -297,7 +297,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
                   <button
                     className="btn sc-report"
                     disabled={!REPORTS[id]}
-                    title={REPORTS[id] ? `${who.name}’s full report on this Item, saved to Materials` : 'Coming soon'}
+                    title={REPORTS[id] ? `${who.name}’s full report on this Item` : 'Coming soon'}
                     onClick={() => onReport(id)}
                   >
                     {meter.report}

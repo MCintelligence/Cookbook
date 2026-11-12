@@ -5,7 +5,7 @@ import { type TextMap, textMap, toRange } from '../editor/textmap';
 import { countWords } from '../storage/index';
 import { words } from './check';
 import { type FoundIssue } from './plugin';
-import { METERS, type SeasoningId, SEASONINGS, meterRemark, mix, oneOf, perThousand, remark, spiceOf, tasteOf, waitingRemark } from './remarks';
+import { METERS, type SeasoningId, meterRemark, mix, oneOf, perThousand, remark, spiceOf, tasteOf, waitingRemark } from './remarks';
 import { GLUE, NOT_ADVERBS, STYLE_RULES, readingGrade, sentences } from './style';
 
 /**
@@ -642,67 +642,3 @@ export function spiceReport({ doc, issues, names, seed = 0 }: ReportInput): Repo
 
 /** The reports there are, by seasoning. */
 export const REPORTS: Partial<Record<SeasoningId, (input: ReportInput) => Report>> = { sam: saltReport, pete: pepperReport, daniel: drunkReport, sally: spiceReport };
-
-// ---------- saving ----------
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/**
- * A saved report's name: the seasoning, then the day and time, as briefly as
- * reads well: "Salty Sam · 31 Oct ’26 · 15.11". The time takes a full stop,
- * as in British English, because Windows allows no colon in a file name.
- */
-export function reportName(id: SeasoningId, when: Date): string {
-  const who = SEASONINGS.find((s) => s.id === id)!.name;
-  const year = String(when.getFullYear()).slice(-2);
-  const time = `${String(when.getHours()).padStart(2, '0')}.${String(when.getMinutes()).padStart(2, '0')}`;
-  return `${who} · ${when.getDate()} ${MONTHS[when.getMonth()]} ’${year} · ${time}`;
-}
-
-/** Markdown has no way to show some characters plainly inside a table or list. */
-const md = (s: string) => s.replace(/([\\`*_[\]|<>#])/g, '\\$1').replace(/\s+/g, ' ').trim();
-
-/** A text bar for a saved report, where the page can't draw one. */
-const bar = (value: number, max: number, width = 20) => (max > 0 ? '█'.repeat(Math.max(value > 0 ? 1 : 0, Math.round((value / max) * width))) : '');
-
-/** The report as a Research card's text: what was found, written to keep, without the jump links. */
-export function reportMarkdown(report: Report, item: string, when: Date): string {
-  const meter = METERS[report.id];
-  const out: string[] = [];
-  out.push(`*${md(report.verdict)}*`);
-  out.push(`On “${md(item || 'Untitled')}”, ${when.toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}.`);
-  if (report.reading) out.push(`**${md(meter.steps[report.reading.at]!.level)}** on a scale from ${meter.ends[0]} to ${meter.ends[1]}: ${md(report.reading.detail)}.`);
-  out.push(report.stats.map((s) => `- **${md(s.label)}:** ${md(s.value)}`).join('\n'));
-  if (report.actions.length > 0) out.push(`## Try this first\n\n${report.actions.map((a, i) => `${i + 1}. ${md(a)}`).join('\n')}`);
-  for (const s of report.sections) {
-    const head = `## ${md(s.title)}${s.note ? `\n\n${md(s.note)}` : ''}`;
-    if (s.kind === 'rows') {
-      if (s.rows.length === 0) {
-        if (s.empty) out.push(`${head}\n\n${md(s.empty)}`);
-        continue;
-      }
-      const lines = s.rows.map((r) => {
-        const what = r.context ? `${md(r.context.before)} **${md(r.context.hit)}** ${md(r.context.after)}` : `**${md(r.label)}**`;
-        const extra = [r.count && r.count > 1 ? `×${r.count}` : '', r.detail ? md(r.detail) : ''].filter(Boolean).join(' · ');
-        return `- ${r.context && r.label !== r.context.hit ? `**${md(r.label)}**: ` : ''}${what}${extra ? ` (${extra})` : ''}`;
-      });
-      out.push(`${head}\n\n${lines.join('\n')}`);
-    } else if (s.kind === 'bars') {
-      if (s.bars.length === 0) {
-        out.push(`${head}\n\n${md(s.empty)}`);
-        continue;
-      }
-      const max = Math.max(...s.bars.map((b) => b.value));
-      out.push(`${head}\n\n| | | |\n| --- | --- | --- |\n${s.bars.map((b) => `| ${md(b.label)} | ${bar(b.value, max)} | ${b.value} |`).join('\n')}`);
-    } else {
-      if (s.cells.length === 0) {
-        out.push(`${head}\n\n${md(s.empty)}`);
-        continue;
-      }
-      // Eight steps of a bar, a character per paragraph, so the shape of the talk shows in plain text.
-      const steps = ' ▁▂▃▄▅▆▇█';
-      out.push(`${head.replace(/ Click one to go there\./, '')}\n\n\`${s.cells.map((c) => steps[Math.round((c.share ?? 0) * 8)]).join('')}\``);
-    }
-  }
-  return `${out.join('\n\n')}\n`;
-}

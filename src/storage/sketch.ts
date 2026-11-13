@@ -13,6 +13,9 @@ import { type CookbookDocument, type DocumentKind } from './document';
  *   sketch:
  *     line: A lighthouse keeper's daughter who lies to keep the light burning.
  *     want: To be named keeper before spring.
+ *
+ * Brainstormers (World on Fire and the rest) are further sections in the same
+ * form, which the writer adds to an Item one whole set at a time.
  */
 
 /** The three Pantry kinds, as the Sketch's hints know them. */
@@ -300,6 +303,75 @@ export const SKETCH_FIELD_HINTS: Record<string, Hints> = {
 
 export type Sketch = Record<string, string>;
 
+/**
+ * Brainstormers: extra sets of questions a writer can add to any Pantry Item.
+ * Each is one Sketch section, added whole, asked of every kind in the same
+ * words with a hint that fits the kind. None repeats a question the Sketch
+ * already asks. Their boxes are kept in `sketch` beside the Sketch's own.
+ */
+const set = (id: string, title: string, they: string, it: string, slots: [key: string, label: string, character: string, setting: string, research: string][]): SketchSection => ({
+  id,
+  title,
+  question: { character: they, setting: it, research: it },
+  layout: 'pair',
+  slots: slots.map(([key, label, character, setting, research]) => ({ key, label, hint: { character, setting, research } })),
+});
+
+export const BRAINSTORMERS: SketchSection[] = [
+  set('world-on-fire', 'World on Fire', 'What happens when their world burns?', 'What happens when its world burns?', [
+    ['wildfire', 'The Wildfire', 'The worst predicament this story could plunge them into.', 'The worst thing this story could bring down on it: a flood, a siege, a sale.', 'The worst thing this story could do with it: lost, stolen, forged, misused.'],
+    ['inferno', 'The Inferno', 'The complications that make things worse, one after another.', 'What else goes wrong here, each trouble feeding the last.', 'What goes wrong because of it, each trouble feeding the last.'],
+    ['cinders', 'The Cinders', 'Their most hopeless moment, when it looks like all is lost.', 'It at its most hopeless, when little is left standing.', 'Its lowest point: broken, buried, discredited, or in the worst hands.'],
+    ['phoenix', 'The Phoenix', 'What they learn from all this, and how it helps them win in the end.', 'What rises from the wreckage, and what it gives those who fought for it.', 'What it proves to be worth in the end, and what it gives whoever holds it.'],
+  ]),
+  set('smoke-and-mirrors', 'Smoke and Mirrors', 'What are they hiding?', 'What is it hiding?', [
+    ['mask', 'The Mask', 'The face they show the world, and who it is meant to fool.', 'What it seems to be to anyone passing through.', 'What it appears to be, or what people take it for.'],
+    ['secret', 'The Secret', 'What they hide, and what they would lose if it came out.', 'What is hidden here: a room, a history, a crime.', 'What it really is, holds or proves.'],
+    ['tell', 'The Tell', 'The slip that gives them away to anyone watching closely.', 'The detail that does not fit, for anyone who looks twice.', 'The mark or flaw that gives the truth away.'],
+    ['reveal', 'The Reveal', 'Who finds out, when, and what breaks because of it.', 'Who uncovers it, when, and what changes here afterwards.', 'Who learns the truth about it, when, and what that sets off.'],
+  ]),
+  set('skin-in-the-game', 'Skin in the Game', 'What do they stand to win or lose?', 'What stands to be won or lost with it?', [
+    ['prize', 'The Prize', 'What they gain if everything goes right.', 'What it becomes, or gives, if it is saved.', 'What it wins for whoever uses it well.'],
+    ['price', 'The Price', 'What they must give up to get it.', 'What it costs to keep it standing.', 'What it costs to get, keep or use.'],
+    ['loss', 'The Loss', 'What is gone for good if they fail.', 'What the story loses for good if it falls.', 'What can never be done or known if it is lost.'],
+    ['clock', 'The Clock', 'Why it must be now: the deadline closing on them.', 'What is running out here: a lease, a tide, a truce.', 'How long it lasts, or how long before someone else gets it.'],
+  ]),
+  set('before-and-after', 'Before and After', 'How does the story change them?', 'How does the story change it?', [
+    ['opening', 'The First Page', 'How they stand as the story opens.', 'How it stands as the story opens.', 'Where it is, and what it means, as the story opens.'],
+    ['turn', 'The Turn', 'The moment they can no longer stay as they were.', 'The event after which it is never the same.', 'The moment it changes hands, use or meaning.'],
+    ['closing', 'The Last Page', 'How they stand at the end, and what is different.', 'How it stands at the end, and what is different.', 'Where it ends up, and what it means by then.'],
+    ['mark', 'The Mark', 'What they leave changed in others.', 'What it leaves changed in those who passed through.', 'What it leaves changed in those who held it.'],
+  ]),
+  set('through-other-eyes', 'Through Other Eyes', 'How do others see them?', 'How do others see it?', [
+    ['friend', 'The Friend', 'How someone who loves them would describe them.', 'How someone who calls it home would describe it.', 'How someone who treasures it would describe it.'],
+    ['enemy', 'The Enemy', 'How someone who hates them would describe them.', 'How someone who wants it gone would describe it.', 'How someone who fears or envies it would describe it.'],
+    ['stranger', 'The Stranger', 'What a stranger assumes on first meeting them, and gets wrong.', 'What a newcomer assumes on arriving, and gets wrong.', 'What someone who finds it by chance would take it for.'],
+    ['reader', 'The Reader', 'What you want the reader to feel about them.', 'What you want the reader to feel on arriving here.', 'What you want the reader to feel when it appears.'],
+  ]),
+];
+
+const BRAINSTORM_KEYS = new Set(BRAINSTORMERS.flatMap((b) => b.slots.map((s) => s.key)));
+
+/** Whether this brainstormer has been added to the Sketch. */
+export const hasBrainstormer = (sketch: Sketch, b: SketchSection) => b.slots.some((s) => s.key in sketch);
+
+/** Adds a brainstormer whole: all of its boxes, empty and ready to fill. */
+export function withBrainstormer(doc: CookbookDocument, b: SketchSection): CookbookDocument {
+  const sketch = sketchOf(doc.fields) ?? {};
+  return { ...doc, fields: { ...doc.fields, sketch: { ...Object.fromEntries(b.slots.map((s) => [s.key, ''])), ...sketch } } };
+}
+
+/** Takes a brainstormer off the Sketch, with anything written in it. */
+export function withoutBrainstormer(doc: CookbookDocument, b: SketchSection): CookbookDocument {
+  const drop = new Set(b.slots.map((s) => s.key));
+  return { ...doc, fields: { ...doc.fields, sketch: Object.fromEntries(Object.entries(sketchOf(doc.fields) ?? {}).filter(([k]) => !drop.has(k))) } };
+}
+
+/** The placeholder for a card field by its name, or the plain one for a field the writer made. */
+export function fieldPlaceholder(kind: string, name: string): string {
+  return (isSketchKind(kind) ? SKETCH_FIELD_HINTS[name.trim().toLowerCase().replace(/\s+/g, ' ')]?.[kind] : undefined) ?? 'Field value';
+}
+
 /** The Item's Sketch, or null when it was made before the Sketch and hasn't taken one on. */
 export function sketchOf(fields: Record<string, unknown>): Sketch | null {
   const raw = fields.sketch;
@@ -308,10 +380,10 @@ export function sketchOf(fields: Record<string, unknown>): Sketch | null {
   return Object.fromEntries(Object.entries(raw as Record<string, unknown>).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)]));
 }
 
-/** Sets one box of the Sketch. An emptied box is dropped from the file, but the Sketch stays. */
+/** Sets one box of the Sketch. An emptied box is dropped from the file, but the Sketch stays, and so does an added brainstormer. */
 export function withSketchValue(doc: CookbookDocument, key: string, value: string): CookbookDocument {
   const { [key]: _old, ...rest } = sketchOf(doc.fields) ?? {};
-  const sketch = value === '' ? rest : { ...rest, [key]: value };
+  const sketch = value === '' && !BRAINSTORM_KEYS.has(key) ? rest : { ...rest, [key]: value };
   return { ...doc, fields: { ...doc.fields, sketch } };
 }
 

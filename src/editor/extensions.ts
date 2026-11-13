@@ -24,7 +24,6 @@ import { KeptSelection } from './keptSelection';
 import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
-import { Brainstorm } from './brainstorm';
 import { Ghost } from './ghost';
 import { TrackChanges } from './trackChanges';
 import { DialogueFocus, Footnote, Note, SeasoningChecks, type SeasoningsRequest, insertFootnote } from './seasonings';
@@ -546,11 +545,9 @@ const SMART_DASHES = [
   }),
 ];
 
-/** `cardKind` is the kind of page open: character and place pages get brainstorming cards. */
-export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}, cardKind: string | null = null) {
+export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
   return [
     Document,
-    Brainstorm.configure({ kind: cardKind }),
     Ghost,
     Text,
     StyledParagraph.configure({ nextStyle }),

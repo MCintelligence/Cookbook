@@ -17,8 +17,6 @@ interface Props {
   onReady: (editor: Editor | null) => void;
   /** A note or footnote was added or clicked in the text; Seasonings should show it. */
   onSeasonings: (request: SeasoningsRequest) => void;
-  /** The kind of page, read once when it opens: character and place pages get brainstorming cards. */
-  cardKind?: string | null;
   /**
    * Read once as the editor is made. When the same Item's editor is made again somewhere else on
    * the page (into or out of Mise en Place), this gives its text and undo history as they are now,
@@ -27,7 +25,7 @@ interface Props {
   takeOver?: () => { initialBody: string; undoLog: UndoLog | null } | null;
 }
 
-export function PageEditor({ onRecorder, nextStyle, onChange, onReady, onSeasonings, cardKind = null, takeOver, ...opened }: Props) {
+export function PageEditor({ onRecorder, nextStyle, onChange, onReady, onSeasonings, takeOver, ...opened }: Props) {
   const [{ initialBody, undoLog }] = useState(() => takeOver?.() ?? opened);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -43,7 +41,6 @@ export function PageEditor({ onRecorder, nextStyle, onChange, onReady, onSeasoni
     extensions: cookbookExtensions(
       (style) => nextStyleRef.current(style),
       (request) => onSeasoningsRef.current(request),
-      cardKind,
     ),
     content: undoLog ? undoLog.base : parseMarkdown(initialBody),
     editorProps: { attributes: { class: 'cb-prose', spellcheck: 'false', 'aria-label': 'Item text' } },

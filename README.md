@@ -118,7 +118,7 @@ relationships:
 
 Portraits are shrunk to at most 600 pixels and kept in `pictures/`, so moving a card never loses its picture.
 
-Character and setting pages start empty. Put the cursor on an empty line and a + appears beside it with brainstorming cards to add, in three groups: Basics (Who they are, Where they come from), Drive (What they want, What stands in their way) and World on Fire (The Wildfire, The Inferno, The Cinders and The Phoenix, or all four at once). Each card is an ordinary `##` heading in the file, and until you write under it a faint line explains what it asks. Every card is optional, and one undo takes out what you just added.
+A card's page starts empty. Under the Sketch, **+ Brainstorm** adds a further set of questions to any card, whatever its kind: World on Fire (The Wildfire, The Inferno, The Cinders, The Phoenix), Smoke and Mirrors (The Mask, The Secret, The Tell, The Reveal), Skin in the Game (The Prize, The Price, The Loss, The Clock), Before and After (The First Page, The Turn, The Last Page, The Mark) and Through Other Eyes (The Friend, The Enemy, The Stranger, The Reader). Each set is added whole as one more Sketch section, kept under `sketch` in the front matter, and can be removed again while it is empty.
 
 ### Linked names
 

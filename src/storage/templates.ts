@@ -58,7 +58,7 @@ export const CARD_TEMPLATES: DocTemplate[] = [
     folder: 'characters',
     title: 'New character',
     fields: SKETCH_START,
-    // The Sketch is on the card; the page is free, and the + on an empty line adds brainstorming cards.
+    // The Sketch is on the card, with brainstormers to add under it; the page is free.
     body: '',
   },
   {

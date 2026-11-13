@@ -47,6 +47,7 @@ import { bookMarkdown } from './export/markdownExport';
 import { printHtml } from './export/print';
 import { type PlateSettings, plateOf } from './plate/settings';
 import { KINDS, saveFile } from './ui/saveFile';
+import { BRAINSTORMERS, hasBrainstormer, isSketchKind, sketchOf, withBrainstormer } from './storage/sketch';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { setMacMenu } from './ui/nativeMenu';
@@ -122,9 +123,6 @@ import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
 import { AREA_SHORTCUTS, type Area, areaOf, areaRoot, areaShown, landingIn, nextArea } from './ui/areas';
-import { BrainstormPlus } from './ui/BrainstormPlus';
-import { BRAINSTORM_GROUPS, type BrainstormCard, isBrainstormKind } from './storage/brainstorm';
-import { emptyLineAt, insertBrainstorm } from './editor/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
@@ -3490,20 +3488,19 @@ export function App() {
       item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
       item('name', 'Name from the Pantry', 'Insert', 'pantry character setting place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
-      // On a character or place page, the brainstorming cards the + offers, so they can be added without the mouse.
-      ...(isBrainstormKind(cardKind)
-        ? BRAINSTORM_GROUPS.flatMap((g) => {
-            const add = (cards: BrainstormCard[]) => () => {
-              const line = emptyLineAt(editor, cardKind);
-              if (line === null) say('Brainstorming cards go on an empty line of their own.');
-              else insertBrainstorm(editor, line, cards);
-            };
-            const list = g.cards[cardKind];
-            return [
-              ...(g.addsAll ? [item(`bs-${g.id}`, `All of ${g.title}`, 'Brainstorm', `brainstorm card ${g.title}`, add(list), `${list.length} cards`)] : []),
-              ...list.map((c) => item(`bs-${g.id}-${c.id}`, c.title, 'Brainstorm', `brainstorm card ${g.title}`, add([c]), g.title)),
-            ];
-          })
+      // On a Pantry Item with the Sketch, the brainstormers its + Brainstorm button offers, so they can be added without the mouse.
+      ...(isSketchKind(cardKind)
+        ? BRAINSTORMERS.map((b) =>
+            item(`bs-${b.id}`, b.title, 'Brainstorm', `brainstorm questions pantry sketch ${b.slots.map((s) => s.label).join(' ')}`, () => {
+              const now = currentDoc();
+              const sketch = now && sketchOf(now.fields);
+              if (!now || !sketch) return say('Use the Pantry Sketch on this Item first.');
+              if (hasBrainstormer(sketch, b)) return say(`${b.title} is already on this Item.`);
+              const next = withBrainstormer(now, b);
+              setDoc(next);
+              scheduleSave(next);
+            }, b.question[cardKind]),
+          )
         : []),
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
@@ -3749,9 +3746,7 @@ export function App() {
             scheduleSave();
           }}
           onSeasonings={showFootnote}
-          cardKind={doc.kind}
         />
-        {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
         <PageFootnotes editor={editor} />
         <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
         {settings.focus && settings.chef.notes && editor && !miseShown && !beside && (

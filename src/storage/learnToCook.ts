@@ -263,7 +263,7 @@ To type a name from the Pantry, type **@** after a space${k('shelf') ? ` or pres
 
 Every card starts with the **Pantry Sketch**: one line on who or what it is, a few short facts, and the same sections for a character, a setting or a material (Purpose, Look, Senses, Nature, Past, Tension and Notes). The faint hint in each box tells you what that question means for this kind of card. Open Mama Lou to see one filled in.
 
-On a character or place card, click the **+** on an empty line of the page to add brainstorming questions, like What do they want? and What are they hiding?
+Under the Sketch, click **+ Brainstorm** to add a further set of questions to any card: **World on Fire**, **Smoke and Mirrors**, **Skin in the Game**, **Before and After** and **Through Other Eyes**.
 
 Right-click any words on the page and choose **Make it a Pantry card** to start a new card from them.
 `,
@@ -488,7 +488,7 @@ export const PANTRY_CARDS: Card[] = [
         without: 'That June doesn’t want it.',
       },
     },
-    body: 'An example character. Change anything in the Sketch above, or click the + on an empty line below for brainstorming questions.\n\n',
+    body: 'An example character. Change anything in the Sketch above, or click + Brainstorm under it for more questions.\n\n',
   },
   {
     section: 'characters',

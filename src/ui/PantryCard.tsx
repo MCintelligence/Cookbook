@@ -1,8 +1,8 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { type CookbookDocument, type Relationship, akaOf, cardFieldKeys, cardFieldsOf, portraitOf, relationshipsOf, withCardFields } from '../storage/document';
 import { type IncomingRelationship, type SceneMention } from '../storage/index';
-import { fieldPlaceholder } from '../storage/brainstorm';
-import { LINE_HINT, SKETCH, SKETCH_FIELD_HINTS, type Sketch, type SketchKind, isSketchKind, sketchOf, withSketch, withSketchValue } from '../storage/sketch';
+import { BRAINSTORMERS, LINE_HINT, SKETCH, SKETCH_FIELD_HINTS, type Sketch, type SketchKind, type SketchSection, fieldPlaceholder, hasBrainstormer, isSketchKind, sketchOf, withBrainstormer, withSketch, withSketchValue, withoutBrainstormer } from '../storage/sketch';
+import { Menu } from './Menu';
 
 export interface CardChoice {
   id: string;
@@ -61,26 +61,56 @@ function Grow({ value, onChange, className, label, hint }: { value: string; onCh
   return <textarea ref={box} rows={1} className={className} aria-label={label} placeholder={hint} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
-/** The Pantry Sketch's sections: the same headings for every kind, with hints that fit this one. */
-function SketchSections({ kind, sketch, onEdit }: { kind: SketchKind; sketch: Sketch; onEdit: (key: string, value: string) => void }) {
+/**
+ * The Pantry Sketch's sections: the same headings for every kind, with hints that fit this one.
+ * After them come the brainstormers the writer has added, in the same form, and a button for more.
+ */
+function SketchSections({ kind, sketch, onEdit, onAdd, onRemove }: { kind: SketchKind; sketch: Sketch; onEdit: (key: string, value: string) => void; onAdd: (b: SketchSection) => void; onRemove: (b: SketchSection) => void }) {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const opener = useRef<HTMLButtonElement>(null);
+  const added = BRAINSTORMERS.filter((b) => hasBrainstormer(sketch, b));
+  const more = BRAINSTORMERS.filter((b) => !hasBrainstormer(sketch, b));
+  const draw = (section: SketchSection, extra: boolean) => (
+    <section className="sk-sec" key={section.id} aria-label={section.title}>
+      <div className="sk-head">
+        <h3>{section.title}</h3>
+        <span className="sk-q">{section.question[kind]}</span>
+        {/* Only an empty set can be taken off, so nothing written is lost. */}
+        {extra && section.slots.every((slot) => !(sketch[slot.key] ?? '').trim()) && (
+          <button className="ghost sk-remove" onClick={() => onRemove(section)}>
+            Remove
+          </button>
+        )}
+      </div>
+      <div className={`sk-${section.layout}`}>
+        {section.slots.map((slot) => (
+          <label className="sk-slot" key={slot.key}>
+            {slot.label && <span className="sk-label">{slot.label}</span>}
+            <Grow className="sk-text" label={slot.label ?? section.title} hint={slot.hint[kind]} value={sketch[slot.key] ?? ''} onChange={(v) => onEdit(slot.key, v)} />
+          </label>
+        ))}
+      </div>
+    </section>
+  );
   return (
     <div className="pc-sketch">
-      {SKETCH.map((section) => (
-        <section className="sk-sec" key={section.id} aria-label={section.title}>
-          <div className="sk-head">
-            <h3>{section.title}</h3>
-            <span className="sk-q">{section.question[kind]}</span>
-          </div>
-          <div className={`sk-${section.layout}`}>
-            {section.slots.map((slot) => (
-              <label className="sk-slot" key={slot.key}>
-                {slot.label && <span className="sk-label">{slot.label}</span>}
-                <Grow className="sk-text" label={slot.label ?? section.title} hint={slot.hint[kind]} value={sketch[slot.key] ?? ''} onChange={(v) => onEdit(slot.key, v)} />
-              </label>
-            ))}
-          </div>
-        </section>
-      ))}
+      {SKETCH.map((section) => draw(section, false))}
+      {added.map((section) => draw(section, true))}
+      {more.length > 0 && (
+        <button
+          ref={opener}
+          className="ghost pc-add"
+          aria-haspopup="menu"
+          aria-expanded={!!menu}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu(menu ? null : { x: r.left, y: r.bottom + 4 });
+          }}
+        >
+          + Brainstorm
+        </button>
+      )}
+      {menu && <Menu items={more.map((b) => ({ label: b.title, hint: b.question[kind], onPick: () => onAdd(b) }))} x={menu.x} y={menu.y} label="Brainstormers" opener={opener.current} onClose={() => setMenu(null)} />}
     </div>
   );
 }
@@ -272,7 +302,7 @@ export function PantryCard({ doc, choices, incoming, appearsIn, loadPicture, onC
         </div>
       </div>
       {sketch ? (
-        <SketchSections kind={kind} sketch={sketch} onEdit={(key, value) => onChange(withSketchValue(doc, key, value))} />
+        <SketchSections kind={kind} sketch={sketch} onEdit={(key, value) => onChange(withSketchValue(doc, key, value))} onAdd={(b) => onChange(withBrainstormer(doc, b))} onRemove={(b) => onChange(withoutBrainstormer(doc, b))} />
       ) : (
         <button className="ghost pc-add pc-use-sketch" onClick={() => onChange(withSketch(doc))}>
           + Use the Pantry Sketch

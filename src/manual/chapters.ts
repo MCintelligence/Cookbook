@@ -226,7 +226,7 @@ A card opens on the page like an Item. Above the writing is its **Pantry Sketch*
 
 Below those are the Sketch's sections, in the same order on every card: **Purpose** (Want and Need), **Look**, **Senses** (Sight, Sound, Smell, Touch and Taste), **Nature** (Temperament and Quirks), **Past**, **Tension** (Within and Without) and **Notes** (Notes and Sources). Each blank box has a faint hint that fits the kind of card: on a character, **When** asks their age; on a setting, its era and season; on a material, when it was made. Fill in as much or as little as you like; the Sketch is searched along with the rest of the card. A card made before the Sketch keeps what it had, with a **+ Use the Pantry Sketch** button to add it.
 
-On a character or place card, put the cursor on an empty line and click the **+** beside it for brainstorming questions: Basics, Drive, and World on Fire. Each one is an ordinary heading, and one Undo takes out what you just added.
+Under the Sketch, **+ Brainstorm** adds a further set of questions to any card, a character, a setting or a material alike: **World on Fire**, **Smoke and Mirrors**, **Skin in the Game**, **Before and After** and **Through Other Eyes**. A set comes whole, as one more section of four boxes with hints that fit the kind of card. While all four boxes are empty, **Remove** takes the set off again.
 
 Right-click words on the page and choose **Make it a Pantry card** to start a card from them.
 

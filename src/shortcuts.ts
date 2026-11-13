@@ -44,8 +44,8 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'modePlan', label: 'Plan (calendar and timeline)', key: 'Mod-Shift-3' },
   // Drafts: ⌥ on a Mac. The three keys sit together at the bottom left, older to the left of newer.
   { id: 'draft', label: 'Draft this item', key: 'Alt-X' },
-  { id: 'olderDraft', label: 'Older draft as ghost text', key: 'Alt-Z' },
-  { id: 'newerDraft', label: 'Newer draft as ghost text', key: 'Alt-C' },
+  { id: 'olderDraft', label: 'Older draft', key: 'Alt-Z' },
+  { id: 'newerDraft', label: 'Newer draft (back to the item)', key: 'Alt-C' },
   { id: 'settings', label: 'Cookbook Settings', key: 'Mod-,' },
   { id: 'manual', label: 'Manual', key: 'F1' },
   // Cookbook saves as you type; this saves anything still waiting straight away and says so.

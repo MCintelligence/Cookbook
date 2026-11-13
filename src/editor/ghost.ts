@@ -1,12 +1,13 @@
 import { Extension, type Editor } from '@tiptap/core';
 import { type Node as PMNode } from '@tiptap/pm/model';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { type EditorState, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import { BODY_STYLE } from './markdown';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 /**
  * Ghost text: a draft of the Item showing through, faded, while it is written again. It is drawn
  * over the page and is never part of the text, so nothing counts it, saves it, checks it or
- * exports it. It keeps pace with the writer a sentence at a time: in the paragraph being written,
+ * exports it. Tab takes the ghost's next sentence as it is. It keeps pace with the writer a sentence at a time: in the paragraph being written,
  * each sentence typed takes the place of one of the draft's, and the rest of that paragraph carries
  * on just after the caret. The draft's later paragraphs follow below, and an empty line starts the
  * next one, as a placeholder does.
@@ -104,8 +105,48 @@ export function ghostDecorations(doc: PMNode, paragraphs: string[]): { shape: st
   return { shape: keyOf(shape, paragraphs), deco: found.length ? DecorationSet.create(doc, found) : DecorationSet.empty };
 }
 
+/**
+ * The ghost's next sentence, to take as it is: the next one in the paragraph being written, or the
+ * first of the next paragraph. Only offered with the caret at the very end of the text, where the
+ * ghost carries on from.
+ */
+export function nextGhostSentence(state: EditorState): { text: string; newParagraph: boolean } | null {
+  const paragraphs = ghostKey.getState(state)?.paragraphs;
+  const { selection, doc } = state;
+  if (!paragraphs?.length || !selection.empty || selection.from !== doc.content.size - 1) return null;
+  const { written, emptyEnd, typed, spaced } = shapeOf(doc);
+  if (typed > 0) {
+    const rest = sentencesOf(paragraphs[written - 1] ?? '').slice(typed);
+    if (rest.length > 0) return { text: (spaced ? '' : ' ') + rest[0]!.trim(), newParagraph: false };
+    const next = sentencesOf(paragraphs[written] ?? '')[0];
+    return next ? { text: next.trim(), newParagraph: true } : null;
+  }
+  const first = emptyEnd ? sentencesOf(paragraphs[written] ?? '')[0] : undefined;
+  return first ? { text: first.trim(), newParagraph: false } : null;
+}
+
+/** Writes the ghost's next sentence into the page as it is. True if there was one. */
+export function acceptGhostSentence(editor: Editor): boolean {
+  const next = nextGhostSentence(editor.state);
+  if (!next) return false;
+  const { state } = editor;
+  const end = state.doc.content.size;
+  const tr = state.tr;
+  if (next.newParagraph) {
+    tr.insert(end, state.schema.nodes.paragraph!.create({ style: BODY_STYLE }, state.schema.text(next.text)));
+    tr.setSelection(TextSelection.create(tr.doc, tr.doc.content.size - 1));
+  } else tr.insertText(next.text, end - 1);
+  editor.view.dispatch(tr.scrollIntoView());
+  return true;
+}
+
 export const Ghost = Extension.create({
   name: 'ghost',
+  // Ahead of Tab's own use (a tab character), but only while there is ghost text to take.
+  priority: 1200,
+  addKeyboardShortcuts() {
+    return { Tab: ({ editor }) => acceptGhostSentence(editor) };
+  },
   addProseMirrorPlugins() {
     return [
       new Plugin<GhostState>({

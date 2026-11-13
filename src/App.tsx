@@ -56,6 +56,9 @@ import { type WritingHistory, loadHistory, recordWords, saveHistory } from './st
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook } from './storage/learnToCook';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
+import { getSchema } from '@tiptap/core';
+import { cookbookExtensions } from './editor/extensions';
+import { SceneText } from './ui/SceneText';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
@@ -1207,8 +1210,8 @@ export function App() {
   };
 
   /**
-   * Which draft shows through each Item as ghost text, by Item id: a draft's number, or 0 for none.
-   * Without a choice, the newest draft shows. Kept in this browser only, as a way of looking.
+   * Items whose ghost text the writer has hidden, by Item id (a value of 0, as older versions kept it).
+   * The ghost is always the newest draft. Kept in this browser only, as a way of looking.
    */
   const [ghostPrefs, setGhostPrefs] = useState<Record<string, number>>(() => {
     try {
@@ -1218,24 +1221,29 @@ export function App() {
       return {};
     }
   });
-  const pickGhost = (id: string, n: number) =>
+  /** Shows (true) or hides the ghost text in an Item. */
+  const showGhost = (id: string, on: boolean) =>
     setGhostPrefs((was) => {
-      const next = { ...was, [id]: n };
+      const { [id]: _old, ...rest } = was;
+      const next = on ? rest : { ...rest, [id]: 0 };
       try {
         localStorage.setItem('cookbook.ghost', JSON.stringify(next));
       } catch {
-        // The newest draft simply shows next time.
+        // The ghost simply shows next time.
       }
       return next;
     });
-  /** The draft showing through the open Item, if any. Only Shelf Items have drafts. */
+  /** The draft showing through the open Item as ghost text: its newest, unless hidden. Only Shelf Items have drafts. */
   const ghostN = useMemo(() => {
-    if (!doc || doc.kind !== 'scene') return null;
-    const list = draftsOf(draftIds, doc.id);
-    const pref = ghostPrefs[doc.id];
-    if (pref === 0) return null;
-    return pref !== undefined && list.includes(pref) ? pref : (list[list.length - 1] ?? null);
+    if (!doc || doc.kind !== 'scene' || ghostPrefs[doc.id] === 0) return null;
+    return draftsOf(draftIds, doc.id).at(-1) ?? null;
   }, [doc?.id, doc?.kind, draftIds, ghostPrefs]);
+  /** A draft open on the page in place of its Item, as the text it is: read, not written in. */
+  const [draftOpen, setDraftOpen] = useState<{ path: string; id: string; n: number; title: string; body: NodeJSON } | null>(null);
+  /** The page's schema, for showing a draft's text; made the first time a draft opens. */
+  const draftSchema = useMemo(() => (draftOpen ? getSchema(cookbookExtensions((st) => st)) : null), [!!draftOpen]);
+  // Opening another Item (or none) closes the draft.
+  useEffect(() => setDraftOpen((d) => (d && d.path !== path ? null : d)), [path]);
   // The ghost is read when the Item opens or another draft is picked, never as the writer types.
   useEffect(() => {
     if (!editor || !fs || !doc) return;
@@ -1287,13 +1295,14 @@ export function App() {
     if (!plainText(item.body).trim()) return say(`There’s nothing in “${item.title}” to draft yet.`);
     try {
       const notes = readNotes(item);
-      const n = await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes });
+      await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes });
       if (p === path) await replaceOpenText('', {});
       else {
         await replaceFileText(p, item, '', {});
         await select(p);
       }
-      pickGhost(item.id, n);
+      showGhost(item.id, true);
+      setDraftOpen(null);
       setDraftIds(await listDrafts(fs));
     } catch (e) {
       setError(`Couldn’t draft “${item.title}”. ${friendlyError(e)}`);
@@ -1314,7 +1323,7 @@ export function App() {
         await select(p);
       }
       await deleteDraft(fs, item.id, n);
-      pickGhost(item.id, 0);
+      setDraftOpen(null);
       setDraftIds(await listDrafts(fs));
     } catch (e) {
       setError(`Couldn’t put Draft ${n} back. ${friendlyError(e)}`);
@@ -1330,6 +1339,7 @@ export function App() {
     try {
       gone = await readDraft(fs, id, n);
       await deleteDraft(fs, id, n);
+      setDraftOpen((d) => (d && d.id === id && d.n === n ? null : d));
     } catch (e) {
       return setError(`Couldn’t delete Draft ${n}. ${friendlyError(e)}`);
     }
@@ -1337,34 +1347,44 @@ export function App() {
     say(`Deleted Draft ${n} of “${title}”.`, () => void writeDraft(fs, id, title, gone).then(async () => setDraftIds(await listDrafts(fs))));
   };
 
-  /** Shows the next older (-1) or newer (1) draft through the open Item; from no ghost, the newest. */
-  const stepGhost = (dir: -1 | 1) => {
-    if (!doc || doc.kind !== 'scene') return say('Open an Item on the Shelf to see its drafts.');
-    const list = draftsOf(draftIds, doc.id);
-    if (list.length === 0) return say(`“${doc.title}” has no drafts yet. ${keysFor('draft') || 'Draft this item'} makes one.`);
-    const at = ghostN === null ? -1 : list.indexOf(ghostN);
-    const to = at === -1 ? list.length - 1 : at + dir;
-    if (to < 0) return say(`Draft ${list[0]} is the oldest.`);
-    if (to >= list.length) return say(`Draft ${list[list.length - 1]} is the newest.`);
-    pickGhost(doc.id, list[to]!);
-    say(`Showing Draft ${list[to]} as ghost text.`);
+  /** Opens a draft on the page as the text it is, opening its Item first if it isn't open. */
+  const openDraft = async (p: string, n: number) => {
+    const item = cards.get(p);
+    if (!fs || !item) return;
+    try {
+      const draft = await readDraft(fs, item.id, n);
+      if (p !== path) await select(p);
+      setDraftOpen({ path: p, id: item.id, n, title: item.title, body: parseMarkdown(draft.body) });
+    } catch (e) {
+      setError(`Couldn’t open Draft ${n}. ${friendlyError(e)}`);
+    }
+  };
+  /** Back from a draft to its Item, ready to write. */
+  const closeDraft = () => {
+    setDraftOpen(null);
+    requestAnimationFrame(() => editor?.commands.focus());
   };
 
-  /** Shows a draft through its Item, opening the Item if it isn't open. */
-  const showDraft = async (p: string, n: number) => {
-    const id = cards.get(p)?.id;
-    if (!id) return;
-    pickGhost(id, n);
-    if (p !== path) await select(p);
+  /**
+   * Steps from the open Item back through its drafts, newest to oldest (-1), or forward again (1),
+   * ending at the Item itself: the newest version, the one being written.
+   */
+  const stepDraft = (dir: -1 | 1) => {
+    if (!doc || !path || doc.kind !== 'scene') return say('Open an Item on the Shelf to see its drafts.');
+    const list = draftsOf(draftIds, doc.id);
+    if (list.length === 0) return say(`“${doc.title}” has no drafts yet. ${keysFor('draft') || 'Draft this item'} makes one.`);
+    // The Item itself comes after its newest draft.
+    const at = draftOpen ? list.indexOf(draftOpen.n) : list.length;
+    const to = at + dir;
+    if (to < 0) return say(`Draft ${list[0]} is the oldest.`);
+    if (to > list.length) return say(`This is “${doc.title}” itself, the newest version.`);
+    if (to === list.length) return closeDraft();
+    void openDraft(path, list[to]!);
   };
 
   const draftMenu = (p: string, n: number, x: number, y: number) => {
-    const id = cards.get(p)?.id;
-    const showing = p === path && ghostN === n;
     showMenu(`Draft ${n}`, x, y, [
-      showing
-        ? { label: 'Hide ghost text', onPick: () => id && pickGhost(id, 0) }
-        : { label: 'Show as ghost text', onPick: () => void showDraft(p, n) },
+      { label: 'Open', onPick: () => void openDraft(p, n) },
       { label: 'Put back in the item', onPick: () => void restoreDraft(p, n) },
       { separator: true },
       { label: 'Delete draft', onPick: () => void removeDraft(p, n) },
@@ -3284,7 +3304,7 @@ export function App() {
     else if (id === 'suggest' || id === 'suggestAlt') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
     else if (id === 'draft') path && doc?.kind === 'scene' ? void draftItem(path) : say('Open an Item on the Shelf to draft it.');
-    else if (id === 'olderDraft' || id === 'newerDraft') stepGhost(id === 'olderDraft' ? -1 : 1);
+    else if (id === 'olderDraft' || id === 'newerDraft') stepDraft(id === 'olderDraft' ? -1 : 1);
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -3584,12 +3604,12 @@ export function App() {
             cmd('draft', 'Draft this item', () => void draftItem(path), 'Actions', keysFor('draft'), 'version rewrite redraft ghost placeholder'),
             ...(draftsOf(draftIds, doc.id).length > 0
               ? [
-                  cmd('olderDraft', 'Older draft as ghost text', () => stepGhost(-1), 'View', keysFor('olderDraft'), 'draft version previous back ghost'),
-                  cmd('newerDraft', 'Newer draft as ghost text', () => stepGhost(1), 'View', keysFor('newerDraft'), 'draft version next forward ghost'),
+                  cmd('olderDraft', 'Open the older draft', () => stepDraft(-1), 'View', keysFor('olderDraft'), 'draft version previous back'),
+                  cmd('newerDraft', 'Open the newer draft (or the item)', () => stepDraft(1), 'View', keysFor('newerDraft'), 'draft version next forward current'),
                 ]
               : []),
             ...(draftsOf(draftIds, doc.id).length > 0
-              ? [cmd('ghost', ghostN !== null ? 'Hide the draft’s ghost text' : 'Show the newest draft as ghost text', () => pickGhost(doc.id, ghostN !== null ? 0 : draftsOf(draftIds, doc.id).at(-1)!), 'View', undefined, 'draft version placeholder faded')]
+              ? [cmd('ghost', ghostN !== null ? 'Hide the ghost text' : 'Show the newest draft as ghost text', () => showGhost(doc.id, ghostN === null), 'View', undefined, 'draft version placeholder faded')]
               : []),
           ]
         : []),
@@ -3880,8 +3900,9 @@ export function App() {
         { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
         { separator: true },
         { label: 'Draft this item', hint: keysFor('draft'), disabled: !doc || !path || doc.kind !== 'scene', onPick: () => path && void draftItem(path) },
-        { label: 'Older draft as ghost text', hint: keysFor('olderDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(-1) },
-        { label: 'Newer draft as ghost text', hint: keysFor('newerDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(1) },
+        { label: 'Older draft', hint: keysFor('olderDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepDraft(-1) },
+        { label: 'Newer draft', hint: keysFor('newerDraft'), disabled: !draftOpen, onPick: () => stepDraft(1) },
+        { label: 'Ghost text', checked: ghostN !== null, disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => doc && showGhost(doc.id, ghostN === null) },
         {
           label: 'Snapshots of this item',
           disabled: !doc || !path,
@@ -3926,7 +3947,7 @@ export function App() {
   // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
   // their identity; anything else that re-renders the app then leaves them be.
   // An Item picked on the Shelf opens on its own page, even from inside the Group shown.
-  const onDraftRow = useStable((p: string, n: number) => void showDraft(p, n));
+  const onDraftRow = useStable((p: string, n: number) => void openDraft(p, n));
   const onDraftMenuRow = useStable((p: string, n: number, x: number, y: number) => draftMenu(p, n, x, y));
   const onSelect = useStable((p: string) => {
     setMise(null);
@@ -4239,7 +4260,7 @@ export function App() {
           onOpenGroup={onOpenGroup}
           shownGroups={miseShown?.groups}
           drafts={draftRows}
-          ghost={path && ghostN !== null ? { path, n: ghostN } : null}
+          ghost={draftOpen && draftOpen.path === path ? { path, n: draftOpen.n } : null}
           onDraft={onDraftRow}
           onDraftMenu={onDraftMenuRow}
           outside={intoArchive}
@@ -4408,10 +4429,27 @@ export function App() {
             />
           )}
           <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
+          {doc && path && draftOpen?.path === path ? (
+            <article className={`cb-page draft-version${asDraft ? ' draft' : ''} eased`} key={`draft-${draftOpen.n}`} style={pageStyle} aria-label={`Draft ${draftOpen.n} of ${draftOpen.title}`}>
+              <div className="draft-version-bar">
+                <span className="draft-version-name">
+                  Draft {draftOpen.n} of “{draftOpen.title}”
+                </span>
+                <button className="pill" onClick={() => void restoreDraft(path, draftOpen.n)} title="Put this draft back in the item; what the item holds now becomes a new draft">
+                  Put back in the item
+                </button>
+                <button className="pill" onClick={closeDraft} title="Back to the item, to write">
+                  Back to the item
+                </button>
+              </div>
+              {draftSchema && <SceneText schema={draftSchema} body={draftOpen.body} />}
+            </article>
+          ) : null}
           {doc && path ? (
             <article
               className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) || fileOf(doc.fields) ? ' card-page' : ''} eased`}
               key={path}
+              hidden={draftOpen?.path === path}
               style={pageStyle}
               onContextMenu={pageMenu}
               // In split view, a double-click in the page's margin keeps this page and closes the other.

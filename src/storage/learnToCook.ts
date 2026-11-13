@@ -134,11 +134,12 @@ Hover over a Group to see how many words it holds.
 
 Want to write a scene again from scratch? Press **Alt+X** (**⌥X** on a Mac), or right-click the Item on the Shelf and choose **Draft this item**.
 
-The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: each sentence you write takes the place of one of the old ones, and the rest of the old paragraph carries on just after the cursor.
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is now your newest version: it starts empty, with the draft’s words showing through as faded **ghost text**, starting on the line you’re writing on. Go sentence by sentence: press **Tab** to keep the next sentence as it was, or type your own and it takes that sentence’s place, the rest of the old paragraph carrying on just after the cursor.
 
 - Draft again and you get **Draft 2**, and so on. The newest draft is listed first, right under the Item.
-- **Alt+Z** (⌥Z) shows an older draft as the ghost text, and **Alt+C** (⌥C) a newer one, back up to the newest. Or click a draft.
-- Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
+- Click a draft to read it: it opens on the page as ordinary text. **Alt+Z** (⌥Z) steps back to older drafts and **Alt+C** (⌥C) forward again, ending back at the Item.
+- Ghost text only ever shows in the Item itself, from its newest draft. Recipe › **Ghost text** hides it.
+- Right-click a draft to **Open** it, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
 - Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
 `,
         },

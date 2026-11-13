@@ -13,7 +13,8 @@ import { type AppSettings, type MarkdownRule, getSettings, markdownTyped } from 
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, fontStack } from '../styles/styles';
-import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Superscript, Underline } from './formatting';
+import { AutoCorrect, AutoCorrectKeys, SmartCopyPaste, TypingRuns } from './autoCorrect';
 import { DropCaps } from './dropCaps';
 import { ChefNotes } from '../chef/notes';
 import { ChefMarkdownPaste } from '../chef/markdownPaste';
@@ -38,7 +39,8 @@ type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash'>;
 
 /** An extension whose typing shortcuts only work while a setting (or a Markdown rule) is on; it is read on each key. */
 function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | MarkdownRule): T {
-  const on = setting === 'curlyQuotes' || setting === 'emDash' ? () => getSettings()[setting] : () => markdownTyped(setting);
+  const typography = setting === 'curlyQuotes' || setting === 'emDash';
+  const on = typography ? () => getSettings()[setting] : () => markdownTyped(setting);
   return extension.extend({
     addInputRules() {
       return (this.parent?.() ?? []).map(
@@ -46,7 +48,8 @@ function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | M
           new InputRule({
             find: rule.find,
             handler: (props) => (on() ? rule.handler(props) : null),
-            undoable: rule.undoable,
+            // Scrivener's smart quotes and dashes are the system's: Backspace deletes the “ or —, and only Undo takes it back.
+            undoable: typography ? false : rule.undoable,
           }),
       );
     },
@@ -520,6 +523,29 @@ const NO_TYPOGRAPHY = {
   superscriptThree: false,
 } as const;
 
+/**
+ * The rest of macOS's smart dashes, which Scrivener uses: a hyphen with a space either side becomes
+ * an en dash, and a third hyphen stays one em dash (two or three hyphens make —).
+ */
+const SmartDashes = Extension.create({
+  name: 'smartDashes',
+  addInputRules: () => SMART_DASHES,
+});
+const SMART_DASHES = [
+  new InputRule({
+    find: /\s-\s$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('– ', range.from + 1, range.to);
+    },
+  }),
+  new InputRule({
+    find: /—-$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('—', range.from, range.to);
+    },
+  }),
+];
+
 /** `cardKind` is the kind of page open: character and place pages get brainstorming cards. */
 export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}, cardKind: string | null = null) {
   return [
@@ -542,6 +568,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Italic,
     Underline,
     Strike,
+    Superscript,
     Code,
     Link,
     PlainMarkRules,
@@ -619,7 +646,14 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
       }),
       'emDash',
     ),
-    UndoRedo,
+    whenOn(SmartDashes, 'emDash'),
+    AutoCorrectKeys,
+    SmartCopyPaste,
+    AutoCorrect,
+    // As in Scrivener (a Mac text view), Undo takes back the whole run of typing since the caret was last
+    // moved, not just the last half-second of it. Moving the caret, a correction or a command starts a new step.
+    UndoRedo.configure({ newGroupDelay: 24 * 60 * 60 * 1000 }),
+    TypingRuns,
     Dropcursor,
     Gapcursor,
     FindExtension,

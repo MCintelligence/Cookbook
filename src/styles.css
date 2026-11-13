@@ -541,9 +541,9 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cb-prose { outline: none; -webkit-hyphens: manual; hyphens: manual; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
-/* Line breaking, as in Scrivener: words wrap whole unless the writer turns hyphenation on in Cookbook Settings › Writing,
-   and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
-   Even lines (text-wrap: pretty) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
+/* Line breaking, as in Scrivener: words wrap whole, each line taking as many as fit, unless the writer turns hyphenation on in
+   Cookbook Settings › Writing, and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
+   Even lines (text-wrap: pretty, off by default, as Scrivener has nothing like it) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
    that under ProseMirror's white-space: break-spaces, so it sets pre-wrap, which only lets a space typed at a line's end hang. */
 :root[data-hyphenate] .cb-prose { -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 7 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; -webkit-hyphenate-limit-lines: 2; }
 :root[data-even-lines] .cb-prose { white-space: pre-wrap; text-wrap: pretty; }
@@ -568,6 +568,8 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .cb-prose code { font-family: 'Courier Prime', monospace; font-size: 0.92em; background: var(--sidebar); border-radius: 4px; padding: 0 3px; }
 .cb-prose pre code { background: none; padding: 0; }
 .cb-prose a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+/* An ordinal's raised ending (1st) sits in the line without pushing it apart, as in Scrivener. */
+.cb-prose sup:not(.cb-footnote) { font-size: 0.65em; line-height: 0; vertical-align: super; }
 .cb-prose img.cb-picture { max-width: 100%; max-height: 360px; vertical-align: middle; border-radius: 6px; }
 .cb-prose img.cb-picture.missing { min-width: 120px; min-height: 40px; outline: 1px dashed var(--line-strong); }
 .cb-prose img.ProseMirror-selectednode { outline: 2px solid var(--focus); }

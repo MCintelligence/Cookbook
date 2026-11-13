@@ -21,6 +21,8 @@ interface CharState {
   italic: boolean;
   underline: boolean;
   strike: boolean;
+  /** Raised text, such as an ordinal's ending (\\super). */
+  sup: boolean;
   /** Track changes from a word processor: text suggested for adding (\\revised) or taking out (\\deleted). */
   inserted: boolean;
   deleted: boolean;
@@ -120,7 +122,7 @@ export function rtfToPage(source: string, linked: ReadonlyMap<string, LinkedNote
   let annot = null as string[] | null;
   const styles = new Map<number, string>();
   let state: CharState = {
-    bold: false, italic: false, underline: false, strike: false, inserted: false, deleted: false, skip: false, uc: 1, into: 'page', link: null, note: null, footnoteAfter: null,
+    bold: false, italic: false, underline: false, strike: false, sup: false, inserted: false, deleted: false, skip: false, uc: 1, into: 'page', link: null, note: null, footnoteAfter: null,
   };
   const stack: CharState[] = [];
   /** Inline nodes of the paragraph being read, and its style number. */
@@ -144,6 +146,7 @@ export function rtfToPage(source: string, linked: ReadonlyMap<string, LinkedNote
     if (state.italic) m.push({ type: 'italic' });
     if (state.underline && !state.link) m.push({ type: 'underline' });
     if (state.strike) m.push({ type: 'strike' });
+    if (state.sup) m.push({ type: 'superscript' });
     if (state.inserted) m.push({ type: 'insertion' });
     else if (state.deleted) m.push({ type: 'deletion' });
     return m;
@@ -300,11 +303,18 @@ export function rtfToPage(source: string, linked: ReadonlyMap<string, LinkedNote
       case 'uldash':
         state.underline = arg !== 0;
         return;
+      case 'super':
+        state.sup = arg !== 0;
+        return;
+      case 'sub':
+      case 'nosupersub':
+        state.sup = false;
+        return;
       case 'ulnone':
         state.underline = false;
         return;
       case 'plain':
-        state.bold = state.italic = state.underline = state.strike = false;
+        state.bold = state.italic = state.underline = state.strike = state.sup = false;
         return;
       case 'revised':
         state.inserted = arg !== 0;

@@ -130,12 +130,26 @@ Nothing in the Archive shows in Prep or Plan, is exported, counted towards your 
 | \`-TD \` at the start of a line | a checklist |
 | \`* * *\` then Enter | a section break |
 | \`!Word\` | a drop cap on the word's first letter |
-| \`--\` | an em dash |
+| \`--\` or \`---\` | an em dash |
+| \` - \` (a hyphen with a space either side) | an en dash |
+| \`...\` | an ellipsis |
 | \`"\` and \`'\` | curly quotes |
 | **/** at the start of a line | the insert menu |
 | **@** after a space | a name from the Pantry |
 
 Backspace straight after a shortcut turns it back into exactly what you typed. Cookbook Settings › Writing › Markdown turns all of them off at once, or any one on its own.
+
+## Corrections as you type
+
+As in Scrivener, a few things are put right as each word is finished, when you type the space, punctuation or new line after it:
+
+- The first word of a sentence gets a capital, after a full stop, question mark or exclamation mark and a space, or at the start of a paragraph. Not after *e.g.* or *i.e.*, a full stop inside a word (3.5), or an ellipsis.
+- A lone *i* becomes *I*, so *i'm* is *I’m*.
+- The ending of an ordinal is raised: 1st, 2nd, 3rd, 11th.
+- A web or mail address (www.example.com, https://…, name@example.com) becomes a link.
+- Scrivener's substitutions: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then.
+
+Undo straight after takes a correction back. Cookbook Settings › Writing › **Corrections** turns each one off.
 
 ## Drop caps
 

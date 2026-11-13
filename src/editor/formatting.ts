@@ -64,6 +64,21 @@ export const Strike = Mark.create({
   },
 });
 
+/** Raised small text, which Scrivener gives an ordinal's ending as it is typed (1st, 2nd). */
+export const Superscript = Mark.create({
+  name: 'superscript',
+  inclusive: false,
+  excludes: 'superscript',
+  parseHTML() {
+    // Not footnote numbers, which are <sup> too.
+    const raised = (el: HTMLElement) => (el.matches('.cb-footnote, .fn, [data-footnote]') || el.querySelector('a[href^="#"]') ? false : null);
+    return [{ tag: 'sup', getAttrs: raised }, { style: 'vertical-align', consuming: false, getAttrs: (v) => (v === 'super' ? null : false) }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['sup', HTMLAttributes, 0];
+  },
+});
+
 export const Code = Mark.create({
   name: 'code',
   parseHTML() {

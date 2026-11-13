@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Lets the desktop app install signed updates and restart into them. The phone apps have no updater: they update through a newer download.",
+  "platforms": [
+    "linux",
+    "macOS",
+    "windows"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "updater:default",
+    "process:allow-restart"
+  ]
+}

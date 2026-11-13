@@ -78,3 +78,65 @@ describe('a menu opened from a button', () => {
     expect(open()).toBe(1);
   });
 });
+
+describe('on a phone', () => {
+  const phone = () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q.includes('pointer: coarse'), media: q, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    return () => {
+      window.matchMedia = real;
+    };
+  };
+  const nested: MenuItem[] = [
+    { label: 'Rename', onPick: () => {} },
+    { label: 'Move to', items: [{ label: 'Chapter two', onPick: () => {} }] },
+  ];
+  function Sheet({ onClosed }: { onClosed: () => void }) {
+    const [open, setOpen] = useState(true);
+    return open ? <Menu items={nested} x={0} y={0} label="Item" onClose={() => (setOpen(false), onClosed())} /> : null;
+  }
+  const mountSheet = () => {
+    let closed = 0;
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    roots.push(root);
+    act(() => root.render(<Sheet onClosed={() => closed++} />));
+    return { closed: () => closed };
+  };
+  const labels = () => Array.from(document.querySelectorAll('.menu-sheet [role^="menuitem"]')).map((b) => b.textContent?.replace('›', '').trim());
+  const escape = () => act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+
+  it('is a sheet whose submenu takes its place, and Back steps out of the submenu before closing the sheet', () => {
+    const restore = phone();
+    try {
+      const sheet = mountSheet();
+      expect(document.querySelector('.menu-sheet-title')?.textContent).toBe('Item');
+      expect(labels()).toEqual(['Rename', 'Move to']);
+      act(() => (document.querySelector('.menu-sheet [aria-haspopup="menu"]') as HTMLElement).click());
+      expect(document.querySelector('.menu-sheet-title')?.textContent).toBe('Move to');
+      expect(labels()).toEqual(['Chapter two']);
+      escape();
+      expect(labels()).toEqual(['Rename', 'Move to']);
+      expect(sheet.closed()).toBe(0);
+      escape();
+      expect(document.querySelector('.menu-sheet')).toBeNull();
+      expect(sheet.closed()).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+
+  it('stays up when the keyboard sliding away resizes the window, and closes on a tap of the shade', () => {
+    const restore = phone();
+    try {
+      const sheet = mountSheet();
+      act(() => void window.dispatchEvent(new Event('resize')));
+      expect(document.querySelector('.menu-sheet')).not.toBeNull();
+      act(() => (document.querySelector('.menu-sheet-shade') as HTMLElement).click());
+      expect(sheet.closed()).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+});

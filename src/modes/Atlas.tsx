@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { fromTouch, menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { PANTRY_SECTIONS } from '../storage/book';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL } from '../storage/pantry';
@@ -7,7 +8,7 @@ import { type ViewProps } from './host';
 import { type Item, type Tie, labelColor, layOut, pairTies, pantryGroups, tiesOf } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
 import { Face, Tally, ToolButton, Zoomer, cardMenu } from './shared';
-import { dragFrom, usePanZoom } from './usePanZoom';
+import { carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
 const SINGULAR: Record<PantrySection, string> = { characters: 'Character', settings: 'Setting', research: 'Material' };
 const NODE = 56;
@@ -40,6 +41,8 @@ export function Atlas({ host, tools, ask }: ViewProps) {
   const spots = useMemo(() => layOut(everything.map((i) => i.card.id), allTies, prefs.spots.atlas ?? {}), [everything, allTies, prefs.spots.atlas]);
   const pan = usePanZoom({ x: -480, y: -320, k: 1 });
   const [moved, setMoved] = useState<{ id: string; spot: Spot } | null>(null);
+  /** The piece a finger has lifted to carry. */
+  const [held, setHeld] = useState<string | null>(null);
   const [tying, setTying] = useState<{ from: string; to: Spot } | null>(null);
   const at = (id: string): Spot => (moved?.id === id ? moved.spot : spots[id]!);
   const put = (id: string, spot: Spot) => setPrefs((now) => ({ spots: { ...now.spots, atlas: { ...(now.spots.atlas ?? {}), [id]: spot } } }));
@@ -105,7 +108,6 @@ export function Atlas({ host, tools, ask }: ViewProps) {
         className="free-board atlas"
         ref={pan.ref}
         onPointerDown={pan.onPointerDown}
-        style={{ backgroundPosition: `${-pan.look.x * pan.look.k}px ${-pan.look.y * pan.look.k}px`, backgroundSize: `${28 * pan.look.k}px ${28 * pan.look.k}px` }}
         onContextMenu={(e) => {
           if (e.target !== e.currentTarget) return;
           e.preventDefault();
@@ -117,7 +119,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
           ]);
         }}
       >
-        <div className="free-layer" style={{ transform: `scale(${pan.look.k}) translate(${-pan.look.x}px, ${-pan.look.y}px)` }}>
+        <div className="free-layer" ref={pan.layer}>
           <svg className="atlas-lines" width="1" height="1" aria-hidden="true">
             {ties.map((t) => {
               const [x1, y1] = at(t.a);
@@ -158,7 +160,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             return (
               <div
                 key={id}
-                className={`atlas-node${id === open ? ' chosen' : ''}${moved?.id === id ? ' lifted' : ''}`}
+                className={`atlas-node${id === open ? ' chosen' : ''}${moved?.id === id ? ' lifted' : ''}${held === id ? ' held' : ''}`}
                 data-atlas={id}
                 style={{ left: x, top: y, '--label': labelColor(item.card.label) ?? 'transparent' } as CSSProperties}
                 role="button"
@@ -168,12 +170,22 @@ export function Atlas({ host, tools, ask }: ViewProps) {
                 onPointerDown={(e) => {
                   if (e.button !== 0) return;
                   const from = spots[id]!;
+                  const el = e.currentTarget;
+                  if (e.pointerType === 'touch')
+                    return carryByTouch(e, pan, from, {
+                      onLift: (on) => setHeld(on ? id : null),
+                      onMove: (spot) => setMoved(spot ? { id, spot } : null),
+                      onDrop: (spot) => (setMoved(null), put(id, spot)),
+                      onMenu: (cx, cy) => el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: cx, clientY: cy })),
+                      onTap: () => (item.path === host.path ? host.open(item.path) : host.select(item.path)),
+                    });
+                  const per = scaleOf(pan.node) * pan.live().k;
                   dragFrom(
                     e,
-                    (dx, dy) => setMoved({ id, spot: [Math.round(from[0] + dx / pan.look.k), Math.round(from[1] + dy / pan.look.k)] }),
+                    (dx, dy) => setMoved({ id, spot: [Math.round(from[0] + dx / per), Math.round(from[1] + dy / per)] }),
                     (did, up) => {
                       setMoved(null);
-                      if (did) put(id, [Math.round(from[0] + (up.clientX - e.clientX) / pan.look.k), Math.round(from[1] + (up.clientY - e.clientY) / pan.look.k)]);
+                      if (did) put(id, [Math.round(from[0] + (up.clientX - e.clientX) / per), Math.round(from[1] + (up.clientY - e.clientY) / per)]);
                       else if (item.path !== host.path) host.select(item.path);
                     },
                   );
@@ -181,6 +193,8 @@ export function Atlas({ host, tools, ask }: ViewProps) {
                 onDoubleClick={() => host.open(item.path)}
                 onContextMenu={(e) => {
                   e.preventDefault();
+                  // A finger's own long press lifts the piece instead (carryByTouch), which opens this menu itself if it isn't carried.
+                  if (fromTouch(e) && e.nativeEvent.isTrusted) return;
                   const others = everything.filter((o) => o.card.id !== id).slice(0, 30);
                   host.menu(
                     'Pantry Item',
@@ -221,7 +235,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             );
           })}
         </div>
-        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. Right-click here for a new Character, Setting or Material.</p>}
+        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. {menuPress()} here for a new Character, Setting or Material.</p>}
       </div>
     </>
   );

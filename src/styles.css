@@ -80,8 +80,9 @@
 }
 
 /* In dark mode only the frame goes dark: the page stays white paper, so picked text colours show as they are.
-   Whatever sits on the page or a Pantry card's details (marks, highlights, little controls) takes the light theme's colours. */
-:root[data-theme='dark'] :is(.cb-page, .pantry-card, .research-viewer) {
+   Whatever sits on the page or a Pantry card's details (marks, highlights, little controls) takes the light theme's colours.
+   Unless the writer chose a dark page (Settings › Appearance › Page): then the page is dark like the rest, with light words. */
+:root[data-theme='dark']:not([data-paper='dark']) :is(.cb-page, .pantry-card, .research-viewer) {
   --text: #1c1c1b;
   --muted: #6b6b67;
   --faint: #8e8e89;
@@ -106,7 +107,15 @@
   color-scheme: light;
 }
 /* Draft has no sheet of its own, so in dark mode it gets a white one to keep dark text readable. */
-:root[data-theme='dark'] .cb-page.draft { background: var(--paper); border-radius: 6px; }
+:root[data-theme='dark']:not([data-paper='dark']) .cb-page.draft { background: var(--paper); border-radius: 6px; }
+:root[data-theme='dark'][data-paper='dark'] {
+  --paper: #161616;
+  --page-text: #e4e4e1;
+  --page-line: #2c2c2b;
+  --page-muted: #7c7c78;
+  --note: #3a3120;
+  --note-line: #8a6d2a;
+}
 
 :root[data-theme='sepia'] {
   /* Portrait: a chocolate-brown frame around a lit parchment page, like a sepia oil painting on a gallery wall. */

@@ -237,11 +237,30 @@ You need Node 22 or newer. For the desktop app you also need Rust and the [Tauri
 npm install
 npm run dev          # browser version at http://localhost:1420
 npm run tauri dev    # desktop app
+npm run tauri android dev   # Android app, on a connected phone or an emulator
 npm test             # storage, format and editor tests
 npm run build        # production web build, including the offline service worker
 ```
 
 Click the recipe's title in the top bar for Your recipes…, to start a new one or open a recipe's folder. In the desktop app a recipe can live in any folder. In the browser, recipes are kept in the browser's private storage, and Chrome and Edge can also open a real folder on your computer.
+
+## On Android
+
+The Android app is the same Cookbook, from the same code, arranged for a phone (`src/mobile.ts`, `src/phone.css`, `src-tauri/gen/android`). It needs Android 7 or newer.
+
+- **One place at a time, from a bar along the bottom:** the Shelf, the open Item as Cook, Prep and Plan, and the Pantry. Nothing is built until it is shown, and at launch only the wordmark shows until the page is ready. The first-run questions are screens of their own, before the app (`src/ui/PhoneTable.tsx`).
+- **No menu bar.** The Item's name at the top of the page opens a sheet with everything about the Item; the recipe's name at the top of the Shelf opens everything about the recipe (Your Recipes, exports, backups, Trash, Goals, the Manual), with Settings beside it. Menus rise from the bottom; windows are full screens with a back arrow.
+- **New things** come from a round + in the corner of the Shelf and the Pantry.
+- **Carrying:** press and hold a row on the Shelf or the Pantry to lift it. Hold it over Prep or Plan in the bar and the list steps aside, so it can be set down on the board, the timeline or a calendar day.
+- **Sized for fingers.** The whole interface is drawn larger (Settings › Interface size steps it further), rows are about 50px tall, and the page's words are larger too.
+- **The writing bar** rides on top of the keyboard while you type: undo, redo, bold, italic, underline, the paragraph's style, inserts, and Aa for fonts and spacing.
+- **Boards and the Atlas**: one finger moves the board, two pinch it. Press and hold a card to lift it (with a tap felt in the hand), carry it, and let go to put it down; near an edge the board moves along.
+- **A long press in the page** is left to Android: it picks the word and shows the system's own Cut, Copy and Paste.
+- **Back** closes whatever is open (a menu, the Shelf, the Pantry, Settings) and only then leaves the app. Words are saved as you type and again whenever the app is put away, when an automatic backup is taken too.
+- **Recipes live in the app's own storage**, since Android gives apps single files rather than folders to work in. They leave as exports (Word, EPUB, Markdown, PDF through Android's print screen) and as zip backups, each saved wherever the system's file picker reaches, including Drive. A Scrivener project is imported as a zip.
+- **Updates** come as a newer APK from the releases page, installed over the old one. Recipes stay put.
+
+To build it you also need the Android SDK and NDK, and the Rust targets (`rustup target add aarch64-linux-android armv7-linux-androideabi`); then `npm run tauri android build -- --apk`. See [RELEASING.md](RELEASING.md) for the signing key.
 
 ## Search
 
@@ -267,7 +286,7 @@ src-tauri/   the native shell for Windows, macOS, Linux, iOS and Android
 1. Offline editor: rich text, named paragraph and character styles, notes, find and replace.
 2. Shelf and Pantry: groups and items, character and setting cards, linked names.
 3. Seasonings v1: spelling, grammar and style checks on the device.
-4. Mobile apps.
+4. Mobile apps: Android (this), then iOS.
 5. Signed updates for the desktop app (see [RELEASING.md](RELEASING.md)).
 6. Optional on-device AI suggestions.
 7. Release.

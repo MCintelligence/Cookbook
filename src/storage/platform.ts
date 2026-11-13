@@ -240,7 +240,10 @@ export async function openBackups(chosen: BookLocation | null): Promise<{ fs: St
 // ---------- choosing a folder ----------
 
 export function canPickFolder(): boolean {
-  return isTauri() || (typeof window !== 'undefined' && 'showDirectoryPicker' in window);
+  // Android hands apps single files, not folders to work in: there, recipes live in Cookbook's own storage,
+  // and leave it as exports and zip backups saved through the system's file picker.
+  if (isTauri()) return !/Android/i.test(navigator.userAgent);
+  return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
 }
 
 /** Asks the writer for a folder. Returns null if they cancel. */

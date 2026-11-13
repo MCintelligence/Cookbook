@@ -1,4 +1,4 @@
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF, childrenOf } from '../storage/book';
@@ -34,7 +34,8 @@ import { type Form, type ModeHost } from './host';
 import { type Group, type Item, readingOrder } from './model';
 import { type BoardSetUp, type Spot, prefsStore, setPrefs } from './prefs';
 import { Zoomer } from './shared';
-import { type Look, dragFrom, usePanZoom } from './usePanZoom';
+import { fromTouch, menuPress } from '../mobile';
+import { type Look, carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
 /** A card on a free board, and the room each takes when they are laid out in rows. */
 export const CARD = { w: 224, h: 160, dx: 252, dy: 196, across: 6 };
@@ -85,6 +86,11 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   const lines = prefs.lines[name] ?? NO_LINES;
   const byId = useMemo(() => new Map(items.map((i) => [i.card.id, i])), [items]);
   const layer = useRef<HTMLDivElement | null>(null);
+  // The layer is moved and scaled by the pan itself, straight on the page, so moving the view never draws the board (usePanZoom).
+  const layerRef = useCallback((n: HTMLDivElement | null) => {
+    layer.current = n;
+    pan.layer(n);
+  }, []);
   // The board's cards use the app through this, so a change elsewhere in the app (another Item picked) doesn't redraw them.
   const hostNow = useRef(host);
   hostNow.current = host;
@@ -211,31 +217,49 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     const chosen = chosenNow();
     if (e.shiftKey || e.metaKey || e.ctrlKey) return choose(chosen.includes(id) ? chosen.filter((s) => s !== id) : [...chosen, id]);
     const group = chosen.includes(id) && chosen.length > 1 ? chosen : [id];
-    const k = pan.look.k;
+    // Pointer pixels to board units: the view's zoom as it is now, and the interface's own (larger on a phone).
+    const k = pan.live().k * scaleOf(e.currentTarget.closest('.free-board'));
     const [ox, oy] = spots.get(id)!;
     const delta = (dx: number, dy: number): Spot => {
       if (!conf.snap) return [Math.round(dx / k), Math.round(dy / k)];
       const [sx, sy] = snap([ox + dx / k, oy + dy / k]);
       return [sx - ox, sy - oy];
     };
+    const tap = () => {
+      choose([id]);
+      if (item.path !== host.path) host.select(item.path);
+    };
+    const setDown = (mx: number, my: number) => {
+      if (mx === 0 && my === 0) {
+        putBackOnPage(group);
+        shiftOnPage([], 0, 0);
+        return;
+      }
+      settling.current = group;
+      putMany(new Map(group.map((g) => [g, [spots.get(g)![0] + mx, spots.get(g)![1] + my]])));
+    };
+    /*
+     * A finger is told apart by what it does first: moving at once moves the view (even from a card,
+     * or from its synopsis while that isn't open for typing); resting lifts the card with a tap felt in
+     * the hand, to be carried and set down; held and let go without moving opens its menu; a tap
+     * picks it, or opens the synopsis for typing when it lands there.
+     */
+    if (e.pointerType === 'touch') {
+      const field = (e.target as Element).closest('textarea, input, [contenteditable="true"]');
+      if (field && field === document.activeElement) return;
+      const card = e.currentTarget;
+      return carryByTouch(e, pan, [0, 0], {
+        onLift: (on) => card.classList.toggle('held', on),
+        onMove: (at) => (at ? shiftOnPage(group, ...delta(at[0] * k, at[1] * k)) : (putBackOnPage(group), shiftOnPage([], 0, 0))),
+        onDrop: (at) => setDown(...delta(at[0] * k, at[1] * k)),
+        onMenu: (x, y) => menuAt(x, y, item),
+        onTap: () => (field instanceof HTMLElement ? field.focus() : tap()),
+      });
+    }
     dragFrom(
       e,
       (dx, dy) => shiftOnPage(group, ...delta(dx, dy)),
-      (did, up) => {
-        if (!did) {
-          choose([id]);
-          if (item.path !== host.path) host.select(item.path);
-          return;
-        }
-        const [mx, my] = delta(up.clientX - e.clientX, up.clientY - e.clientY);
-        if (mx === 0 && my === 0) {
-          putBackOnPage(group);
-          shiftOnPage([], 0, 0);
-          return;
-        }
-        settling.current = group;
-        putMany(new Map(group.map((g) => [g, [spots.get(g)![0] + mx, spots.get(g)![1] + my]])));
-      },
+      (did, up) => (did ? setDown(...delta(up.clientX - e.clientX, up.clientY - e.clientY)) : tap()),
     );
   };
 
@@ -439,11 +463,16 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   ];
   const cardMenuAt = (e: ReactMouseEvent<HTMLElement>, item: Item) => {
     e.preventDefault();
+    // A finger's long press is the card's own (cardDown): it lifts the card, and opens this menu only if it isn't carried.
+    if (fromTouch(e)) return;
+    menuAt(e.clientX, e.clientY, item);
+  };
+  const menuAt = (cx: number, cy: number, item: Item) => {
     const id = item.card.id;
     const chosen = chosenNow();
     const them = chosen.includes(id) ? chosen : [id];
     if (!chosen.includes(id)) choose([id]);
-    host.menu('Item', e.clientX, e.clientY, menuOf({ host, ask, item, pantry, ties }, [{ label: 'Shape', items: shapeMenu(them) }, { label: 'Colour', items: colourMenu(them) }, { separator: true }]));
+    host.menu('Item', cx, cy, menuOf({ host, ask, item, pantry, ties }, [{ label: 'Shape', items: shapeMenu(them) }, { label: 'Colour', items: colourMenu(them) }, { separator: true }]));
   };
 
   // ---------- Laying out ----------
@@ -622,7 +651,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         look={pan.look}
         size={pan.size}
         surface={pan.ref}
-        layer={layer}
+        layer={layerRef}
         ghost={ghost}
         marquee={marquee}
       />
@@ -659,7 +688,7 @@ interface CanvasProps {
   look: Look;
   size: [number, number];
   surface(node: HTMLDivElement | null): void;
-  layer: RefObject<HTMLDivElement | null>;
+  layer(node: HTMLDivElement | null): void;
   ghost: RefObject<SVGPathElement | null>;
   marquee: RefObject<HTMLDivElement | null>;
 }
@@ -677,9 +706,9 @@ const Canvas = memo(function Canvas({ act, host, ask, pantry, items, ties, spots
       ref={surface}
       onPointerDown={(e) => act.current!.surfaceDown(e)}
       onContextMenu={(e) => act.current!.surfaceMenu(e)}
-      style={{ '--k': look.k, backgroundPosition: `${-look.x * look.k}px ${-look.y * look.k}px`, backgroundSize: `${28 * look.k}px ${28 * look.k}px` } as CSSProperties}
     >
-      <div ref={layer} className="free-layer" style={{ transform: `scale(${look.k}) translate(${-look.x}px, ${-look.y}px)` }}>
+      {/* Where the view is (the grid behind, the layer's transform) is written by the pan itself, so moving it draws nothing here. */}
+      <div ref={layer} className="free-layer">
         <svg className="board-lines" width="1" height="1" aria-hidden="true">
           {drawn.map(({ line: l, path }) => (
             <g key={l.id} data-line={l.id} className="board-line">
@@ -712,14 +741,15 @@ const Canvas = memo(function Canvas({ act, host, ask, pantry, items, ties, spots
           const shape = looks[id]?.shape ?? 'box';
           const [w, fh] = fixedSize(shape, cards);
           const h = fh ?? CARD.h * 1.6;
-          // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten.
-          const [vw, vh] = size;
-          if (x + w < look.x - 80 || y + h < look.y - 80 || x > look.x + vw / look.k + 80 || y > look.y + vh / look.k + 80) return null;
+          // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten. The board isn't drawn
+          // again while the view moves, so a screen's worth on every side is drawn too, ready for a swipe or a pinch out.
+          const [vw, vh] = [size[0] / look.k, size[1] / look.k];
+          if (x + w < look.x - vw || y + h < look.y - vh || x > look.x + vw * 2 || y > look.y + vh * 2) return null;
           return <FreeCard key={id} act={act} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} shape={shape} titles={cards === 'titles'} tint={tintOf(looks[id]?.colour)} />;
         })}
         <div ref={marquee} className="board-marquee" style={{ display: 'none' }} />
       </div>
-      {items.length === 0 && <p className="mode-empty">{pantry ? 'The Pantry is empty. Right-click here for a new Character, Setting or Material.' : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
+      {items.length === 0 && <p className="mode-empty">{pantry ? `The Pantry is empty. ${menuPress()} here for a new Character, Setting or Material.` : `Nothing on the Shelf yet. ${menuPress()} here for a new Item.`}</p>}
     </div>
   );
 });

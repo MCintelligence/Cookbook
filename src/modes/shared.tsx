@@ -297,7 +297,8 @@ export function Synopsis({ value, label, onSave, placeholder = 'What happens her
       value={text}
       placeholder={placeholder}
       onChange={(e) => setText(e.target.value)}
-      onPointerDown={(e) => e.stopPropagation()}
+      // A finger on a synopsis not yet open for typing is the card's (or the board's, for a swipe): the card decides, and a tap opens it for typing.
+      onPointerDown={(e) => (e.pointerType !== 'touch' || e.currentTarget === document.activeElement) && e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onBlur={() => text.trim() !== value && onSave(text.trim())}

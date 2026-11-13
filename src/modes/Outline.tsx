@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { STATUSES } from '../storage/document';
 import { sayWhen } from '../storage/storyDate';
@@ -116,7 +117,7 @@ export function Outline({ host, tools, ask }: ViewProps) {
           tools,
         )}
       {all.length === 0 && groups.length === 0 ? (
-        <p className="mode-empty">Nothing on the Shelf yet. Right-click the Shelf to add a Group or an Item, and it will be listed here.</p>
+        <p className="mode-empty">Nothing on the Shelf yet. {menuPress()} the Shelf to add a Group or an Item, and it will be listed here.</p>
       ) : (
         <table>
           <thead>

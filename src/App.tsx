@@ -50,6 +50,12 @@ import { KINDS, saveFile } from './ui/saveFile';
 import { BRAINSTORMERS, hasBrainstormer, isSketchKind, sketchOf, withBrainstormer } from './storage/sketch';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
+import { createPortal } from 'react-dom';
+import { PhoneBar } from './ui/PhoneBar';
+import { PhoneFab } from './ui/PhoneFab';
+import { PhoneNav, type PhoneTab } from './ui/PhoneNav';
+import { usePhone } from './ui/usePhone';
+import { ANDROID_APP, fromTouch, haptic, isPhone, isTouch, onBack } from './mobile';
 import { setMacMenu } from './ui/nativeMenu';
 const TrashDialog = lazy(() => import('./ui/TrashDialog').then((m) => ({ default: m.TrashDialog })));
 import { type Order, loadOrder } from './storage/order';
@@ -197,13 +203,18 @@ interface KeptCaret {
 // Settings opens rarely, so it loads when first needed and keeps the first load light.
 const Settings = lazy(() => import('./ui/Settings').then((m) => ({ default: m.Settings })));
 const SetTheTable = lazy(() => import('./ui/SetTheTable').then((m) => ({ default: m.SetTheTable })));
+const PhoneTable = lazy(() => import('./ui/PhoneTable').then((m) => ({ default: m.PhoneTable })));
 const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.Manual })));
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
 const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
 const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+/** On a phone the whole interface is larger, for fingers (phone.css), and Small, Medium and Large step from there. */
+const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
+/** How large the page's words are on a phone, against a computer's: larger, though not as much as the buttons. */
+const PHONE_PAGE = { small: 1, medium: 1.1, large: 1.22 } as const;
 /** A window narrow enough for the phone layout, where side panels slide over the page (styles.css, 900px). */
-const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches;
+const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches || isPhone();
 /** Below this the page is shown as Draft, since a whole sheet of paper won't fit. */
 const isSmallDesk = (deskWidth: number, panelColumn: number) => deskWidth > 0 && deskWidth + panelColumn < 640;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
@@ -330,6 +341,12 @@ export function App() {
   /** In Chef Mode the Shelf (sideOpen) and the right-hand panel (ovenSide) stay tucked away until asked for. */
   const [sideOpen, setSideOpen] = useState(false);
   const [ovenSide, setOvenSide] = useState(false);
+  /** A phone-sized touch screen: the writing bar rides the keyboard and the menus wait under one button. */
+  const phone = usePhone();
+  /** On a phone the full format row is put away until asked for, to leave the screen to the words. */
+  const [phoneTools, setPhoneTools] = useState(false);
+  /** Where today's words go on a phone: the head of the Shelf. */
+  const [phoneFooter, setPhoneFooter] = useState<HTMLDivElement | null>(null);
   const panelNow = useRef<{ panel: Panel | null; ovenSide: boolean }>({ panel: null, ovenSide: false });
   panelNow.current = { panel, ovenSide };
   const togglePanel = (p: Panel) => {
@@ -440,6 +457,8 @@ export function App() {
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
   /** Set the Table, the welcome questions: on the very first start, or again from Cookbook Settings or Help. */
   const [table, setTable] = useState<'first' | 'again' | null>(null);
+  /** The first recipe has been opened, or failed to: until then a phone shows only the wordmark, never a half-built app. */
+  const [booted, setBooted] = useState(false);
   /** The manual, open at a chapter. */
   const [manualAt, setManualAt] = useState<{ chapter: string; at: number } | null>(null);
   const lastSection = useRef<SettingsSection>('general');
@@ -511,7 +530,7 @@ export function App() {
     if (mode.create && mode.from) info = await copyBook(mode.from, nextFs, mode.create, mode.setup);
     else if (mode.create && mode.make) info = await makeBookOrUndo(nextFs, () => mode.make!(nextFs));
     else if (mode.create && mode.learn) {
-      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, keysFor));
+      info = await makeBookOrUndo(nextFs, () => makeLearnToCook(nextFs, isTouch() ? () => '' : keysFor, isTouch()));
       rememberLearnToCook(target);
       // It opens at Welcome, like a recipe reopening where the writer left off.
       try {
@@ -727,8 +746,19 @@ export function App() {
         }
       }
       await openAt(await defaultLocation());
-    })().catch((e: unknown) => setError(friendlyError(e)));
+    })()
+      .catch((e: unknown) => setError(friendlyError(e)))
+      .finally(() => setBooted(true));
   }, []);
+  // The Item the writer left open comes a moment after its recipe. A phone waits for it (though not for long,
+  // since a recipe may have nothing open) so that the first thing drawn is the page, not an empty screen.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!booted || settled) return;
+    if (doc) return setSettled(true);
+    const wait = window.setTimeout(() => setSettled(true), 800);
+    return () => window.clearTimeout(wait);
+  }, [booted, doc, settled]);
 
   const refreshTree = useCallback(async () => {
     if (!fs) return;
@@ -836,8 +866,8 @@ export function App() {
       }
       void flushSave().then(saveUndoNow);
       void saveIndexNow();
-      // The browser can't wait for a zip as a tab closes, so the book is backed up whenever it's put away.
-      if (!isTauri() && document.visibilityState === 'hidden' && getSettings().backupOnClose && Date.now() - lastBackupAt.current > 10 * 60_000) void autoBackup().catch(() => {});
+      // The browser can't wait for a zip as a tab closes, and a phone never says when it ends an app, so there the book is backed up whenever it's put away.
+      if ((!isTauri() || ANDROID_APP) && document.visibilityState === 'hidden' && getSettings().backupOnClose && Date.now() - lastBackupAt.current > 10 * 60_000) void autoBackup().catch(() => {});
       // Put away with its words saved, so a phone or browser ending Cookbook in the background isn't taken for a crash.
       if (locationRef.current && (document.visibilityState === 'hidden' || e.type === 'pagehide')) markClosed(window.localStorage, locationRef.current);
     };
@@ -999,6 +1029,11 @@ export function App() {
     if (pendingSave.current) {
       await flushSave();
       await saveUndoNow();
+    }
+    // On a phone the Shelf and the Pantry are places of their own: opening something from one goes to the page it opens on.
+    if (isPhone() && !getSettings().focus && (sideOpen || panelNow.current.panel === 'pantry')) {
+      setPanel((open) => (open === 'pantry' ? null : open));
+      goToMode('cook');
     }
     setSideOpen(false);
     docRef.current = opened;
@@ -1852,12 +1887,11 @@ export function App() {
     // A second click on the recipe's name closes its menu.
     if (menu?.label === 'Recipe' && menu.opener === e.currentTarget) return setMenu(null);
     const r = e.currentTarget.getBoundingClientRect();
-    setMenu({
-      label: 'Recipe',
-      opener: e.currentTarget,
-      x: r.left,
-      y: r.bottom + 4,
-      items: [
+    showMenu(
+      'Recipe',
+      r.left,
+      r.bottom + 4,
+      [
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { separator: true },
         // Plate and serve is the one way out of Cookbook: it sets the book and serves the EPUB or PDF.
@@ -1867,18 +1901,46 @@ export function App() {
         { label: 'Import Scrivener project…', hint: '.scriv', onPick: () => void chooseScrivener() },
         { label: 'Back up as a zip…', onPick: () => void backUp() },
         { label: 'Trash', onPick: openTrash },
+        ...(phone
+          ? ([
+              { separator: true },
+              { label: 'Goals…', onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
+              { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
+              { label: 'Expand the Shelf', onPick: () => setFolding({ open: true, at: Date.now() }) },
+              { label: 'Collapse the Shelf', onPick: () => setFolding({ open: false, at: Date.now() }) },
+              { separator: true },
+              { label: 'Manual', onPick: () => setManualAt({ chapter: '', at: Date.now() }) },
+              { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+            ] as MenuItem[])
+          : []),
         { separator: true },
         { label: 'Cookbook Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
       ],
-    });
+      e.currentTarget,
+    );
   };
 
   /**
    * Opens a menu. Given the button that opened it, a second press on that button
    * closes the menu instead of opening it again, as the Recipe button does.
    */
-  const showMenu = (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) =>
+  /** While set, a menu that would open hands its items here instead (see itemsOf). */
+  const borrowMenu = useRef<((label: string, items: MenuItem[]) => void) | null>(null);
+  const showMenu = (label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement) => {
+    if (borrowMenu.current) return borrowMenu.current(label, items);
     setMenu((open) => (opener && open?.opener === opener ? null : { label, x, y, items, opener }));
+  };
+  /** The items a menu-opening function would show, without showing them. */
+  const itemsOf = (open: () => void): MenuItem[] => {
+    let got: MenuItem[] = [];
+    borrowMenu.current = (_label, items) => (got = items);
+    try {
+      open();
+    } finally {
+      borrowMenu.current = null;
+    }
+    return got;
+  };
 
   /** Proofreader fixes and choices for an issue, for the underline's menu and the Seasonings card's. */
   const issueItems = async (issue: FoundIssue): Promise<MenuItem[]> => {
@@ -1944,11 +2006,33 @@ export function App() {
     ];
   };
 
+  /** Rows, columns and the header of the table the cursor is in. */
+  const tableItems = (ed: Editor): MenuItem[] => {
+    const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => void fn(ed.chain().focus()).run();
+    const at = ed.view.domAtPos(ed.state.selection.from).node;
+    const table = (at instanceof Element ? at : at.parentElement)?.closest('table');
+    return [
+      { label: 'Add row above', onPick: run((c) => c.addRowBefore()) },
+      { label: 'Add row below', onPick: run((c) => c.addRowAfter()) },
+      { label: 'Add column left', onPick: run((c) => c.addColumnBefore()) },
+      { label: 'Add column right', onPick: run((c) => c.addColumnAfter()) },
+      { separator: true },
+      { label: 'Header row', checked: !!table?.querySelector('tr:first-child th'), onPick: run((c) => c.toggleHeaderRow()) },
+      { separator: true },
+      { label: 'Delete row', onPick: run((c) => c.deleteRow()) },
+      { label: 'Delete column', onPick: run((c) => c.deleteColumn()) },
+      { label: 'Delete table', danger: true, onPick: run((c) => c.deleteTable()) },
+    ];
+  };
+
   /** Right-click on the page: what it offers depends on what is under the pointer. */
   const pageMenu = (e: React.MouseEvent) => {
     const ed = editor;
     const target = e.target as Element;
     if (!ed || !ed.view.dom.contains(target)) return;
+    // A long press with a finger belongs to the system: it picks the word and offers its own Cut, Copy and Paste,
+    // as in every other app. The table's choices are on the writing bar, and a tap on an underline opens its card.
+    if (fromTouch(e)) return;
     e.preventDefault();
     const { clientX: x, clientY: y } = e;
     const at = ed.view.posAtCoords({ left: x, top: y });
@@ -1971,20 +2055,7 @@ export function App() {
       ]);
     }
 
-    if (target.closest('.cb-prose td, .cb-prose th')) {
-      return showMenu('Table', x, y, [
-        { label: 'Add row above', onPick: run((c) => c.addRowBefore()) },
-        { label: 'Add row below', onPick: run((c) => c.addRowAfter()) },
-        { label: 'Add column left', onPick: run((c) => c.addColumnBefore()) },
-        { label: 'Add column right', onPick: run((c) => c.addColumnAfter()) },
-        { separator: true },
-        { label: 'Header row', checked: !!target.closest('table')?.querySelector('tr:first-child th'), onPick: run((c) => c.toggleHeaderRow()) },
-        { separator: true },
-        { label: 'Delete row', onPick: run((c) => c.deleteRow()) },
-        { label: 'Delete column', onPick: run((c) => c.deleteColumn()) },
-        { label: 'Delete table', danger: true, onPick: run((c) => c.deleteTable()) },
-      ]);
-    }
+    if (target.closest('.cb-prose td, .cb-prose th')) return showMenu('Table', x, y, tableItems(ed));
 
     const breakEl = target.closest('hr[data-scene-break]');
     if (breakEl) {
@@ -3628,7 +3699,7 @@ export function App() {
           ]
         : []),
       ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
-      ...(isTauri() && !IS_MAC ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
+      ...(isTauri() && !IS_MAC && !ANDROID_APP ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
       ...MODES.map((m) => cmd(m.shortcut, `${m.name}: ${m.hint[modeSide].toLowerCase()}`, () => goToMode(m.id), 'View', keysFor(m.shortcut), 'mode cook prep plan outline board corkboard calendar timeline atlas arcs relationships')),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
@@ -3659,7 +3730,8 @@ export function App() {
   const searchBook = useCallback((query: string): SearchHit[] => index.current?.index.search(query, { limit: 8, aside: true }) ?? [], [indexVersion]);
 
   const nextStyle = useCallback((style: string) => paragraphStyle(sheet, style).next ?? style, [sheet]);
-  const css = useMemo(() => stylesToCss(sheet), [sheet]);
+  // On a phone, what a style sets in Crimson Pro is drawn in Merriweather (fonts-phone.css). Only the drawing: the style, and what is exported or printed, are untouched.
+  const css = useMemo(() => (phone ? stylesToCss(sheet).replaceAll("'Crimson Pro'", "'Merriweather Page'") : stylesToCss(sheet)), [sheet, phone]);
 
   const page = pageOf(book?.page);
   const goals: Goals = { dailyGoal: book?.dailyGoal ?? settings.dailyGoal, bookTarget: book?.bookTarget, deadline: book?.deadline, weekendsOff: !!book?.weekendsOff };
@@ -3738,9 +3810,12 @@ export function App() {
     watch.observe(el);
     return () => watch.disconnect();
   }, []);
-  const small = isSmallDesk(deskWidth, panelColumn);
+  // A phone, either way up, is narrower than a sheet of paper worth reading: the page is its words, at their own size.
+  const small = isSmallDesk(deskWidth, panelColumn) || phone;
   const asDraft = page.view === 'draft' || small;
-  const pageZoom = asDraft && small ? 1 / UI_ZOOM[settings.size] : page.zoom / 100 / UI_ZOOM[settings.size];
+  // The page is zoomed apart from the interface around it, so the interface's own zoom is taken back out.
+  const uiZoom = phone ? PHONE_ZOOM[settings.size] : UI_ZOOM[settings.size];
+  const pageZoom = asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) / uiZoom : page.zoom / 100 / uiZoom;
   zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom, dir) } });
   const pageStyle: CSSProperties = asDraft ? { zoom: pageZoom } : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
   // The cards above the page are as wide as the page itself, at any size and zoom.
@@ -3782,6 +3857,45 @@ export function App() {
   const miseOthers = useMemo(() => miseWords(miseList, (p) => cards.get(p)?.words ?? 0, miseActive, 0), [miseList, cards, miseActive]);
 
   /** File, Edit, View, Insert, Format, Recipe and Help along the top bar. Each is built when it opens. */
+  /**
+   * On a phone, the open Item's name in the top bar opens one sheet with everything about it:
+   * what can be done to the Item (its row's own menu on the Shelf, and its drafts and
+   * snapshots), and how the page behaves. Cook, Prep and Plan are in the bar along the bottom.
+   */
+  const phoneItemSheet = (opener: HTMLElement) => {
+    const recipe = topMenus.find((m) => m.label === 'Recipe')!.items();
+    const pick = (label: string) => recipe.find((i) => 'label' in i && i.label === label);
+    const node = path ? findNode([...tree, ...researchTree, ...archiveTree, ...pantryNodes], path) : null;
+    const own = node ? itemsOf(() => rowMenu(node, 0, 0)) : [];
+    const drafts = doc?.kind === 'scene' ? (['Draft this item', 'Older draft as ghost text', 'Newer draft as ghost text'].map(pick).filter(Boolean) as MenuItem[]) : [];
+    const snaps = pick('Snapshots of this item');
+    showMenu(
+      doc?.title || 'Item',
+      0,
+      0,
+      [
+        ...(own.length > 0 ? ([{ heading: 'This Item' }] as MenuItem[]) : []),
+        // Open is where the writer already is.
+        ...own
+          .filter((i, n, all) => !('separator' in i && (n === 0 || n === all.length - 1)) && !('label' in i && i.label === 'Open'))
+          // A name is changed where it is listed, so Rename goes to the Shelf (or the Pantry) first.
+          .map((i) => ('label' in i && i.label === 'Rename' && 'onPick' in i ? { ...i, onPick: () => ((isCard(doc?.kind) ? setPanel('pantry') : setSideOpen(true)), i.onPick()) } : i)),
+        ...(drafts.length > 0 || snaps ? ([{ separator: true }, ...drafts, ...(snaps ? [snaps] : [])] as MenuItem[]) : []),
+        ...(doc && editor && !inMode
+          ? ([
+              { separator: true },
+              { heading: 'The page' },
+              { label: 'Track changes', items: trackItems(editor) },
+              { label: 'Mise en Place (the whole group)', checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
+              { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
+              { label: 'Chef Mode', checked: settings.focus, onPick: toggleFocus },
+            ] as MenuItem[])
+          : []),
+      ],
+      opener,
+    );
+  };
+
   const topMenus: BarMenu[] = [
     {
       label: 'File',
@@ -3801,7 +3915,7 @@ export function App() {
           : ([
               { separator: true },
               { label: 'Cookbook Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
-              ...(isTauri() ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
+              ...(isTauri() && !ANDROID_APP ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
             ] as MenuItem[])),
       ],
     },
@@ -3840,18 +3954,23 @@ export function App() {
           { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
           { separator: true },
           // On a Mac the menu bar's own Window › Enter Full Screen does this.
-          ...(isTauri() && !IS_MAC ? [{ label: 'Full screen', hint: keysFor('fullscreen'), binding: binding('fullscreen'), checked: fullScreen, onPick: toggleFullScreen }, { separator: true as const }] : []),
-          { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
-          { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
-          {
-            label: 'Zoom',
-            disabled: !book,
-            items: [
-              ...ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })),
-              { separator: true as const },
-              { label: 'Reset', hint: '100%', onPick: () => updateBook({ page: { ...page, zoom: 100 } }) },
-            ],
-          },
+          ...(isTauri() && !IS_MAC && !ANDROID_APP ? [{ label: 'Full screen', hint: keysFor('fullscreen'), binding: binding('fullscreen'), checked: fullScreen, onPick: toggleFullScreen }, { separator: true as const }] : []),
+          // A phone's screen is narrower than a sheet of paper, so the page is always shown as Draft there, at the size the words are set in.
+          ...(phone
+            ? []
+            : ([
+            { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
+            { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
+            {
+              label: 'Zoom',
+              disabled: !book,
+              items: [
+                ...ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })),
+                { separator: true as const },
+                { label: 'Reset', hint: '100%', onPick: () => updateBook({ page: { ...page, zoom: 100 } }) },
+              ],
+            },
+              ] as MenuItem[])),
           {
             label: 'Theme',
             items: (['system', 'light', 'dark', 'sepia'] as const).map((t) => ({ label: `${t[0]!.toUpperCase()}${t.slice(1)}`, checked: settings.theme === t, onPick: () => setSettings({ theme: t }) })),
@@ -4077,6 +4196,25 @@ export function App() {
   );
   const shelfLive = useMemo(() => (doc && path ? { path, editor } : null), [!!doc, path, editor]);
 
+  // The phone's Back button or gesture, once nothing floats over the app (mobile.ts closes those first):
+  // it slides the Shelf or the open panel away, then comes back from Prep or Plan to the page.
+  const backNow = useRef<() => boolean>(() => false);
+  backNow.current = () => {
+    if (sideOpen || (settings.focus && ovenSide)) return setSideOpen(false), setOvenSide(false), true;
+    if (panel && narrowWindow() && !settings.focus) return setPanel(null), true;
+    if (modeStore.get() !== 'cook') return goToMode('cook'), true;
+    if (phone && getSettings().focus) return toggleFocus(), true;
+    return false;
+  };
+  useEffect(() => onBack(() => backNow.current()), []);
+  // When the on-screen keyboard slides up it takes half the screen; the line being written comes up with it.
+  useEffect(() => {
+    if (!phone || !editor) return;
+    const keep = () => editor.isFocused && requestAnimationFrame(() => !editor.isDestroyed && editor.commands.scrollIntoView());
+    window.addEventListener('resize', keep);
+    return () => window.removeEventListener('resize', keep);
+  }, [phone, editor]);
+
   const modeSide = sideOf(isCard(doc?.kind));
   const inMode = mode !== 'cook' && !!book && !!fs;
   useEffect(() => {
@@ -4138,10 +4276,91 @@ export function App() {
     say,
       };
 
+  /** Where the writer is on a phone: the Shelf, the Pantry, or the open Item seen as Cook, Prep or Plan. */
+  const phoneTab: PhoneTab = sideOpen ? 'shelf' : panel === 'pantry' ? 'pantry' : mode;
+  const onPhoneTab = useStable((tab: PhoneTab) => {
+    haptic('tick');
+    setSideOpen(tab === 'shelf');
+    setPanel(tab === 'pantry' ? 'pantry' : null);
+    if (tab === 'cook' || tab === 'prep' || tab === 'plan') goToMode(tab);
+  });
+
+  // A phone shows one thing at a time, and builds nothing it isn't showing: the wordmark until the
+  // first recipe is open, then the welcome questions on their own, and only then the app.
+  if (phone && (!booted || !settled || table)) {
+    const splash = (
+      <div className="phone-splash" role="status" aria-label="Cookbook is opening">
+        <span className="brand">cookbook</span>
+      </div>
+    );
+    if (!booted || !settled || !table) return splash;
+    return (
+      <Suspense fallback={splash}>
+        <PhoneTable first={table === 'first'} onDone={() => setTable(null)} />
+      </Suspense>
+    );
+  }
+
+  // On a phone today's words sit at the head of the Shelf (see phoneFooter); everywhere else, along the foot.
+  const footerEl = (
+        <footer className="footer">
+          <LiveGoals
+            editor={editor}
+            history={history}
+            goals={goals}
+            onGoals={(changes) => updateBook(changes)}
+            item={doc && path && doc.kind === 'scene' ? { title: doc.title, goal: sceneGoal(doc), onShelf: path.startsWith(BOOKSHELF + '/') } : null}
+            savedItemWords={(path && cards.get(path)?.words) || 0}
+            otherWords={otherWords}
+            onSceneGoal={(goal) => {
+              const base = currentDoc() ?? doc;
+              if (!base) return;
+              const { goal: _old, ...fields } = base.fields;
+              const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
+              setDoc(updated);
+              scheduleSave(updated);
+            }}
+            onExport={exportHistoryCsv}
+            request={goalsRequest}
+          />
+          <span className="footer-end">
+            {miseShown && (
+              <MiseCount
+                name={miseShown.title}
+                items={miseList.length}
+                otherWords={miseOthers}
+                editor={miseActive ? editor : null}
+                savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
+              />
+            )}
+            {book?.suggest && (
+              <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>
+                Suggesting
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            )}
+            {doc && (
+              <ZoomControl
+                zoom={page.zoom}
+                label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
+                onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
+              />
+            )}
+            {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
+            <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
+            <button className="gear" aria-label="Cookbook Settings" title={`Cookbook Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+              <Icon name="gear" size={18} />
+            </button>
+          </span>
+        </footer>
+  );
+
   const chefLook = settings.focus ? lookVars(settings.chef) : null;
   return (
     <div
-      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${chefLook ? ' ' + chefLook.classes.join(' ') : ''}${settings.focus && menu && (menu.label === 'Recipe' || menu.label === 'Mode') ? ' top-held' : ''}`}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}${chefLook ? ' ' + chefLook.classes.join(' ') : ''}${settings.focus && menu && (menu.label === 'Recipe' || menu.label === 'Mode') ? ' top-held' : ''}`}
       style={{ '--shelf-w': `${shelfWidth}px`, ...chefLook?.vars } as CSSProperties}
     >
       <style>{css}</style>
@@ -4181,7 +4400,7 @@ export function App() {
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
-            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode'} />}
+            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode' || (phone && !!menu && menu.label === (doc?.title || 'Item'))} onPhone={phone ? phoneItemSheet : undefined} />}
           </span>
         </div>
         <div className="top-actions">
@@ -4231,55 +4450,37 @@ export function App() {
           void importFiles(Array.from(e.dataTransfer.files), dropFolder(e.target));
         }}
       >
-        <h2 className="panel-h shelf-h">Shelf</h2>
-        <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
-        <Tree
-          nodes={tree}
-          root={BOOKSHELF}
-          selected={path}
-          cards={cards}
-          live={shelfLive}
-          collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
-          renaming={renaming}
-          onSelect={onSelect}
-          onMove={onTreeMove}
-          onStartRename={setRenaming}
-          onRename={onTreeRename}
-          onMenu={onRowMenu}
-          onTrash={onTreeTrash}
-          dropTarget={fileDrop}
-          folding={folding}
-          recipes={recipes}
-          marked={shelfMarked}
-          onMark={onShelfMark}
-          onOpenGroup={onOpenGroup}
-          shownGroups={miseShown?.groups}
-          drafts={draftRows}
-          ghost={draftOpen && draftOpen.path === path ? { path, n: draftOpen.n } : null}
-          onDraft={onDraftRow}
-          onDraftMenu={onDraftMenuRow}
-          outside={intoArchive}
-        />
-        </ShelfSearch>
-        <div className="compartments">
-          <Compartment
-            name="Research"
-            icon="research"
-            className="research"
-            count={researchTree.length}
-            dropping={archiveDrop === 'research' || fileDrop === RESEARCH}
-            openKey={`cookbook.researchOpen:${JSON.stringify(location)}`}
-            empty="Notes, pictures, PDFs and web pages to look at while you write. Drop files here, or right-click to add a note. Nothing here is part of the book."
-            emptyDrop="Let go to keep it in Research."
-            onMenu={researchSpaceMenu}
-          >
+        {(!phone || sideOpen) && (
+          <>
+            {phone ? (
+              <div className="phone-shelf-head">
+                <div className="phone-shelf-top">
+                  <button className="phone-recipe" aria-haspopup="menu" onClick={bookMenu}>
+                    <span className="phone-recipe-label">Recipe</span>
+                    <span className="phone-recipe-name">
+                      {book?.title ?? 'Your Recipes'}
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </span>
+                  </button>
+                  <button className="phone-icon" aria-label="Settings" onClick={() => openSettings()}>
+                    <Icon name="gear" size={22} />
+                  </button>
+                </div>
+                <div className="phone-today" ref={setPhoneFooter} />
+              </div>
+            ) : (
+              <h2 className="panel-h shelf-h">Shelf</h2>
+            )}
+            <ShelfSearch search={searchShelf} selected={path} onOpen={onSelect} onMenu={onHitMenu}>
             <Tree
-              nodes={researchTree}
-              root={RESEARCH}
+              nodes={tree}
+              root={BOOKSHELF}
               selected={path}
               cards={cards}
               live={shelfLive}
-              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${RESEARCH}`}
+              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${BOOKSHELF}`}
               renaming={renaming}
               onSelect={onSelect}
               onMove={onTreeMove}
@@ -4289,44 +4490,111 @@ export function App() {
               onTrash={onTreeTrash}
               dropTarget={fileDrop}
               folding={folding}
-              outside={outOfResearch}
+              recipes={recipes}
+              marked={shelfMarked}
+              onMark={onShelfMark}
+              onOpenGroup={onOpenGroup}
+              shownGroups={miseShown?.groups}
+              drafts={draftRows}
+              ghost={draftOpen && draftOpen.path === path ? { path, n: draftOpen.n } : null}
+              onDraft={onDraftRow}
+              onDraftMenu={onDraftMenuRow}
+              outside={intoArchive}
             />
-          </Compartment>
-          <Compartment
-            name="Archive"
-            icon="archive"
-            className="archive"
-            count={archiveTree.length}
-            dropping={archiveDrop === 'in'}
-            openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`}
-            empty="Set Items aside here: drag them in, or right-click and pick Move to Archive. They leave Prep and Plan until they are put back."
-            emptyDrop="Let go to archive it."
-            onMenu={archiveSpaceMenu}
-          >
-            <Tree
-              nodes={archiveTree}
-              root={ARCHIVE}
-              selected={path}
-              cards={cards}
-              live={shelfLive}
-              collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
-              renaming={renaming}
-              onSelect={onSelect}
-              onMove={onTreeMove}
-              onStartRename={setRenaming}
-              onRename={onTreeRename}
-              onMenu={onRowMenu}
-              onTrash={onTreeTrash}
-              folding={folding}
-              tagCards
-              outside={outOfArchive}
-            />
-          </Compartment>
-        </div>
-        {shelfBar()}
+            </ShelfSearch>
+            <div className="compartments">
+              <Compartment
+                name="Research"
+                icon="research"
+                className="research"
+                count={researchTree.length}
+                dropping={archiveDrop === 'research' || fileDrop === RESEARCH}
+                openKey={`cookbook.researchOpen:${JSON.stringify(location)}`}
+                empty="Notes, pictures, PDFs and web pages to look at while you write. Drop files here, or right-click to add a note. Nothing here is part of the book."
+                emptyDrop="Let go to keep it in Research."
+                onMenu={researchSpaceMenu}
+              >
+                <Tree
+                  nodes={researchTree}
+                  root={RESEARCH}
+                  selected={path}
+                  cards={cards}
+                  live={shelfLive}
+                  collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${RESEARCH}`}
+                  renaming={renaming}
+                  onSelect={onSelect}
+                  onMove={onTreeMove}
+                  onStartRename={setRenaming}
+                  onRename={onTreeRename}
+                  onMenu={onRowMenu}
+                  onTrash={onTreeTrash}
+                  dropTarget={fileDrop}
+                  folding={folding}
+                  outside={outOfResearch}
+                />
+              </Compartment>
+              <Compartment
+                name="Archive"
+                icon="archive"
+                className="archive"
+                count={archiveTree.length}
+                dropping={archiveDrop === 'in'}
+                openKey={`cookbook.archiveOpen:${JSON.stringify(location)}`}
+                empty="Set Items aside here: drag them in, or right-click and pick Move to Archive. They leave Prep and Plan until they are put back."
+                emptyDrop="Let go to archive it."
+                onMenu={archiveSpaceMenu}
+              >
+                <Tree
+                  nodes={archiveTree}
+                  root={ARCHIVE}
+                  selected={path}
+                  cards={cards}
+                  live={shelfLive}
+                  collapseKey={`cookbook.closedFolders:${JSON.stringify(location)}:${ARCHIVE}`}
+                  renaming={renaming}
+                  onSelect={onSelect}
+                  onMove={onTreeMove}
+                  onStartRename={setRenaming}
+                  onRename={onTreeRename}
+                  onMenu={onRowMenu}
+                  onTrash={onTreeTrash}
+                  folding={folding}
+                  tagCards
+                  outside={outOfArchive}
+                />
+              </Compartment>
+            </div>
+            {phone ? (
+              <>
+                {book && (
+                  <PhoneFab
+                    label="New"
+                    onPick={(opener) => {
+                      const group = pickedGroup(shelfMarked, tree);
+                      showMenu(
+                        'New',
+                        0,
+                        0,
+                        [
+                          { label: 'New Item', onPick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
+                          { label: 'New Group', onPick: () => void (group ? addFolderIn(group) : addFolder()) },
+                          { separator: true },
+                          { label: 'Import files…', onPick: () => chooseImport(null) },
+                        ],
+                        opener,
+                      );
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              shelfBar()
+            )}
+          </>
+        )}
       </nav>
       <ShelfResizer width={shelfWidth} onWidth={setShelfWidth} shelf={() => shelfRef.current} />
-      {(sideOpen || (settings.focus && ovenSide)) && (
+      {!phone && (sideOpen || (settings.focus && ovenSide)) && (
         <div
           className="side-backdrop"
           onClick={() => {
@@ -4489,7 +4757,20 @@ export function App() {
               onClose={closePanel}
               onMenu={pantryMenu}
               onHitMenu={onHitMenu}
-              bar={pantryBar()}
+              bar={
+                phone ? (
+                  <PhoneFab
+                    label={`New ${CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!.name}`}
+                    onPick={() => {
+                      const group = pickedGroup(pantryMarked, pantryNodes);
+                      const template = CARD_TEMPLATES.find((t) => t.folder === pantryGroup)!;
+                      void (group ? addFrom(template, group, NAME_IT) : addCard(NAME_IT));
+                    }}
+                  />
+                ) : (
+                  pantryBar()
+                )
+              }
             >
               <Tree
                 nodes={pantryNodes}
@@ -4686,58 +4967,20 @@ export function App() {
         }}
       />
 
-      <footer className="footer">
-        <LiveGoals
+      {phone && !inMode && doc && (
+        <PhoneBar
           editor={editor}
-          history={history}
-          goals={goals}
-          onGoals={(changes) => updateBook(changes)}
-          item={doc && path && doc.kind === 'scene' ? { title: doc.title, goal: sceneGoal(doc), onShelf: path.startsWith(BOOKSHELF + '/') } : null}
-          savedItemWords={(path && cards.get(path)?.words) || 0}
-          otherWords={otherWords}
-          onSceneGoal={(goal) => {
-            const base = currentDoc() ?? doc;
-            if (!base) return;
-            const { goal: _old, ...fields } = base.fields;
-            const updated = { ...base, fields: goal ? { ...fields, goal } : fields };
-            setDoc(updated);
-            scheduleSave(updated);
-          }}
-          onExport={exportHistoryCsv}
-          request={goalsRequest}
+          tools={phoneTools}
+          onTools={() => setPhoneTools((on) => !on)}
+          onMenu={(label, items) => showMenu(label, 0, 0, items)}
+          styles={() => (editor ? ((formatItems(editor)[0] as { items: MenuItem[] }).items) : [])}
+          insert={() => topMenus.find((m) => m.label === 'Insert')!.items()}
+          table={() => (editor ? tableItems(editor) : null)}
         />
-        <span className="footer-end">
-          {miseShown && (
-            <MiseCount
-              name={miseShown.title}
-              items={miseList.length}
-              otherWords={miseOthers}
-              editor={miseActive ? editor : null}
-              savedItemWords={miseActive ? (cards.get(miseActive)?.words ?? 0) : 0}
-            />
-          )}
-          {book?.suggest && (
-            <button className="suggest-chip" title={`Stop suggesting changes (${[keysFor('suggest'), keysFor('suggestAlt')].filter(Boolean).join(' or ')})`} onClick={toggleSuggest}>
-              Suggesting
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
-            </button>
-          )}
-          {doc && (
-            <ZoomControl
-              zoom={page.zoom}
-              label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
-              onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
-            />
-          )}
-          {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
-          <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
-          <button className="gear" aria-label="Cookbook Settings" title={`Cookbook Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
-            <Icon name="gear" size={18} />
-          </button>
-        </span>
-      </footer>
+      )}
+
+      {phone ? phoneFooter && createPortal(footerEl, phoneFooter) : footerEl}
+      {phone && book && <PhoneNav tab={phoneTab} onTab={onPhoneTab} />}
 
       {settingsAt && (
         <Suspense fallback={<div className="settings" aria-busy="true" />}>

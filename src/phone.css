@@ -1,0 +1,645 @@
+/*
+ * Phones and tablets. mobile.ts puts two classes on <html>:
+ *   .touch  a finger does the pointing (phones, tablets, touch laptops used by touch)
+ *   .phone  a phone-sized touch screen, held either way up
+ *
+ * On a phone the whole interface is drawn larger (the zoom below), the way Android sizes its own
+ * apps for fingers: Medium makes the desktop's 13px text about 16px and its rows about 50px.
+ * Every size in the phone section is in those larger pixels: 40px here is 50px on the glass.
+ * The writing page is zoomed apart from all this (App.tsx, PHONE_PAGE).
+ */
+
+/* ---------- Any touch screen ---------- */
+
+/* The app never zooms as a whole: a pinch is for the boards, which handle it themselves. */
+html.touch { -webkit-tap-highlight-color: transparent; touch-action: pan-x pan-y; }
+html.touch button, html.touch [role='button'], html.touch summary, html.touch label { touch-action: manipulation; }
+/* The app's own furniture isn't text to select: a long press there opens a row's menu or starts a drag, never a selection. */
+html.touch :is(.topbar, .toolbar, .sidebar, .footer, .panel-head, .panel-bar, .menu, .phone-bar, .segmented, .set-nav, .palette-list, .free-board, .prep-card, .tree, .sc-head, .phone-fab) { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.touch :is(.topbar, .toolbar, .sidebar, .footer, .panel-head, .panel-bar, .phone-bar, .prep-card) :is(input, textarea) { user-select: text; -webkit-user-select: text; }
+
+/* A press shows at once, the way a hover does for a mouse. */
+html.touch :is(.tree button, .menu button, .panel-btn, .bar-btn, .icon-btn, .pb-btn, .side-toggle, .palette-item, .set-nav-item, .phone-recipe, .crumb-mode, .phone-add-row):active:not(:disabled) { background: color-mix(in srgb, var(--text) 9%, transparent); }
+/* What a mouse finds by pointing is simply shown. */
+html.touch .recipe-more { opacity: 1; }
+
+/* The boards and the atlas take every touch themselves: one finger moves them, two pinch them. */
+html.touch .free-board { touch-action: none; }
+/* A card a finger has lifted grows a little and casts a deeper shadow, as icons do on a home screen. */
+.prep-card.free.held, .atlas-node.held { transform: scale(1.06); box-shadow: 0 14px 34px rgba(var(--shadow), 0.28); z-index: 5; transition: transform 0.12s ease-out, box-shadow 0.12s ease-out; }
+.prep-card.free.lifted.held { cursor: grabbing; }
+
+/* ---------- Phone ---------- */
+
+html.phone { zoom: 1.25; }
+html.phone[data-size='small'] { zoom: 1.12; }
+html.phone[data-size='large'] { zoom: 1.4; }
+/* Merriweather where a computer has Crimson Pro (fonts-phone.css), on the page as in the interface. */
+html.phone { --font-text: 'Merriweather UI', Georgia, serif; --font-label: 'Merriweather UI', Georgia, serif; }
+html.phone .cb-page [style*='Crimson Pro'] { font-family: 'Merriweather Page', serif !important; }
+html.phone { --nav-h: 56px; --phone-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M11 5l-7 7 7 7'/%3E%3C/svg%3E"); }
+
+@keyframes phone-fade-in { from { opacity: 0; } }
+@keyframes phone-sheet-in { from { transform: translateY(100%); } }
+@keyframes phone-page-in { from { transform: translateX(28px); opacity: 0; } }
+/* A whole page arriving over another slides in solid, so the one before never shows through it. */
+@keyframes phone-push-in { from { transform: translateX(100%); } }
+@keyframes phone-page-back { from { transform: translateX(-28px); opacity: 0; } }
+
+/* While Cookbook opens: the wordmark alone, on the colour Android shows before the app draws, so nothing flashes. */
+.phone-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bar); }
+html.phone .phone-splash .brand, .phone-splash .brand { display: block; font-size: 30px; }
+
+/*
+ * The app on a phone is one place at a time, chosen from the bar along the bottom:
+ * the Shelf, the open Item as Cook, Prep or Plan, and the Pantry. `at-…` on .app says which.
+ */
+html.phone .app { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+html.phone .app, html.phone .app.drawer-open {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 46px auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'top' 'tools' 'desk' 'pbar' 'nav';
+}
+html.phone .app.focus { grid-template-columns: minmax(0, 1fr) !important; }
+
+/* ---- The bottom bar ---- */
+.phone-nav { display: none; }
+html.phone .phone-nav { grid-area: nav; position: relative; z-index: 10; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: var(--nav-h); padding: 0 4px; border-top: 1px solid var(--line); background: var(--bar); }
+.phone-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; border: none; background: transparent; color: var(--muted); font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+.phone-nav-pill { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 26px; border-radius: var(--radius-row); transition: background-color 0.15s ease-out; }
+/* Where the writer is: the words and the picture take the accent. Nothing is ever filled in to say so. */
+.phone-nav button[aria-current='page'] { color: var(--accent); }
+.phone-nav button:active .phone-nav-pill { background: color-mix(in srgb, var(--text) 10%, transparent); }
+/* The keyboard takes the bar's place: while something is being typed, it is out of the way, and what sat above it reaches the keys. */
+html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus), html.phone .app.focus { --nav-h: 0px; }
+html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus) .phone-nav { display: none; }
+/* Chef Mode is the page and nothing else. */
+html.phone .app.focus .phone-nav { display: none; }
+
+/* ---- Cook, Prep and Plan: the top bar is the Item's name, Search and Seasonings ---- */
+html.phone .topbar { padding: 0 4px 0 6px; gap: 0; }
+html.phone :is(.brand, .menubar, .crumb-book, .side-toggle, .side-backdrop, .shelf-resize) { display: none; }
+html.phone .top-actions > .panel-btn[title='Pantry'] { display: none; }
+html.phone .brand-wrap { gap: 0; flex: 1 1 auto; min-width: 0; }
+html.phone .crumb { flex: 1 1 auto; min-width: 0; }
+html.phone .crumb-mode { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 38px; padding: 0 10px; border-radius: var(--radius-control); font-family: var(--font-display); font-size: 17px; color: var(--text); }
+html.phone .crumb-mode .mode-icon { display: none; }
+html.phone .crumb-mode-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.phone .top-actions { gap: 0; flex: none; }
+html.phone .panel-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: var(--radius-control); font-size: 0; position: relative; }
+html.phone .panel-btn svg { width: 22px; height: 22px; }
+html.phone .panel-btn .badge { position: absolute; top: 4px; right: 2px; margin: 0; font-size: 9px; }
+html.phone .find > button:first-child, html.phone .find-toggle { width: 40px; height: 40px; border-radius: var(--radius-control); }
+
+/* The full format row waits behind the writing bar's Aa button. */
+html.phone .app:not(.phone-tools):not(.in-mode) .toolbar { display: none; }
+html.phone .toolbar { height: auto; min-height: 44px; padding: 2px 6px; }
+
+/* The page fills the screen, with room under the last line to bring it clear of the keyboard. */
+html.phone .desk { padding: 0 0 72px; scrollbar-width: none; scrollbar-gutter: auto; }
+html.phone .desk::-webkit-scrollbar { display: none; }
+html.phone .cb-page.draft { padding: 14px 18px 28px; max-width: none; }
+html.phone .pantry-card { margin: 6px; width: auto !important; }
+html.phone .error { margin: 8px; }
+html.phone .empty { padding: 40px 20px; text-align: center; font-size: 15px; }
+
+/* ---- The Shelf: a place of its own, the recipe at its head ---- */
+html.phone .sidebar { display: none; }
+html.phone .app.side-open .sidebar { display: flex; position: fixed; z-index: 9; inset: 0 0 var(--nav-h) 0; width: auto; padding: env(safe-area-inset-top) calc(8px + env(safe-area-inset-right)) 88px calc(8px + env(safe-area-inset-left)); border: none; box-shadow: none; font-size: 14px; }
+html.phone .app.side-open .sidebar > * { animation: phone-fade-in 0.14s ease-out; }
+.phone-shelf-head { display: flex; flex-direction: column; margin: 0 -8px 8px; padding: 6px 8px 4px; background: var(--bar); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 3; }
+.phone-shelf-top { display: flex; align-items: center; gap: 4px; }
+.phone-recipe { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 2px 10px; border: none; border-radius: var(--radius-row); background: transparent; color: var(--text); text-align: left; }
+.phone-recipe-label { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.phone-recipe-name { display: flex; align-items: center; gap: 4px; min-width: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone-recipe-name svg { flex: none; color: var(--muted); }
+.phone-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); }
+/* Today's words and the saved tick, here because a phone has no bar along the foot for them. */
+.phone-today:empty { display: none; }
+html.phone .phone-today .footer { position: static; display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 6px; border: none; background: transparent; font-size: 13px; }
+html.phone .phone-today :is(.zoom, .gear, .status-control) { display: none; }
+html.phone .phone-today .footer-end { margin-left: auto; gap: 6px; }
+html.phone .phone-today .goals-button { min-height: 38px; font-size: 13px; }
+
+html.phone .panel-search { flex: none; height: 42px; margin: 0 2px 8px; border-radius: var(--radius-control); padding: 0 14px; }
+html.phone .panel-search input { font-size: 15px; }
+
+/* Rows: 44px (55 on the glass) with their words in the middle of them, top to bottom. */
+html.phone .tree button { justify-content: center; min-height: 44px; padding: 4px 10px; font-size: 15px; border-radius: var(--radius-row); }
+html.phone .tree .tree-folder { align-items: center; }
+html.phone .tree .tree-card-row, html.phone .tree .tree-card > :first-child { align-items: center; }
+html.phone .tree .tree-card-title { font-size: 15px; line-height: 1.3; }
+html.phone .tree .tree-card-synopsis { font-size: 12.5px; line-height: 1.35; }
+html.phone .tree .tree-words { font-size: 11.5px; }
+html.phone .tree .tree-recipe { min-height: 38px; line-height: 38px; }
+html.phone .sidebar .tree-folder .chevron { width: 28px; height: 36px; margin-left: -6px; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+html.phone .tree-ghost { max-width: 240px; padding: 10px 14px; font-size: 15px; border-radius: var(--radius-pop); box-shadow: 0 12px 30px rgba(var(--shadow), 0.3); }
+html.phone .compartments { position: static; margin: 10px -8px 0; }
+html.phone .compartment > button, html.phone .compartment-head { min-height: 44px; font-size: 12px; }
+
+/* The round button for something new, in the corner where a thumb rests. */
+.phone-fab { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(var(--nav-h, 0px) + 16px + env(safe-area-inset-bottom)); z-index: 11; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; padding: 0; border: none; border-radius: var(--radius-pop); background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 14px rgba(var(--shadow), 0.28); }
+.phone-fab:active { filter: brightness(0.92); transform: scale(0.96); }
+/* While the search has the keyboard, the bar is gone and the button sits just above the keys. */
+html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea):focus) .phone-fab { bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+
+/* ---- The Pantry (a place) and Seasonings (a page over Cook) ---- */
+html.phone .app:not(.panel-open) .drawer { display: none; }
+html.phone .drawer { position: fixed; z-index: 6; inset: 0; width: auto; box-shadow: none; border: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+html.phone .app.at-pantry .drawer { bottom: var(--nav-h); z-index: 9; }
+html.phone .app:not(.at-pantry) .drawer { z-index: 12; animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .drawer > .panel { padding: 0 12px 96px; position: relative; }
+html.phone .drawer .panel-bar { display: none; }
+html.phone .panel-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 4px; height: 50px; margin: 0 -12px 6px; padding: 0 8px 0 16px; background: var(--bar); border-bottom: 1px solid var(--line); }
+html.phone .panel-head .panel-h { flex: 1 1 auto; margin: 0; font-size: 20px; line-height: 1.2; }
+html.phone .panel-head .panel-h::after { display: none; }
+html.phone .panel-head .panel-tools { display: inline-flex; align-items: center; gap: 4px; }
+/* The Pantry is a place, so it has no way out of its own: the bar below is the way. */
+html.phone .pantry-panel .panel-head .icon-btn[aria-label^='Close'] { display: none; }
+/* Seasonings is a page over the writing: Close is an arrow back, first in its heading. */
+html.phone .seasonings .panel-head { padding-left: 50px; }
+html.phone .seasonings .panel-head .icon-btn[aria-label^='Close'] { position: absolute; left: 4px; top: 4px; width: 42px; height: 42px; border-radius: var(--radius-control); }
+html.phone .seasonings .panel-head .icon-btn[aria-label^='Close'] svg { display: none; }
+html.phone .seasonings .panel-head .icon-btn[aria-label^='Close']::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
+html.phone .segmented { height: 42px; margin-bottom: 8px; }
+html.phone .segmented button { min-height: 42px; font-size: 14px; }
+html.phone .pantry-panel .tree button { min-height: 48px; }
+html.phone .pantry-panel .card-icon { width: 28px; height: 28px; font-size: 13px; }
+
+/* Seasonings: the switch in the heading, cards with room to breathe, adding one at the end of the list. */
+.phone-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 6px; font-size: 13px; color: var(--muted); }
+html.phone .seasonings .panel-list { display: flex; flex-direction: column; gap: 10px; }
+html.phone .seasonings .sc { padding: 12px 14px; }
+html.phone .sc-head .sub-h { font-size: 12px; }
+html.phone .sc-remark { font-size: 14px; line-height: 1.45; }
+html.phone .gauge-level { font-size: 14px; }
+html.phone .gauge-ends { font-size: 11px; }
+html.phone .sc .handle { width: 36px; height: 36px; border-radius: var(--radius-control); }
+html.phone .sc-foot { gap: 10px; }
+html.phone .sc-check { min-height: 40px; font-size: 14px; }
+.phone-add-row { order: 99; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 1px dashed var(--line-strong); border-radius: var(--radius-pop); background: transparent; color: var(--accent); font-size: 14px; font-weight: 700; }
+.phone-add-row span { font-size: 20px; line-height: 1; }
+html.phone .seasonings .pick { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+html.phone .seasonings .tile { min-height: 120px; }
+
+/* The suggestion card rises from the bottom, within reach of a thumb. */
+html.phone .issue-card { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: auto; max-width: none; border-radius: var(--radius-pop) var(--radius-pop) 0 0; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+
+/* ---- Set the Table on a phone (PhoneTable.tsx): the Seasonings set the table with the writer ----
+   One question to a screen, asked by one of the cast in a speech bubble. Panels stay neutral: only
+   text, icons, faces and outlines take the accent. Radii are the desktop's own. */
+.phone-table { position: fixed; inset: 0; display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: var(--bg); color: var(--text); overflow: hidden; }
+.pt-top { flex: none; display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 6px; }
+.pt-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.pt-progress { flex: 1 1 auto; display: flex; gap: 4px; }
+.pt-progress span { flex: 1 1 0; height: 4px; border-radius: 2px; background: var(--line-strong); transition: background-color 0.3s; }
+.pt-progress span[data-done='true'] { background: var(--accent); }
+.pt-progress-gap { flex: 1 1 auto; }
+.pt-skip { flex: none; min-width: 64px; min-height: 42px; padding: 0 10px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 14px; font-weight: 700; text-align: right; }
+.pt-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 16px; padding: 6px 20px 20px; }
+.pt-main.pt-on { animation: phone-page-in 0.28s cubic-bezier(0.2, 0, 0, 1); }
+.pt-main.pt-back { animation: phone-page-back 0.28s cubic-bezier(0.2, 0, 0, 1); }
+.pt-main h1 { margin: 0; font-family: var(--font-display); font-size: 27px; font-weight: 400; line-height: 1.18; outline: none; text-wrap: balance; }
+.pt-center { text-align: center; }
+.pt-lead { margin: 0; font-family: var(--font-text); font-size: 15px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
+.pt-hint { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.pt-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* The host and their bubble */
+.pt-says { display: flex; align-items: flex-end; gap: 10px; min-height: 76px; }
+.pt-says-face { flex: none; display: inline-flex; color: var(--accent); animation: pt-nod 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.pt-bubble { position: relative; flex: 1 1 auto; margin: 0 0 6px; padding: 9px 13px 10px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-pop); background: var(--surface); font-family: var(--font-text); font-size: 14.5px; line-height: 1.45; animation: pt-pop 0.32s cubic-bezier(0.3, 1.3, 0.5, 1) both; transform-origin: 0 100%; }
+.pt-bubble::before, .pt-bubble::after { content: ''; position: absolute; left: -8px; bottom: 10px; border: 7px solid transparent; border-right-color: var(--line-strong); border-left: 0; }
+.pt-bubble::after { left: -5.5px; border-right-color: var(--surface); }
+.pt-bubble-who { display: block; margin-bottom: 1px; font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+@keyframes pt-pop { from { opacity: 0; transform: scale(0.94) translateY(4px); } }
+@keyframes pt-nod { 0% { transform: translateY(8px) rotate(-6deg); opacity: 0; } 60% { transform: translateY(-2px) rotate(3deg); opacity: 1; } }
+
+/* The table: a plate, cutlery, and the cast seated round it */
+.pt-table { position: relative; align-self: center; width: 280px; height: 270px; margin-top: 2vh; color: var(--line-strong); }
+.pt-plate { position: absolute; inset: 15px 20px; width: 240px; height: 240px; }
+.pt-plate-mark { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--accent); }
+.pt-wordmark { font-family: 'Sansita Swashed', var(--font-display); font-size: 30px; font-weight: 600; animation: pt-pop 0.5s 0.15s cubic-bezier(0.3, 1.3, 0.5, 1) both; }
+.pt-done svg path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: pt-draw 0.5s 0.35s ease-out forwards; }
+@keyframes pt-draw { to { stroke-dashoffset: 0; } }
+.pt-seat { position: absolute; display: inline-flex; color: var(--accent); transition: color 0.3s, opacity 0.3s; animation: pt-sit 0.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.pt-seat[data-on='false'] { color: var(--line-strong); opacity: 0.55; }
+.pt-seat-0 { left: 34px; top: 0; animation-delay: 0.1s; }
+.pt-seat-1 { right: 34px; top: 0; animation-delay: 0.2s; }
+.pt-seat-2 { left: 34px; bottom: 0; animation-delay: 0.3s; }
+.pt-seat-3 { right: 34px; bottom: 0; animation-delay: 0.4s; }
+@keyframes pt-sit { from { opacity: 0; transform: translateY(14px) scale(0.8); } }
+.pt-seat[data-on='true'] .face { animation: pt-bob 3.2s ease-in-out infinite; }
+.pt-seat-1 .face { animation-delay: -0.8s !important; }
+.pt-seat-2 .face { animation-delay: -1.6s !important; }
+.pt-seat-3 .face { animation-delay: -2.4s !important; }
+@keyframes pt-bob { 50% { transform: translateY(-3px) rotate(-2deg); } }
+.pt-is-welcome h1, .pt-is-ready h1 { font-size: 30px; }
+
+/* What you write: tiles, two to a row */
+.pt-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pt-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 112px; padding: 12px 12px 13px; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); text-align: left; transition: border-color 0.15s, transform 0.12s; }
+.pt-tile:active, .pt-row:active, .pt-swatch:active, .pt-chips button:active, .pt-step:active { transform: scale(0.97); }
+.pt-tile-icon { display: inline-flex; margin-bottom: 4px; color: var(--muted); transition: color 0.15s; }
+.pt-tile-name { font-size: 15px; font-weight: 700; }
+.pt-tile-blurb { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.pt-tile[aria-checked='true'] :is(.pt-tile-icon, .pt-tile-name) { color: var(--accent); }
+
+/* The name on a title page */
+.pt-titlepage { align-self: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; width: 62%; aspect-ratio: 5 / 6; padding: 20px 16px; border: 1px solid var(--line); border-radius: var(--radius-row); background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 26px -12px rgba(0, 0, 0, 0.22); transform: rotate(-1.2deg); text-align: center; }
+.pt-tp-kind { font-family: var(--font-label); font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.pt-tp-title { font-family: var(--font-display); font-size: 30px; line-height: 1.1; }
+.pt-tp-rule { width: 36px; height: 1.5px; background: var(--accent); }
+.pt-tp-by { max-width: 100%; overflow-wrap: anywhere; font-family: var(--font-text); font-size: 15px; font-style: italic; color: var(--accent); }
+.pt-tp-by.pt-tp-empty { color: var(--muted); }
+.pt-field { display: flex; flex-direction: column; gap: 8px; }
+html.phone .phone-table input.pt-input { height: 52px; padding: 0 16px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 17px; outline: none; text-align: center; }
+.pt-input:focus { border-color: var(--accent); }
+
+/* Which English: the words that change, then the list */
+.pt-specimen { display: flex; justify-content: center; gap: 14px; margin: 2px 0 0; font-family: var(--font-display); font-size: 25px; }
+.pt-specimen b { font-weight: inherit; color: var(--accent); }
+.pt-list { display: flex; flex-direction: column; gap: 8px; }
+.pt-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); text-align: left; transition: border-color 0.15s, transform 0.12s; }
+.pt-row > .pt-row-name { flex: none; }
+.pt-row > .pt-row-blurb { flex: 1 1 auto; min-width: 0; text-align: right; }
+.pt-row[aria-checked='true'] .pt-row-name { color: var(--accent); }
+.pt-row-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pt-row-name { font-size: 15.5px; font-weight: 700; }
+.pt-row-blurb { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.pt-dot, .pt-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 2px solid var(--line-strong); border-radius: 50%; color: var(--accent); }
+.pt-box { border-radius: var(--radius-row); }
+.pt-row[aria-checked='true'] :is(.pt-dot, .pt-box) { border-color: var(--accent); }
+
+/* How it looks: a sample page, the themes, the sizes */
+.pt-sample { padding: 16px 18px 18px; border: 1px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); transition: background-color 0.3s, border-color 0.3s; }
+.pt-sample-head { display: block; margin-bottom: 6px; font-family: var(--font-display); font-size: 19px; }
+.pt-sample p { margin: 0; font-family: var(--font-text); font-size: 15px; line-height: 1.65; }
+.pt-swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pt-swatch { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 6px 0; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; transition: transform 0.12s; }
+.pt-swatch-pic { position: relative; display: flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line-strong); transition: box-shadow 0.2s; }
+.pt-swatch-pic span { width: 22px; height: 28px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1); }
+.pt-swatch[aria-checked='true'] { color: var(--accent); }
+.pt-swatch[aria-checked='true'] .pt-swatch-pic { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.pt-sizes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pt-sizes button { display: flex; align-items: center; justify-content: center; height: 56px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--muted); font-family: var(--font-display); }
+.pt-sizes button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
+
+/* Words a day: a big number with − and +, quick picks, and what the pace makes */
+.pt-goal { display: flex; align-items: center; gap: 8px; padding: 12px 0 4px; }
+.pt-step { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border: 1.5px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--accent); transition: transform 0.12s; }
+.pt-goal-n { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0; }
+html.phone .phone-table .pt-goal-n input { width: 100%; border: none; outline: none; background: transparent; color: var(--accent); font-family: var(--font-display); font-size: 52px; line-height: 1.1; text-align: center; font-variant-numeric: tabular-nums; }
+.pt-goal-n span { font-size: 14px; color: var(--muted); }
+.pt-chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pt-chips button { min-height: 44px; padding: 0; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; transition: transform 0.12s; }
+.pt-chips button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
+.pt-payoff { display: flex; align-items: center; gap: 10px; margin: 6px 0 0; padding: 14px 16px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-family: var(--font-text); font-size: 15px; line-height: 1.5; }
+.pt-payoff svg { flex: none; color: var(--accent); }
+
+/* The Seasonings: a line they'd read, what each would catch, and the cast */
+.pt-demo { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); }
+.pt-demo-line { margin: 0 0 10px; font-family: var(--font-text); font-size: 16px; line-height: 1.7; }
+.pt-m { text-decoration: underline wavy transparent; text-decoration-thickness: 1.5px; text-underline-offset: 4px; text-decoration-skip-ink: none; transition: text-decoration-color 0.25s; }
+.pt-m[data-by='sam'][data-on='true'] { text-decoration-color: var(--spelling); }
+.pt-m[data-by='pete'][data-on='true'] { text-decoration-color: var(--grammar); }
+.pt-m[data-by='sally'][data-on='true'] { text-decoration-style: dotted; text-decoration-thickness: 2px; text-decoration-color: var(--style); }
+.pt-catches { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--line); list-style: none; font-size: 13px; color: var(--muted); }
+.pt-catches li { display: flex; align-items: center; gap: 8px; animation: pt-pop 0.25s ease-out both; }
+.pt-catches .face { flex: none; color: var(--accent); }
+.pt-cast { align-items: center; min-height: 72px; padding: 10px 12px; }
+.pt-cast-face { flex: none; display: inline-flex; color: var(--line-strong); transition: color 0.2s, transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.pt-cast[aria-checked='true'] .pt-cast-face { color: var(--accent); transform: rotate(-6deg) scale(1.06); }
+.pt-role { margin-left: 4px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.pt-cast[aria-checked='true'] .pt-voice { font-family: var(--font-text); font-style: italic; color: var(--text); animation: pt-pop 0.28s ease-out both; }
+
+/* The way on */
+.pt-foot { flex: none; display: flex; flex-direction: column; gap: 4px; padding: 10px 20px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 70%, transparent); }
+.pt-next { width: 100%; min-height: 54px; border: none; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); font-size: 17px; font-weight: 700; transition: transform 0.12s; }
+.pt-next:active { filter: brightness(0.93); transform: scale(0.985); }
+.pt-later { min-height: 44px; border: none; background: transparent; color: var(--muted); font-size: 14.5px; font-weight: 700; }
+
+:root[data-reduce-motion] .phone-table *, :root[data-reduce-motion] .phone-table *::before { animation: none !important; transition: none !important; }
+:root[data-reduce-motion] .pt-done svg path { stroke-dashoffset: 0; }
+
+/* ---- Switches, buttons and fields everywhere on a phone ---- */
+html.phone input.switch { width: 40px; height: 22px; }
+html.phone .btn { min-height: 38px; padding: 0 14px; border-radius: var(--radius-control); font-size: 14px; }
+html.phone .icon-btn { min-width: 38px; height: 38px; border-radius: var(--radius-control); }
+html.phone :is(input[type='text'], input[type='search'], input[type='number'], input:not([type]), select, textarea) { font-size: max(1em, 14px); }
+
+/* ---- The writing bar: one row on top of the keyboard while the page has the cursor ---- */
+.phone-bar { display: none; }
+html.phone .phone-bar { grid-area: pbar; align-items: stretch; height: 42px; border-top: 1px solid var(--line); background: var(--bar); color: var(--text); }
+html.phone .app:has(.cb-page .ProseMirror-focused) .phone-bar { display: flex; }
+.pb-scroll { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.pb-scroll::-webkit-scrollbar { display: none; }
+.pb-btn { flex: 1 0 30px; max-width: 44px; display: inline-flex; align-items: center; justify-content: center; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.pb-btn svg { width: 20px; height: 20px; }
+.pb-btn:disabled { color: var(--faint); opacity: 0.5; }
+.pb-btn[aria-pressed='true'] { color: var(--accent); }
+.pb-letter { font-family: var(--font-display); font-size: 18px; line-height: 1; font-style: normal; text-decoration: none; }
+i.pb-letter { font-style: italic; font-family: var(--font-text); font-size: 20px; }
+u.pb-letter { text-decoration: underline; text-underline-offset: 3px; }
+.pb-aa { font-size: 15px; font-weight: 700; }
+.pb-sep { flex: none; align-self: center; width: 1px; height: 20px; margin: 0 1px; background: var(--line-strong); }
+/* The keyboard-down button stays put at the end while the rest scrolls under it. */
+.phone-bar > .pb-btn { flex: none; border-left: 1px solid var(--line); border-radius: 0; width: 42px; }
+
+/* Messages sit clear of the writing bar and the gesture bar. */
+html.phone .notice { left: 12px; right: 12px; bottom: calc(var(--nav-h) + 12px + env(safe-area-inset-bottom)); transform: none; max-width: none; min-height: 46px; padding: 4px 6px 4px 16px; border-radius: var(--radius-pop); font-size: 14px; box-shadow: 0 6px 20px rgba(var(--shadow), 0.28); }
+html.phone .notice span { flex: 1 1 auto; white-space: normal; line-height: 1.35; }
+html.phone .notice-undo { height: 38px; padding: 0 12px; border-radius: var(--radius-control); font-size: 14px; }
+html.phone .notice-close { width: 38px; height: 38px; border-radius: var(--radius-control); }
+html.phone .app:has(:is(input:not([type='checkbox']):not([type='radio']), textarea, [contenteditable='true']):focus) .notice { bottom: calc(54px + env(safe-area-inset-bottom)); }
+
+/* ---- Menus are sheets that rise from the bottom (Menu.tsx): tall rows, a drill-down for submenus ---- */
+.menu-sheet-wrap { position: fixed; inset: 0; z-index: 40; }
+.menu-sheet-shade { position: absolute; inset: 0; background: rgba(var(--shadow), 0.42); animation: phone-fade-in 0.2s ease-out; }
+.menu.menu-sheet { position: absolute; left: 0; right: 0; bottom: 0; top: auto; min-width: 0; max-width: none; max-height: 80%; overflow-y: auto; overscroll-behavior: contain; padding: 0 8px calc(10px + env(safe-area-inset-bottom)); border: none; border-radius: var(--radius-pop) var(--radius-pop) 0 0; box-shadow: 0 -8px 32px rgba(var(--shadow), 0.24); animation: phone-sheet-in 0.24s cubic-bezier(0.2, 0, 0, 1); }
+.menu.menu-sheet button { min-height: 44px; padding: 0 14px; font-size: 15px; border-radius: var(--radius-row); }
+.menu.menu-sheet .menu-sep { margin: 4px 14px; }
+.menu.menu-sheet .menu-heading { padding: 10px 14px 2px; font-size: 10px; }
+/* A phone has no keys for the shortcuts a menu lists; the arrow that marks a submenu stays. */
+.menu.menu-sheet .menu-hint:not([aria-hidden]) { display: none; }
+.menu.menu-sheet .menu-hint[aria-hidden] { font-size: 18px; }
+.menu-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 4px; min-height: 44px; margin: 0 -8px 2px; padding: 8px 8px 0; background: var(--surface); border-bottom: 1px solid var(--line); border-radius: var(--radius-pop) var(--radius-pop) 0 0; }
+.menu-sheet-grip { position: absolute; top: 6px; left: 50%; width: 32px; height: 4px; margin-left: -16px; border-radius: 2px; background: var(--line-strong); }
+.menu-sheet-title { padding: 6px 14px 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu.menu-sheet .menu-sheet-back { width: 40px; min-height: 40px; flex: none; padding: 0; justify-content: center; border-radius: var(--radius-control); }
+.menu-sheet-back + .menu-sheet-title { padding: 0 4px; }
+
+/* ---- Pop-ups that hang off a button on a computer fill the width here ---- */
+html.phone .palette-backdrop { padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
+html.phone .palette { max-height: 70%; }
+html.phone .palette-input { height: 46px; }
+html.phone .palette-hint { display: none; }
+html.phone .tb-popover { max-width: calc(100% - 16px); }
+html.phone .insert-menu { width: min(260px, calc(100% - 16px)); }
+/* Goals: a page of their own, over everything, with the way back at the top left. */
+html.phone .app.side-open .sidebar:has(.goals-pop) { z-index: 45; bottom: 0; }
+html.phone .app:has(.goals-pop) .phone-fab { display: none; }
+html.phone .goals-pop { position: fixed; inset: 0; width: auto; height: auto; max-width: none; max-height: none; overflow: auto; border: none; border-radius: 0; box-shadow: none; padding: env(safe-area-inset-top) calc(18px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left)); animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); z-index: 41; }
+html.phone .goals-tabs { padding-left: 52px; }
+.goals-back { position: absolute; left: calc(6px + env(safe-area-inset-left)); top: calc(3px + env(safe-area-inset-top)); z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.goals-back::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
+html.phone .goals-tabs button { min-height: 46px; font-size: 14px; }
+html.phone :is(.issue-card, .name-peek) { max-width: calc(100% - 16px); }
+
+@media (prefers-reduced-motion: reduce) {
+  html.phone :is(.sidebar > *, .drawer, .menu-sheet-shade, .menu.menu-sheet, .goals-pop, .lib, .settings), .phone-table, .phone-table * { animation: none !important; }
+  .pt-done svg path { stroke-dashoffset: 0; }
+}
+
+/* ---- Whole screens: windows that float in the middle of a computer screen ---- */
+html.phone .lib-backdrop { padding: 0; align-items: stretch; background: var(--surface); z-index: 30; }
+html.phone .lib, html.phone .lib.recipes, html.phone .lib.new-recipe { width: 100%; height: auto; max-height: none; border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .recipes-head { min-height: 46px; padding: 0 10px; }
+html.phone .recipes-head .sub-h { font-size: 12px; }
+html.phone .recipes-nav, html.phone .tpl-nav { max-height: none; }
+html.phone .manual-nav { width: auto; }
+html.phone .manual .recipes-nav { max-height: 28%; }
+html.phone .manual .manual-main { flex: 1 1 auto; padding: 14px 16px 28px; }
+html.phone .manual-page { font-size: 15px; }
+html.phone .shelf-backdrop { padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
+html.phone .shelf { max-height: 80%; }
+html.phone .new-foot { min-height: 56px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
+html.phone .lib input[type='checkbox'] { width: 20px; height: 20px; }
+
+/* Settings: one long page, its sections a row of chips that scrolls sideways under the header. */
+html.phone .settings { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; font-size: 14px; animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .set-body { padding: 10px 12px 40%; }
+html.phone .set-main { max-width: 100%; }
+html.phone .set-top { flex-wrap: nowrap; min-height: 46px; padding: 4px 8px; }
+html.phone .set-brand { display: none; }
+html.phone .set-top-actions { flex: 1 1 auto; }
+html.phone .set-btn { min-height: 36px; }
+html.phone .set-nav { position: sticky; top: 46px; z-index: 1; flex-wrap: nowrap; align-items: center; overflow-x: auto; max-width: 100%; gap: 6px; padding: 6px 0; background: var(--bg); scrollbar-width: none; }
+html.phone .set-nav::-webkit-scrollbar { display: none; }
+html.phone .set-nav .set-nav-item { flex: none; min-height: 34px; padding: 0 12px; border-radius: var(--radius-control); font-size: 14px; white-space: nowrap; }
+html.phone .set-scope { flex: none; width: auto; padding: 0 2px 0 6px; white-space: nowrap; }
+html.phone .set-section { scroll-margin-top: 100px; }
+html.phone .set-h2 { scroll-margin-top: 104px; }
+html.phone :is(.set-sel, .set-search, .set-num, .set-text) { min-height: 36px; font-size: 14px; }
+html.phone .set-sel { height: 36px; }
+html.phone .settings input[type='checkbox'] { width: 20px; height: 20px; }
+
+/* ---- Prep and Plan ---- */
+html.phone .mode-tools, html.phone .in-mode .toolbar { gap: 6px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+html.phone :is(.mode-tools, .in-mode .toolbar) :is(select, .pick, .seg) { min-height: 34px; font-size: 14px; flex: none; }
+html.phone .tally { display: none; }
+
+/* Plate and serve: its three columns become three tabs, the pages first. */
+.plate-panes { display: none; }
+html.phone .plate { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+html.phone .plate-panes { display: flex; flex: none; padding: 4px 8px; gap: 6px; background: var(--bar); border-bottom: 1px solid var(--line); }
+html.phone .plate-panes button { flex: 1; min-height: 34px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); font-size: 14px; }
+html.phone .plate-panes button[aria-selected='true'] { color: var(--accent); font-weight: 700; }
+html.phone .plate-main > * { display: none; }
+html.phone .plate-main.show-pages > .plate-stage { display: flex; }
+html.phone .plate-main.show-book > .plate-book, html.phone .plate-main.show-style > .plate-style { display: block; flex: 1 1 auto; width: auto; max-width: none; padding: 14px 20px 14px 14px; font-size: 14px; }
+html.phone .plate-top { gap: 8px; padding: 0 8px; height: 46px; }
+html.phone .plate-brand { display: none; }
+html.phone .plate-btn { height: 36px; padding: 0 14px; border-radius: var(--radius-control); font-size: 14px; }
+html.phone .plate-menu { top: 40px; width: min(240px, calc(100% - 16px)); }
+html.phone .plate-menu button { min-height: 40px; font-size: 14px; }
+html.phone .plate-stagebar { height: auto; min-height: 40px; flex-wrap: wrap; gap: 6px 12px; padding: 4px 8px; }
+html.phone .plate-side input[type='checkbox'] { width: 20px; height: 20px; }
+
+/* The Outline: a table on a computer, a list on a phone: each Item's name, its synopsis under it, and where it stands under that. */
+html.phone .outline table, html.phone .outline tbody, html.phone .outline tr { display: block; width: auto; }
+html.phone .outline thead { display: none; }
+html.phone .outline tbody tr:not(.outline-group) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 8px 14px 10px; border-bottom: 1px solid var(--line); }
+html.phone .outline tbody tr:not(.outline-group) > * { display: block; padding: 0 !important; border: none; width: auto; min-width: 0; }
+html.phone .outline tbody th { flex: 1 0 100%; width: auto; min-width: 0; }
+html.phone .outline-title { padding: 2px 0; font-size: 16px; }
+html.phone .outline-synopsis { flex: 1 0 100%; min-width: 0; font-size: 14px; color: var(--muted); }
+html.phone .outline-synopsis:empty { display: none !important; }
+html.phone :is(.outline-label, .outline-status, .outline-when, .outline-words) { font-size: 12px; }
+html.phone .outline-words { margin-left: auto; }
+html.phone .outline-group { display: block; }
+html.phone .outline-group th { display: block; padding: 14px 14px 6px !important; }
+html.phone .outline tr.chosen { box-shadow: inset 4px 0 0 var(--accent); }
+
+/* Your Recipes and the Manual: a heading with a back arrow, then their search and choices beneath. */
+html.phone .lib > .recipes-head { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px 10px 52px; min-height: 46px; }
+html.phone .lib > .recipes-head > .panel-h { flex: 1 1 auto; margin: 0; font-size: 19px; line-height: 34px; }
+html.phone .lib > .recipes-head > .recipes-spacer { display: none; }
+html.phone .lib > .recipes-head > .recipes-search { order: 5; flex: 1 0 100%; margin: 0 0 0 -40px; height: 40px; border-radius: var(--radius-control); }
+html.phone .lib > .recipes-head > :is(.recipes-sort, .recipes-views) { order: 6; }
+html.phone .lib > .recipes-head > .btn-primary { order: 2; min-height: 34px; }
+html.phone .lib > .recipes-head > .icon-btn:last-child { position: absolute; left: 6px; top: 6px; width: 40px; height: 40px; border-radius: var(--radius-control); display: inline-flex; align-items: center; justify-content: center; }
+html.phone .lib > .recipes-head > .icon-btn:last-child svg { display: none; }
+html.phone .lib > .recipes-head > .icon-btn:last-child::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
+html.phone .lib > .recipes-head > .recipes-views + .recipes-spacer + .btn-primary { order: 2; }
+html.phone .recipes-nav { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 8px 12px; scrollbar-width: none; }
+html.phone .lib.recipes:not(.manual) .recipes-nav > :is(.sub-h, p, .text-link) { display: none; }
+html.phone .lib.recipes:not(.manual) .recipes-nav button { flex: none; min-height: 34px; padding: 0 12px; border-radius: var(--radius-control); white-space: nowrap; }
+html.phone .lib.recipes:not(.manual) .recipes-body { flex-direction: column; }
+html.phone .manual .recipes-nav { display: block; }
+/* Recent, All, Favourites, Archived and Trash: a row of chips above the recipes. */
+html.phone .lib.recipes:not(.manual) .recipes-body { display: flex; flex-direction: column; }
+html.phone .lib.recipes:not(.manual) .recipes-nav { order: -1; flex: none; flex-direction: row; width: auto; border: none; border-bottom: 1px solid var(--line); background: transparent; }
+html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item { flex: none; width: auto; min-height: 34px; margin: 0; padding: 0 12px; gap: 6px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); white-space: nowrap; }
+html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item[aria-current], html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-item.on { color: var(--accent); }
+html.phone .lib.recipes:not(.manual) .recipes-nav .recipes-nav-label { flex: none; }
+html.phone .lib.recipes:not(.manual) .recipes-main { flex: 1 1 auto; overflow: auto; }
+html.phone .recipe-title { font-size: 15px; }
+html.phone .recipe-meta, html.phone .recipe-goal { font-size: 12px; }
+
+/* Every other window (Trash, Snapshots, reports): a heading with a back arrow, as on Android. */
+html.phone .lib { padding-left: 16px; padding-right: 16px; }
+html.phone .lib > .lib-head { position: sticky; top: 0; z-index: 2; justify-content: flex-start; min-height: 50px; margin: 0 -16px 10px; padding: 0 16px 0 52px; background: var(--bar); border-bottom: 1px solid var(--line); }
+html.phone .lib > .lib-head h2 { font-size: 20px; font-weight: 400; }
+html.phone .lib > .lib-head .lib-close { position: absolute; left: 4px; top: 4px; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: var(--radius-control); font-size: 0; color: var(--text); }
+html.phone .lib > .lib-head .lib-close::before { content: ''; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--phone-back) center / contain no-repeat; mask: var(--phone-back) center / contain no-repeat; }
+html.phone .lib.recipes, html.phone .lib.new-recipe { padding-left: 0; padding-right: 0; }
+html.phone .trash-empty, html.phone .lib p { font-size: 14px; line-height: 1.45; }
+html.phone .lib li button, html.phone .lib .trash-row { min-height: 48px; }
+
+/* ---------- Calendar ---------- */
+/* Seven columns on a phone leave a title two letters. The month is a list of its days instead: the day down the left, what falls on it in full beside it. Every day keeps its row, so there is somewhere to set a carried Item down. */
+html.phone .cal-month:not(.small) { display: block; overflow-y: auto; padding-bottom: 24px; }
+html.phone .cal-month:not(.small) .cal-weekday, html.phone .cal-month:not(.small) .cal-day.out { display: none; }
+html.phone .cal-month:not(.small) .cal-day { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-content: center; row-gap: 0; min-height: 46px; padding: 4px 12px 4px 0; border-right: none; }
+html.phone .cal-month:not(.small) .cal-num { grid-column: 1; grid-row: 1 / span 40; align-self: center; display: flex; flex-direction: column; align-items: center; padding: 0; font-size: 17px; line-height: 1.1; color: var(--text); }
+html.phone .cal-month:not(.small) .cal-day:not(.busy) .cal-num { color: var(--muted); }
+html.phone .cal-month:not(.small) .cal-day.today .cal-num { color: var(--accent); }
+html.phone .cal-wd { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+html.phone .cal-month:not(.small) .cal-chip, html.phone .cal-month:not(.small) .cal-chip.long { grid-column: 2; margin: 3px 0; padding: 8px 12px; min-height: 40px; border-width: 1px 1px 1px 3px; border-radius: var(--radius-pop); font-size: 15px; white-space: normal; }
+html.phone .cal-year { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 12px; }
+
+/* ---------- Carrying by finger ---------- */
+/* What a finger has lifted (touchDrag.ts): a copy rides under the finger and the thing itself waits, faded, where it was. */
+:where(.touch-ghost) { background-color: var(--card); }
+.touch-ghost { transform-origin: 0 0; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); border-radius: var(--radius-pop); will-change: transform; }
+[data-touch-lifted] { opacity: 0.35; }
+.touch-ghost[data-touch-lifted] { opacity: 1; }
+/* Where a carried row of the Outline would land: one line across the row, not one for each of its parts. */
+html.phone .outline tr.drop-before > * { box-shadow: none; }
+html.phone .outline tr.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+html.phone .outline tr.touch-ghost { background: var(--card); }
+html.touch [draggable='true'] { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* A synopsis on a card is written in place, but only once a tap opens it: before that a press and hold lifts the card rather than picking words. */
+html.touch .mode-synopsis:not(:focus) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* ---- Goals and writing history on a phone (PhoneGoals.tsx): a page of its own ----
+   Panels stay neutral; the accent is for words, icons, the ring, the bars and the calendar's dots.
+   A picked tab or range says so in accent words, never with a filled or bordered panel. */
+html.phone .goals-pop.phone-goals { display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); overflow: hidden; background: var(--bg); }
+.pg-top { flex: none; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 6px; border-bottom: 1px solid var(--line); }
+.pg-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.pg-icon:disabled { color: var(--line-strong); }
+.pg-tabs { flex: 1 1 auto; display: flex; justify-content: center; gap: 4px; }
+.pg-tabs button { min-width: 96px; min-height: 42px; padding: 0 14px; border: none; background: transparent; color: var(--muted); font-size: 15px; font-weight: 700; }
+.pg-tabs button[aria-selected='true'] { color: var(--accent); }
+.pg-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; animation: phone-fade-in 0.2s ease-out; }
+.pg-page { display: flex; flex-direction: column; gap: 18px; padding: 14px 18px calc(28px + env(safe-area-inset-bottom)); }
+.pg-sub { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.pg-section { display: flex; flex-direction: column; gap: 10px; padding-top: 18px; border-top: 1px solid var(--line); }
+.pg-section h2 { margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 400; line-height: 1.2; overflow-wrap: anywhere; }
+.pg-section h2 + .pg-sub { margin-top: -6px; }
+
+/* Today: the ring */
+.pg-hero { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 8px; }
+.pg-ring { position: relative; display: grid; place-items: center; width: 210px; height: 210px; }
+.pg-ring svg { position: absolute; inset: 0; }
+.pg-ring-arc { animation: pg-fill 0.9s cubic-bezier(0.2, 0, 0, 1) both; }
+@keyframes pg-fill { from { stroke-dashoffset: var(--c); } }
+.pg-ring-n { margin-top: -14px; font-family: var(--font-display); font-size: 46px; line-height: 1; font-variant-numeric: tabular-nums; }
+.pg-ring-of { position: absolute; top: calc(50% + 24px); font-size: 13px; color: var(--muted); }
+.pg-hero-sub { margin: 0; font-size: 15px; font-weight: 700; color: var(--accent); }
+
+/* Today: the run and this week's days */
+.pg-week { display: flex; flex-direction: column; gap: 12px; }
+.pg-streak { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.pg-streak b { font-family: var(--font-display); font-size: 24px; font-weight: 400; }
+.pg-streak-icon { display: inline-flex; color: var(--accent); }
+.pg-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.pg-days li { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.pg-day-mark { position: relative; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 1.5px solid var(--line-strong); border-radius: 50%; overflow: hidden; color: var(--accent); }
+.pg-day-mark i { position: absolute; left: 0; right: 0; bottom: 0; background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.pg-days li[data-state='future'] .pg-day-mark { border-style: dotted; }
+.pg-days li[data-state='rest'] .pg-day-mark { border-style: dashed; }
+.pg-day-l { font-size: 12px; font-weight: 700; color: var(--muted); }
+.pg-days li[data-today='true'] .pg-day-l { color: var(--accent); }
+
+/* Goals you can set */
+.pg-stepper { display: flex; align-items: center; gap: 10px; }
+.pg-step { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 50px; border: 1.5px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--accent); }
+.pg-step:active, .pg-switch:active, .pg-cal-d:active:not(:disabled), .pg-export:active { transform: scale(0.96); }
+html.phone .pg-stepper .goals-num { flex: 1 1 auto; min-width: 0; height: 50px; border: none; background: transparent; color: var(--text); font-family: var(--font-display); font-size: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.pg-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; font-size: 15px; }
+.pg-field + .pg-field { border-top: 1px solid var(--line); }
+html.phone .pg-field :is(.goals-num, .goals-date) { width: 150px; height: 44px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-control); background: var(--surface); font-size: 16px; text-align: right; }
+.pg-bar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pg-bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.pg-book { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pg-book-n { font-family: var(--font-display); font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pg-notes { display: flex; flex-direction: column; gap: 10px; margin: 2px 0 0; padding: 0; list-style: none; font-family: var(--font-text); font-size: 14px; line-height: 1.55; }
+.pg-notes li { display: flex; align-items: flex-start; gap: 10px; }
+.pg-notes svg { flex: none; margin-top: 2px; color: var(--accent); }
+.pg-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; min-height: 64px; padding: 14px 0 0; border: none; border-top: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15px; text-align: left; }
+.pg-switch > span:first-child { display: flex; flex-direction: column; gap: 3px; }
+.pg-switch-track { flex: none; position: relative; width: 50px; height: 30px; border: 1.5px solid var(--line-strong); border-radius: 15px; }
+.pg-switch-track i { position: absolute; top: 4px; left: 4px; width: 19px; height: 19px; border-radius: 50%; background: var(--muted); transition: transform 0.2s cubic-bezier(0.3, 1.3, 0.5, 1), background-color 0.2s; }
+.pg-switch[aria-checked='true'] .pg-switch-track i { transform: translateX(20px); background: var(--accent); }
+
+/* History: the range, the period and its total */
+.pg-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1.5px solid var(--line); border-radius: var(--radius-control); }
+.pg-seg button { min-height: 42px; border: none; background: transparent; color: var(--muted); font-size: 14.5px; font-weight: 700; }
+.pg-seg button + button { border-left: 1px solid var(--line); }
+.pg-seg button[aria-checked='true'] { color: var(--accent); }
+.pg-period { display: flex; align-items: center; gap: 4px; }
+.pg-period-mid { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.pg-period-label { font-family: var(--font-label); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.pg-period-n { font-family: var(--font-display); font-size: 44px; line-height: 1.1; font-variant-numeric: tabular-nums; animation: pt-pop 0.3s ease-out both; }
+.pg-compare { display: flex; align-items: center; justify-content: center; gap: 6px; margin: -8px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
+.pg-compare-arrow { display: inline-flex; color: var(--accent); }
+.pg-compare-arrow[data-dir='down'] { color: var(--muted); }
+
+/* History: bars */
+.pg-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.pg-col-bar { fill: var(--line-strong); transform-box: fill-box; transform-origin: 50% 100%; animation: pg-grow 0.45s cubic-bezier(0.2, 0, 0, 1) both; }
+.pg-col[data-met='true'] .pg-col-bar { fill: var(--accent); }
+.pg-col[data-on='true'] .pg-col-bar { fill: var(--text); }
+@keyframes pg-grow { from { transform: scaleY(0); } }
+.pg-col-l { fill: var(--muted); font-size: 11px; font-weight: 700; }
+.pg-col-l.today { fill: var(--accent); }
+.pg-col-l.future { fill: var(--line-strong); }
+.pg-chart-goal { fill: var(--muted); font-size: 10px; }
+.pg-picked { min-height: 20px; margin: -10px 0 0; font-size: 14px; text-align: center; }
+
+/* History: a month as a calendar of dots */
+.pg-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: 4px; }
+.pg-cal-h { padding-bottom: 4px; font-size: 11.5px; font-weight: 700; color: var(--muted); text-align: center; }
+.pg-cal-d { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; height: 54px; padding: 4px 0 0; border: none; border-radius: var(--radius-control); background: transparent; color: var(--muted); }
+.pg-cal-n { font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.pg-cal-d[data-today='true'] .pg-cal-n { color: var(--accent); font-weight: 800; }
+.pg-cal-d[data-on='true'] .pg-cal-n { color: var(--text); font-weight: 800; }
+.pg-cal-d[data-future='true'] { opacity: 0.4; }
+.pg-cal-dot { width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 45%, transparent); transform: scale(var(--s)); animation: pg-dot 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+.pg-cal-dot[data-met='true'] { background: var(--accent); }
+.pg-cal-d:not([data-future='true']) .pg-cal-dot[data-none='true'] { transform: scale(0.16); background: var(--line-strong); }
+@keyframes pg-dot { from { transform: scale(0); } }
+
+/* History: records, the log, export */
+.pg-records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pg-records > div { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); }
+.pg-records svg { margin-bottom: 4px; color: var(--accent); }
+.pg-records b { font-family: var(--font-display); font-size: 24px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.pg-records small { font-family: var(--font-text); font-size: 14px; color: var(--muted); }
+.pg-records span { font-size: 12.5px; line-height: 1.35; color: var(--muted); }
+.pg-log { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.pg-log li { display: grid; grid-template-columns: 7.2em minmax(0, 1fr) 4.2em 18px; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; }
+.pg-log li + li { border-top: 1px solid var(--line); }
+.pg-log li[data-off='true'] { color: var(--muted); }
+.pg-log li[data-today='true'] .pg-log-name { color: var(--accent); font-weight: 700; }
+.pg-log-n { text-align: right; font-variant-numeric: tabular-nums; }
+.pg-log-met { display: inline-flex; color: var(--accent); }
+.pg-export { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 15px; font-weight: 700; }
+.pg-export svg { color: var(--accent); }
+
+:root[data-reduce-motion] .phone-goals *, :root[data-reduce-motion] .phone-goals { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { .phone-goals, .phone-goals * { animation: none !important; } }

@@ -193,3 +193,141 @@ export function historyCsv(history: WritingHistory): string {
   const days = [...history.keys()].sort();
   return ['date,written,deleted,net', ...days.map((d) => `${d},${history.get(d)!.written},${history.get(d)!.deleted},${netWords(history.get(d))}`)].join('\n') + '\n';
 }
+
+export type HistoryRange = 'week' | 'month' | 'year';
+
+export interface PeriodBar {
+  key: string;
+  /** A short label under the bar: a weekday letter, a day of the month, a month letter. */
+  label: string;
+  /** A full name for a reader and the tapped bar: "Tue 10 Nov", "March 2026". */
+  name: string;
+  words: number;
+  met: boolean;
+  today: boolean;
+  /** Not yet come. */
+  future: boolean;
+}
+
+export interface Period {
+  /** "This week", "3–9 Nov", "November", "March 2025", "2026". */
+  label: string;
+  /** One per day (a week or a month) or per month (a year). */
+  bars: PeriodBar[];
+  total: number;
+  /** The period before, counted to the same point, so a week three days in meets three days of the last. */
+  before: number;
+  /** Words a day over the days so far. */
+  perDay: number;
+  /** Days with some writing. */
+  wrote: number;
+  /** Whether the period holds today. */
+  current: boolean;
+  /** Monday of the week, or the 1st of the month, for laying out a calendar. */
+  start: string;
+}
+
+const LONG_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * A week, month or year of the history, `offset` periods back from the one holding today (0 is now,
+ * -1 the one before). Reads only the days in the period and the one before it, so paging back
+ * through years of history costs the same as this week.
+ */
+export function periodOf(history: WritingHistory, range: HistoryRange, offset: number, { dailyGoal }: GoalOptions, now = new Date()): Period {
+  const today = dayKey(now);
+  const goal = Math.max(1, dailyGoal);
+  const words = (d: Date) => netWords(history.get(dayKey(d)));
+  const sum = (from: Date, days: number) => {
+    let total = 0;
+    for (let i = 0; i < days; i++) total += words(addDays(from, i));
+    return total;
+  };
+  /** Days of the period that have come, today included. */
+  const elapsed = (from: Date, days: number) => Math.max(0, Math.min(days, Math.round((fromKey(today).getTime() - from.getTime()) / 86_400_000) + 1));
+
+  if (range === 'year') {
+    const year = now.getFullYear() + offset;
+    const bars: PeriodBar[] = [];
+    let total = 0;
+    let wrote = 0;
+    let before = 0;
+    let gone = 0;
+    for (let m = 0; m < 12; m++) {
+      const first = new Date(year, m, 1);
+      const days = new Date(year, m + 1, 0).getDate();
+      const past = elapsed(first, days);
+      let n = 0;
+      for (let i = 0; i < days; i++) {
+        const w = words(addDays(first, i));
+        n += w;
+        if (w > 0) wrote++;
+      }
+      // Last year, to the same day of the year.
+      before += sum(new Date(year - 1, m, 1), Math.min(past, new Date(year - 1, m + 1, 0).getDate()));
+      gone += past;
+      total += n;
+      const key = dayKey(first).slice(0, 7);
+      bars.push({ key, label: LONG_MONTHS[m]![0]!, name: `${LONG_MONTHS[m]} ${year}`, words: n, met: false, today: key === today.slice(0, 7), future: past === 0 });
+    }
+    return { label: String(year), bars, total, before, perDay: Math.round(total / Math.max(1, gone)), wrote, current: offset === 0, start: `${year}-01-01` };
+  }
+
+  const start = range === 'week' ? addDays(mondayOf(now), offset * 7) : new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const days = range === 'week' ? 7 : new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+  const past = elapsed(start, days);
+  const prior = range === 'week' ? addDays(start, -7) : new Date(start.getFullYear(), start.getMonth() - 1, 1);
+  const priorDays = range === 'week' ? 7 : new Date(prior.getFullYear(), prior.getMonth() + 1, 0).getDate();
+  const bars: PeriodBar[] = [];
+  let total = 0;
+  let wrote = 0;
+  for (let i = 0; i < days; i++) {
+    const d = addDays(start, i);
+    const key = dayKey(d);
+    const w = words(d);
+    total += w;
+    if (w > 0) wrote++;
+    bars.push({
+      key,
+      label: range === 'week' ? 'MTWTFSS'[i]! : String(d.getDate()),
+      name: `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} ${d.getDate()} ${short(d.getMonth())}`,
+      words: w,
+      met: w >= goal,
+      today: key === today,
+      future: key > today,
+    });
+  }
+  const end = addDays(start, days - 1);
+  const thisYear = start.getFullYear() === now.getFullYear();
+  const label =
+    range === 'week'
+      ? offset === 0
+        ? 'This week'
+        : offset === -1
+          ? 'Last week'
+          : `${start.getDate()}${start.getMonth() !== end.getMonth() ? ' ' + short(start.getMonth()) : ''}–${end.getDate()} ${short(end.getMonth())}${end.getFullYear() !== now.getFullYear() ? ' ' + end.getFullYear() : ''}`
+      : `${LONG_MONTHS[start.getMonth()]}${thisYear ? '' : ' ' + start.getFullYear()}`;
+  return {
+    label,
+    bars,
+    total,
+    before: sum(prior, Math.min(past, priorDays)),
+    perDay: Math.round(total / Math.max(1, past)),
+    wrote,
+    current: offset === 0,
+    start: dayKey(start),
+  };
+}
+
+/** Words a day over the last `days` days, today included, counting the days nothing was written. */
+export function recentPace(history: WritingHistory, now = new Date(), days = 14): number {
+  let total = 0;
+  for (let i = 0; i < days; i++) total += netWords(history.get(dayKey(addDays(now, -i))));
+  return Math.round(total / days);
+}
+
+/** The day a target is reached at a steady pace, or null when there is no pace or it is already reached. */
+export function finishAt(current: number, target: number, pace: number, now = new Date()): Date | null {
+  if (current >= target || pace <= 0) return null;
+  return addDays(now, Math.ceil((target - current) / pace));
+}

@@ -2,6 +2,7 @@ import { type CSSProperties, type DragEvent, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { type IconName } from './iconArt';
 import { webAddress } from '../storage/research';
+import { ResearchWeb } from './ResearchWeb';
 
 interface Props {
   /** The web address this note keeps, if it is a web page. */
@@ -41,15 +42,14 @@ function droppedAddress(e: DragEvent): string | null {
 /**
  * Above a Research note's page: one click to bring in what Scrivener's Research holds (a PDF, a
  * picture, a web page, sound or film, words or any other file), or drop it here. A note that keeps
- * a web address shows it instead, with a way to add the page itself once saved from a browser.
- * Nothing here goes online.
+ * a web address shows the live page instead (see ResearchWeb), the way Scrivener does, with
+ * nothing saved first. Only that page goes online; nothing else here does.
  */
 export function ResearchAdd({ url, onFiles, onAddress, onForgetAddress, style }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState('');
   const [over, setOver] = useState(false);
-  const [copied, setCopied] = useState(false);
   const typedAddress = webAddress(typed);
 
   const pick = (accept: string) => {
@@ -105,36 +105,7 @@ export function ResearchAdd({ url, onFiles, onAddress, onForgetAddress, style }:
   if (url) {
     return (
       <section className={`research-viewer research-add is-link${over ? ' is-over' : ''}`} style={style} aria-label={`Web page: ${url}`} {...drop}>
-        <header className="research-bar">
-          <Icon name="web" size={15} />
-          <span className="research-kind">Web page</span>
-          <a className="research-name research-link" href={url} target="_blank" rel="noopener noreferrer" title="Open in your browser">
-            {url}
-          </a>
-          <button
-            className="research-save"
-            onClick={() => {
-              void navigator.clipboard?.writeText(url).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-          >
-            {copied ? 'Copied' : 'Copy address'}
-          </button>
-          <button className="icon-btn" aria-label="Take the address off this note" title="Take the address off this note" onClick={onForgetAddress}>
-            <Icon name="remove" size={13} />
-          </button>
-        </header>
-        <div className="research-add-body">
-          <p className="research-add-tip">
-            To keep the page itself, save it from your browser (as a Web Archive, a web page or a PDF), then{' '}
-            <button className="text-link" onClick={() => pick(SAVED_PAGE)}>
-              add the saved page
-            </button>{' '}
-            or drop it here. It then shows here, even with no connection.
-          </p>
-        </div>
+        <ResearchWeb url={url} onAddSaved={() => pick(SAVED_PAGE)} onForget={onForgetAddress} />
         {picker}
       </section>
     );
@@ -155,7 +126,7 @@ export function ResearchAdd({ url, onFiles, onAddress, onForgetAddress, style }:
               {k.label}
             </button>
           ))}
-          <button className="research-kind-btn" aria-pressed={typing} title="A web page’s address, to open in your browser" onClick={() => setTyping((t) => !t)}>
+          <button className="research-kind-btn" aria-pressed={typing} title="A web page’s address, shown live here" onClick={() => setTyping((t) => !t)}>
             <Icon name="web" size={16} />
             Web page
           </button>

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type CookbookDocument, parseDocument, serializeDocument } from './document';
-import { SKETCH, SKETCH_FIELD_HINTS, sketchOf, sketchText, withSketch, withSketchValue } from './sketch';
-import { fieldPlaceholder } from './brainstorm';
+import { BRAINSTORMERS, SKETCH, SKETCH_FIELD_HINTS, fieldPlaceholder, hasBrainstormer, sketchOf, sketchText, withBrainstormer, withSketch, withSketchValue, withoutBrainstormer } from './sketch';
 import { toIndexed } from './index';
 
 const card = (fields: Record<string, unknown> = {}): CookbookDocument => ({ id: 'a', title: 'June', kind: 'character', fields, body: '' });
@@ -50,7 +49,31 @@ describe('the Pantry Sketch', () => {
   it('fits the short facts’ hints to the kind', () => {
     expect(fieldPlaceholder('character', 'When')).toBe(SKETCH_FIELD_HINTS.when!.character);
     expect(fieldPlaceholder('research', 'Role in story')).toBe(SKETCH_FIELD_HINTS['role in story']!.research);
-    expect(fieldPlaceholder('setting', 'offers')).toBe('What draws people here');
+    expect(fieldPlaceholder('setting', 'Favourite knife')).toBe('Field value');
+  });
+
+  it('offers brainstormers in the Sketch’s own form, for every kind', () => {
+    expect(BRAINSTORMERS[0]!.title).toBe('World on Fire');
+    expect(BRAINSTORMERS[0]!.slots.map((s) => s.label)).toEqual(['The Wildfire', 'The Inferno', 'The Cinders', 'The Phoenix']);
+    const keys = [...SKETCH, ...BRAINSTORMERS].flatMap((s) => s.slots.map((slot) => slot.key));
+    expect(new Set(['line', ...keys]).size).toBe(keys.length + 1);
+    for (const b of BRAINSTORMERS) {
+      expect(b.question.character).toMatch(/\b(they|them|their)\b/);
+      expect(b.question.setting).toBe(b.question.research);
+      for (const kind of ['character', 'setting', 'research'] as const) for (const slot of b.slots) expect(slot.hint[kind]).toBeTruthy();
+    }
+  });
+
+  it('adds a brainstormer whole, keeps it while it is empty, and takes it off again', () => {
+    const fire = BRAINSTORMERS[0]!;
+    let doc = withBrainstormer(withSketchValue(card({ sketch: {} }), 'want', 'To keep the light'), fire);
+    expect(sketchOf(doc.fields)).toEqual({ wildfire: '', inferno: '', cinders: '', phoenix: '', want: 'To keep the light' });
+    doc = withSketchValue(withSketchValue(doc, 'cinders', 'The light goes out'), 'cinders', '');
+    expect(hasBrainstormer(sketchOf(doc.fields)!, fire)).toBe(true);
+    const back = parseDocument(serializeDocument(doc));
+    expect(hasBrainstormer(sketchOf(back.fields)!, fire)).toBe(true);
+    expect(hasBrainstormer(sketchOf(back.fields)!, BRAINSTORMERS[1]!)).toBe(false);
+    expect(sketchOf(withoutBrainstormer(back, fire).fields)).toEqual({ want: 'To keep the light' });
   });
 
   it('is found by search', () => {

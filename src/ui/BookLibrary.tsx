@@ -1,3 +1,4 @@
+import { pressed } from '../shortcuts';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { menuPress } from '../mobile';
 import { Icon as Art } from './Icon';
@@ -32,7 +33,7 @@ interface Props {
   startNew?: boolean;
   onOpen: (location: BookLocation) => void;
   onOpenFolder: () => void;
-  /** Opens Learn to Cook, making a fresh one if it was deleted. */
+  /** Opens How to Cook, making a fresh one if it was deleted. */
   onLearn: () => void;
   onCreate: (choice: NewRecipeChoice) => void;
   onAdopt: (location: BookLocation) => void;
@@ -154,7 +155,7 @@ export function BookLibrary(props: Props) {
     const onKey = (e: KeyboardEvent) => {
       // Escape closes a menu or the window on top first, and Your Recipes only after.
       if (e.key === 'Escape' && !document.querySelector('.menu') && !making && !savingTemplate && renaming === null) onClose();
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f' && !making) {
+      if (pressed(e, 'find') && !making) {
         e.preventDefault();
         search.current?.focus();
       }
@@ -593,7 +594,7 @@ export function BookLibrary(props: Props) {
                 <div className="recipes-empty">
                   <span className="recipes-pot">{Icon.pot}</span>
                   <p className="recipes-empty-line">The kitchen’s ready when you are.</p>
-                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have. New to Cookbook? Learn to Cook is a recipe that shows you round.</p>
+                  <p className="recipes-empty-help">Start your first recipe from a template, or open a recipe’s folder you already have. New to Cookbook? How to Cook is a recipe that shows you round.</p>
                   <div className="lib-row">
                     <button className="btn btn-primary" onClick={() => setMaking(true)}>
                       New Recipe
@@ -604,7 +605,7 @@ export function BookLibrary(props: Props) {
                       </button>
                     )}
                     <button className="btn" onClick={onLearn} disabled={busy}>
-                      Learn to Cook
+                      How to Cook
                     </button>
                   </div>
                 </div>

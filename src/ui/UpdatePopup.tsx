@@ -13,7 +13,7 @@ import { checkDue, lastGoodCheck, untilMidnight, putOff, rememberGoodCheck, reme
  *
  * The popup shows over every part of the app, but waits until the writer
  * pauses typing. "Later" keeps it away for a day (or until "Check now" in
- * App Settings finds it again). See updateSchedule.ts for when checks run.
+ * Cookbook Settings finds it again). See updateSchedule.ts for when checks run.
  */
 
 interface Ready {

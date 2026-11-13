@@ -47,6 +47,7 @@ import { bookMarkdown } from './export/markdownExport';
 import { printHtml } from './export/print';
 import { type PlateSettings, plateOf } from './plate/settings';
 import { KINDS, saveFile } from './ui/saveFile';
+import { BRAINSTORMERS, hasBrainstormer, isSketchKind, sketchOf, withBrainstormer } from './storage/sketch';
 import { Menu, type MenuItem } from './ui/Menu';
 import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { createPortal } from 'react-dom';
@@ -62,6 +63,9 @@ import { type WritingHistory, loadHistory, recordWords, saveHistory } from './st
 import { type BookTemplateId, type DocTemplate, CARD_TEMPLATES, SCENE_TEMPLATES, applyBookTemplate, createFromTemplate } from './storage/templates';
 import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLearnToCook, rememberLearnToCook } from './storage/learnToCook';
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
+import { getSchema } from '@tiptap/core';
+import { cookbookExtensions } from './editor/extensions';
+import { SceneText } from './ui/SceneText';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
 import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCounts';
@@ -128,9 +132,6 @@ import { appendScene, mergeNotes, partitionNotes, splitAtBreak } from './editor/
 const BookLibrary = lazy(() => import('./ui/BookLibrary').then((m) => ({ default: m.BookLibrary })));
 import { SceneBreakActions } from './ui/SceneBreakActions';
 import { AREA_SHORTCUTS, type Area, areaOf, areaRoot, areaShown, landingIn, nextArea } from './ui/areas';
-import { BrainstormPlus } from './ui/BrainstormPlus';
-import { BRAINSTORM_GROUPS, type BrainstormCard, isBrainstormKind } from './storage/brainstorm';
-import { emptyLineAt, insertBrainstorm } from './editor/brainstorm';
 import { FindBox } from './ui/FindBox';
 import { PageFootnotes, editFootnote } from './ui/PageFootnotes';
 import { useProofreader } from './proofread/useProofreader';
@@ -140,7 +141,7 @@ import { recipeDefaults } from './writers';
 import { tableSetBefore } from './ui/tableSet';
 import { IssueCard } from './ui/IssueCard';
 import { KIND_OF, type SeasoningId, fixText, isSeasoning, needsReview, rulesOff } from './proofread/remarks';
-import { type Report, REPORTS, reportMarkdown, reportName } from './proofread/reports';
+import { type Report, REPORTS } from './proofread/reports';
 import { ReportWindow } from './ui/ReportWindow';
 import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, likelyNames, stepIssue } from './proofread/plugin';
 import { RULE_GROUPS } from './proofread/rules';
@@ -166,12 +167,17 @@ import { SeasoningsBadge } from './ui/SeasoningsBadge';
 import { Toolbar } from './ui/Toolbar';
 import { ZoomControl } from './ui/ZoomControl';
 import { OvenEdges, useSlideAway } from './ui/OvenEdges';
+import { ChefBar } from './chef/ChefBar';
+import { ChefMargin } from './chef/ChefMargin';
+import { type ChefLook, SIZE, lookVars } from './chef/look';
+import { addChefNote, chefNotesRead, flushChefNotes, loadChefNotes, putNotesOn } from './chef/notes';
 import { StatusControl, StatusIcon } from './ui/StatusIcon';
 import { type Recipe, Tree } from './ui/Tree';
 import { BAR_ICONS, PanelBar } from './ui/PanelBar';
 import { allPaths, stillThere, topmost } from './ui/selection';
 import { Compartment } from './ui/Compartment';
-import { addResearchFile, kindName, mimeOf } from './storage/research';
+import { addResearchFile, keepResearchFile, kindName, mimeOf, titleOfAddress, titleOfFile } from './storage/research';
+import { ResearchAdd } from './ui/ResearchAdd';
 const ResearchViewer = lazy(() => import('./ui/ResearchViewer').then((m) => ({ default: m.ResearchViewer })));
 import { ShelfResizer, useShelfWidth } from './ui/ShelfResizer';
 import { type CardChoice, PantryCard } from './ui/PantryCard';
@@ -209,8 +215,6 @@ const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
 const PHONE_PAGE = { small: 1, medium: 1.1, large: 1.22 } as const;
 /** A window narrow enough for the phone layout, where side panels slide over the page (styles.css, 900px). */
 const narrowWindow = () => window.matchMedia('(max-width: 900px)').matches || isPhone();
-/** Fit width's zoom: the page, plus the desk's 24px sides, fills the desk. */
-const fitZoom = (deskWidth: number, pageInches: number) => Math.max(0.4, Math.min(2.5, (deskWidth - 48) / (pageInches * 96)));
 /** Below this the page is shown as Draft, since a whole sheet of paper won't fit. */
 const isSmallDesk = (deskWidth: number, panelColumn: number) => deskWidth > 0 && deskWidth + panelColumn < 640;
 /** The character styles that ⌘B, ⌘I and ⌘U apply. */
@@ -228,8 +232,6 @@ const BASIC_KEYS: Record<string, { key: string; style: BasicStyle }> = {
 /** The top folder a path is in: the Shelf (bookshelf), the Pantry, the Archive or the recipes. */
 const topOf = (p: string) => p.split('/')[0]!;
 const ORDERED = (order: Order) => ({ [PANTRY]: [...PANTRY_SECTIONS], ...order });
-/** The Group in the Pantry's Materials where Seasonings reports are kept. */
-const REPORT_GROUP = 'Seasoning Reports';
 
 /** The Pantry's sections are fixed: they can hold folders but not be moved or renamed. */
 const PANTRY_FOLDERS = new Map(PANTRY_SECTIONS.map((s) => [joinPath(PANTRY, s), SECTION_LABEL[s]]));
@@ -301,6 +303,8 @@ function folderName(location: BookLocation): string {
 interface AddOptions {
   /** Open the new row's name box straight away. */
   name?: boolean;
+  /** The row the new one goes just after; by default the open Item. */
+  after?: string | null;
 }
 /** For the panel bars' New buttons, which would otherwise keep focus, so a typed name pressed them again. */
 const NAME_IT: AddOptions = { name: true };
@@ -390,6 +394,11 @@ export function App() {
     void loadPrefs(fs);
     return flushPrefs;
   }, [fs]);
+  // Chef notes are kept with the recipe, like the views' set-up.
+  useEffect(() => {
+    void loadChefNotes(fs);
+    return flushChefNotes;
+  }, [fs]);
   /** What the Shelf and Pantry show of the open Item as last indexed (see shownOf), to tell a save that only changed words. */
   const shownBefore = useRef<{ path: string; shown: string } | null>(null);
   /** Saves since the Shelf last caught up changed only words, so the open Item's saved word count is behind. */
@@ -446,7 +455,7 @@ export function App() {
   const shelfRef = useRef<HTMLElement>(null);
   /** The Settings screen's section while it is open, or null while writing. */
   const [settingsAt, setSettingsAt] = useState<SettingsSection | null>(null);
-  /** Set the Table, the welcome questions: on the very first start, or again from App Settings or Help. */
+  /** Set the Table, the welcome questions: on the very first start, or again from Cookbook Settings or Help. */
   const [table, setTable] = useState<'first' | 'again' | null>(null);
   /** The first recipe has been opened, or failed to: until then a phone shows only the wordmark, never a half-built app. */
   const [booted, setBooted] = useState(false);
@@ -696,7 +705,7 @@ export function App() {
       return 'done';
     });
 
-  /** Opens Learn to Cook, or makes a fresh one if the last was deleted. */
+  /** Opens How to Cook, or makes a fresh one if the last was deleted. */
   const learnToCook = async () => {
     const kept = learnToCookLocation();
     if (kept && (await bookExists(kept))) return openAt(kept);
@@ -715,11 +724,11 @@ export function App() {
     started.current = true;
     const last = recentBooks()[0]?.location;
     (async () => {
-      // A writer's very first start opens Learn to Cook, unless an older Cookbook already made their first recipe.
+      // A writer's very first start opens How to Cook, unless an older Cookbook already made their first recipe.
       if (!last && !learnedBefore() && !(await bookExists(await defaultLocation()))) {
         try {
           await learnToCook();
-          // The welcome questions come first, over Learn to Cook, which is there when they're done.
+          // The welcome questions come first, over How to Cook, which is there when they're done.
           if (!tableSetBefore()) setTable('first');
           return;
         } catch {
@@ -1160,10 +1169,19 @@ export function App() {
     }
   };
 
+  /**
+   * Where a new Group or Item goes on the Shelf: beside the row picked on the Shelf, at the same depth
+   * and just after it, or else beside the open Item. With nothing picked or open, at the end of the Shelf.
+   */
+  const shelfSpot = (): { folder: string; after: string | null } => {
+    const picked = shelfMarked.size === 1 ? [...shelfMarked][0]! : null;
+    const here = picked && findNode(tree, picked) ? picked : path && path.startsWith(BOOKSHELF + '/') ? path : null;
+    return here ? { folder: parentOf(here), after: here } : { folder: BOOKSHELF, after: null };
+  };
+
   const addScene = (template?: DocTemplate, opts?: AddOptions) => {
-    // New pages go in the book of the one being written, so they land in the same chapter.
-    const folder = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, opts);
+    const { folder, after } = shelfSpot();
+    return addFrom(template ?? SCENE_TEMPLATES[0]!, folder, { ...opts, after });
   };
 
   /** A new card in the Pantry group being shown, or in the folder of the open card if it is in that group. */
@@ -1178,11 +1196,13 @@ export function App() {
     if (!fs) return;
     const p = await createFromTemplate(fs, folder, template);
     const top = topOf(p);
-    if (top === BOOKSHELF || top === PANTRY || top === RESEARCH) order.current = await placeNew(fs, order.current, treeOf(top), top, p, path);
+    if (top === BOOKSHELF || top === PANTRY || top === RESEARCH) order.current = await placeNew(fs, order.current, treeOf(top), top, p, opts?.after !== undefined ? opts.after : path);
     const current = index.current;
     if (current) current.index.upsert(toIndexed(p, await readDocument(fs, p), await fs.stamp(p)));
     indexChanged();
     await refreshTree();
+    // The new row becomes the one picked, so the next new one goes after it.
+    if (top === BOOKSHELF) setShelfMarked(new Set([p]));
     await select(p);
     if (opts?.name) setRenaming(p);
   };
@@ -1223,8 +1243,8 @@ export function App() {
   };
 
   /**
-   * Which draft shows through each Item as ghost text, by Item id: a draft's number, or 0 for none.
-   * Without a choice, the newest draft shows. Kept in this browser only, as a way of looking.
+   * Items whose ghost text the writer has hidden, by Item id (a value of 0, as older versions kept it).
+   * The ghost is always the newest draft. Kept in this browser only, as a way of looking.
    */
   const [ghostPrefs, setGhostPrefs] = useState<Record<string, number>>(() => {
     try {
@@ -1234,24 +1254,29 @@ export function App() {
       return {};
     }
   });
-  const pickGhost = (id: string, n: number) =>
+  /** Shows (true) or hides the ghost text in an Item. */
+  const showGhost = (id: string, on: boolean) =>
     setGhostPrefs((was) => {
-      const next = { ...was, [id]: n };
+      const { [id]: _old, ...rest } = was;
+      const next = on ? rest : { ...rest, [id]: 0 };
       try {
         localStorage.setItem('cookbook.ghost', JSON.stringify(next));
       } catch {
-        // The newest draft simply shows next time.
+        // The ghost simply shows next time.
       }
       return next;
     });
-  /** The draft showing through the open Item, if any. Only Shelf Items have drafts. */
+  /** The draft showing through the open Item as ghost text: its newest, unless hidden. Only Shelf Items have drafts. */
   const ghostN = useMemo(() => {
-    if (!doc || doc.kind !== 'scene') return null;
-    const list = draftsOf(draftIds, doc.id);
-    const pref = ghostPrefs[doc.id];
-    if (pref === 0) return null;
-    return pref !== undefined && list.includes(pref) ? pref : (list[list.length - 1] ?? null);
+    if (!doc || doc.kind !== 'scene' || ghostPrefs[doc.id] === 0) return null;
+    return draftsOf(draftIds, doc.id).at(-1) ?? null;
   }, [doc?.id, doc?.kind, draftIds, ghostPrefs]);
+  /** A draft open on the page in place of its Item, as the text it is: read, not written in. */
+  const [draftOpen, setDraftOpen] = useState<{ path: string; id: string; n: number; title: string; body: NodeJSON } | null>(null);
+  /** The page's schema, for showing a draft's text; made the first time a draft opens. */
+  const draftSchema = useMemo(() => (draftOpen ? getSchema(cookbookExtensions((st) => st)) : null), [!!draftOpen]);
+  // Opening another Item (or none) closes the draft.
+  useEffect(() => setDraftOpen((d) => (d && d.path !== path ? null : d)), [path]);
   // The ghost is read when the Item opens or another draft is picked, never as the writer types.
   useEffect(() => {
     if (!editor || !fs || !doc) return;
@@ -1303,13 +1328,14 @@ export function App() {
     if (!plainText(item.body).trim()) return say(`There’s nothing in “${item.title}” to draft yet.`);
     try {
       const notes = readNotes(item);
-      const n = await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes });
+      await saveDraft(fs, { id: item.id, title: item.title, body: item.body, notes });
       if (p === path) await replaceOpenText('', {});
       else {
         await replaceFileText(p, item, '', {});
         await select(p);
       }
-      pickGhost(item.id, n);
+      showGhost(item.id, true);
+      setDraftOpen(null);
       setDraftIds(await listDrafts(fs));
     } catch (e) {
       setError(`Couldn’t draft “${item.title}”. ${friendlyError(e)}`);
@@ -1330,7 +1356,7 @@ export function App() {
         await select(p);
       }
       await deleteDraft(fs, item.id, n);
-      pickGhost(item.id, 0);
+      setDraftOpen(null);
       setDraftIds(await listDrafts(fs));
     } catch (e) {
       setError(`Couldn’t put Draft ${n} back. ${friendlyError(e)}`);
@@ -1346,6 +1372,7 @@ export function App() {
     try {
       gone = await readDraft(fs, id, n);
       await deleteDraft(fs, id, n);
+      setDraftOpen((d) => (d && d.id === id && d.n === n ? null : d));
     } catch (e) {
       return setError(`Couldn’t delete Draft ${n}. ${friendlyError(e)}`);
     }
@@ -1353,34 +1380,44 @@ export function App() {
     say(`Deleted Draft ${n} of “${title}”.`, () => void writeDraft(fs, id, title, gone).then(async () => setDraftIds(await listDrafts(fs))));
   };
 
-  /** Shows the next older (-1) or newer (1) draft through the open Item; from no ghost, the newest. */
-  const stepGhost = (dir: -1 | 1) => {
-    if (!doc || doc.kind !== 'scene') return say('Open an Item on the Shelf to see its drafts.');
-    const list = draftsOf(draftIds, doc.id);
-    if (list.length === 0) return say(`“${doc.title}” has no drafts yet. ${keysFor('draft') || 'Draft this item'} makes one.`);
-    const at = ghostN === null ? -1 : list.indexOf(ghostN);
-    const to = at === -1 ? list.length - 1 : at + dir;
-    if (to < 0) return say(`Draft ${list[0]} is the oldest.`);
-    if (to >= list.length) return say(`Draft ${list[list.length - 1]} is the newest.`);
-    pickGhost(doc.id, list[to]!);
-    say(`Showing Draft ${list[to]} as ghost text.`);
+  /** Opens a draft on the page as the text it is, opening its Item first if it isn't open. */
+  const openDraft = async (p: string, n: number) => {
+    const item = cards.get(p);
+    if (!fs || !item) return;
+    try {
+      const draft = await readDraft(fs, item.id, n);
+      if (p !== path) await select(p);
+      setDraftOpen({ path: p, id: item.id, n, title: item.title, body: parseMarkdown(draft.body) });
+    } catch (e) {
+      setError(`Couldn’t open Draft ${n}. ${friendlyError(e)}`);
+    }
+  };
+  /** Back from a draft to its Item, ready to write. */
+  const closeDraft = () => {
+    setDraftOpen(null);
+    requestAnimationFrame(() => editor?.commands.focus());
   };
 
-  /** Shows a draft through its Item, opening the Item if it isn't open. */
-  const showDraft = async (p: string, n: number) => {
-    const id = cards.get(p)?.id;
-    if (!id) return;
-    pickGhost(id, n);
-    if (p !== path) await select(p);
+  /**
+   * Steps from the open Item back through its drafts, newest to oldest (-1), or forward again (1),
+   * ending at the Item itself: the newest version, the one being written.
+   */
+  const stepDraft = (dir: -1 | 1) => {
+    if (!doc || !path || doc.kind !== 'scene') return say('Open an Item on the Shelf to see its drafts.');
+    const list = draftsOf(draftIds, doc.id);
+    if (list.length === 0) return say(`“${doc.title}” has no drafts yet. ${keysFor('draft') || 'Draft this item'} makes one.`);
+    // The Item itself comes after its newest draft.
+    const at = draftOpen ? list.indexOf(draftOpen.n) : list.length;
+    const to = at + dir;
+    if (to < 0) return say(`Draft ${list[0]} is the oldest.`);
+    if (to > list.length) return say(`This is “${doc.title}” itself, the newest version.`);
+    if (to === list.length) return closeDraft();
+    void openDraft(path, list[to]!);
   };
 
   const draftMenu = (p: string, n: number, x: number, y: number) => {
-    const id = cards.get(p)?.id;
-    const showing = p === path && ghostN === n;
     showMenu(`Draft ${n}`, x, y, [
-      showing
-        ? { label: 'Hide ghost text', onPick: () => id && pickGhost(id, 0) }
-        : { label: 'Show as ghost text', onPick: () => void showDraft(p, n) },
+      { label: 'Open', onPick: () => void openDraft(p, n) },
       { label: 'Put back in the item', onPick: () => void restoreDraft(p, n) },
       { separator: true },
       { label: 'Delete draft', onPick: () => void removeDraft(p, n) },
@@ -1666,7 +1703,7 @@ export function App() {
    * after the open one or at the end of `into`. In Research, any other file
    * (a PDF, picture, web page, sound or film) comes in to be looked at.
    */
-  const importFiles = async (files: File[], into: string | null) => {
+  const importFiles = async (files: File[], into: string | null, opts: { open?: boolean } = {}) => {
     if (!fs || files.length === 0) return;
     await flushSave();
     await saveUndoNow();
@@ -1707,7 +1744,7 @@ export function App() {
     await reindex();
     await refreshTree();
     if (problems.length > 0) setError(`Some files weren’t imported. ${problems.join('. ')}.`);
-    if (first) {
+    if (first && opts.open !== false) {
       await select(first);
     }
   };
@@ -1856,19 +1893,13 @@ export function App() {
       r.bottom + 4,
       [
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
-        { label: 'Configure this recipe…', onPick: () => openSettings('page') },
-        { label: 'App Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
         { separator: true },
+        // Plate and serve is the one way out of Cookbook: it sets the book and serves the EPUB or PDF.
         { label: 'Plate and serve…', onPick: () => void openPlate() },
-        { label: 'Export as Word…', hint: '.docx', onPick: () => void exportBook('docx') },
-        { label: 'Export as EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
-        { label: 'Export as Markdown…', hint: '.md', onPick: () => void exportBook('md') },
-        { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
         { separator: true },
         { label: 'Import files…', hint: '.docx .md .txt', onPick: () => chooseImport(null) },
         { label: 'Import Scrivener project…', hint: '.scriv', onPick: () => void chooseScrivener() },
         { label: 'Back up as a zip…', onPick: () => void backUp() },
-        { separator: true },
         { label: 'Trash', onPick: openTrash },
         ...(phone
           ? ([
@@ -1882,6 +1913,8 @@ export function App() {
               { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
             ] as MenuItem[])
           : []),
+        { separator: true },
+        { label: 'Cookbook Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
       ],
       e.currentTarget,
     );
@@ -1953,7 +1986,7 @@ export function App() {
           const basic = BASIC_KEYS[st.id];
           return {
             label: st.name,
-            hint: basic && keys(basic.key),
+            hint: basic && binding(st.id) ? keys(binding(st.id)) : undefined,
             checked: basic ? isFormatted(ed, basic.style) : ed.isActive('charStyle', { style: st.id }),
             onPick: () => {
               ed.commands.focus();
@@ -2104,6 +2137,7 @@ export function App() {
       { separator: true },
       { label: 'Search', hint: keys('Mod-F'), onPick: () => findEverywhere(words) },
       { separator: true },
+      ...(settings.focus ? [{ label: 'New Chef note', hint: keysFor('chefNote'), onPick: newChefNote }] : []),
       { label: 'Chef Mode', hint: keysFor('focus'), checked: settings.focus, onPick: toggleFocus },
     ];
     if (words) {
@@ -2641,15 +2675,14 @@ export function App() {
   const shelfBar = () => {
     const all = allPaths(tree);
     const everything = all.length > 0 && shelfMarked.size === all.length;
-    const group = pickedGroup(shelfMarked, tree);
     return (
       <PanelBar
         label="Shelf tools"
         status={shelfMarked.size > 1 ? `${shelfMarked.size} picked` : undefined}
         buttons={[
           { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: all.length === 0, onClick: () => (everything ? setShelfMarked(new Set()) : onShelfMark(new Set(all), true)) },
-          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void (group ? addFolderIn(group) : addFolder()) },
-          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void (group ? addFrom(SCENE_TEMPLATES[0]!, group, NAME_IT) : addScene(undefined, NAME_IT)) },
+          { label: 'New group', icon: BAR_ICONS.newGroup, onClick: () => void addFolder() },
+          { label: 'New item', icon: BAR_ICONS.newItem, onClick: () => void addScene(undefined, NAME_IT) },
           { label: shelfMarked.size > 1 ? `Delete ${shelfMarked.size} picked` : 'Delete picked', icon: BAR_ICONS.trash, danger: true, end: true, disabled: shelfMarked.size === 0, onClick: () => void trashPaths([...shelfMarked]) },
         ]}
       />
@@ -2862,14 +2895,14 @@ export function App() {
     await refreshTree();
   };
 
-  /** A new book goes beside the book of the page being written, and its name is ready to type. */
+  /** A new Group goes beside the row picked on the Shelf (or the open Item), and its name is ready to type. */
   const addFolder = async () => {
     if (!fs) return;
-    const here = path && path.startsWith(BOOKSHELF + '/') ? parentOf(path) : BOOKSHELF;
-    const parent = here === BOOKSHELF ? BOOKSHELF : parentOf(here);
-    const created = await createFolder(fs, parent);
-    order.current = await placeNew(fs, order.current, tree, BOOKSHELF, created, here === BOOKSHELF ? path : here);
+    const { folder, after } = shelfSpot();
+    const created = await createFolder(fs, folder);
+    order.current = await placeNew(fs, order.current, tree, BOOKSHELF, created, after);
     await refreshTree();
+    setShelfMarked(new Set([created]));
     setRenaming(created);
   };
 
@@ -2898,6 +2931,8 @@ export function App() {
       order.current = renamed.order;
       followMove(from, renamed.path);
       landed = renamed.path;
+      // A Group picked on the Shelf stays picked under its new name, so what is added next goes beside it.
+      setShelfMarked((m) => (m.has(from) ? new Set([...m].map((x) => (x === from ? landed : x))) : m));
     } catch (e) {
       setError(friendlyError(e));
     }
@@ -2988,6 +3023,50 @@ export function App() {
     // Pictures written into scenes as ![…](path) are read from the book.
     setPictureLoader(fs ? loadPicture : null);
   }, [fs, loadPicture]);
+  /** A Research note still called what it was made as, so what is added to it can name it. */
+  const unnamed = (title: string) => !title.trim() || SCENE_TEMPLATES.some((t) => t.title === title) || title === 'Untitled';
+  /**
+   * Files picked or dropped on a Research note's page. The first shows in the note itself (or, if it
+   * is words and the note is empty, becomes its text); any more come in as Items just after it.
+   */
+  const addToResearchNote = async (files: File[]) => {
+    const p = path;
+    const base = currentDoc() ?? doc;
+    if (!fs || !p || !base || topOf(p) !== RESEARCH || fileOf(base.fields) || files.length === 0) return;
+    const [first, ...rest] = files;
+    const blank = !base.body.trim();
+    try {
+      const bytes = new Uint8Array(await first!.arrayBuffer());
+      const title = unnamed(base.title) ? titleOfFile(first!.name) : base.title;
+      if (canImport(first!.name)) {
+        if (!blank || !editor) rest.unshift(first!);
+        else {
+          const imported = importFile(first!.name, bytes);
+          const next = { ...base, title: unnamed(base.title) ? imported.title : base.title };
+          setDoc(next);
+          scheduleSave(next);
+          editor.chain().focus().setContent(parseMarkdown(imported.body), { emitUpdate: true }).run();
+        }
+      } else {
+        const kept = await keepResearchFile(fs, first!.name, title, bytes);
+        const next = { ...base, title, fields: { ...base.fields, file: kept } };
+        setDoc(next);
+        scheduleSave(next);
+      }
+    } catch (e) {
+      setError(`Couldn’t add ${first!.name}. ${friendlyError(e)}`);
+    }
+    if (rest.length > 0) await importFiles(rest, parentOf(p), { open: false });
+  };
+  /** A web address kept in a Research note, which names it if it hasn't a name yet. */
+  const addAddressToNote = (href: string) => {
+    const base = currentDoc() ?? doc;
+    if (!base || !path || topOf(path) !== RESEARCH) return;
+    const next = { ...base, title: unnamed(base.title) ? titleOfAddress(href) : base.title, fields: { ...base.fields, url: href } };
+    setDoc(next);
+    scheduleSave(next);
+  };
+
   const pickPortrait = async (file: File) => {
     const base = currentDoc() ?? doc;
     if (!fs || !base) return;
@@ -3037,47 +3116,17 @@ export function App() {
     setDialogueFocus(editor, drunk);
   }, [editor, uncheckedKinds, drunk, doc?.id]);
 
-  // A seasoning's report on the open Item. It is worked out once, when asked for, and kept in the
-  // Pantry's Research under Seasoning Reports, named after the seasoning and the time.
-  const [report, setReport] = useState<{ report: Report; item: string; saved: string | null } | null>(null);
+  // A seasoning's report on the open Item, worked out once when asked for. It is not kept anywhere:
+  // a fresh report is one click away, so older ones aren't saved in the Pantry.
+  const [report, setReport] = useState<{ report: Report; item: string } | null>(null);
   useEffect(() => setReport(null), [doc?.id]);
-  const saveReport = async (built: Report, item: string, when: Date): Promise<string> => {
-    if (!fs) throw new Error('No recipe is open.');
-    const folder = joinPath(joinPath(PANTRY, 'research'), REPORT_GROUP);
-    const fresh = !(await fs.exists(folder));
-    if (fresh) await fs.makeFolder(folder);
-    // A second report from the same seasoning in the same minute is numbered, so the two can be told apart.
-    let title = reportName(built.id, when);
-    for (let n = 2; await fs.exists(joinPath(folder, `${fileNameFor(title)}.md`)); n++) title = `${reportName(built.id, when)} (${n})`;
-    const p = await createDocument(fs, folder, title, SECTION_KIND.research);
-    const saved: CookbookDocument = { ...(await readDocument(fs, p)), body: reportMarkdown(built, item, when) };
-    await writeDocument(fs, p, saved);
-    // The Group goes at the end of Research, and each report at the end of the Group, so they read oldest first.
-    const pantry = await readTree(fs, PANTRY, ORDERED(order.current));
-    if (fresh) order.current = await placeNew(fs, order.current, pantry, PANTRY, folder, null);
-    order.current = await placeNew(fs, order.current, pantry, PANTRY, p, null);
-    // Only the new card is indexed, rather than checking every file in the Recipe again.
-    const current = index.current;
-    if (current && current.fs === fs) {
-      current.index.upsert(toIndexed(p, saved, await fs.stamp(p)));
-      indexChanged();
-    }
-    setPantryTree(await readTree(fs, PANTRY, ORDERED(order.current)));
-    return baseName(p).replace(/\.md$/, '');
-  };
   const openReport = (id: SeasoningId) => {
     if (!editor || !doc) return;
-    const when = new Date();
     const build = REPORTS[id];
     if (!build) return;
     // A new seed each time, so the same page reported twice still gets fresh words.
     const built = build({ doc: editor.state.doc, issues: issuesOf(editor.state), names: nameMatcherOf(editor.state), seed: Math.floor(Math.random() * 2 ** 31) });
-    const item = doc.title;
-    setReport({ report: built, item, saved: null });
-    saveReport(built, item, when).then(
-      (name) => setReport((r) => (r?.report === built ? { ...r, saved: name } : r)),
-      (e: unknown) => setError(`Couldn’t save the ${built.title}: ${friendlyError(e)}`),
-    );
+    setReport({ report: built, item: doc.title });
   };
   const castIds = useEditorState({
     editor,
@@ -3272,7 +3321,7 @@ export function App() {
       }
       return;
     }
-    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan', 'draft', 'olderDraft', 'newerDraft']);
+    const id = commandFor(e, ['palette', 'switcher', 'shelf', 'seasonings', 'focus', 'newScene', 'settings', 'save', 'nextArea', 'prevArea', ...Object.keys(AREA_SHORTCUTS), 'nextIssue', 'prevIssue', 'prevItem', 'nextItem', 'mise', 'fullscreen', 'manual', 'suggest', 'suggestAlt', 'modeCook', 'modePrep', 'modePlan', 'draft', 'olderDraft', 'newerDraft', 'chefNote']);
     if (id === 'save') {
       // Writers press it out of habit: it only saves what is waiting (not the index or undo history,
       // which are whole-file writes), and it never opens the browser's Save page dialog.
@@ -3296,6 +3345,11 @@ export function App() {
       e.preventDefault();
       // A free board or the atlas on screen takes the zoom keys for itself.
       if (!window.dispatchEvent(new CustomEvent(BOARD_ZOOM, { detail: dir ?? 0, cancelable: true }))) return;
+      // In Chef Mode they change the reader's text size instead of the page's zoom.
+      if (getSettings().focus) {
+        const now = getSettings().chef.size;
+        return setLook({ size: dir === null ? 100 : Math.min(SIZE.max, Math.max(SIZE.min, now + dir * SIZE.step)) });
+      }
       if (dir === null) updateBook({ page: { ...pageOf(book.page), zoom: 100 } });
       else zoomPage.current(dir);
       return;
@@ -3307,6 +3361,7 @@ export function App() {
     else if (id === 'shelf') setShelf({ at: null });
     else if (id === 'seasonings') doc && togglePanel('seasonings');
     else if (id === 'focus') toggleFocus();
+    else if (id === 'chefNote') newChefNote();
     else if (id === 'newScene') void addScene();
     else if (id === 'settings') openSettings();
     else if (id === 'nextArea' || id === 'prevArea') cycleArea(id === 'nextArea' ? 1 : -1);
@@ -3318,7 +3373,7 @@ export function App() {
     else if (id === 'suggest' || id === 'suggestAlt') toggleSuggest();
     else if (id === 'fullscreen') toggleFullScreen();
     else if (id === 'draft') path && doc?.kind === 'scene' ? void draftItem(path) : say('Open an Item on the Shelf to draft it.');
-    else if (id === 'olderDraft' || id === 'newerDraft') stepGhost(id === 'olderDraft' ? -1 : 1);
+    else if (id === 'olderDraft' || id === 'newerDraft') stepDraft(id === 'olderDraft' ? -1 : 1);
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onAppKey.current(e);
@@ -3334,7 +3389,7 @@ export function App() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
-  /** Zooms the open page one step in or out, from what Fit width works out to when it's on. */
+  /** Zooms the open page one step in or out. */
   const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});
   const zoomOk = useRef(false);
   zoomOk.current = !!book && !settingsAt;
@@ -3387,7 +3442,20 @@ export function App() {
   useEffect(() => {
     // The page redraws its fading when focus mode or what it keeps bright changes.
     if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(focusKey, true));
-  }, [editor, settings.focus, settings.fade]);
+  }, [editor, settings.focus, settings.fade, settings.chef.notes]);
+  // The open Item's Chef notes go on its page once it opens, and once the recipe's notes are read.
+  const notesRead = useStore(chefNotesRead);
+  useEffect(() => {
+    if (editor && doc?.id) putNotesOn(editor, doc.id);
+  }, [editor, doc?.id, notesRead]);
+  const setLook = (change: Partial<ChefLook>) => setSettings({ chef: { ...getSettings().chef, ...change } });
+  /** A Chef note on the words selected, or the word at the cursor. Only in Chef Mode, where notes are seen. */
+  const newChefNote = () => {
+    if (!getSettings().focus) return say('Chef notes are written in Chef Mode.');
+    if (!editor || !doc) return say('Open an Item to write a Chef note on it.');
+    if (!getSettings().chef.notes) setLook({ notes: true });
+    addChefNote(editor);
+  };
   useEffect(() => {
     // Typewriter scrolling keeps the line being typed in the middle of the window.
     if (!editor || !settings.typewriter) return;
@@ -3511,20 +3579,19 @@ export function App() {
       item('footnote', 'Footnote', 'Insert', 'footnote note', () => editFootnote(insertFootnote(editor)), keysFor('footnote')),
       item('name', 'Name from the Pantry', 'Insert', 'pantry character setting place @ name', () => setShelf({ at: null }), keysFor('shelf')),
       ...sheet.paragraph.map((p) => item(`style-${p.id}`, p.name, 'Style', 'style paragraph heading', () => void editor.chain().focus().updateAttributes('paragraph', { style: p.id }).run(), 'Style')),
-      // On a character or place page, the brainstorming cards the + offers, so they can be added without the mouse.
-      ...(isBrainstormKind(cardKind)
-        ? BRAINSTORM_GROUPS.flatMap((g) => {
-            const add = (cards: BrainstormCard[]) => () => {
-              const line = emptyLineAt(editor, cardKind);
-              if (line === null) say('Brainstorming cards go on an empty line of their own.');
-              else insertBrainstorm(editor, line, cards);
-            };
-            const list = g.cards[cardKind];
-            return [
-              ...(g.addsAll ? [item(`bs-${g.id}`, `All of ${g.title}`, 'Brainstorm', `brainstorm card ${g.title}`, add(list), `${list.length} cards`)] : []),
-              ...list.map((c) => item(`bs-${g.id}-${c.id}`, c.title, 'Brainstorm', `brainstorm card ${g.title}`, add([c]), g.title)),
-            ];
-          })
+      // On a Pantry Item with the Sketch, the brainstormers its + Brainstorm button offers, so they can be added without the mouse.
+      ...(isSketchKind(cardKind)
+        ? BRAINSTORMERS.map((b) =>
+            item(`bs-${b.id}`, b.title, 'Brainstorm', `brainstorm questions pantry sketch ${b.slots.map((s) => s.label).join(' ')}`, () => {
+              const now = currentDoc();
+              const sketch = now && sketchOf(now.fields);
+              if (!now || !sketch) return say('Use the Pantry Sketch on this Item first.');
+              if (hasBrainstormer(sketch, b)) return say(`${b.title} is already on this Item.`);
+              const next = withBrainstormer(now, b);
+              setDoc(next);
+              scheduleSave(next);
+            }, b.question[cardKind]),
+          )
         : []),
     ];
   }, [editor, sheet, settings.shortcuts, settings.shortcutStyle, cardKind]);
@@ -3541,6 +3608,7 @@ export function App() {
   const sideAway = useSlideAway(settings.focus && ovenSide, tuckAway);
   const seasoningsShown = seasoningsOpen && (!settings.focus || ovenSide);
   const saveEverything = useCallback(async () => {
+    flushChefNotes();
     await flushSave();
     await saveUndoNow();
     await saveIndexNow();
@@ -3604,17 +3672,18 @@ export function App() {
             cmd('draft', 'Draft this item', () => void draftItem(path), 'Actions', keysFor('draft'), 'version rewrite redraft ghost placeholder'),
             ...(draftsOf(draftIds, doc.id).length > 0
               ? [
-                  cmd('olderDraft', 'Older draft as ghost text', () => stepGhost(-1), 'View', keysFor('olderDraft'), 'draft version previous back ghost'),
-                  cmd('newerDraft', 'Newer draft as ghost text', () => stepGhost(1), 'View', keysFor('newerDraft'), 'draft version next forward ghost'),
+                  cmd('olderDraft', 'Open the older draft', () => stepDraft(-1), 'View', keysFor('olderDraft'), 'draft version previous back'),
+                  cmd('newerDraft', 'Open the newer draft (or the item)', () => stepDraft(1), 'View', keysFor('newerDraft'), 'draft version next forward current'),
                 ]
               : []),
             ...(draftsOf(draftIds, doc.id).length > 0
-              ? [cmd('ghost', ghostN !== null ? 'Hide the draft’s ghost text' : 'Show the newest draft as ghost text', () => pickGhost(doc.id, ghostN !== null ? 0 : draftsOf(draftIds, doc.id).at(-1)!), 'View', undefined, 'draft version placeholder faded')]
+              ? [cmd('ghost', ghostN !== null ? 'Hide the ghost text' : 'Show the newest draft as ghost text', () => showGhost(doc.id, ghostN === null), 'View', undefined, 'draft version placeholder faded')]
               : []),
           ]
         : []),
       ...(doc ? [cmd('snapshot', 'Take a snapshot of this item', () => void takeSnapshot('By hand')), cmd('snapshots', 'Snapshots of this item…', () => path && void showSnapshots(path))] : []),
       cmd('focus', settings.focus ? 'Leave Chef Mode' : 'Chef Mode (focus mode)', toggleFocus, 'View', keysFor('focus'), 'focus distraction study chef oven'),
+      ...(settings.focus ? [cmd('chefNote', 'New Chef note', newChefNote, 'View', keysFor('chefNote'), 'comment note chef margin')] : []),
       ...(book
         ? [
             cmd('suggest', book.suggest ? 'Stop suggesting changes' : 'Suggest changes (track changes)', toggleSuggest, 'Edit', keysFor('suggest'), 'track changes review suggest edits insert'),
@@ -3635,28 +3704,25 @@ export function App() {
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
+      cmd('zoomReset', 'Zoom: Reset to 100%', () => updateBook({ page: { ...page, zoom: 100 } }), 'View', undefined, 'zoom reset actual size normal'),
       ...(['system', 'light', 'dark', 'sepia'] as const).map((t) => cmd(`theme-${t}`, `Theme: ${t[0]!.toUpperCase()}${t.slice(1)}`, () => setSettings({ theme: t }), 'View', settings.theme === t ? '✓' : undefined)),
       cmd('goals', 'Goals', () => setGoalsRequest({ tab: 'targets', at: Date.now() }), 'Recipe', undefined, 'target daily words streak'),
       cmd('history', 'Writing history', () => setGoalsRequest({ tab: 'history', at: Date.now() }), 'Recipe', undefined, 'words written days'),
       cmd('plate', 'Plate and serve (set the finished book)…', () => void openPlate(), 'Recipe', undefined, 'publish typeset print pdf epub book layout trim drop cap serve'),
-      cmd('docx', 'Export as Word…', () => void exportBook('docx'), 'Recipe', '.docx'),
-      cmd('epub', 'Export as EPUB…', () => void exportBook('epub'), 'Recipe', '.epub'),
-      cmd('md', 'Export as Markdown…', () => void exportBook('md'), 'Recipe', '.md'),
-      cmd('print', 'Print or save as PDF…', () => void exportBook('print'), 'Recipe'),
       cmd('import', 'Import files…', () => chooseImport(null), 'Recipe', '.docx .md .txt'),
       cmd('scrivener', 'Import Scrivener project…', () => void chooseScrivener(), 'Recipe', '.scriv', 'scrivener scriv binder move switch'),
       cmd('zip', 'Back up as a zip…', () => void backUp(), 'Recipe'),
       cmd('backup', 'Back up now', () => void backUpNow(), 'Recipe', undefined, 'automatic backup'),
       cmd('books', 'Your Recipes…', () => setLibraryOpen(true), 'Recipe', undefined, 'books works open library switch'),
       cmd('trash', 'Trash', openTrash, 'Recipe', undefined, 'deleted restore'),
-      cmd('settings', 'App Settings', () => openSettings(), 'App Settings', keysFor('settings'), 'settings preferences options'),
+      cmd('settings', 'Cookbook Settings', () => openSettings(), 'Cookbook Settings', keysFor('settings'), 'settings preferences options'),
       // Also here because a web browser keeps Ctrl+1 to Ctrl+8 for its own tabs.
       cmd('goShelf', 'Go to the Shelf', () => goToArea('shelf'), 'Go to', keysFor('goShelf'), 'keyboard focus panel'),
       cmd('goPantry', 'Go to the Pantry', () => goToArea('pantry'), 'Go to', keysFor('goPantry'), 'keyboard focus panel'),
       cmd('goSeasonings', 'Go to Seasonings', () => goToArea('seasonings'), 'Go to', keysFor('goSeasonings'), 'keyboard focus panel proofread'),
       cmd('goToolbar', 'Go to the toolbar', () => goToArea('toolbar'), 'Go to', keysFor('goToolbar'), 'keyboard focus formatting'),
       cmd('nextIssue', 'Next issue', () => goToIssue(1), 'Go to', keysFor('nextIssue'), 'proofread spelling grammar mistake'),
-      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `App Settings › ${label}`, () => openSettings(id), 'App Settings', undefined, words)),
+      ...sections.map(([id, label, words]) => cmd(`settings-${id}`, `Cookbook Settings › ${label}`, () => openSettings(id), 'Cookbook Settings', undefined, words)),
       ...places,
     ];
   };
@@ -3717,63 +3783,43 @@ export function App() {
   }, [libraryOpen]);
   const exportHistoryCsv = () =>
     void saveFile(`${book?.title ?? 'Recipe'} writing history`, historyCsv(history.get()), KINDS.csv).catch((e: unknown) => setError(friendlyError(e)));
-  // The page is drawn at the book's zoom whatever the interface size; Fit width fills the desk.
+  // The page is drawn at the book's zoom whatever the interface size.
   const desk = useRef<HTMLElement>(null);
   const pageSize = PAGE_SIZES[page.size];
   // On a phone a whole sheet of paper won't fit, so the scene is shown as Draft. A side panel takes
   // its own column beside the desk, but opening one shouldn't switch the page between views.
   const panelColumn = drawerOpen && !settings.focus && window.innerWidth > 900 ? drawerWidth() : 0;
   /*
-   * While the window is being resized, the page keeps up in the same frame: the desk's width goes
-   * straight into the --fit variable that Fit width zooms by, with no re-render of the app. The app
-   * only re-renders when the page switches between Page and Draft, and once the resizing stops
-   * (for the Fit width percentage in the footer). Re-rendering on every frame made the page lag a
-   * frame or more behind the window, most of all on Linux.
+   * While the window is being resized the app only re-renders when the page switches between Page
+   * and Draft. Re-rendering on every frame made the page lag a frame or more behind the window,
+   * most of all on Linux.
    */
   const [deskWidth, setDeskWidth] = useState(0);
-  const deskNow = useRef({ pageWidth: pageSize.width, panel: panelColumn, width: 0 });
-  deskNow.current.pageWidth = pageSize.width;
+  const deskNow = useRef({ panel: panelColumn, width: 0 });
   deskNow.current.panel = panelColumn;
   useEffect(() => {
     const el = desk.current;
     if (!el) return;
-    let settle: number | undefined;
     const watch = new ResizeObserver(() => {
       const now = deskNow.current;
       const width = el.clientWidth;
-      el.style.setProperty('--fit', String(fitZoom(width, now.pageWidth)));
       const was = now.width;
       now.width = width;
-      window.clearTimeout(settle);
       if (was === 0 || isSmallDesk(was, now.panel) !== isSmallDesk(width, now.panel)) setDeskWidth(width);
-      else settle = window.setTimeout(() => setDeskWidth(el.clientWidth), 120);
     });
     watch.observe(el);
-    return () => {
-      watch.disconnect();
-      window.clearTimeout(settle);
-    };
+    return () => watch.disconnect();
   }, []);
-  // A new paper size changes the fit at once, without waiting for the desk to resize.
-  useLayoutEffect(() => {
-    const el = desk.current;
-    if (el && el.clientWidth > 0) el.style.setProperty('--fit', String(fitZoom(el.clientWidth, pageSize.width)));
-  }, [pageSize.width]);
   // A phone, either way up, is narrower than a sheet of paper worth reading: the page is its words, at their own size.
   const small = isSmallDesk(deskWidth, panelColumn) || phone;
   const asDraft = page.view === 'draft' || small;
-  const fitWidth = page.zoom === 0 && !asDraft;
   // The page is zoomed apart from the interface around it, so the interface's own zoom is taken back out.
   const uiZoom = phone ? PHONE_ZOOM[settings.size] : UI_ZOOM[settings.size];
-  const pageZoom = asDraft && (page.zoom === 0 || small) ? (phone ? PHONE_PAGE[settings.size] : 1) / uiZoom : page.zoom === 0 ? fitZoom(deskWidth, pageSize.width) : page.zoom / 100 / uiZoom;
-  const fittedZoom = Math.round(fitZoom(deskWidth, pageSize.width) * 100);
-  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom || Math.round(fitZoom(desk.current?.clientWidth ?? deskWidth, pageSize.width) * 100), dir) } });
-  const pageStyle: CSSProperties =
-    asDraft
-      ? { zoom: pageZoom }
-      : { zoom: fitWidth ? 'var(--fit)' : pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
+  const pageZoom = asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) / uiZoom : page.zoom / 100 / uiZoom;
+  zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom, dir) } });
+  const pageStyle: CSSProperties = asDraft ? { zoom: pageZoom } : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
   // The cards above the page are as wide as the page itself, at any size and zoom.
-  const cardStyle: CSSProperties = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: fitWidth ? `calc(${pageSize.width * 96}px * var(--fit))` : pageSize.width * 96 * pageZoom };
+  const cardStyle: CSSProperties = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
   /** The open Item's editor and what goes with it: on its own page, or in its place in Mise en Place. */
   const pageBody = () => {
@@ -3795,11 +3841,12 @@ export function App() {
             scheduleSave();
           }}
           onSeasonings={showFootnote}
-          cardKind={doc.kind}
         />
-        {isBrainstormKind(doc.kind) && <BrainstormPlus editor={editor} kind={doc.kind} />}
         <PageFootnotes editor={editor} />
         <SceneBreakActions editor={editor} nextTitle={next ? next.name.replace(/\.md$/, '') : null} onSplit={(pos) => void splitScene(pos)} onMerge={() => void mergeNext()} />
+        {settings.focus && settings.chef.notes && editor && !miseShown && !beside && (
+          <ChefMargin editor={editor} writer={settings.writerName.trim() || 'You'} showResolved={settings.chef.resolved} onMenu={showMenu} />
+        )}
       </>
     );
   };
@@ -3858,16 +3905,6 @@ export function App() {
         { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
         { label: 'Import files…', hint: '.docx .md .txt', disabled: !fs, onPick: () => chooseImport(null) },
         { label: 'Import Scrivener project…', hint: '.scriv', onPick: () => void chooseScrivener() },
-        {
-          label: 'Export',
-          disabled: !fs,
-          items: [
-            { label: 'Word…', hint: '.docx', onPick: () => void exportBook('docx') },
-            { label: 'EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
-            { label: 'Markdown…', hint: '.md', onPick: () => void exportBook('md') },
-          ],
-        },
-        { label: 'Print or save as PDF…', disabled: !fs, onPick: () => void exportBook('print') },
         { separator: true },
         { label: 'Back up now', disabled: !fs, onPick: () => void backUpNow() },
         { label: 'Back up as a zip…', disabled: !fs, onPick: () => void backUp() },
@@ -3877,7 +3914,7 @@ export function App() {
           ? []
           : ([
               { separator: true },
-              { label: 'App Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
+              { label: 'Cookbook Settings…', hint: keysFor('settings'), binding: binding('settings'), onPick: () => openSettings() },
               ...(isTauri() && !ANDROID_APP ? [{ label: 'Quit', onPick: () => void quitApp() }] : []),
             ] as MenuItem[])),
       ],
@@ -3922,9 +3959,17 @@ export function App() {
           ...(phone
             ? []
             : ([
-                { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
-                { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
-                { label: 'Zoom', disabled: !book, items: ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })) },
+            { label: 'Paper', checked: page.view === 'page', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'page' } }) },
+            { label: 'Draft', checked: page.view === 'draft', disabled: !book, onPick: () => updateBook({ page: { ...page, view: 'draft' } }) },
+            {
+              label: 'Zoom',
+              disabled: !book,
+              items: [
+                ...ZOOMS.map((z) => ({ label: zoomLabel(z), checked: page.zoom === z, onPick: () => updateBook({ page: { ...page, zoom: z } }) })),
+                { separator: true as const },
+                { label: 'Reset', hint: '100%', onPick: () => updateBook({ page: { ...page, zoom: 100 } }) },
+              ],
+            },
               ] as MenuItem[])),
           {
             label: 'Theme',
@@ -3964,14 +4009,14 @@ export function App() {
     {
       label: 'Recipe',
       items: () => [
-        { label: 'Configure this recipe…', disabled: !book, onPick: () => openSettings('page') },
         { label: 'Plate and serve…', disabled: !book, onPick: () => void openPlate() },
         { label: 'Goals…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
         { label: 'Writing history…', disabled: !book, onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
         { separator: true },
         { label: 'Draft this item', hint: keysFor('draft'), disabled: !doc || !path || doc.kind !== 'scene', onPick: () => path && void draftItem(path) },
-        { label: 'Older draft as ghost text', hint: keysFor('olderDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(-1) },
-        { label: 'Newer draft as ghost text', hint: keysFor('newerDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepGhost(1) },
+        { label: 'Older draft', hint: keysFor('olderDraft'), disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => stepDraft(-1) },
+        { label: 'Newer draft', hint: keysFor('newerDraft'), disabled: !draftOpen, onPick: () => stepDraft(1) },
+        { label: 'Ghost text', checked: ghostN !== null, disabled: !doc || doc.kind !== 'scene' || draftsOf(draftIds, doc.id).length === 0, onPick: () => doc && showGhost(doc.id, ghostN === null) },
         {
           label: 'Snapshots of this item',
           disabled: !doc || !path,
@@ -3989,7 +4034,7 @@ export function App() {
       label: 'Help',
       items: () => [
         { label: 'Manual', hint: keysFor('manual'), binding: binding('manual'), onPick: () => setManualAt({ chapter: '', at: Date.now() }) },
-        { label: 'Learn to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
+        { label: 'How to Cook', onPick: () => void learnToCook().catch((e: unknown) => setError(friendlyError(e))) },
         { label: 'Set the Table…', onPick: () => setTable('again') },
         { separator: true },
         { label: 'Keyboard shortcuts…', onPick: () => openSettings('shortcuts') },
@@ -4016,7 +4061,7 @@ export function App() {
   // The Shelf, the Pantry's list and the toolbar are memoised, so they get handlers that keep
   // their identity; anything else that re-renders the app then leaves them be.
   // An Item picked on the Shelf opens on its own page, even from inside the Group shown.
-  const onDraftRow = useStable((p: string, n: number) => void showDraft(p, n));
+  const onDraftRow = useStable((p: string, n: number) => void openDraft(p, n));
   const onDraftMenuRow = useStable((p: string, n: number, x: number, y: number) => draftMenu(p, n, x, y));
   const onSelect = useStable((p: string) => {
     setMise(null);
@@ -4299,24 +4344,24 @@ export function App() {
             {doc && (
               <ZoomControl
                 zoom={page.zoom}
-                fitted={fittedZoom}
                 label={page.view === 'draft' ? 'Draft' : PAGE_SIZES[page.size].label}
                 onZoom={(zoom) => updateBook({ page: { ...page, zoom } })}
               />
             )}
             {doc && doc.kind === 'scene' && !fileOf(doc.fields) && <StatusControl status={statusOf(doc.fields)} onStatus={(s: SceneStatus) => setCardField('status', s === 'not-started' ? undefined : s)} />}
             <SavedStatus state={saveState} editor={doc ? editor : null} where={where} />
-            <button className="gear" aria-label="App Settings" title={`App Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
+            <button className="gear" aria-label="Cookbook Settings" title={`Cookbook Settings (${keysFor('settings')})`} onClick={() => openSettings()}>
               <Icon name="gear" size={18} />
             </button>
           </span>
         </footer>
   );
 
+  const chefLook = settings.focus ? lookVars(settings.chef) : null;
   return (
     <div
-      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}`}
-      style={{ '--shelf-w': `${shelfWidth}px` } as CSSProperties}
+      className={`app${archiveDrop === 'mode' ? ' mode-drop' : ''}${panel === 'pantry' || (seasoningsOpen && doc) ? ' panel-open' : ''}${drawerOpen && !settings.focus ? ' drawer-open' : ''}${settings.focus ? ' focus' : ''}${settings.typewriter ? ' typewriter' : ''}${sideOpen ? ' side-open' : ''}${settings.focus && ovenSide ? ' oven-side' : ''}${inMode ? ' in-mode' : ''}${phone && phoneTools ? ' phone-tools' : ''}${phone ? ` at-${phoneTab}` : ''}${chefLook ? ' ' + chefLook.classes.join(' ') : ''}${settings.focus && menu && (menu.label === 'Recipe' || menu.label === 'Mode') ? ' top-held' : ''}`}
+      style={{ '--shelf-w': `${shelfWidth}px`, ...chefLook?.vars } as CSSProperties}
     >
       <style>{css}</style>
       <header className="topbar">
@@ -4340,12 +4385,13 @@ export function App() {
               onContextMenu={(e) => {
                 e.preventDefault();
                 showMenu('Recipe', e.clientX, e.clientY, [
-                  { label: 'Configure…', onPick: () => openSettings('page') },
                   { label: 'Goals…', onPick: () => setGoalsRequest({ tab: 'targets', at: Date.now() }) },
                   { label: 'Writing history…', onPick: () => setGoalsRequest({ tab: 'history', at: Date.now() }) },
                   { separator: true },
                   { label: 'Back up now', onPick: () => void backUpNow() },
                   { label: 'Your Recipes…', onPick: () => setLibraryOpen(true) },
+                  { separator: true },
+                  { label: 'Cookbook Settings…', hint: keysFor('settings'), onPick: () => openSettings() },
                 ]);
               }}
             >
@@ -4450,7 +4496,7 @@ export function App() {
               onOpenGroup={onOpenGroup}
               shownGroups={miseShown?.groups}
               drafts={draftRows}
-              ghost={path && ghostN !== null ? { path, n: ghostN } : null}
+              ghost={draftOpen && draftOpen.path === path ? { path, n: draftOpen.n } : null}
               onDraft={onDraftRow}
               onDraftMenu={onDraftMenuRow}
               outside={intoArchive}
@@ -4558,6 +4604,24 @@ export function App() {
         />
       )}
       {settings.focus && <OvenEdges seasonings={!!doc && panel === 'seasonings'} onShelf={() => goToArea('shelf')} onSide={() => goToArea(doc && panel === 'seasonings' ? 'seasonings' : 'pantry')} />}
+      {settings.focus && book && (
+        <ChefBar
+          look={settings.chef}
+          onLook={setLook}
+          editor={doc ? editor : null}
+          chosen={chosen}
+          unchecked={unchecked}
+          paused={paused}
+          onCheck={(id, on) => (id === 'daniel' ? setSeasonings({ drunk: on || undefined }) : setSeasonings({ unchecked: on ? unchecked.filter((u) => u !== id) : [...new Set([...unchecked, id])] }))}
+          onPick={(id) => setSeasonings({ chosen: [...chosen, id], ...(id === 'daniel' ? { drunk: true } : { unchecked: unchecked.filter((u) => u !== id) }) })}
+          onPaused={(on) => setSeasonings({ paused: on || undefined })}
+          onMenu={showMenu}
+          onAddNote={newChefNote}
+          noteKey={keysFor('chefNote')}
+          onLeave={() => setSettings({ focus: false })}
+          leaveKey={keysFor('focus')}
+        />
+      )}
 
       <main className={`desk${beside && doc ? ' split' : ''}${deskDrop ? ' drop-' + deskDrop : ''}${page.view === 'draft' ? ' draft' : ''}`} ref={desk}>
         {error && (
@@ -4582,7 +4646,7 @@ export function App() {
               active={miseActive}
               editor={editor}
               cards={cards}
-              className={`cb-page${asDraft ? ' draft' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              className={`cb-page${asDraft ? ' draft' : ''} eased`}
               style={pageStyle}
               renderActive={pageBody}
               onActivate={select}
@@ -4594,6 +4658,16 @@ export function App() {
           </div>
         ) : (
           <>
+          {doc && path && topOf(path) === RESEARCH && !fileOf(doc.fields) && (
+            <ResearchAdd
+              key={path}
+              style={cardStyle}
+              url={typeof doc.fields.url === 'string' && doc.fields.url ? doc.fields.url : null}
+              onFiles={(files) => void addToResearchNote(files)}
+              onAddress={addAddressToNote}
+              onForgetAddress={() => setCardField('url', undefined)}
+            />
+          )}
           {doc && path && fileOf(doc.fields) && (
             <Suspense fallback={null}>
               <ResearchViewer style={cardStyle} file={fileOf(doc.fields)!} loadBytes={loadResearchBytes} onSave={() => void saveResearchCopy(path)} />
@@ -4618,10 +4692,27 @@ export function App() {
             />
           )}
           <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
+          {doc && path && draftOpen?.path === path ? (
+            <article className={`cb-page draft-version${asDraft ? ' draft' : ''} eased`} key={`draft-${draftOpen.n}`} style={pageStyle} aria-label={`Draft ${draftOpen.n} of ${draftOpen.title}`}>
+              <div className="draft-version-bar">
+                <span className="draft-version-name">
+                  Draft {draftOpen.n} of “{draftOpen.title}”
+                </span>
+                <button className="pill" onClick={() => void restoreDraft(path, draftOpen.n)} title="Put this draft back in the item; what the item holds now becomes a new draft">
+                  Put back in the item
+                </button>
+                <button className="pill" onClick={closeDraft} title="Back to the item, to write">
+                  Back to the item
+                </button>
+              </div>
+              {draftSchema && <SceneText schema={draftSchema} body={draftOpen.body} />}
+            </article>
+          ) : null}
           {doc && path ? (
             <article
-              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) || fileOf(doc.fields) ? ' card-page' : ''}${page.zoom !== 0 ? ' eased' : ''}`}
+              className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) || fileOf(doc.fields) ? ' card-page' : ''} eased`}
               key={path}
+              hidden={draftOpen?.path === path}
               style={pageStyle}
               onContextMenu={pageMenu}
               // In split view, a double-click in the page's margin keeps this page and closes the other.
@@ -4722,7 +4813,7 @@ export function App() {
       )}
 
       <IssueCard editor={editor} proof={proof} request={issueRequest} />
-      {report && editor && <ReportWindow editor={editor} report={report.report} item={report.item} saved={report.saved} onClose={() => setReport(null)} />}
+      {report && editor && <ReportWindow editor={editor} report={report.report} item={report.item} onClose={() => setReport(null)} />}
       {slash !== null && editor && <InsertMenu editor={editor} at={slash} items={insertItems} onClose={() => setSlash(null)} />}
 
       {shelf && (
@@ -4786,15 +4877,7 @@ export function App() {
           onEditTemplate={(t) => void editTemplate(t)}
           openBookItems={[
             { label: 'Back up as a zip…', onPick: () => void backUp() },
-            {
-              label: 'Export',
-              items: [
-                { label: 'Word…', hint: '.docx', onPick: () => void exportBook('docx') },
-                { label: 'EPUB…', hint: '.epub', onPick: () => void exportBook('epub') },
-                { label: 'Markdown…', hint: '.md', onPick: () => void exportBook('md') },
-                { label: 'Print or save as PDF…', onPick: () => void exportBook('print') },
-              ],
-            },
+            { label: 'Plate and serve…', onPick: () => (closeLibrary(), void openPlate()) },
           ]}
         /></Suspense>
       )}

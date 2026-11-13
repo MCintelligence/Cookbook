@@ -121,7 +121,7 @@ export class HtmlWriter {
   }
 }
 
-const PLAIN_TAGS: Record<string, string> = { bold: 'strong', italic: 'em', underline: 'u', strike: 's', code: 'code' };
+const PLAIN_TAGS: Record<string, string> = { bold: 'strong', italic: 'em', underline: 'u', strike: 's', superscript: 'sup', code: 'code' };
 
 /** Page-independent CSS for exported and printed books, on top of the book's styles. */
 export function bookCss(sheet: StyleSheet, scope: string): string {

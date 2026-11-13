@@ -9,19 +9,21 @@ import { type Mark as PMMark, type Node as PMNode, type NodeType } from '@tiptap
 import { liftListItem } from '@tiptap/pm/schema-list';
 import { Plugin, TextSelection, type Transaction } from '@tiptap/pm/state';
 import { commandFor } from '../shortcuts';
-import { type AppSettings, type MarkdownRule, getSettings, markdownOn } from '../settings';
+import { type AppSettings, type MarkdownRule, getSettings, markdownTyped } from '../settings';
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, fontStack } from '../styles/styles';
-import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Superscript, Underline } from './formatting';
+import { AutoCorrect, AutoCorrectKeys, SmartCopyPaste, TypingRuns } from './autoCorrect';
 import { DropCaps } from './dropCaps';
+import { ChefNotes } from '../chef/notes';
+import { ChefMarkdownPaste } from '../chef/markdownPaste';
 import { FindExtension } from './findPlugin';
 import { FocusMode } from './focusMode';
 import { KeptSelection } from './keptSelection';
 import { LinkedNames } from './names';
 import { PageKeys } from './pageKeys';
 import { Proofread } from '../proofread/plugin';
-import { Brainstorm } from './brainstorm';
 import { Ghost } from './ghost';
 import { TrackChanges } from './trackChanges';
 import { DialogueFocus, Footnote, Note, SeasoningChecks, type SeasoningsRequest, insertFootnote } from './seasonings';
@@ -36,7 +38,8 @@ type TypingSetting = keyof Pick<AppSettings, 'curlyQuotes' | 'emDash'>;
 
 /** An extension whose typing shortcuts only work while a setting (or a Markdown rule) is on; it is read on each key. */
 function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | MarkdownRule): T {
-  const on = setting === 'curlyQuotes' || setting === 'emDash' ? () => getSettings()[setting] : () => markdownOn(setting);
+  const typography = setting === 'curlyQuotes' || setting === 'emDash';
+  const on = typography ? () => getSettings()[setting] : () => markdownTyped(setting);
   return extension.extend({
     addInputRules() {
       return (this.parent?.() ?? []).map(
@@ -44,7 +47,8 @@ function whenOn<T extends AnyExtension>(extension: T, setting: TypingSetting | M
           new InputRule({
             find: rule.find,
             handler: (props) => (on() ? rule.handler(props) : null),
-            undoable: rule.undoable,
+            // Scrivener's smart quotes and dashes are the system's: Backspace deletes the “ or —, and only Undo takes it back.
+            undoable: typography ? false : rule.undoable,
           }),
       );
     },
@@ -111,7 +115,7 @@ const StyledParagraph = Node.create<{ nextStyle: NextStyle }>({
         const { $from, empty } = editor.state.selection;
         // Only top-level paragraphs; lists keep their own Enter behaviour.
         if (!empty || $from.depth !== 1 || $from.parent.type.name !== this.name) return false;
-        if (markdownOn('sceneBreak') && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
+        if (markdownTyped('sceneBreak') && BREAK_LINE.test($from.parent.textContent) && $from.parentOffset === $from.parent.content.size) {
           return editor.commands.command(({ tr, state }) => {
             const start = $from.before();
             tr.replaceWith(start, $from.after(), state.schema.nodes.sceneBreak!.create());
@@ -518,11 +522,32 @@ const NO_TYPOGRAPHY = {
   superscriptThree: false,
 } as const;
 
-/** `cardKind` is the kind of page open: character and place pages get brainstorming cards. */
-export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}, cardKind: string | null = null) {
+/**
+ * The rest of macOS's smart dashes, which Scrivener uses: a hyphen with a space either side becomes
+ * an en dash, and a third hyphen stays one em dash (two or three hyphens make —).
+ */
+const SmartDashes = Extension.create({
+  name: 'smartDashes',
+  addInputRules: () => SMART_DASHES,
+});
+const SMART_DASHES = [
+  new InputRule({
+    find: /\s-\s$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('– ', range.from + 1, range.to);
+    },
+  }),
+  new InputRule({
+    find: /—-$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('—', range.from, range.to);
+    },
+  }),
+];
+
+export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}) {
   return [
     Document,
-    Brainstorm.configure({ kind: cardKind }),
     Ghost,
     Text,
     StyledParagraph.configure({ nextStyle }),
@@ -540,6 +565,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Italic,
     Underline,
     Strike,
+    Superscript,
     Code,
     Link,
     PlainMarkRules,
@@ -550,6 +576,8 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Image,
     BlockShortcuts,
     DropCaps,
+    // Before PasteCleanup, so Markdown pasted in Chef Mode comes in formatted.
+    ChefMarkdownPaste,
     PasteCleanup,
     whenOn(
       BulletList.extend({
@@ -615,13 +643,21 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
       }),
       'emDash',
     ),
-    UndoRedo,
+    whenOn(SmartDashes, 'emDash'),
+    AutoCorrectKeys,
+    SmartCopyPaste,
+    AutoCorrect,
+    // As in Scrivener (a Mac text view), Undo takes back the whole run of typing since the caret was last
+    // moved, not just the last half-second of it. Moving the caret, a correction or a command starts a new step.
+    UndoRedo.configure({ newGroupDelay: 24 * 60 * 60 * 1000 }),
+    TypingRuns,
     Dropcursor,
     Gapcursor,
     FindExtension,
     DialogueFocus,
     SeasoningChecks,
     FocusMode,
+    ChefNotes,
     LinkedNames,
     Proofread,
   ];

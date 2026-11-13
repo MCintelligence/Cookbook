@@ -156,6 +156,7 @@ export function importDocx(name: string, data: Uint8Array): Imported {
       if (has('i')) marks.push({ type: 'italic' });
       if (has('u') && !link) marks.push({ type: 'underline' });
       if (has('strike') || has('dstrike')) marks.push({ type: 'strike' });
+      if (attr(rPr ? childrenNamed(rPr, 'vertAlign')[0] : null, 'val') === 'superscript') marks.push({ type: 'superscript' });
       const font = attr(rPr ? childrenNamed(rPr, 'rFonts')[0] : null, 'ascii') ?? '';
       if (/courier|consolas|mono/i.test(font)) marks.push({ type: 'code' });
       return marks;

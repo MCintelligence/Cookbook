@@ -83,6 +83,13 @@ export const ICONS = {
   picture: art(24, s('M20.5 12V18.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5v-13A1.5 1.5 0 0 1 5 4h10'), f('M3.6 17.6l5.2-6 3.8 4.2 2.4-2.6 5.4 5.6v.5H3.6zM17.8 5.2a2 2 0 1 1 0 4 2 2 0 1 1 0-4z')),
   /** A web page: a globe, one half solid. */
   web: art(24, s('M12 3a9 9 0 1 1-8.6 6.3'), f('M12 3a9 9 0 0 0 0 18c-2.2-2.4-3.4-5.6-3.4-9S9.8 5.4 12 3z'), s('M3.4 12h17.2', 2)),
+  /** Back and Forward through a web page's history: a bold chevron each way. */
+  back: art(24, s('M14.6 5.4 8 12l6.6 6.6', 2.8)),
+  forward: art(24, s('M9.4 5.4 16 12l-6.6 6.6', 2.8)),
+  /** Reload: a circle left open at the top, with a solid arrowhead. */
+  reload: art(24, s('M18.6 13.2a6.8 6.8 0 1 1-2.2-6.2', 2.4), f('M20.4 3.6v6.6h-6.6z')),
+  /** Open in your browser: a box open at one corner, an arrow leaving through it. */
+  outside: art(24, s('M10.2 4.8H6.4a1.6 1.6 0 0 0-1.6 1.6v11.2a1.6 1.6 0 0 0 1.6 1.6h11.2a1.6 1.6 0 0 0 1.6-1.6v-3.8'), s('M12.4 11.6 18.8 5.2', 2.6), f('M13.6 3.4h7v7z')),
   /** Sound: a solid note. */
   sound: art(24, f('M9 6.2 19.5 3.5v12.2a3 3 0 1 1-2-2.8V7.6L11 9.3v8.4a3 3 0 1 1-2-2.8z')),
   /** A film: a strip with its holes cut out. */
@@ -104,6 +111,32 @@ export const ICONS = {
     s('M8 26H3.5M40 26h4.5', 3),
     f('M5.5 18.5h37a1.5 1.5 0 0 1 0 3h-37a1.5 1.5 0 0 1 0-3z'),
   ),
+  /** A Chef note: a solid speech card, two lines of writing cut out of it and a gloss down its side. */
+  chefNote: art(24, f('M4.5 3.5h15A1.5 1.5 0 0 1 21 5v10a1.5 1.5 0 0 1-1.5 1.5H11.4L6.5 20.6V16.5h-2A1.5 1.5 0 0 1 3 15V5a1.5 1.5 0 0 1 1.5-1.5zM8 7.6h9v1.8H8zM8 11h6v1.8H8zM4.9 5.4h1.2v8.8H4.9z')),
+  /** Line height: lines with an arrow up and down beside them. */
+  lineHeight: art(24, s('M11 6h9.5M11 12h9.5M11 18h9.5'), s('M3.6 8.4 6 5.8l2.4 2.6M3.6 15.6 6 18.2l2.4-2.6', 2), s('M6 6.4v11.2', 2)),
+  /** Space between paragraphs: two short paragraphs with a gap. */
+  paraSpace: art(24, s('M3.5 4.5h17M3.5 8.5h11'), s('M3.5 15.5h17M3.5 19.5h11'), f('M10.6 11h2.8v2h-2.8z')),
+  /** Column width: two walls with arrows out to them. */
+  colWidth: art(24, s('M3.5 4v16M20.5 4v16', 2.6), s('M8.5 12h7', 2), s('M10.4 9.2 7.6 12l2.8 2.8M13.6 9.2l2.8 2.8-2.8 2.8', 2)),
+  /** Leave: an open door frame and an arrow going out of it. */
+  leave: art(24, s('M10 3.8H6A1.8 1.8 0 0 0 4.2 5.6v12.8A1.8 1.8 0 0 0 6 20.2h4'), s('M14.2 7.6 18.6 12l-4.4 4.4M18.4 12H9', 2.6)),
+  /** Board tools: the shapes a card can take. */
+  shapeBox: art(24, s('M4 6h16v12H4z', 2.2)),
+  shapeRounded: art(24, s('M8 6h8a4 4 0 0 1 4 4v4a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4v-4a4 4 0 0 1 4-4z', 2.2)),
+  shapeOval: art(24, s('M12 6c4.6 0 8.5 2.7 8.5 6s-3.9 6-8.5 6-8.5-2.7-8.5-6 3.9-6 8.5-6z', 2.2)),
+  shapeDiamond: art(24, s('M12 3.5 20.5 12 12 20.5 3.5 12z', 2.2)),
+  /** Board tools: the ways a line runs between cards, each ending in an arrowhead. */
+  lineStraight: art(24, s('M4.5 19.5 16 8', 2.2), f('M20 4l-2.2 8.2-6-6z')),
+  lineElbow: art(24, s('M3.5 19h8V7.5H15', 2.2), f('M21 7.5l-6.5 4v-8z')),
+  lineCurved: art(24, s('M3.5 19.5c7.5 0 6-12 11.5-12', 2.2), f('M21 7.5l-6.5 4v-8z')),
+  /** Board tools: a new card joined on after the chosen one, or below it beside its fellows. */
+  addChild: art(24, f('M2.5 8h8.5v8H2.5z'), s('M11 12h3.5', 2), s('M18.5 8.5v7M15 12h7', 2.6)),
+  addSibling: art(24, f('M6 2.5h12v7.5H6z'), s('M12 10v3', 2), s('M12 15.5v7M8.5 19h7', 2.6)),
+  /** Board tools: laying the cards out along their lines. */
+  arrange: art(24, f('M2.5 9.5h6v5h-6z'), s('M8.5 12h3M11.5 6v12M11.5 6h3M11.5 18h3', 2), s('M15.5 3.8h6v4.4h-6zM15.5 15.8h6v4.4h-6z', 2)),
+  /** Board tools: cards settle on the board's dots. */
+  snap: art(24, f('M5 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM12 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM19 3.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM5 10.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8zM5 17.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 1 1 0-2.8z'), s('M10.5 10.5h9v9h-9z', 2.2)),
 } satisfies Record<string, IconArt>;
 
 export type IconName = keyof typeof ICONS;

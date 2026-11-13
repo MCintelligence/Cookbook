@@ -1,29 +1,25 @@
-import { type CSSProperties, type DragEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, useMemo, useState } from 'react';
-import { fromTouch, menuPress } from '../mobile';
+import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
-import { parentOf } from '../storage/adapter';
-import { BOOKSHELF, PANTRY_SECTIONS, childrenOf } from '../storage/book';
-import { LABELS, STATUSES } from '../storage/document';
-import { type PantrySection } from '../storage/pantry';
+import { BOOKSHELF, PANTRY_SECTIONS } from '../storage/book';
+import { LABELS } from '../storage/document';
 import { type MenuItem } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
 import { useStore } from '../ui/store';
+import { CardFace, SINGULAR, cardStyle, menuOf, sectionOfGroup } from './BoardCards';
+import { snap } from './diagram';
+import { FreeBoard } from './FreeBoard';
 import { type Form, type ModeHost, type ViewProps } from './host';
-import { type Group, type Item, boardRows, dropPlace, labelColor, pantryGroups, readingOrder, rowOf, shelfGroups } from './model';
+import { type Group, type Item, boardRows, dropPlace, pantryGroups, rowOf, shelfGroups } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
-import { Face, Pick, Seg, Synopsis, Tally, ToolButton, Zoomer, cardMenu, itemMenu, shortWhen } from './shared';
-import { carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
+import { Pick, Seg, Tally } from './shared';
 
 const DRAG = 'application/x-cookbook-item';
-/** A card on a free board, and the room each takes when they are laid out in rows. */
-const CARD = { w: 224, h: 160, dx: 252, dy: 196, across: 6 };
-const SINGULAR: Record<PantrySection, string> = { characters: 'Character', settings: 'Setting', research: 'Material' };
-const sectionOfGroup = (group: string) => group.slice('pantry/'.length) as PantrySection;
 
 /**
  * The board: the Shelf's Items (or the Pantry's) as cards. As a grid, the columns are the Groups
  * and the rows can be plotlines or statuses, and dragging a card moves the Item on the Shelf.
- * As a free board the cards lie wherever they are put, on a surface with no edges.
+ * As a free board (FreeBoard.tsx) the cards lie wherever they are put, for a mindmap or a flowchart.
  */
 export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolean }) {
   const prefs = useStore(prefsStore);
@@ -43,219 +39,50 @@ export function Board({ host, tools, ask, pantry }: ViewProps & { pantry: boolea
     }
     return count;
   }, [pantry, items, host.indexVersion]);
-  const pan = usePanZoom();
-
-  /** Where each card lies on the free board: where it was put, or its turn in rows, a new row for each Group. */
-  const spots = useMemo(() => {
-    const saved = prefs.spots[name] ?? {};
-    const at = new Map<string, Spot>();
-    let row = 0;
-    for (const g of groups) {
-      g.items.forEach((item, i) => at.set(item.card.id, saved[item.card.id] ?? [(i % CARD.across) * CARD.dx, (row + Math.floor(i / CARD.across)) * CARD.dy]));
-      row += Math.max(1, Math.ceil(g.items.length / CARD.across));
-    }
-    return at;
-  }, [groups, prefs.spots, name]);
-  const bounds = (): [number, number, number, number] | null => {
-    const all = [...spots.values()];
-    return all.length === 0 ? null : [Math.min(...all.map((s) => s[0])), Math.min(...all.map((s) => s[1])), Math.max(...all.map((s) => s[0])) + CARD.w, Math.max(...all.map((s) => s[1])) + CARD.h];
-  };
-  const put = (id: string, spot: Spot) => setPrefs((now) => ({ spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: spot } } }));
-  const tidy = () => setPrefs((now) => ({ spots: { ...now.spots, [name]: {} } }));
-
-  /** The Shelf, put in the order the cards lie in on the free board, Group by Group. */
-  const orderFromBoard = async () => {
-    for (const g of groups) {
-      const folder = g.path;
-      const direct = g.items.filter((i) => parentOf(i.path) === folder);
-      if (direct.length !== g.items.length || childrenOf(host.tree, BOOKSHELF, folder).length !== direct.length) continue;
-      const ordered = readingOrder(direct, (i) => spots.get(i.card.id)!, CARD.dy);
-      for (let n = 0; n < ordered.length; n++) if (ordered[n] !== direct[n]) await host.move(ordered[n]!.path, folder, n);
-    }
-  };
-
   const here = host.path && host.cards.get(host.path)?.kind === 'scene' ? groups.find((g) => g.items.some((i) => i.path === host.path))?.path : undefined;
   const home = here ?? groups.find((g) => g.path !== BOOKSHELF)?.path ?? BOOKSHELF;
   const newHere = (spot?: Spot): MenuItem[] => {
-    const place = (id: string | null) => id && spot && put(id, spot);
+    const place = (id: string | null) => id && spot && setPrefs((now) => ({ spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: conf.snap ? snap(spot) : spot } } }));
     if (pantry) return PANTRY_SECTIONS.map((s) => ({ label: `New ${SINGULAR[s]}${spot ? ' here' : ''}`, onPick: () => void host.newCard(s).then(place) }));
     return [{ label: spot ? 'New Item here' : 'New Item', onPick: () => void host.newItem(home).then(place) }];
   };
 
   const total = items.length;
+  const lead = (
+    <Seg
+      label="Layout"
+      value={conf.layout}
+      options={[
+        { id: 'grid', name: 'Grid' },
+        { id: 'free', name: 'Free' },
+      ]}
+      onPick={(layout) => set({ layout })}
+    />
+  );
+  const tally = <Tally>{pantry ? `${total} in the Pantry` : `${total} ${total === 1 ? 'Item' : 'Items'} · ${groups.filter((g) => g.path !== BOOKSHELF).length} Groups`}</Tally>;
+  if (conf.layout === 'free') return <FreeBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} ties={ties} conf={conf} set={set} newHere={newHere} tools={tools} lead={lead} tally={tally} />;
   return (
     <>
       {tools &&
         createPortal(
           <>
-            <Seg
-              label="Layout"
-              value={conf.layout}
+            {lead}
+            <Pick
+              label="Rows"
+              value={conf.rows}
               options={[
-                { id: 'grid', name: 'Grid' },
-                { id: 'free', name: 'Free' },
+                { id: 'none', name: 'One row' },
+                { id: 'label', name: pantry ? 'Rows by label' : 'Rows by plotline' },
+                ...(pantry ? [] : [{ id: 'status' as const, name: 'Rows by status' }]),
               ]}
-              onPick={(layout) => set({ layout })}
+              onPick={(rows) => set({ rows })}
             />
-            {conf.layout === 'grid' ? (
-              <Pick
-                label="Rows"
-                value={conf.rows}
-                options={[
-                  { id: 'none', name: 'One row' },
-                  { id: 'label', name: pantry ? 'Rows by label' : 'Rows by plotline' },
-                  ...(pantry ? [] : [{ id: 'status' as const, name: 'Rows by status' }]),
-                ]}
-                onPick={(rows) => set({ rows })}
-              />
-            ) : (
-              <>
-                <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />
-                <ToolButton label="Lay the cards out in rows again" onClick={tidy}>
-                  Tidy up
-                </ToolButton>
-              </>
-            )}
-            <Tally>{pantry ? `${total} in the Pantry` : `${total} ${total === 1 ? 'Item' : 'Items'} · ${groups.filter((g) => g.path !== BOOKSHELF).length} Groups`}</Tally>
+            {tally}
           </>,
           tools,
         )}
-      {conf.layout === 'grid' ? (
-        <GridBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} rows={conf.rows} ties={ties} newHere={newHere} />
-      ) : (
-        <div
-          className="free-board"
-          ref={pan.ref}
-          onPointerDown={pan.onPointerDown}
-          onContextMenu={(e) => {
-            if (e.target !== e.currentTarget) return;
-            e.preventDefault();
-            const [x, y] = pan.toBoard(e.clientX, e.clientY);
-            host.menu('Board', e.clientX, e.clientY, [
-              ...newHere([Math.round(x - CARD.w / 2), Math.round(y - 20)]),
-              { separator: true },
-              { label: 'Fit all', onPick: () => pan.fit(bounds()) },
-              { label: 'Tidy up', onPick: tidy },
-              ...(pantry ? [] : [{ label: 'Put the Shelf in the board’s order', onPick: () => void orderFromBoard() }]),
-            ]);
-          }}
-        >
-          <div className="free-layer" ref={pan.layer}>
-            {items.map((item) => {
-              const [x, y] = spots.get(item.card.id)!;
-              // Only the cards in sight are drawn, so a board of thousands moves as easily as one of ten. The board isn't drawn
-              // again while it moves (usePanZoom), so a screen's worth on every side is drawn too, ready for a swipe or a pinch out.
-              const { x: lx, y: ly, k } = pan.look;
-              const [w, h] = [pan.size[0] / k, pan.size[1] / k];
-              if (x + CARD.w < lx - w || y + CARD.h * 2 < ly - h || x > lx + w * 2 || y > ly + h * 2) return null;
-              return <FreeCard key={item.card.id} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} pan={pan} onPut={(spot) => put(item.card.id, spot)} />;
-            })}
-          </div>
-          {total === 0 && <p className="mode-empty">{pantry ? `The Pantry is empty. ${menuPress()} here for a new Character, Setting or Material.` : 'Nothing on the Shelf yet. Right-click here for a new Item.'}</p>}
-        </div>
-      )}
+      <GridBoard host={host} ask={ask} pantry={pantry} groups={groups} items={items} rows={conf.rows} ties={ties} newHere={newHere} />
     </>
-  );
-}
-
-interface CardProps {
-  host: ModeHost;
-  ask(form: Form): void;
-  item: Item;
-  pantry: boolean;
-  ties: Map<string, number>;
-}
-
-function menuOf({ host, ask, item, pantry }: CardProps): MenuItem[] {
-  return pantry ? cardMenu(host, item) : itemMenu(host, item, ask);
-}
-
-/** What a card says: the name, the synopsis (written in place), and a line of where it stands. */
-function CardFace({ host, item, pantry, ties }: CardProps) {
-  const { card } = item;
-  const tied = ties.get(card.id) ?? 0;
-  return (
-    <>
-      <header>
-        {pantry && <Face host={host} item={item} size={26} />}
-        <h3>{card.title}</h3>
-      </header>
-      <Synopsis key={card.synopsis} value={card.synopsis} label={`Synopsis of ${card.title}`} placeholder={pantry ? 'Who or what, in a line' : 'What happens here?'} onSave={(text) => void host.setField(item.path, 'synopsis', text || undefined)} />
-      <footer>
-        {pantry ? (
-          <span>{[tied > 0 ? `${tied} ${tied === 1 ? 'tie' : 'ties'}` : '', card.dates.length > 0 ? `${card.dates.length} ${card.dates.length === 1 ? 'date' : 'dates'}` : ''].filter(Boolean).join(' · ') || ' '}</span>
-        ) : (
-          <>
-            <span className="prep-card-status">
-              <StatusIcon status={card.status} decorative /> {STATUSES.find((s) => s.id === card.status)!.label}
-            </span>
-            <span>{card.dates[0] ? shortWhen(card.dates[0]) : `${card.words.toLocaleString('en')} words`}</span>
-          </>
-        )}
-      </footer>
-    </>
-  );
-}
-
-const cardStyle = (item: Item): CSSProperties => ({ '--label': labelColor(item.card.label) ?? 'transparent' }) as CSSProperties;
-
-type Pan = ReturnType<typeof usePanZoom>;
-
-/**
- * A card on the free board. With a mouse it drags at once and a double-click opens it. With a
- * finger it works as cards do on a phone's home screen (see carryByTouch): a quick drag moves the
- * board, a press and hold lifts the card with a tap in the hand, and a tap picks it, or opens it
- * when it is already picked.
- */
-function FreeCard(props: CardProps & { x: number; y: number; pan: Pan; onPut(spot: Spot): void }) {
-  const { host, item, x, y, pan, onPut } = props;
-  const [moved, setMoved] = useState<Spot | null>(null);
-  const [lifted, setLifted] = useState(false);
-  const [px, py] = moved ?? [x, y];
-  const chosen = item.path === host.path;
-
-  const byTouch = (e: ReactPointerEvent<HTMLElement>, field: Element | null) =>
-    carryByTouch(e, pan, [x, y], {
-      onLift: setLifted,
-      onMove: setMoved,
-      onDrop: (spot) => (setMoved(null), onPut(spot)),
-      onMenu: (cx, cy) => host.menu('Item', cx, cy, menuOf(props)),
-      // A tap on the synopsis opens it for typing; anywhere else it picks the card, or opens a picked one.
-      onTap: () => (field instanceof HTMLElement ? field.focus() : chosen ? host.open(item.path) : host.select(item.path)),
-    });
-
-  return (
-    <article
-      className={`prep-card free${chosen ? ' chosen' : ''}${moved ? ' lifted' : ''}${lifted ? ' held' : ''}`}
-      style={{ ...cardStyle(item), left: px, top: py, width: CARD.w }}
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        // The synopsis is written in place. A mouse there types; a finger there types only once the synopsis is open for
-        // typing (a tap opens it), and otherwise does what it does anywhere on the card, so a swipe that lands on it still moves the board.
-        const field = (e.target as Element).closest('textarea, input, [contenteditable="true"]');
-        if (e.pointerType === 'touch') return field && field === document.activeElement ? undefined : byTouch(e, field);
-        if (field) return;
-        const scale = scaleOf(e.currentTarget.closest('.free-board')) * pan.live().k;
-        dragFrom(
-          e,
-          (dx, dy) => setMoved([Math.round(x + dx / scale), Math.round(y + dy / scale)]),
-          (did, up) => {
-            setMoved(null);
-            if (did) onPut([Math.round(x + (up.clientX - e.clientX) / scale), Math.round(y + (up.clientY - e.clientY) / scale)]);
-            else if (item.path !== host.path) host.select(item.path);
-          },
-        );
-      }}
-      onDoubleClick={() => host.open(item.path)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        // A finger's long press is handled above: it lifts the card, and opens the menu only if the card isn't carried.
-        if (fromTouch(e)) return;
-        host.menu('Item', e.clientX, e.clientY, menuOf(props));
-      }}
-    >
-      <CardFace {...props} />
-    </article>
   );
 }
 

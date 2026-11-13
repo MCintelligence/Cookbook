@@ -19,7 +19,7 @@ export function shortcutsChapter(keyOf: (id: string) => string = keysFor): Chapt
   const rows = SHORTCUTS.map((s) => `| ${s.label} | ${keyOf(s.id) || 'none'} |`);
   return {
     ...SHORTCUTS_CHAPTER,
-    body: `These are the shortcuts as they are set on this device. Change any of them in App Settings › Keyboard shortcuts.\n\n| Command | Shortcut |\n| --- | --- |\n${rows.join('\n')}\n\nThe page has its own too: Backspace straight after a typing shortcut undoes it, Alt+↑ and Alt+↓ move a Shelf row, and F2 renames one.`,
+    body: `These are the shortcuts as they are set on this device. Change any of them in Cookbook Settings › Keyboard shortcuts.\n\n| Command | Shortcut |\n| --- | --- |\n${rows.join('\n')}\n\nThe page has its own too: Backspace straight after a typing shortcut undoes it, Alt+↑ and Alt+↓ move a Shelf row, and F2 renames one.`,
   };
 }
 
@@ -184,7 +184,7 @@ export function Manual({ chapter, at, onClose, onLearn }: Props) {
                 {current.id === 'welcome' && (
                   <p>
                     <button type="button" className="btn" onClick={() => (onClose(), onLearn())}>
-                      Open Learn to Cook
+                      Open How to Cook
                     </button>
                   </p>
                 )}

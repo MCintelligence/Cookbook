@@ -63,7 +63,7 @@ export function ownPatternIssues(text: string, own: OwnPatterns): Issue[] {
         rule: 'own-pattern',
         message: fix ? `Your list says “${fix}” rather than “${m[0]}”.` : `“${m[0]}” is on your list.`,
         suggestions: fix !== undefined ? [fix] : [],
-        why: 'You put this on your own list in Recipe Settings › Seasonings.',
+        why: 'You put this on your own list in Cookbook Settings › Seasonings.',
       });
     }
   }

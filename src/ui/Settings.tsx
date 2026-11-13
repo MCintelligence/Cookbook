@@ -255,7 +255,7 @@ export function Settings(props: Props) {
       className="settings"
       role="dialog"
       aria-modal="true"
-      aria-label="App Settings"
+      aria-label="Cookbook Settings"
       ref={box}
       // A click on the background keeps the keyboard in Settings rather than dropping it on the page.
       tabIndex={-1}
@@ -263,7 +263,7 @@ export function Settings(props: Props) {
       <header className="set-top">
         <div className="set-brand">
           <span className="brand">cookbook</span>
-          <span className="set-crumb">· App Settings</span>
+          <span className="set-crumb">· Cookbook Settings</span>
         </div>
         <div className="set-top-actions">
           <label className="set-search">
@@ -276,16 +276,16 @@ export function Settings(props: Props) {
         </div>
       </header>
       <div className="set-body">
-        <nav className="set-nav" aria-label="App Settings sections">
-          <div className="set-scope">App Settings</div>
+        <nav className="set-nav" aria-label="Cookbook Settings sections">
+          <div className="set-scope">On this device</div>
           {APP_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
-          <div className="set-scope">Recipe Settings</div>
+          <div className="set-scope">This recipe</div>
           {BOOK_SECTIONS.map(([id, label]) => (
             <NavItem key={id} id={id} label={label} current={!searching && id === spied} onPick={pick} />
           ))}
-          <p className="set-note">Recipe settings are saved in the recipe’s folder, so they travel with it. App settings stay on this device.</p>
+          <p className="set-note">This recipe’s settings are saved in its folder, so they travel with it. The rest stay on this device.</p>
         </nav>
         <main className="set-main">
           <Query.Provider value={query}>
@@ -326,7 +326,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Your name" help="Optional. New recipes put it on their title page when they’re plated." words="author">
               <input className="set-text" aria-label="Your name" placeholder="Not set" defaultValue={s.writerName} onBlur={(e) => e.target.value !== s.writerName && set({ writerName: e.target.value.trim() })} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
             </Row>
-            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Recipe Settings › Seasonings)." words="language spelling dialect american british canadian australian">
+            <Row title="Your English" help="Which spelling Salty Sam checks in a recipe that hasn’t chosen its own (Cookbook Settings › Seasonings)." words="language spelling dialect american british canadian australian">
               <Select label="Your English" value={s.english} options={[['auto', 'As my system'], ...ENGLISHES.map((e): [string, string] => [e.id, e.name])] as [AppSettings['english'], string][]} onChange={(english) => set({ english })} />
             </Row>
             <Row title="What you write" help="Picks the template New Recipe offers first." words="writer novelist template">
@@ -440,7 +440,7 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Curly quotes and apostrophes" help={'"like this" becomes “like this”.'}>
               <Switch label="Curly quotes" on={s.curlyQuotes} onChange={(curlyQuotes) => set({ curlyQuotes })} />
             </Row>
-            <Row title="Two hyphens make an em dash" help="-- becomes —, and ... becomes …">
+            <Row title="Smart dashes and ellipses" help="-- or --- becomes —, a hyphen with a space either side becomes –, and ... becomes …">
               <Switch label="Em dash" on={s.emDash} onChange={(emDash) => set({ emDash })} />
             </Row>
             <Row title="Typing @ opens the Pantry shelf" help="Not after a letter or number, so email addresses are left alone.">
@@ -450,12 +450,32 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
               <Switch label="Typing / opens the insert menu" on={s.slashMenu} onChange={(slashMenu) => set({ slashMenu })} />
             </Row>
           </Group>
+          <Group title="Corrections">
+            <Row title="Capitalise the first word of sentences" help="As each first word is finished, as in Scrivener. Not after e.g., i.e. or an ellipsis." words="capitals capitalization autocorrect sentence case">
+              <Switch label="Capitalise the first word of sentences" on={s.capitalSentences} onChange={(capitalSentences) => set({ capitalSentences })} />
+            </Row>
+            <Row title="Capitalise a lone i" help="i on its own, and in i’m or i’ll, becomes I." words="capitals autocorrect">
+              <Switch label="Capitalise a lone i" on={s.capitalI} onChange={(capitalI) => set({ capitalI })} />
+            </Row>
+            <Row title="Raise ordinal endings" help="1st, 2nd and 3rd get a raised ending as you finish them." words="superscript ordinals">
+              <Switch label="Raise ordinal endings" on={s.ordinals} onChange={(ordinals) => set({ ordinals })} />
+            </Row>
+            <Row title="Make web addresses into links" help="www.example.com, https://… and mail addresses become links as you finish them." words="links urls web addresses detect">
+              <Switch label="Make web addresses into links" on={s.webLinks} onChange={(webLinks) => set({ webLinks })} />
+            </Row>
+            <Row title="Symbol and text substitution" help="Scrivener’s list: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then." words="symbols copyright trademark arrows fractions replace autocorrect">
+              <Switch label="Symbol and text substitution" on={s.textSubstitutions} onChange={(textSubstitutions) => set({ textSubstitutions })} />
+            </Row>
+            <Row title="Smart copy and paste" help="A word selected by double-click is cut or deleted with the space beside it, and pasted back with spaces either side, as in Scrivener." words="smart cut delete paste spaces">
+              <Switch label="Smart copy and paste" on={s.smartCopyPaste} onChange={(smartCopyPaste) => set({ smartCopyPaste })} />
+            </Row>
+          </Group>
           <Group title="Line breaks">
             <Row title="Hyphenate long words" help="Off, words wrap whole, as in Scrivener. On, only words of 7 letters or more break, with 3 letters either side of the hyphen." words="hyphenation hyphens line breaks">
               <Switch label="Hyphenate long words" on={s.hyphenate} onChange={(hyphenate) => set({ hyphenate })} />
             </Row>
-            <Row title="Even out line endings" help="A paragraph doesn’t end on a lone word when a better break is nearby. Plate always keeps lone lines off the top and bottom of a printed page." words="widows orphans short last line wrap">
-              <Switch label="Even out line endings" on={s.evenLines} onChange={(evenLines) => set({ evenLines })} />
+            <Row title="Even out line endings" help="Off, as in Scrivener, each line takes as many words as fit. On, a paragraph doesn’t end on a lone word when a better break is nearby. Plate always keeps lone lines off the top and bottom of a printed page." words="widows orphans short last line wrap balance">
+              <Switch label="Even out line endings" on={s.balanceLines} onChange={(balanceLines) => set({ balanceLines })} />
             </Row>
           </Group>
           <Group title="Markdown">
@@ -627,6 +647,29 @@ function Shortcuts() {
   const [recording, setRecording] = useState<string | null>(null);
   const [clash, setClash] = useState<string | null>(null);
   const query = useContext(Query);
+  // While recording, every key press goes to the recorder first, wherever the focus is, and no
+  // other shortcut runs: the Mac app's engine may not send the keys to the button at all.
+  useEffect(() => {
+    if (!recording) return;
+    const id = recording;
+    const label = SHORTCUTS.find((o) => o.id === id)?.label ?? '';
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.key === 'Escape') return setRecording(null);
+      const b = bindingOf(e);
+      if (!b) return;
+      // A shortcut needs ⌘/Ctrl or Alt, or it would type a letter.
+      if (!/(^|-)(Mod|Alt|Ctrl)-/.test(b) && !/^F\d+$/.test(b)) return setClash('Use ⌘ or Ctrl (or Alt) with a key.');
+      const other = SHORTCUTS.find((o) => o.id !== id && binding(o.id).toLowerCase() === b.toLowerCase());
+      setClash(other ? `${keys(b)} was ${other.label}; that has no shortcut now.` : `${label} is now ${keys(b)}.`);
+      if (other) setBinding(other.id, '');
+      setBinding(id, b);
+      setRecording(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [recording]);
   const shown = SHORTCUTS.filter((c) => matches(query, c.label, keys(binding(c.id)), 'keyboard shortcut'));
   return (
     <>
@@ -647,23 +690,13 @@ function Shortcuts() {
                   <button
                     className={`set-btn set-key${recording === c.id ? ' set-recording' : ''}`}
                     aria-label={recording === c.id ? `Press the new shortcut for ${c.label}, or Escape to keep it` : `Change shortcut for ${c.label}`}
-                    onClick={() => setRecording(recording === c.id ? null : c.id)}
-                    onBlur={() => recording === c.id && setRecording(null)}
-                    onKeyDown={(e) => {
-                      if (recording !== c.id) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (e.key === 'Escape') return setRecording(null);
-                      const b = bindingOf(e.nativeEvent);
-                      if (!b) return;
-                      // A shortcut needs ⌘/Ctrl or Alt, or it would type a letter.
-                      if (!/(^|-)(Mod|Alt|Ctrl)-/.test(b) && !/^F\d+$/.test(b)) return setClash('Use ⌘ or Ctrl (or Alt) with a key.');
-                      const other = SHORTCUTS.find((o) => o.id !== c.id && binding(o.id).toLowerCase() === b.toLowerCase());
-                      setClash(other ? `${keys(b)} was ${other.label}; that has no shortcut now.` : null);
-                      if (other) setBinding(other.id, '');
-                      setBinding(c.id, b);
-                      setRecording(null);
+                    onClick={(e) => {
+                      // Safari's engine (the Mac app) doesn't focus a button on a click, so it is focused here
+                      // to show where the keys go and to stop recording when the focus moves away.
+                      e.currentTarget.focus();
+                      setRecording(recording === c.id ? null : c.id);
                     }}
+                    onBlur={() => recording === c.id && setRecording(null)}
                   >
                     <span className="set-kbd">{recording === c.id ? 'Press keys…' : binding(c.id) ? keys(binding(c.id)) : 'None'}</span>
                   </button>
@@ -757,7 +790,7 @@ function PageView({ book, onBook, sheet, onEditStyle }: Pick<Props, 'book' | 'on
           />
         </Row>
         <Row title="Zoom" help={`${keys('Mod-=')} and ${keys('Mod--')} also zoom the page.`}>
-          <ZoomSlider zoom={page.zoom} fitted={100} onZoom={(zoom) => set({ zoom })} />
+          <ZoomSlider zoom={page.zoom} onZoom={(zoom) => set({ zoom })} />
         </Row>
       </Group>
     </>
@@ -911,7 +944,7 @@ function Proofreading({ proof }: { proof: Proofreader }) {
   return (
     <>
       <Group title="Language">
-        <Row title="Spelling" help="Saved with the recipe, so a co-author gets the same. A recipe that never chose follows your English in App Settings › General.">
+        <Row title="Spelling" help="Saved with the recipe, so a co-author gets the same. A recipe that never chose follows your English in Cookbook Settings › General.">
           <Seg label="Spelling" value={proof.dialect} options={DIALECTS.map((d) => [d.id, d.name])} onChange={proof.setDialect} />
         </Row>
         <Row title="Your dictionary" help={`${proof.words.length} ${proof.words.length === 1 ? 'word' : 'words'}, kept with the recipe.`} words={proof.words.join(' ')}>

@@ -1,3 +1,4 @@
+import { typingRunsKey } from './autoCorrect';
 import { type Editor } from '@tiptap/core';
 import { closeHistory, redo, undo, undoDepth } from '@tiptap/pm/history';
 import { EditorState, type Plugin, Selection, type Transaction } from '@tiptap/pm/state';
@@ -100,7 +101,17 @@ export class UndoRecorder {
   };
 
   private after = ({ transaction: tr, appendedTransactions = [] }: { transaction: Transaction; appendedTransactions?: readonly Transaction[] }) => {
-    if (this.replaying || !tr.docChanged) return;
+    if (this.replaying) return;
+    if (!tr.docChanged) {
+      // Moving the caret ends a run of typing (see TypingRuns), which Undo must still know after reopening.
+      const close = appendedTransactions.find((t) => !t.docChanged && t.getMeta(CLOSE_HISTORY_META));
+      const last = this.entries[this.entries.length - 1];
+      if (close && last && !(last && 's' in last && last.s.length === 0)) {
+        this.entries.push({ t: close.time, s: [], sel: tr.selection.toJSON(), x: 1 });
+        this.version++;
+      }
+      return;
+    }
     this.log(tr);
     // Suggest changes' marks are logged as changes of their own, since whether it was on can't be known on replay.
     // Other plugins' additions are made again as the log is replayed.
@@ -195,6 +206,8 @@ function replayed(plugin: Plugin): boolean {
   const key = (plugin as unknown as { key: string }).key;
   // Suggest changes' own additions are in the log already, as changes of their own.
   if (plugin.spec.key === trackKey) return false;
+  // Where the caret moved is in the log already too, as the ends of runs of typing.
+  if (plugin.spec.key === typingRunsKey) return false;
   return key === HISTORY_META || !!plugin.spec.appendTransaction || !!plugin.spec.filterTransaction;
 }
 

@@ -93,7 +93,7 @@ export function plateCss(s: PlateSettings, scope = '.plate-text'): string {
   const glyph = s.sceneBreak ? JSON.stringify(s.sceneBreak) : '"\\00a0"';
   const cap = (s.lineHeight * 2 + 0.95).toFixed(2);
   return `
-${scope} { font-family: '${s.font}', Georgia, serif; font-size: ${s.size}pt; line-height: ${s.lineHeight}; color: #111; text-align: justify; hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 7 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; -webkit-hyphenate-limit-lines: 2; text-wrap: pretty; font-kerning: normal; font-variant-ligatures: common-ligatures; overflow-wrap: break-word; }
+${scope} { font-family: '${s.font}', Georgia, serif; font-size: ${s.size}pt; line-height: ${s.lineHeight}; color: #111; text-align: justify; hyphens: manual; -webkit-hyphens: manual; font-kerning: normal; font-variant-ligatures: common-ligatures; overflow-wrap: break-word; }
 ${scope} p { margin: 0; text-indent: 1.5em; }
 ${scope} p.first, ${scope} .scene-break + p, ${scope} p.cont, ${scope} .matter p:first-child { text-indent: 0; }
 ${scope} p.split-end { text-align-last: justify; }

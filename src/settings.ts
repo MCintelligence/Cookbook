@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { type BookLocation } from './storage/platform';
 import { type English, isEnglish } from './proofread/english';
 import { type WriterKind, isWriterKind } from './writers';
+import { type ChefLook, DEFAULT_LOOK, parseLook } from './chef/look';
 
 /**
  * Settings for the app on this device, kept in the browser's storage (or the
@@ -34,10 +35,18 @@ export interface AppSettings {
   reduceMotion: boolean;
   curlyQuotes: boolean;
   emDash: boolean;
+  /** Scrivener's corrections as a word is finished (see editor/autoCorrect.ts), all on by default as there. */
+  capitalSentences: boolean;
+  capitalI: boolean;
+  ordinals: boolean;
+  webLinks: boolean;
+  textSubstitutions: boolean;
+  /** Scrivener's smart copy and paste: a double-clicked word goes and comes back with its spaces. */
+  smartCopyPaste: boolean;
   /** Breaks long words at line ends with a hyphen. Off, as in Scrivener and Word, words wrap whole. */
   hyphenate: boolean;
-  /** Evens out where lines break so a paragraph doesn't end on a lone word. */
-  evenLines: boolean;
+  /** Evens out where lines break so a paragraph doesn't end on a lone word. Off, as Scrivener fills each line. (Was evenLines, on by default.) */
+  balanceLines: boolean;
   /** Markdown as a whole: when off, no rule below works, whatever its own switch says. */
   markdown: boolean;
   /** Each Markdown rule on its own (see MARKDOWN_RULES). */
@@ -49,6 +58,8 @@ export interface AppSettings {
   /** What focus mode leaves bright. */
   fade: Exclude<Fade, 'off'>;
   focus: boolean;
+  /** How Chef Mode shows the page: paper, ink, font, size and spacing, set from its reader bar. */
+  chef: ChefLook;
   typewriter: boolean;
   /** What ⌘V does: keep formatting, or paste plain text. */
   pastePlain: boolean;
@@ -101,6 +112,14 @@ export function markdownOn(rule: MarkdownRule, s: AppSettings = current): boolea
   return s.markdown && s.markdownRules[rule];
 }
 
+/**
+ * Whether typing a Markdown rule formats the text now. Chef Mode has no toolbar, so there every rule
+ * typed works, whatever the switches say. (How a recipe is read and plated still follows markdownOn.)
+ */
+export function markdownTyped(rule: MarkdownRule, s: AppSettings = current): boolean {
+  return s.focus || markdownOn(rule, s);
+}
+
 export const DEFAULT_SETTINGS: AppSettings = {
   writerName: '',
   english: 'auto',
@@ -116,14 +135,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   curlyQuotes: true,
   emDash: true,
+  capitalSentences: true,
+  capitalI: true,
+  ordinals: true,
+  webLinks: true,
+  textSubstitutions: true,
+  smartCopyPaste: true,
   hyphenate: false,
-  evenLines: true,
+  balanceLines: false,
   markdown: true,
   markdownRules: allRules(true),
   atShelf: true,
   slashMenu: true,
   fade: 'paragraph',
   focus: false,
+  chef: DEFAULT_LOOK,
   typewriter: false,
   pastePlain: false,
   saveDelay: 600,
@@ -184,6 +210,7 @@ export function parseSettings(raw: string | null): AppSettings {
   out.writer = isWriterKind(saved.writer) ? saved.writer : '';
   if (!((out.dailyGoal as number) > 0)) out.dailyGoal = DEFAULT_SETTINGS.dailyGoal;
   out.newSeasonings = Array.isArray(saved.newSeasonings) ? saved.newSeasonings.filter((id): id is string => SEASONING_IDS.includes(id as string)) : [];
+  out.chef = parseLook(saved.chef);
   out.shortcuts = Object.fromEntries(Object.entries(out.shortcuts as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
   return out as unknown as AppSettings;
 }
@@ -241,7 +268,7 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   root.dataset.paper = s.paper;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   root.toggleAttribute('data-hyphenate', s.hyphenate);
-  root.toggleAttribute('data-even-lines', s.evenLines);
+  root.toggleAttribute('data-even-lines', s.balanceLines);
   // Sepia frames a light page in dark chrome, so its scrollbars and controls are dark.
   root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#28221D' }[theme];

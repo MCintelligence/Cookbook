@@ -41,7 +41,7 @@ export const CHAPTERS: Chapter[] = [
 
 ## Where to start
 
-- **Learn to Cook** (Help › Learn to Cook) is a recipe made for trying things out, with a Group for each part of Cookbook. Change it or delete it; Help makes a fresh copy whenever you want one.
+- **How to Cook** (Help › How to Cook) is a recipe made for trying things out, with a Group for each part of Cookbook. Change it or delete it; Help makes a fresh copy whenever you want one.
 - **Set the Table** (Help › Set the Table…) asks the welcome questions again: your name, your English, what you write, the look, a daily goal and your Seasonings.
 - This manual opens from Help › Manual, with {key:manual|Help › Manual} or from the command palette. The search at the top finds any word in it.`,
   },
@@ -66,7 +66,7 @@ File › **New Recipe…** offers a starting point down the left:
 
 Your own templates sit below them, in groups you make. Any recipe can be saved as a template from New Recipe, with or without its text. Give the recipe a title, and if you like a series, its number in the series and a word goal.
 
-A new recipe starts with the Seasonings you chose in Set the Table, and your name on its title page when you plate it. App Settings › General changes both.
+A new recipe starts with the Seasonings you chose in Set the Table, and your name on its title page when you plate it. Cookbook Settings › General changes both.
 
 ## Where recipes are kept
 
@@ -96,6 +96,7 @@ Moving never renames a file unless the Group it lands in already has one of the 
 - **Add a note** by right-clicking Research and choosing **New note in Research**. Notes are pages like any other, with their own words, label and status.
 - **Bring in files** by dropping them from your computer onto Research, or right-click it and choose **Import files…**. Word, Markdown and text files become notes; anything else is kept as it is.
 - **Look at a file** by clicking it. A picture or PDF shows above a page of your own notes about it, with − and + to zoom. You can select and copy the words of a PDF. A web page shows as it was saved, Safari web archives included, without going online. Sound and films play. **Save a copy…** gives you the file back to open in another app.
+- **Show a web page live** by choosing **Web page** above a note's page and pasting its address, or by dropping a link there. The page shows straight from the web, as in Scrivener, with nothing to save first: follow its links, and use Back, Forward and Reload in its bar. **Open in browser** opens it in your own browser. With no connection it says so and shows again once you're back online; to read it offline, save it from your browser and add the saved page.
 - **Arrange** Research as you like, in Groups of its own. Drag a Shelf Item or Group onto Research to move it there, or drag a note back onto the Shelf. Files stay in Research.
 
 Nothing in Research is exported, counted towards your words, or shown in Prep or Plan, and the Shelf's search leaves it out. The search in the top bar still finds it. A Scrivener project's Research folder comes in here, and so does any other folder Scrivener kept beside the Draft.
@@ -129,12 +130,26 @@ Nothing in the Archive shows in Prep or Plan, is exported, counted towards your 
 | \`-TD \` at the start of a line | a checklist |
 | \`* * *\` then Enter | a section break |
 | \`!Word\` | a drop cap on the word's first letter |
-| \`--\` | an em dash |
+| \`--\` or \`---\` | an em dash |
+| \` - \` (a hyphen with a space either side) | an en dash |
+| \`...\` | an ellipsis |
 | \`"\` and \`'\` | curly quotes |
 | **/** at the start of a line | the insert menu |
 | **@** after a space | a name from the Pantry |
 
-Backspace straight after a shortcut turns it back into exactly what you typed. App Settings › Writing › Markdown turns all of them off at once, or any one on its own.
+Backspace straight after a shortcut turns it back into exactly what you typed. Cookbook Settings › Writing › Markdown turns all of them off at once, or any one on its own.
+
+## Corrections as you type
+
+As in Scrivener, a few things are put right as each word is finished, when you type the space, punctuation or new line after it:
+
+- The first word of a sentence gets a capital, after a full stop, question mark or exclamation mark and a space, or at the start of a paragraph. Not after *e.g.* or *i.e.*, a full stop inside a word (3.5), or an ellipsis.
+- A lone *i* becomes *I*, so *i'm* is *I’m*.
+- The ending of an ordinal is raised: 1st, 2nd, 3rd, 11th.
+- A web or mail address (www.example.com, https://…, name@example.com) becomes a link.
+- Scrivener's substitutions: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then.
+
+Undo straight after takes a correction back. Cookbook Settings › Writing › **Corrections** turns each one off.
 
 ## Drop caps
 
@@ -142,7 +157,7 @@ Put **!** before a word, as in \`!Dragon\`, and its first letter becomes a drop 
 
 ## Styles
 
-Every paragraph has a **paragraph style** (Body, Chapter title, Letter, and any you add), and words inside it can have a **character style** (Strong, Emphasis, Thought…). Pick one from the Format menu, the insert menu or the right-click menu. Change how a style looks once in Recipe Settings › Styles and everything in that style follows. Format › Clear formatting takes direct formatting off.
+Every paragraph has a **paragraph style** (Body, Chapter title, Letter, and any you add), and words inside it can have a **character style** (Strong, Emphasis, Thought…). Pick one from the Format menu, the insert menu or the right-click menu. Change how a style looks once in Cookbook Settings › Styles and everything in that style follows. Format › Clear formatting takes direct formatting off.
 
 ## Fonts
 
@@ -166,9 +181,9 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 
 ## Drafts
 
-To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on. As you write the new version it keeps pace a sentence at a time: each sentence you write takes the place of one of the draft's, and the rest of that paragraph carries on just after the cursor.
+To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The Item is now the newest version, and the draft shows through it as faded ghost text, starting on the line you're on. Work through it a sentence at a time: **Tab** keeps the next sentence as it was, or type your own and it takes that sentence's place, with the rest of the old paragraph carrying on just after the cursor.
 
-Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. {key:olderDraft|Recipe › Older draft as ghost text} shows an older draft through the Item and {key:newerDraft|Recipe › Newer draft as ghost text} a newer one, back up to the newest; clicking a draft does the same. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
+Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. Click a draft to read it on the page as ordinary text. {key:olderDraft|Recipe › Older draft} steps back to older drafts and {key:newerDraft|Recipe › Newer draft} forward again, ending back at the Item. Ghost text only ever shows in the Item itself, from its newest draft; Recipe › **Ghost text** hides it. Right-click a draft to **Open** it, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',
@@ -187,7 +202,7 @@ Long Groups load as you scroll. The bottom bar shows the Group's Items and words
     id: 'changes',
     title: 'Track changes',
     summary: 'Suggest edits, then accept or reject them.',
-    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} (or {key:suggestAlt|the second key in App Settings › Keyboard}) and every edit becomes a suggestion instead of going straight in. Insert puts changes in without taking anything away; on a Mac, whose keyboard has no Insert key, ⌘⇧E does the same.
+    body: `Turn on **Suggest changes** with {key:suggest|Edit › Track changes › Suggest changes} (or {key:suggestAlt|the second key in Cookbook Settings › Keyboard}) and every edit becomes a suggestion instead of going straight in. Insert puts changes in without taking anything away; on a Mac, whose keyboard has no Insert key, ⌘⇧E does the same.
 
 - **New words** are underlined in the accent colour.
 - **Deleted words** stay on the page, struck through, until you decide. Backspace walks back over them, so you can keep deleting.
@@ -204,7 +219,7 @@ Right-click a change for **Accept change** or **Reject change**. Edit › **Trac
 
 ## Word files
 
-**Export as Word** keeps your suggestions as Word's own tracked changes, with your name from App Settings as their author, so an editor can accept or reject them in Word. Accept all first for a clean copy. Importing a Word file brings its tracked changes in as suggestions: inserted and deleted words, new and joined paragraphs, formatting and paragraph styles.
+Exporting a Group or Item as **Word** keeps your suggestions as Word's own tracked changes, with your name from Cookbook Settings as their author, so an editor can accept or reject them in Word. Accept all first for a clean copy. Importing a Word file brings its tracked changes in as suggestions: inserted and deleted words, new and joined paragraphs, formatting and paragraph styles.
 
 Plate, Serve and other exports show the text as if every change were accepted, and words waiting to be deleted don't count towards your goals or word counts.`,
   },
@@ -216,7 +231,7 @@ Plate, Serve and other exports show the text as if every change were accepted, a
 
 - **Characters**: the people in your story.
 - **Settings**: the places.
-- **Materials**: research, notes, sources, and the Seasonings' reports.
+- **Materials**: research, notes and sources.
 
 Each part holds **Items** (cards), in Groups of your own, nested as deep as you like. The search at the top looks at names, nicknames and fields. The + button makes a new card.
 
@@ -226,7 +241,7 @@ A card opens on the page like an Item. Above the writing is its **Pantry Sketch*
 
 Below those are the Sketch's sections, in the same order on every card: **Purpose** (Want and Need), **Look**, **Senses** (Sight, Sound, Smell, Touch and Taste), **Nature** (Temperament and Quirks), **Past**, **Tension** (Within and Without) and **Notes** (Notes and Sources). Each blank box has a faint hint that fits the kind of card: on a character, **When** asks their age; on a setting, its era and season; on a material, when it was made. Fill in as much or as little as you like; the Sketch is searched along with the rest of the card. A card made before the Sketch keeps what it had, with a **+ Use the Pantry Sketch** button to add it.
 
-On a character or place card, put the cursor on an empty line and click the **+** beside it for brainstorming questions: Basics, Drive, and World on Fire. Each one is an ordinary heading, and one Undo takes out what you just added.
+Under the Sketch, **+ Brainstorm** adds a further set of questions to any card, a character, a setting or a material alike: **World on Fire**, **Smoke and Mirrors**, **Skin in the Game**, **Before and After** and **Through Other Eyes**. A set comes whole, as one more section of four boxes with hints that fit the kind of card. While all four boxes are empty, **Remove** takes the set off again.
 
 Right-click words on the page and choose **Make it a Pantry card** to start a card from them.
 
@@ -258,13 +273,13 @@ Each seasoning is one card: a remark in its own voice, its meter for the open pa
 - Spelling is a red wavy underline, grammar a blue one, and Sally marks style in chili red. A word is only checked once you've moved past it.
 - **Fix** a slip by clicking its underline and picking a suggestion. {key:nextIssue|F7} steps to the next, {key:prevIssue|Shift+F7} to the one before.
 - **Right-click** an underlined word to add it to your dictionary or remove the mark for good.
-- **Report** opens a window with the seasoning's verdict, its numbers, a few things to try first, and everything it found. Each report is also kept as a card in Pantry › Materials › Seasoning Reports.
+- **Report** opens a window with the seasoning's verdict, its numbers, a few things to try first, and everything it found.
 
 ## Your English
 
-Salty Sam spells in American, British, Canadian or Australian English. A recipe uses the English you chose in Set the Table (App Settings › General › Your English) until it picks its own in Recipe Settings › Seasonings. New Zealand English uses the Australian word list; Irish, Indian and South African English use the British one.
+Salty Sam spells in American, British, Canadian or Australian English. A recipe uses the English you chose in Set the Table (Cookbook Settings › General › Your English) until it picks its own in Cookbook Settings › Seasonings. New Zealand English uses the Australian word list; Irish, Indian and South African English use the British one.
 
-Every character's and place's name counts as a word. Your own words go in \`dictionary.txt\` in the recipe's folder, one a line; Recipe Settings › Seasonings shows them and can bring back every mark you removed.`,
+Every character's and place's name counts as a word. Your own words go in \`dictionary.txt\` in the recipe's folder, one a line; Cookbook Settings › Seasonings shows them and can bring back every mark you removed.`,
   },
   {
     id: 'views',
@@ -307,13 +322,21 @@ Everything here is kept in the recipe's own files. Story dates, Pantry dates and
     id: 'modes',
     title: 'Chef Mode',
     summary: 'Focus mode, and other ways to see the page.',
-    body: `**Chef Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (App Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Chef Mode}, the page's right-click menu or the command palette. Press it again or press Escape to leave it.
+    body: `**Chef Mode** is for focus: the panels step aside and the page fades everything but the paragraph or sentence you're in (Cookbook Settings › Writing chooses which). The Shelf waits off the left edge and the Pantry or Seasonings off the right: rest the pointer on an edge, or click it, and the panel slides in over the page, then slides away again when you move off it. Turn it on with {key:focus|View › Chef Mode}, the page's right-click menu or the command palette. Press it again or press Escape to leave it.
+
+Every bar folds away in Chef Mode, the top bar too: rest the pointer at the top edge of the window and it comes down. With no toolbar, Markdown does the formatting: every Markdown rule works as you type, even one switched off in App Settings, and Markdown pasted as plain text comes in formatted.
+
+**The reader bar** along the bottom sets how the page looks to you, like an e-book reader: the paper, the ink, one font for every word, text size (⌘= and ⌘− change it too), line height, the space between paragraphs and the column's width. **Reset** puts the page back as styled. These only change how Chef Mode shows the page on this computer, never the recipe, its styles or what you plate. The arrow at its end folds it away to a small tab.
+
+The sprig on the reader bar shows the Seasonings as their faces: a lit face has its Check on, a dot means it has something to say, and a click turns it on or off.
+
+**Chef notes** are notes in the right-hand margin, as comments are in Word. Select some words (or put the cursor in one) and press {key:chefNote|the note button on the reader bar}, or right-click and choose **New Chef note**. Each note can be edited, answered, resolved or deleted from its card. Chef notes are only made and seen in Chef Mode, but they are kept with the recipe (in \`chef-notes.json\`), so they are there again each time you come back. They are never part of the text: plating, export and search leave them out.
 
 Also in the View menu:
 
 - **Typewriter scrolling** keeps the line you're typing in the middle of the window.
-- **Paper** shows the page as a sheet; **Draft** is a plain column of text. The page's size, margins and indents are in Recipe Settings › Layout.
-- **Zoom**: the percentage in the bottom bar opens a slider; ⌘= and ⌘− (Ctrl+= and Ctrl+−) zoom, ⌘0 (Ctrl+0) goes back to 100%.
+- **Paper** shows the page as a sheet; **Draft** is a plain column of text. The page's size, margins and indents are in Cookbook Settings › Layout.
+- **Zoom**: the percentage in the bottom bar opens a slider, with **Reset** to go back to 100%; ⌘= and ⌘− (Ctrl+= and Ctrl+−) zoom, ⌘0 (Ctrl+0) goes back to 100%.
 - **Split view** shows another Item next to the one you're writing. Drag an Item from the Shelf to the left or right edge of the page area (or right-click it and choose **Open beside this one**). Drop it anywhere else and it opens in place of the page, as a click does. To close split view, double-click the page you want to keep (in its margin, if it's the one you're writing), or click **×** on the other.
 - **Full screen**: the desktop app starts full screen. On Windows and Linux, F11 or View › Full screen switches it; on a Mac, use Window › Enter Full Screen.`,
   },
@@ -323,11 +346,11 @@ Also in the View menu:
     summary: 'A daily goal, a whole-recipe target, a deadline and your streak.',
     body: `The ring in the bottom bar fills as you reach today's goal, and your streak grows each day you do. Click it for **Goals**:
 
-- **Words a day**, to fill the ring. A recipe that hasn't set its own uses your daily goal from App Settings › General.
+- **Words a day**, to fill the ring. A recipe that hasn't set its own uses your daily goal from Cookbook Settings › General.
 - **Whole recipe**: the words you're aiming for in total.
 - **Deadline**, and Cookbook works out the words a day you need.
 
-**Writing history** shows the words written and deleted each day, by day, week or month, and exports them as a CSV file. Pasted text doesn't count unless you turn that on in Recipe Settings › Goals, where you can also keep weekends off from breaking the streak. Splitting or merging Items never counts.
+**Writing history** shows the words written and deleted each day, by day, week or month, and exports them as a CSV file. Pasted text doesn't count unless you turn that on in Cookbook Settings › Goals, where you can also keep weekends off from breaking the streak. Splitting or merging Items never counts.
 
 An Item can have a goal of its own; the bottom bar then shows how close it is.`,
   },
@@ -345,7 +368,7 @@ Plate settings are kept with the recipe and save as you change them. **Serve** m
 
 ## Plain exports
 
-File › **Export** makes a Word document, an EPUB or Markdown of the manuscript as it is, and **Print or save as PDF** prints it. Right-click a Group or Item to export it alone, or untick **Include in export** to leave an Item out. File › **Import files…** brings in Word, Markdown and plain text as new Items.
+Plate and serve is the way to send the whole recipe out. For a plain copy of one part, right-click a Group or Item to export it as Word or Markdown, or print it. Untick **Include in export** to leave an Item out of Plate. File › **Import files…** brings in Word, Markdown and plain text as new Items.
 
 ## Coming from Scrivener
 
@@ -373,7 +396,7 @@ File › **Import Scrivener project…** turns a whole Scrivener 2 or 3 project 
 
 Each backup is opened again as soon as it's written and checked against the recipe. Cookbook keeps the newest 10 (or 25, or all), plus one a day for the last week and one a week for the last month. **Restore** opens a copy of the recipe as it was, beside your own; it never writes over it.
 
-Backups go to Cookbook's own folder, on the same disk as your recipes, unless you choose another in App Settings › Saving and backups. A synced or external folder is the best protection against a lost or broken computer.`,
+Backups go to Cookbook's own folder, on the same disk as your recipes, unless you choose another in Cookbook Settings › Saving and backups. A synced or external folder is the best protection against a lost or broken computer.`,
   },
   {
     id: 'finding',
@@ -390,10 +413,10 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
   {
     id: 'settings',
     title: 'Settings',
-    summary: 'App Settings and Recipe Settings, and what each keeps.',
+    summary: 'Cookbook Settings, and what each part keeps.',
     body: `Open Settings from the gear in the bottom bar or with {key:settings|the gear in the bottom bar}. The search at the top finds any setting. Changes save as you make them.
 
-**App Settings** stay on this device:
+**Cookbook Settings** has two parts. **On this device** stays on this computer:
 
 - **General**: About you (your name, your English, what you write, your daily goal and the Seasonings new recipes start with, and Set the Table again), starting up, and how shortcuts are shown.
 - **Appearance**: theme (System, Light, Dark, Sepia), text size and motion. The page stays white paper in every theme, so text colours look the same in dark mode as they were picked.
@@ -402,7 +425,7 @@ Every menu is in the top bar: File, Edit, View, Insert, Format, Recipe and Help.
 - **Keyboard shortcuts**: every shortcut, and changing it.
 - **Updates and privacy**.
 
-**Recipe Settings** are saved in the recipe's folder, so they travel with it:
+**This recipe** is saved in the recipe's folder, so it travels with it:
 
 - **Layout**: page size, margins and indents.
 - **Styles**: paragraph and character styles.

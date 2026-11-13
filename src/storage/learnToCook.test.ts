@@ -17,7 +17,7 @@ async function made() {
 
 const texts = (node: NodeJSON): NodeJSON[] => (node.text !== undefined ? [node] : (node.content ?? []).flatMap(texts));
 
-describe('Learn to Cook', () => {
+describe('How to Cook', () => {
   it('is a recipe with one Group for each part of Cookbook, in order, opening at Welcome', async () => {
     const { fs, info } = await made();
     expect((await openBook(fs)).title).toBe(LEARN_TO_COOK);
@@ -81,9 +81,9 @@ describe('Learn to Cook', () => {
     const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
     expect(learnedBefore(storage)).toBe(false);
     expect(learnToCookLocation(storage)).toBeNull();
-    rememberLearnToCook({ kind: 'browser', name: 'Learn to Cook' }, storage);
+    rememberLearnToCook({ kind: 'browser', name: 'How to Cook' }, storage);
     expect(learnedBefore(storage)).toBe(true);
-    expect(learnToCookLocation(storage)).toEqual({ kind: 'browser', name: 'Learn to Cook' });
+    expect(learnToCookLocation(storage)).toEqual({ kind: 'browser', name: 'How to Cook' });
   });
 
   it('on a touch screen, adds a page that says where the menus are and what a right-click is', async () => {

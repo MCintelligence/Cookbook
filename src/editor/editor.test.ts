@@ -62,7 +62,7 @@ describe('typing shortcuts', () => {
   it('turns -TD and a space into a checklist', () => {
     const editor = make();
     type(editor, '-TD find the hymn');
-    expect(md(editor)).toBe('- [ ] find the hymn\n');
+    expect(md(editor)).toBe('- [ ] Find the hymn\n');
   });
 
   it('turns a checklist back into the typed text on Backspace, keeping the space', () => {
@@ -79,7 +79,8 @@ describe('typing shortcuts', () => {
     press(editor, 'Enter');
     press(editor, 'Enter');
     type(editor, 'after');
-    expect(md(editor)).toBe('- one\n  - two\n\nafter\n');
+    // Enter finishes the word, so “two” starts its sentence with a capital, as in Scrivener.
+    expect(md(editor)).toBe('- one\n  - Two\n\nafter\n');
   });
 
   it('makes an empty item a paragraph on Backspace instead of joining the item above', () => {
@@ -87,7 +88,7 @@ describe('typing shortcuts', () => {
     press(editor, 'Enter');
     press(editor, 'Backspace');
     type(editor, 'two');
-    expect(md(editor)).toBe('- one\n\ntwo\n');
+    expect(md(editor)).toBe('- One\n\ntwo\n');
   });
 
   it('indents a plain paragraph with a tab that survives saving, and never starts a list', () => {
@@ -102,7 +103,7 @@ describe('typing shortcuts', () => {
   it('applies plain bold, italic, underline, strikethrough and code from Markdown', () => {
     const editor = make();
     type(editor, 'a **bold** and *soft* and _under_ and ~~gone~~ and `x` end');
-    expect(md(editor)).toBe('a **bold** and *soft* and [under]{.ul} and ~~gone~~ and `x` end\n');
+    expect(md(editor)).toBe('A **bold** and *soft* and [under]{.ul} and ~~gone~~ and `x` end\n');
     expect(editor.getJSON().content?.[0]?.content?.[1]?.marks).toEqual([{ type: 'bold' }]);
   });
 
@@ -111,7 +112,7 @@ describe('typing shortcuts', () => {
     type(editor, '-1 one');
     press(editor, 'Enter');
     type(editor, 'two');
-    expect(md(editor)).toBe('1. one\n2. two\n');
+    expect(md(editor)).toBe('1. One\n2. two\n');
     const other = make();
     type(other, '## Part one');
     press(other, 'Enter');
@@ -263,7 +264,7 @@ describe('notes', () => {
     const editor = make('[pie]{.note #n1}');
     editor.commands.focus('end');
     type(editor, ' crust');
-    expect(md(editor)).toBe('[pie]{.note #n1} crust\n');
+    expect(md(editor)).toBe('[Pie]{.note #n1} crust\n');
   });
 
   it('removes a note anchor but keeps the words and other styles', () => {
@@ -385,9 +386,9 @@ describe('the writer’s own font, size and colour', () => {
     type(editor, 'z');
     const texts: string[] = [];
     editor.state.doc.descendants((n) => {
-      if (n.isText && n.text !== 'item') texts.push(`${n.text}:${n.marks.find((m) => m.type.name === 'textStyle')?.attrs.font ?? ''}`);
+      if (n.isText && n.text?.toLowerCase() !== 'item') texts.push(`${n.text}:${n.marks.find((m) => m.type.name === 'textStyle')?.attrs.font ?? ''}`);
     });
-    expect(texts).toEqual(['x:Caudex', 'y:Caudex', 'z:Caudex']);
+    expect(texts).toEqual(['x:Caudex', 'Y:Caudex', 'z:Caudex']);
   });
 });
 

@@ -45,9 +45,11 @@ export interface ModeHost {
   rename(path: string): void;
   /** Takes an Item out of the mode showing (Prep or Plan), leaving the Item itself alone. Set by the mode, not the app. */
   remove(path: string): void;
-  menu(label: string, x: number, y: number, items: MenuItem[]): void;
+  /** Shows a menu; given the button that opens it, a second press of the button closes it. */
+  menu(label: string, x: number, y: number, items: MenuItem[], opener?: HTMLElement): void;
   loadPicture(path: string): Promise<string>;
-  say(text: string): void;
+  /** A notice at the foot of the window, with an Undo button when `undo` is given. */
+  say(text: string, undo?: () => void): void;
 }
 
 export interface ViewProps {

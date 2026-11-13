@@ -127,7 +127,7 @@ describe('mode set-up', () => {
     const read = readPrefs(JSON.stringify({ together: true, board: { layout: 'free' }, timeline: { px: 9999 }, outline: { columns: ['words', 3] } }));
     // The old "Shelf and Pantry together" switch is gone; a modes.json that still has it reads as if it didn't.
     expect('together' in read).toBe(false);
-    expect(read.board).toEqual({ layout: 'free', rows: 'none' });
+    expect(read.board).toEqual({ layout: 'free', rows: 'none', cards: 'full', snap: false, route: 'curved', ends: 'end', flow: 'auto' });
     expect(read.timeline.px).toBe(96);
     expect(read.outline.columns).toEqual(['words']);
     expect(read.atlas).toEqual(DEFAULT_PREFS.atlas);

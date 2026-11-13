@@ -131,7 +131,7 @@ describe('Markdown settings', () => {
       }
     };
     type('# **so** *very*');
-    expect(serializeMarkdown(editor.getJSON() as NodeJSON)).toBe('\\# \\*\\*so\\*\\* *very*\n');
+    expect(serializeMarkdown(editor.getJSON() as NodeJSON)).toBe('\\# \\*\\*So\\*\\* *very*\n');
   });
 
   it('keeps what the old switches said', () => {

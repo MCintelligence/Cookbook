@@ -63,6 +63,7 @@ function runProps(sheet: StyleSheet, { styles, plain, link, format = {} }: Run):
   else if (format.color) props.push(`<w:color w:val="${format.color.replace('#', '')}"/>`);
   if (format.size) props.push(`<w:sz w:val="${Math.round(format.size * 2)}"/><w:szCs w:val="${Math.round(format.size * 2)}"/>`);
   if (underline || (link && first)) props.push('<w:u w:val="single"/>');
+  if (plain.has('superscript')) props.push('<w:vertAlign w:val="superscript"/>');
   return props.length > 0 ? `<w:rPr>${props.join('')}</w:rPr>` : '';
 }
 
@@ -74,7 +75,7 @@ function textRun(text: string, rPr = ''): string {
 const RAISED = 1.6;
 const DROPPED = 2.4;
 
-const PLAIN = new Set(['bold', 'italic', 'underline', 'strike', 'code']);
+const PLAIN = new Set(['bold', 'italic', 'underline', 'strike', 'superscript', 'code']);
 
 class DocxBody {
   readonly notes: string[] = [];

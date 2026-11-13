@@ -33,6 +33,11 @@ export interface AppSettings {
   reduceMotion: boolean;
   curlyQuotes: boolean;
   emDash: boolean;
+  /** Scrivener's corrections as a word is finished (see editor/autoCorrect.ts), all on by default as there. */
+  capitalSentences: boolean;
+  capitalI: boolean;
+  ordinals: boolean;
+  webLinks: boolean;
   /** Breaks long words at line ends with a hyphen. Off, as in Scrivener and Word, words wrap whole. */
   hyphenate: boolean;
   /** Evens out where lines break so a paragraph doesn't end on a lone word. */
@@ -124,6 +129,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reduceMotion: false,
   curlyQuotes: true,
   emDash: true,
+  capitalSentences: true,
+  capitalI: true,
+  ordinals: true,
+  webLinks: true,
   hyphenate: false,
   evenLines: true,
   markdown: true,

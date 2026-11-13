@@ -13,7 +13,8 @@ import { type AppSettings, type MarkdownRule, getSettings, markdownTyped } from 
 import { BODY_STYLE, HEADING_STYLES, QUOTE_STYLE } from './markdown';
 import { type ParagraphFormat, type TextFormat, textFormatOf } from './format';
 import { PX_PER_PT, fontStack } from '../styles/styles';
-import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Underline } from './formatting';
+import { BlockShortcuts, Bold, Code, CodeBlock, HardBreak, carriedMarks, Image, Italic, Link, PasteCleanup, PlainMarkRules, Strike, Superscript, Underline } from './formatting';
+import { AutoCorrect, AutoCorrectKeys } from './autoCorrect';
 import { DropCaps } from './dropCaps';
 import { ChefNotes } from '../chef/notes';
 import { ChefMarkdownPaste } from '../chef/markdownPaste';
@@ -520,6 +521,29 @@ const NO_TYPOGRAPHY = {
   superscriptThree: false,
 } as const;
 
+/**
+ * The rest of macOS's smart dashes, which Scrivener uses: a hyphen with a space either side becomes
+ * an en dash, and a third hyphen stays one em dash (two or three hyphens make —).
+ */
+const SmartDashes = Extension.create({
+  name: 'smartDashes',
+  addInputRules: () => SMART_DASHES,
+});
+const SMART_DASHES = [
+  new InputRule({
+    find: /\s-\s$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('– ', range.from + 1, range.to);
+    },
+  }),
+  new InputRule({
+    find: /—-$/,
+    handler: ({ state, range }) => {
+      state.tr.insertText('—', range.from, range.to);
+    },
+  }),
+];
+
 /** `cardKind` is the kind of page open: character and place pages get brainstorming cards. */
 export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: SeasoningsRequest) => void = () => {}, cardKind: string | null = null) {
   return [
@@ -542,6 +566,7 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
     Italic,
     Underline,
     Strike,
+    Superscript,
     Code,
     Link,
     PlainMarkRules,
@@ -619,6 +644,9 @@ export function cookbookExtensions(nextStyle: NextStyle, onRequest: (r: Seasonin
       }),
       'emDash',
     ),
+    whenOn(SmartDashes, 'emDash'),
+    AutoCorrectKeys,
+    AutoCorrect,
     UndoRedo,
     Dropcursor,
     Gapcursor,

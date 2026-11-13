@@ -182,7 +182,7 @@ To go back to one Item, click it on the Shelf.
           synopsis: 'Shortcuts that format as you type, and the insert menu.',
           body: `# Typing and formatting
 
-Cookbook tidies as you type. "Straight quotes" turn curly, two hyphens -- make an em dash, and three dots make an ellipsis.
+Cookbook tidies as you type, as Scrivener does. "Straight quotes" turn curly, two hyphens -- make an em dash, a hyphen between spaces makes an en dash, and three dots make an ellipsis. When you finish a word, the first in a sentence gets its capital, a lone i becomes I, 1st and 2nd are raised, and web addresses become links.
 
 Markdown works too, if you know it. Try each on an empty line below:
 

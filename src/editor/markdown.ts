@@ -16,7 +16,7 @@
  *   | a | table |              with a | --- | line under the first row
  *   ```                        a code block, ended by another ```
  *
- *   **bold**  *italic*  [underline]{.ul}  ~~struck~~  `code`  [a link](https://…)
+ *   **bold**  *italic*  [underline]{.ul}  [st]{.sup}  ~~struck~~  `code`  [a link](https://…)
  *   ![a picture](pantry/pictures/lou.jpg)
  *   [any character style]{.thought}   [text a note is attached to]{.note #n1}
  *   [words suggested]{.ins}   [words suggested for deletion]{.del}     (track changes)
@@ -35,7 +35,7 @@
 
 import { type ParagraphChange, type ParagraphFormat, type TextFormat, paragraphChangeOf, paragraphFormatOf, parseParagraphChange, parseParagraphFormat, parseTextFormat, textFormatOf, writeParagraphChange, writeParagraphFormat, writeTextFormat } from './format';
 
-export type PlainMark = 'bold' | 'italic' | 'underline' | 'strike' | 'code';
+export type PlainMark = 'bold' | 'italic' | 'underline' | 'strike' | 'superscript' | 'code';
 export type MarkJSON =
   | { type: 'charStyle'; attrs: { style: string } }
   | { type: 'textStyle'; attrs: TextFormat }
@@ -64,7 +64,7 @@ const LINK_PREFIX = '@';
 /** Direct formatting's key is % and its attributes as written, which keeps equal formats equal. */
 const FORMAT_PREFIX = '%';
 /** Internal keys for plain formatting. Style ids can't start with *, so they never clash. */
-const PLAIN_KEY: Record<PlainMark, string> = { bold: '*b', italic: '*i', underline: '*u', strike: '*s', code: '*c' };
+const PLAIN_KEY: Record<PlainMark, string> = { bold: '*b', italic: '*i', underline: '*u', strike: '*s', superscript: '*p', code: '*c' };
 /** Track changes: a suggested insertion and deletion, written as [..]{.ins} and [..]{.del}. */
 const INS_KEY = '*ins';
 const DEL_KEY = '*del';
@@ -73,7 +73,7 @@ const FMT_PREFIX = '*fmt:';
 const isChangeKey = (key: string) => key === INS_KEY || key === DEL_KEY || key.startsWith(FMT_PREFIX);
 const KEY_PLAIN = Object.fromEntries(Object.entries(PLAIN_KEY).map(([k, v]) => [v, k])) as Record<string, PlainMark>;
 /** Outermost first: notes, links, character styles, then bold, italic, underline, strike, and code innermost. */
-const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*c': 5 };
+const RANK: Record<string, number> = { '*b': 1, '*i': 2, '*u': 3, '*s': 4, '*p': 4.5, '*c': 5 };
 
 /** Marks are handled internally as string keys: a style id, *b for bold, note#<id>, @<href>, %<format>. */
 export function markKey(m: MarkJSON): string {
@@ -469,7 +469,7 @@ function tokenize(src: string): Token[] {
       const m = /^\]\{\.([A-Za-z0-9_-]+)(?: #([A-Za-z0-9_-]+))?\}/.exec(rest);
       if (m && (m[2] === undefined || m[1] === 'note')) {
         pushText();
-        const style = m[2] !== undefined ? NOTE_PREFIX + m[2] : m[1] === 'ul' ? PLAIN_KEY.underline : m[1] === 'ins' ? INS_KEY : m[1] === 'del' ? DEL_KEY : m[1]!;
+        const style = m[2] !== undefined ? NOTE_PREFIX + m[2] : m[1] === 'ul' ? PLAIN_KEY.underline : m[1] === 'sup' ? PLAIN_KEY.superscript : m[1] === 'ins' ? INS_KEY : m[1] === 'del' ? DEL_KEY : m[1]!;
         tokens.push({ kind: 'close', style, raw: m[0] });
         i += m[0].length;
         continue;
@@ -765,6 +765,8 @@ function serializeInline(nodes: NodeJSON[]): string {
           ? `]{${style.slice(FORMAT_PREFIX.length)}}`
           : style === PLAIN_KEY.underline
             ? ']{.ul}'
+            : style === PLAIN_KEY.superscript
+              ? ']{.sup}'
             : `]{.${style}}`);
   const open = (style: string) => STAR[style] ?? '[';
   for (const p of pieces) {

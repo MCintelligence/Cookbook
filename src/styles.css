@@ -1285,6 +1285,10 @@ button.seas-quote:hover { color: var(--accent); }
 .cb-ghost, .cb-ghost-inline { opacity: 0.32; pointer-events: none; user-select: none; }
 .mise .cb-prose p.ghost-line::before, .mise .cb-prose p.ghost-line::after, .mise .cb-ghost, .mise .cb-ghost-inline { display: none; }
 .tree-draft { font-style: italic; }
+.cb-page[hidden] { display: none !important; }
+.draft-version-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -8px 0 24px; padding-bottom: 10px; border-bottom: 1px solid var(--page-line); font-size: 13px; color: var(--page-muted); }
+.draft-version-bar .pill { height: 30px; color: var(--page-text); background: transparent; }
+.draft-version-name { flex: 1; min-width: 0; font-style: italic; }
 
 /* Panel toolbars: a thin row of icons that stays at the foot of the Shelf, the Pantry and Seasonings. */
 .sidebar { display: flex; flex-direction: column; padding-bottom: 0; }

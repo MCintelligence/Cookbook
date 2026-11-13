@@ -60,9 +60,9 @@ interface Props {
   shownGroups?: Set<string>;
   /** Each Item's drafts by number, by the Item's path: listed under it, in italics. */
   drafts?: Map<string, number[]>;
-  /** The draft showing through the open Item as ghost text. */
+  /** The draft open on the page, shown as picked. */
   ghost?: { path: string; n: number } | null;
-  /** A click on a draft: opens its Item with that draft as the ghost text. */
+  /** A click on a draft: opens it on the page, as its own text. */
   onDraft?: (path: string, n: number) => void;
   /** A right-click (or the menu key) on a draft. */
   onDraftMenu?: (path: string, n: number, x: number, y: number) => void;
@@ -546,7 +546,7 @@ function TreeItem({ node, parent, index, depth, ...shared }: Shared & { node: Tr
                   className="tree-recipe tree-draft"
                   tabIndex={-1}
                   data-draft-of={node.path}
-                  title={ghost?.path === node.path && ghost.n === n ? `Draft ${n}, showing through as ghost text` : `Open “${label}” with Draft ${n} showing through`}
+                  title={`Read Draft ${n} of “${label}”`}
                   onClick={() => onDraft?.(node.path, n)}
                   onContextMenu={(e) => {
                     if (!onDraftMenu) return;

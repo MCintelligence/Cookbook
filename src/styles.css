@@ -541,9 +541,9 @@ select.pc-value { font-family: inherit; font-size: 13px; }
 .break-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cb-prose { outline: none; -webkit-hyphens: manual; hyphens: manual; min-height: 600px; caret-color: var(--accent); }
 .cb-prose p { orphans: 2; widows: 2; }
-/* Line breaking, as in Scrivener: words wrap whole unless the writer turns hyphenation on in Cookbook Settings › Writing,
-   and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
-   Even lines (text-wrap: pretty) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
+/* Line breaking, as in Scrivener: words wrap whole, each line taking as many as fit, unless the writer turns hyphenation on in
+   Cookbook Settings › Writing, and then only words of 7 letters or more, with at least 3 letters either side of the hyphen (never "be-longing").
+   Even lines (text-wrap: pretty, off by default, as Scrivener has nothing like it) balances the last lines of a paragraph so it doesn't end on a lone word. Browsers skip
    that under ProseMirror's white-space: break-spaces, so it sets pre-wrap, which only lets a space typed at a line's end hang. */
 :root[data-hyphenate] .cb-prose { -webkit-hyphens: auto; hyphens: auto; hyphenate-limit-chars: 7 3 3; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; -webkit-hyphenate-limit-lines: 2; }
 :root[data-even-lines] .cb-prose { white-space: pre-wrap; text-wrap: pretty; }

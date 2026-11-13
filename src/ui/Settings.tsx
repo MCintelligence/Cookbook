@@ -449,13 +449,19 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
             <Row title="Make web addresses into links" help="www.example.com, https://… and mail addresses become links as you finish them." words="links urls web addresses detect">
               <Switch label="Make web addresses into links" on={s.webLinks} onChange={(webLinks) => set({ webLinks })} />
             </Row>
+            <Row title="Symbol and text substitution" help="Scrivener’s list: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then." words="symbols copyright trademark arrows fractions replace autocorrect">
+              <Switch label="Symbol and text substitution" on={s.textSubstitutions} onChange={(textSubstitutions) => set({ textSubstitutions })} />
+            </Row>
+            <Row title="Smart copy and paste" help="A word selected by double-click is cut or deleted with the space beside it, and pasted back with spaces either side, as in Scrivener." words="smart cut delete paste spaces">
+              <Switch label="Smart copy and paste" on={s.smartCopyPaste} onChange={(smartCopyPaste) => set({ smartCopyPaste })} />
+            </Row>
           </Group>
           <Group title="Line breaks">
             <Row title="Hyphenate long words" help="Off, words wrap whole, as in Scrivener. On, only words of 7 letters or more break, with 3 letters either side of the hyphen." words="hyphenation hyphens line breaks">
               <Switch label="Hyphenate long words" on={s.hyphenate} onChange={(hyphenate) => set({ hyphenate })} />
             </Row>
-            <Row title="Even out line endings" help="A paragraph doesn’t end on a lone word when a better break is nearby. Plate always keeps lone lines off the top and bottom of a printed page." words="widows orphans short last line wrap">
-              <Switch label="Even out line endings" on={s.evenLines} onChange={(evenLines) => set({ evenLines })} />
+            <Row title="Even out line endings" help="Off, as in Scrivener, each line takes as many words as fit. On, a paragraph doesn’t end on a lone word when a better break is nearby. Plate always keeps lone lines off the top and bottom of a printed page." words="widows orphans short last line wrap balance">
+              <Switch label="Even out line endings" on={s.balanceLines} onChange={(balanceLines) => set({ balanceLines })} />
             </Row>
           </Group>
           <Group title="Markdown">

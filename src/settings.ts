@@ -38,10 +38,13 @@ export interface AppSettings {
   capitalI: boolean;
   ordinals: boolean;
   webLinks: boolean;
+  textSubstitutions: boolean;
+  /** Scrivener's smart copy and paste: a double-clicked word goes and comes back with its spaces. */
+  smartCopyPaste: boolean;
   /** Breaks long words at line ends with a hyphen. Off, as in Scrivener and Word, words wrap whole. */
   hyphenate: boolean;
-  /** Evens out where lines break so a paragraph doesn't end on a lone word. */
-  evenLines: boolean;
+  /** Evens out where lines break so a paragraph doesn't end on a lone word. Off, as Scrivener fills each line. (Was evenLines, on by default.) */
+  balanceLines: boolean;
   /** Markdown as a whole: when off, no rule below works, whatever its own switch says. */
   markdown: boolean;
   /** Each Markdown rule on its own (see MARKDOWN_RULES). */
@@ -133,8 +136,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   capitalI: true,
   ordinals: true,
   webLinks: true,
+  textSubstitutions: true,
+  smartCopyPaste: true,
   hyphenate: false,
-  evenLines: true,
+  balanceLines: false,
   markdown: true,
   markdownRules: allRules(true),
   atShelf: true,
@@ -258,7 +263,7 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   root.dataset.size = s.size;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   root.toggleAttribute('data-hyphenate', s.hyphenate);
-  root.toggleAttribute('data-even-lines', s.evenLines);
+  root.toggleAttribute('data-even-lines', s.balanceLines);
   // Sepia frames a light page in dark chrome, so its scrollbars and controls are dark.
   root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#28221D' }[theme];

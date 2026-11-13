@@ -131,3 +131,47 @@ describe('Scrivener’s rules', () => {
     expect(addressAt('file.txt ', 8)).toBe(null);
   });
 });
+
+describe('Scrivener’s substitutions and dashes', () => {
+  it('swaps its list as each word is finished', () => {
+    expect(typed('teh cat (c) 2026 and 1/2 a cup --> there <-- ==> <== tehn ok')).toBe('The cat © 2026 and ½ a cup → there ← ⇒ ⇐ then ok');
+    expect(typed('so 11/2 and 1/2/3 and xteh ')).toBe('So 11/2 and 1/2/3 and xteh ');
+  });
+
+  it('deletes a curly quote or dash with Backspace, and Undo gives the hyphens back', () => {
+    const editor = make('Text');
+    type(editor, ' a--');
+    expect(editor.getText()).toBe('Text a—');
+    editor.commands.undo();
+    expect(editor.getText()).toBe('Text a--');
+    type(editor, '"');
+    expect(editor.getText()).toBe('Text a--”');
+    // Backspace tries to take a shortcut back first; for a quote there is nothing to take back, so it just deletes.
+    expect(editor.commands.undoInputRule()).toBe(false);
+    expect(editor.getText()).toBe('Text a--”');
+  });
+});
+
+describe('Undo steps', () => {
+  it('takes back a whole run of typing, however long it took, until the caret moves', () => {
+    const editor = make('Start.');
+    const { view } = editor;
+    let clock = 1_000_000;
+    const slow = (text: string) => {
+      for (const ch of text) {
+        clock += 3000;
+        const { from, to } = view.state.selection;
+        view.dispatch(view.state.tr.insertText(ch, from, to).setTime(clock));
+      }
+    };
+    slow(' one');
+    slow(' two');
+    editor.commands.setTextSelection(1);
+    editor.commands.focus('end');
+    slow(' three');
+    editor.commands.undo();
+    expect(editor.getText()).toBe('Start. one two');
+    editor.commands.undo();
+    expect(editor.getText()).toBe('Start.');
+  });
+});

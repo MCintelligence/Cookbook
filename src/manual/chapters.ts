@@ -146,6 +146,7 @@ As in Scrivener, a few things are put right as each word is finished, when you t
 - A lone *i* becomes *I*, so *i'm* is *I’m*.
 - The ending of an ordinal is raised: 1st, 2nd, 3rd, 11th.
 - A web or mail address (www.example.com, https://…, name@example.com) becomes a link.
+- Scrivener's substitutions: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then.
 
 Undo straight after takes a correction back. Cookbook Settings › Writing › **Corrections** turns each one off.
 

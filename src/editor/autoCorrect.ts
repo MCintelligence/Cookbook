@@ -7,7 +7,8 @@ import { getSettings } from '../settings';
 
 /**
  * Scrivener's typing corrections, with its default settings: capitalising the first word of a
- * sentence and a lone "i", superscript ordinals (1st, 2nd) and web addresses made into links.
+ * sentence and a lone "i", superscript ordinals (1st, 2nd), web addresses made into links, and its
+ * list of symbol and text substitutions ((c) to ©, teh to the).
  * Like Scrivener, each one happens as a word is finished, when a space, a new line or a mark of
  * punctuation is typed after it, never while the word is being written and never on paste.
  *
@@ -145,6 +146,46 @@ export function ordinalAt(text: string, typed: number): [number, number] | null 
   return [start + m[1]!.length, typed];
 }
 
+/**
+ * Scrivener's own list of symbol and text substitutions, as it ships (Settings › Corrections › Symbol and
+ * text substitution, on by default). Each is made when the word is finished. "—>" is "-->" after the
+ * two hyphens have become an em dash.
+ */
+export const SUBSTITUTIONS: readonly (readonly [string, string])[] = [
+  ['(c)', '©'],
+  ['(r)', '®'],
+  ['(tm)', '™'],
+  ['-->', '→'],
+  ['—>', '→'],
+  ['<--', '←'],
+  ['<—', '←'],
+  ['==>', '⇒'],
+  ['<==', '⇐'],
+  ['1/2', '½'],
+  ['1/3', '⅓'],
+  ['2/3', '⅔'],
+  ['1/4', '¼'],
+  ['3/4', '¾'],
+  ['teh', 'the'],
+  ['tehn', 'then'],
+];
+
+/** A substitution for the text just finished, as [from, to, replacement], or null. A capital stays a capital (Teh → The). */
+export function substitutionAt(text: string, typed: number): [number, number, string] | null {
+  const ch = text[typed] ?? '';
+  if (!DELIMITER.test(ch) || ch === '/') return null;
+  for (const [key, value] of SUBSTITUTIONS) {
+    const from = typed - key.length;
+    if (from < 0) continue;
+    const word = text.slice(from, typed);
+    if (word.toLowerCase() !== key) continue;
+    if (from > 0 && (ALNUM.test(text[from - 1]!) || text[from - 1] === '/')) continue;
+    const capital = /^\p{Lu}/u.test(word) && /^\p{Ll}/u.test(value);
+    return [from, typed, capital ? value[0]!.toUpperCase() + value.slice(1) : value];
+  }
+  return null;
+}
+
 /** Top-level domains a bare address (example.com) is linked with; www. and http:// always are. */
 const DOMAINS = 'com|org|net|edu|gov|mil|int|info|biz|io|co|uk|us|ca|au|nz|ie|de|fr|es|it|nl|eu|me|app|dev';
 const ADDRESS = new RegExp(`^(?:(?:https?|ftp)://[^\\s<>"]+|www\\.[^\\s<>"]+\\.[^\\s<>"]+|[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.(?:${DOMAINS})(?:/[^\\s<>"]*)?|[\\w.+-]+@[a-z0-9-]+(?:\\.[a-z0-9-]+)+)$`, 'i');
@@ -218,7 +259,9 @@ export function correctionsAt(state: EditorState, pos: number, newLine: boolean,
   let changed = false;
 
   const capital = capitalAt(text, typed, s.capitalSentences, s.capitalI);
-  if (capital !== null && plain(at(capital), at(capital) + 1)) {
+  const fixed = capital === null ? text : text.slice(0, capital) + text[capital]!.toUpperCase() + text.slice(capital + 1);
+  const swap = s.textSubstitutions ? substitutionAt(fixed, typed) : null;
+  if (capital !== null && plain(at(capital), at(capital) + 1) && !(swap && capital >= swap[0])) {
     const from = at(capital);
     const node = state.doc.nodeAt(from);
     const upper = text[capital]!.toUpperCase();
@@ -239,6 +282,13 @@ export function correctionsAt(state: EditorState, pos: number, newLine: boolean,
   const address = s.webLinks && link ? addressAt(text, typed) : null;
   if (address && link && plain(at(address[0]), at(address[1]))) {
     tr.addMark(at(address[0]), at(address[1]), link.create({ href: address[2] }));
+    changed = true;
+  }
+
+  // Last, as it changes the length of the text; nothing above reaches past its start.
+  if (swap && plain(at(swap[0]), at(swap[1]))) {
+    const node = state.doc.nodeAt(at(swap[0]));
+    tr.replaceWith(at(swap[0]), at(swap[1]), state.schema.text(swap[2], node?.marks ?? []));
     changed = true;
   }
   return changed;
@@ -309,6 +359,153 @@ export const AutoCorrect = Extension.create({
             if (state.selection.empty && correctionsAt(state, state.selection.from, false, tr)) dispatchOwn(view, tr);
           },
         }),
+      }),
+    ];
+  },
+});
+
+// ---------- smart copy and paste ----------
+
+const smartKey = new PluginKey('smartCopyPaste');
+/** What keeps a word apart from its neighbours: a space, or punctuation after it. */
+const OPENING = /[([{“‘"'¿¡]/u;
+const CLOSING = /[\s.,;:!?)\]}”’"'…]/u;
+
+/**
+ * The spaces Scrivener's smart delete takes with a whole word (selected by double-click), so the
+ * words either side keep one space between them: the space before the word, or after it at the
+ * start of a line. `text` is the paragraph and [from, to) the word.
+ */
+export function smartDeleteRange(text: string, from: number, to: number): [number, number] {
+  const before = text[from - 1];
+  const after = text[to];
+  if (before === ' ' && (after === undefined || CLOSING.test(after))) return [from - 1, to];
+  if ((before === undefined || before === ' ' || OPENING.test(before)) && after === ' ') return [from, to + 1];
+  return [from, to];
+}
+
+/** The spaces Scrivener's smart paste puts around a word that was copied whole: [before, after]. */
+export function smartPasteSpaces(before: string | undefined, pasted: string, after: string | undefined): [string, string] {
+  const lead = !/^\s/u.test(pasted) && before !== undefined && !/\s/u.test(before) && !OPENING.test(before) ? ' ' : '';
+  const trail = !/\s$/u.test(pasted) && after !== undefined && ALNUM.test(after) ? ' ' : '';
+  return [lead, trail];
+}
+
+/**
+ * Scrivener's smart copy and paste (on by default): a word selected by double-click is deleted or
+ * cut with the space beside it, and pasted back with a space either side as needed. Only words
+ * selected whole get this, as in Scrivener; a selection made any other way is left as it is.
+ */
+export const SmartCopyPaste = Extension.create({
+  name: 'smartCopyPaste',
+  addProseMirrorPlugins() {
+    let pendingWord = false;
+    let word: { from: number; to: number } | null = null;
+    let copied: string | null = null;
+    let pasting: string | null = null;
+    let cutting = false;
+    const isWord = (state: EditorState) => !!word && state.selection.from === word.from && state.selection.to === word.to && state.selection.$from.sameParent(state.selection.$to);
+    const deleteWord = (view: EditorView): boolean => {
+      const { state } = view;
+      if (!getSettings().smartCopyPaste || !isWord(state)) return false;
+      const { $from, from, to } = state.selection;
+      const start = $from.start();
+      const text = $from.parent.textBetween(0, $from.parent.content.size, undefined, '￼');
+      const [a, b] = smartDeleteRange(text, from - start, to - start);
+      word = null;
+      view.dispatch(state.tr.delete(start + a, start + b).scrollIntoView());
+      return true;
+    };
+    return [
+      new Plugin({
+        key: smartKey,
+        props: {
+          handleDoubleClick() {
+            pendingWord = true;
+            return false;
+          },
+          handleKeyDown(view, event) {
+            if ((event.key === 'Backspace' || event.key === 'Delete') && !event.metaKey && !event.ctrlKey && !event.altKey) return deleteWord(view);
+            return false;
+          },
+          handleDOMEvents: {
+            copy(view) {
+              copied = getSettings().smartCopyPaste && isWord(view.state) ? view.state.doc.textBetween(view.state.selection.from, view.state.selection.to) : null;
+              return false;
+            },
+            cut(view) {
+              cutting = getSettings().smartCopyPaste && isWord(view.state);
+              copied = cutting ? view.state.doc.textBetween(view.state.selection.from, view.state.selection.to) : null;
+              return false;
+            },
+          },
+          handlePaste(_view, event) {
+            const text = event.clipboardData?.getData('text/plain') ?? null;
+            pasting = getSettings().smartCopyPaste && copied !== null && text === copied ? text : null;
+            return false;
+          },
+        },
+        appendTransaction(transactions, oldState, state) {
+          if (cutting && transactions.some((t) => t.getMeta('uiEvent') === 'cut')) {
+            cutting = false;
+            const { $from } = state.selection;
+            const start = $from.start();
+            const at = $from.parentOffset;
+            const [a, b] = smartDeleteRange($from.parent.textBetween(0, $from.parent.content.size, undefined, '\ufffc'), at, at);
+            return a === b ? null : state.tr.delete(start + a, start + b);
+          }
+          const was = pasting;
+          pasting = null;
+          if (was === null || !transactions.some((t) => t.getMeta('uiEvent') === 'paste' || t.getMeta('paste'))) return null;
+          const { from: start } = oldState.selection;
+          const begin = transactions.reduce((p, t) => t.mapping.map(p, -1), start);
+          const end = state.selection.from;
+          const $begin = state.doc.resolve(begin);
+          const $end = state.doc.resolve(end);
+          if (!$begin.sameParent($end)) return null;
+          const before = $begin.parentOffset > 0 ? $begin.parent.textBetween($begin.parentOffset - 1, $begin.parentOffset, undefined, '￼') : undefined;
+          const after = $end.parentOffset < $end.parent.content.size ? $end.parent.textBetween($end.parentOffset, $end.parentOffset + 1, undefined, '￼') : undefined;
+          const [lead, trail] = smartPasteSpaces(before, was, after);
+          if (!lead && !trail) return null;
+          const tr = state.tr;
+          if (trail) tr.insertText(trail, end);
+          if (lead) tr.insertText(lead, begin);
+          return tr;
+        },
+        view: () => ({
+          update(view) {
+            const { selection } = view.state;
+            if (pendingWord) {
+              pendingWord = false;
+              word = selection.empty ? null : { from: selection.from, to: selection.to };
+            } else if (word && (selection.from !== word.from || selection.to !== word.to)) word = null;
+          },
+        }),
+      }),
+    ];
+  },
+});
+
+// ---------- undo steps ----------
+
+/**
+ * Scrivener's Undo takes back a whole run of typing, however long it took, and the run ends when the
+ * caret is moved (by a click or an arrow key). Here the undo history keeps typing together (see its
+ * newGroupDelay), and moving the caret closes the step, even when it comes back to the same place.
+ */
+export const typingRunsKey = new PluginKey('typingRuns');
+
+export const TypingRuns = Extension.create({
+  name: 'typingRuns',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: typingRunsKey,
+        appendTransaction(transactions, oldState, state) {
+          if (transactions.some((t) => t.docChanged) || oldState.selection.eq(state.selection)) return null;
+          if (transactions.some((t) => t.getMeta('addToHistory') === false)) return null;
+          return closeHistory(state.tr);
+        },
       }),
     ];
   },

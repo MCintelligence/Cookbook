@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey, TextSelection, type EditorState } from '@tiptap/pm/state';
+import { AllSelection, Plugin, PluginKey, type Selection, TextSelection, type EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view';
 
 /** Where focus can go while the page's selection should still show: menus, the menu bar and the format toolbar. */
@@ -9,11 +9,14 @@ const key = new PluginKey<boolean>('keptSelection');
 
 const keeps = (el: EventTarget | null) => el instanceof Element && !!el.closest(KEEPS);
 
+/** Selected text to keep: a stretch of text, or everything after Select all (⌘A makes a selection of its own kind). */
+const spans = (sel: Selection) => (sel instanceof TextSelection || sel instanceof AllSelection) && !sel.empty;
+
 /** The selection to paint while it is kept, or null. */
 export function keptRange(state: EditorState): { from: number; to: number } | null {
   if (!key.getState(state)) return null;
   const sel = state.selection;
-  return sel instanceof TextSelection && !sel.empty ? { from: sel.from, to: sel.to } : null;
+  return spans(sel) ? { from: sel.from, to: sel.to } : null;
 }
 
 /**
@@ -55,7 +58,13 @@ export const KeptSelection = Extension.create({
             },
             blur(view, e) {
               // Switching to another app hides the selection as usual.
-              if (keeps(e.relatedTarget) && document.hasFocus()) set(view, true);
+              if (!document.hasFocus()) return false;
+              if (keeps(e.relatedTarget) || keeps(document.activeElement)) set(view, true);
+              // Some engines say where the focus went only once it has arrived.
+              else
+                requestAnimationFrame(() => {
+                  if (!view.isDestroyed && !view.hasFocus() && keeps(document.activeElement)) set(view, true);
+                });
               return false;
             },
           },

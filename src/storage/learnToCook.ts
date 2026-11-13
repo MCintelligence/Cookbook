@@ -134,11 +134,12 @@ Hover over a Group to see how many words it holds.
 
 Want to write a scene again from scratch? Press **Alt+X** (**⌥X** on a Mac), or right-click the Item on the Shelf and choose **Draft this item**.
 
-The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is left empty, and the draft shows through as faded **ghost text**, starting on the line you’re writing on. Write your new version over it: each sentence you write takes the place of one of the old ones, and the rest of the old paragraph carries on just after the cursor.
+The Item stays where it is, but its words move into **Draft 1**, listed under it on the Shelf in italics. The Item is now your newest version: it starts empty, with the draft’s words showing through as faded **ghost text**, starting on the line you’re writing on. Go sentence by sentence: press **Tab** to keep the next sentence as it was, or type your own and it takes that sentence’s place, the rest of the old paragraph carrying on just after the cursor.
 
 - Draft again and you get **Draft 2**, and so on. The newest draft is listed first, right under the Item.
-- **Alt+Z** (⌥Z) shows an older draft as the ghost text, and **Alt+C** (⌥C) a newer one, back up to the newest. Or click a draft.
-- Right-click a draft to **Hide ghost text**, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
+- Click a draft to read it: it opens on the page as ordinary text. **Alt+Z** (⌥Z) steps back to older drafts and **Alt+C** (⌥C) forward again, ending back at the Item.
+- Ghost text only ever shows in the Item itself, from its newest draft. Recipe › **Ghost text** hides it.
+- Right-click a draft to **Open** it, **Put back in the item** (whatever the Item holds now becomes a new draft, so nothing is lost), or **Delete draft**.
 - Drafts never count towards word counts or goals, and they stay out of Mise en Place, search and anything you plate, serve or export. They are kept in backups, in the recipe’s \`drafts\` folder.
 `,
         },
@@ -182,7 +183,7 @@ To go back to one Item, click it on the Shelf.
           synopsis: 'Shortcuts that format as you type, and the insert menu.',
           body: `# Typing and formatting
 
-Cookbook tidies as you type. "Straight quotes" turn curly, two hyphens -- make an em dash, and three dots make an ellipsis.
+Cookbook tidies as you type, as Scrivener does. "Straight quotes" turn curly, two hyphens -- make an em dash, a hyphen between spaces makes an en dash, and three dots make an ellipsis. When you finish a word, the first in a sentence gets its capital, a lone i becomes I, 1st and 2nd are raised, and web addresses become links.
 
 Markdown works too, if you know it. Try each on an empty line below:
 
@@ -193,7 +194,7 @@ Markdown works too, if you know it. Try each on an empty line below:
 
 Don't want some of these? Cookbook Settings › Writing turns Markdown off, or any one rule on its own.
 
-Words wrap whole, as in Scrivener, and a paragraph won't end on one lonely word when a better break is close by. Cookbook Settings › Writing › **Line breaks** turns hyphenation on, for long words only, or lets lines break wherever they fall. Plate keeps at least two lines of a paragraph together at the foot and top of every printed page.
+Words wrap whole, as in Scrivener, each line taking as many as fit. Cookbook Settings › Writing › **Line breaks** turns hyphenation on, for long words only, or evens out line endings so a paragraph won't end on one lonely word. Plate keeps at least two lines of a paragraph together at the foot and top of every printed page.
 
 Type **/** at the start of a line for the **insert menu**: styles, lists, a table, a section break or a footnote. Or use the Insert and Format menus at the top.
 

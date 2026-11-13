@@ -96,6 +96,7 @@ Moving never renames a file unless the Group it lands in already has one of the 
 - **Add a note** by right-clicking Research and choosing **New note in Research**. Notes are pages like any other, with their own words, label and status.
 - **Bring in files** by dropping them from your computer onto Research, or right-click it and choose **Import files…**. Word, Markdown and text files become notes; anything else is kept as it is.
 - **Look at a file** by clicking it. A picture or PDF shows above a page of your own notes about it, with − and + to zoom. You can select and copy the words of a PDF. A web page shows as it was saved, Safari web archives included, without going online. Sound and films play. **Save a copy…** gives you the file back to open in another app.
+- **Show a web page live** by choosing **Web page** above a note's page and pasting its address, or by dropping a link there. The page shows straight from the web, as in Scrivener, with nothing to save first: follow its links, and use Back, Forward and Reload in its bar. **Open in browser** opens it in your own browser. With no connection it says so and shows again once you're back online; to read it offline, save it from your browser and add the saved page.
 - **Arrange** Research as you like, in Groups of its own. Drag a Shelf Item or Group onto Research to move it there, or drag a note back onto the Shelf. Files stay in Research.
 
 Nothing in Research is exported, counted towards your words, or shown in Prep or Plan, and the Shelf's search leaves it out. The search in the top bar still finds it. A Scrivener project's Research folder comes in here, and so does any other folder Scrivener kept beside the Draft.
@@ -129,12 +130,26 @@ Nothing in the Archive shows in Prep or Plan, is exported, counted towards your 
 | \`-TD \` at the start of a line | a checklist |
 | \`* * *\` then Enter | a section break |
 | \`!Word\` | a drop cap on the word's first letter |
-| \`--\` | an em dash |
+| \`--\` or \`---\` | an em dash |
+| \` - \` (a hyphen with a space either side) | an en dash |
+| \`...\` | an ellipsis |
 | \`"\` and \`'\` | curly quotes |
 | **/** at the start of a line | the insert menu |
 | **@** after a space | a name from the Pantry |
 
 Backspace straight after a shortcut turns it back into exactly what you typed. Cookbook Settings › Writing › Markdown turns all of them off at once, or any one on its own.
+
+## Corrections as you type
+
+As in Scrivener, a few things are put right as each word is finished, when you type the space, punctuation or new line after it:
+
+- The first word of a sentence gets a capital, after a full stop, question mark or exclamation mark and a space, or at the start of a paragraph. Not after *e.g.* or *i.e.*, a full stop inside a word (3.5), or an ellipsis.
+- A lone *i* becomes *I*, so *i'm* is *I’m*.
+- The ending of an ordinal is raised: 1st, 2nd, 3rd, 11th.
+- A web or mail address (www.example.com, https://…, name@example.com) becomes a link.
+- Scrivener's substitutions: (c) ©, (r) ®, (tm) ™, --> →, <-- ←, ==> ⇒, <== ⇐, 1/2 ½, 1/4 ¼, 3/4 ¾, 1/3 ⅓, 2/3 ⅔, teh the, tehn then.
+
+Undo straight after takes a correction back. Cookbook Settings › Writing › **Corrections** turns each one off.
 
 ## Drop caps
 
@@ -166,9 +181,9 @@ Click a section break (\`* * *\`) to **split** the Item there: everything after 
 
 ## Drafts
 
-To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The draft shows through as faded ghost text, starting on the line you're on. As you write the new version it keeps pace a sentence at a time: each sentence you write takes the place of one of the draft's, and the rest of that paragraph carries on just after the cursor.
+To write an Item again from scratch, press {key:draft|Recipe › Draft this item}, or right-click it on the Shelf and choose **Draft this item**. The Item keeps its place, but its words move into **Draft 1**, listed under it in italics, and the Item is left empty. The Item is now the newest version, and the draft shows through it as faded ghost text, starting on the line you're on. Work through it a sentence at a time: **Tab** keeps the next sentence as it was, or type your own and it takes that sentence's place, with the rest of the old paragraph carrying on just after the cursor.
 
-Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. {key:olderDraft|Recipe › Older draft as ghost text} shows an older draft through the Item and {key:newerDraft|Recipe › Newer draft as ghost text} a newer one, back up to the newest; clicking a draft does the same. Right-click a draft to **Hide ghost text**, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
+Draft again for Draft 2, and so on. Drafts are listed newest first, so the latest is right under the Item. Click a draft to read it on the page as ordinary text. {key:olderDraft|Recipe › Older draft} steps back to older drafts and {key:newerDraft|Recipe › Newer draft} forward again, ending back at the Item. Ghost text only ever shows in the Item itself, from its newest draft; Recipe › **Ghost text** hides it. Right-click a draft to **Open** it, **Put back in the item** (what the Item holds now becomes a new draft first) or **Delete draft** (Undo in the notice brings it back). Drafts don't count towards word counts or goals, and stay out of Mise en Place, search, Plate and export. Ghost text is never saved, checked or counted.`,
   },
   {
     id: 'mise',

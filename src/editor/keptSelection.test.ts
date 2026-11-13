@@ -77,3 +77,13 @@ describe('the selection while a menu is open', () => {
     expect(kept(editor)).toBe(0);
   });
 });
+
+describe('after Select all', () => {
+  it('stays highlighted while the menu is open', () => {
+    const { editor, item } = setup();
+    editor.commands.selectAll();
+    blur(editor, item);
+    expect(editor.view.dom.querySelector('.cb-kept-selection')?.textContent).toBe('Keep this selected');
+  });
+
+});

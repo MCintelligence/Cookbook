@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Editor } from '@tiptap/core';
 import { cookbookExtensions } from './extensions';
 import { parseMarkdown, serializeMarkdown, type NodeJSON } from './markdown';
-import { ghostKey, sentencesOf, setGhost } from './ghost';
+import { acceptGhostSentence, ghostKey, sentencesOf, setGhost } from './ghost';
 import { docWords } from './docStats';
 
 const editors: Editor[] = [];
@@ -14,6 +14,7 @@ function make(markdown: string) {
   editors.push(editor);
   return editor;
 }
+const md = (editor: Editor) => serializeMarkdown(editor.getJSON() as NodeJSON);
 const shown = (editor: Editor) => {
   const dom = editor.view.dom;
   return {
@@ -55,6 +56,20 @@ describe('ghost text', () => {
     expect(shown(editor).after).toBe(' Nobody spoke.');
     editor.commands.insertContent(' cackled. Silence.');
     expect(shown(editor)).toEqual({ line: null, below: ['Then supper.'], after: null });
+  });
+
+  it('takes the ghost’s next sentence as it is with Tab, then the next paragraph’s', () => {
+    const editor = make('');
+    setGhost(editor, ['June burned the rice. Lou laughed.', 'Then supper.']);
+    const tab = () => editor.view.someProp('handleKeyDown', (f) => f(editor.view, new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+    expect(tab()).toBe(true);
+    expect(md(editor)).toBe('June burned the rice.\n');
+    editor.commands.insertContent(' Lou howled.');
+    expect(acceptGhostSentence(editor)).toBe(true);
+    expect(md(editor)).toBe('June burned the rice. Lou howled.\n\nThen supper.\n');
+    expect(shown(editor)).toEqual({ line: null, below: [], after: null });
+    // Nothing left to take: Tab does what it always does.
+    expect(acceptGhostSentence(editor)).toBe(false);
   });
 
   it('splits sentences after their stops and closing quotes', () => {

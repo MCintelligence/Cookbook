@@ -25,8 +25,12 @@ function type(editor: Editor, text: string, gap = 50) {
     view.dispatch(view.state.tr.insertText(ch, from, to).setTime(clock));
   }
 }
-function pause() {
+/** The writer stops and moves the caret away and back: as in Scrivener, that ends one step of typing. */
+function pause(editor: Editor) {
   clock += 5000;
+  const at = editor.state.selection.from;
+  editor.commands.setTextSelection(1);
+  editor.commands.setTextSelection(at);
 }
 
 const md = (editor: Editor) => serializeMarkdown(editor.getJSON() as NodeJSON);
@@ -42,7 +46,7 @@ describe('undo that survives closing', () => {
   it('undoes the same steps after reopening', () => {
     const { editor, recorder } = make('The kitchen.');
     type(editor, ' It smelled of cornbread.');
-    pause();
+    pause(editor);
     type(editor, ' Lou hummed.');
     const saved = JSON.stringify(recorder.toJSON());
     const text = md(editor);
@@ -81,10 +85,10 @@ describe('undo that survives closing', () => {
   it('keeps undos and redos made before closing', () => {
     const { editor, recorder } = make('Pie.');
     type(editor, ' Peach.');
-    pause();
+    pause(editor);
     type(editor, ' Cobbler.');
     editor.commands.undo();
-    pause();
+    pause(editor);
     const saved = JSON.stringify(recorder.toJSON());
     const again = reopen(md(editor), saved);
     expect(again.restored).toBe(true);
@@ -97,7 +101,7 @@ describe('undo that survives closing', () => {
     const { editor, recorder } = make('Plain words');
     editor.commands.setTextSelection({ from: 1, to: 6 });
     editor.commands.toggleMark('charStyle', { style: 'strong' });
-    pause();
+    pause(editor);
     editor.commands.focus('end');
     editor.commands.insertContent({ type: 'footnote', attrs: { text: 'A note.' } });
     const text = md(editor);
@@ -153,7 +157,7 @@ describe('undo that survives closing', () => {
   it('replays off screen and shows the result once', () => {
     const { editor, recorder } = make('The kitchen.');
     type(editor, ' It smelled of cornbread.');
-    pause();
+    pause(editor);
     type(editor, ' Lou hummed.');
     const text = md(editor);
     const log = parseUndoLog(JSON.stringify(recorder.toJSON()))!;

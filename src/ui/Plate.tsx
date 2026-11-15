@@ -68,6 +68,8 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
   const [picked, setPicked] = useState<Row | null>(null);
   const [margins, setMargins] = useState(false);
   const [serveOpen, setServeOpen] = useState(false);
+  /** On a phone the three columns are one at a time: the pages, what goes in the book, and how it is set. */
+  const [pane, setPane] = useState<'pages' | 'book' | 'style'>('pages');
   const host = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 900, height: 700 });
@@ -305,6 +307,16 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
     <div className="plate" role="dialog" aria-label="Plate">
       <style>{plateCss(s) + pageCss(s)}</style>
       <header className="plate-top">
+        {/* On a phone: a back arrow and the place's label over the recipe's name, as every page there. */}
+        <button type="button" className="plate-back" aria-label="Cancel" onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5M11 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="plate-phone-head">
+          <span>Plate</span>
+          <b>{title}</b>
+        </span>
         <span className="plate-brand">cookbook</span>
         <span className="plate-crumb">{title} · Plate</span>
         <span className="plate-top-gap" />
@@ -334,7 +346,15 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
         </div>
       </header>
 
-      <div className="plate-main">
+      <div className="plate-panes" role="tablist" aria-label="Plate">
+        {(['pages', 'book', 'style'] as const).map((id) => (
+          <button key={id} role="tab" aria-selected={pane === id} onClick={() => setPane(id)}>
+            {id === 'pages' ? 'Pages' : id === 'book' ? 'Book' : 'Style'}
+          </button>
+        ))}
+      </div>
+
+      <div className={`plate-main show-${pane}`}>
         <aside className="plate-side plate-book" aria-label="Book">
           <h2>Book</h2>
           <div className="plate-sec">Front matter</div>

@@ -1,4 +1,5 @@
 import { isTauri } from '../storage/platform';
+import { ANDROID_APP, setSystemBars } from '../mobile';
 
 /** An rgb() or rgba() colour as Tauri's [r, g, b, a], or null if it isn't one. */
 export function rgbaOf(css: string): [number, number, number, number] | null {
@@ -24,6 +25,8 @@ export function matchWindowToBars(): void {
     const key = colour.join(',');
     if (key === last) return;
     last = key;
+    // On Android the app keeps clear of the status and navigation bars; the strips behind them take the bars' colour.
+    if (ANDROID_APP) return setSystemBars([colour[0], colour[1], colour[2]]);
     void Promise.all([import('@tauri-apps/api/window'), import('@tauri-apps/api/webview')]).then(([w, v]) =>
       Promise.all([w.getCurrentWindow().setBackgroundColor(colour), v.getCurrentWebview().setBackgroundColor(colour)]).catch(() => {}),
     );

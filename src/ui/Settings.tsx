@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { isTouch } from '../mobile';
 import { Icon } from './Icon';
 import { type AppSettings, MARKDOWN_RULES, type Theme, getSettings, setSettings, useSettings } from '../settings';
 import { WRITERS } from '../writers';
@@ -260,6 +261,13 @@ export function Settings(props: Props) {
       tabIndex={-1}
     >
       <header className="set-top">
+        {/* A phone heads the page as every page there is headed: a back arrow and its name. */}
+        <button type="button" className="set-back" aria-label="Back to writing" onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5M11 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="set-phone-title">Settings</span>
         <div className="set-brand">
           <span className="brand">cookbook</span>
           <span className="set-crumb">· Cookbook Settings</span>
@@ -400,6 +408,19 @@ function SectionBody({ id, ...props }: Props & { id: SettingsSection }) {
               </div>
             )}
           </div>
+          <Group title="Page">
+            <Row title="Page in the dark theme" help="White paper with dark words, or a dark page with light words. A colour you gave words yourself stays as you picked it.">
+              <Seg
+                label="Page in the dark theme"
+                value={s.paper}
+                options={[
+                  ['white', 'White'],
+                  ['dark', 'Dark'],
+                ]}
+                onChange={(paper) => set({ paper })}
+              />
+            </Row>
+          </Group>
           <Group title="Interface">
             <Row title="Interface size" help="Menus, sidebar and buttons. The page has its own zoom, in Layout.">
               <Seg
@@ -896,7 +917,7 @@ function Styles({ sheet, onEditStyle, onAddStyle, onRenameStyle }: Pick<Props, '
               );
             })}
           </div>
-          <p className="set-row-help">Apply them with the shortcuts, or a right-click on the page.</p>
+          <p className="set-row-help">{isTouch() ? 'Apply them from the Format menu, or the writing bar above the keyboard.' : 'Apply them with the shortcuts, or a right-click on the page.'}</p>
         </div>
       </div>
     </>

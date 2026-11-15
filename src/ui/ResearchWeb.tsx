@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Icon } from './Icon';
 import { isTauri } from '../storage/platform';
+import { openWeb } from '../mobile';
+import { usePhone } from './usePhone';
 
 interface Props {
   url: string;
@@ -57,7 +59,76 @@ function useTrail(start: string) {
  * also shows sites that won't sit inside another page; in a web browser it is a frame. With no
  * connection it says so, and the page shows again once the connection is back.
  */
-export function ResearchWeb({ url, onAddSaved, onForget }: Props) {
+export function ResearchWeb(props: Props) {
+  return usePhone() ? <PhoneWeb {...props} /> : <DeskWeb {...props} />;
+}
+
+/**
+ * A web page on a phone. A page squeezed into a card on a phone's screen is hard to read and many
+ * sites refuse to sit inside another page, so the note shows what the page is and opens it in
+ * Android's in-app browser (the writer's own browser over Cookbook, with their sign-ins and reader
+ * view; Back returns here). Off Android, it opens in a new tab.
+ */
+function PhoneWeb({ url, onAddSaved, onForget }: Props) {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  let host = url;
+  let path = '';
+  try {
+    const u = new URL(url);
+    host = u.hostname.replace(/^www\./, '');
+    path = decodeURI(u.pathname + u.search).replace(/\/$/, '');
+  } catch {
+    // Shown as written.
+  }
+  const read = () => {
+    if (!openWeb(url)) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+  const copy = () => {
+    void navigator.clipboard?.writeText(url).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="phone-web" aria-label={`Web page: ${url}`}>
+      <span className="phone-web-label">Web page</span>
+      <span className="phone-web-host">{host}</span>
+      {path && <span className="phone-web-path">{path}</span>}
+      <button type="button" className="phone-web-read" disabled={!online} onClick={read}>
+        <Icon name="outside" size={18} />
+        {online ? 'Read it' : 'Offline for now'}
+      </button>
+      {!online && <p className="phone-web-note">It opens once the phone is back online. A saved copy can be read any time.</p>}
+      <div className="phone-web-rows">
+        <button type="button" className="sheet-row" onClick={copy}>
+          <Icon name="web" size={18} />
+          {copied ? 'Copied' : 'Copy the address'}
+        </button>
+        <button type="button" className="sheet-row" onClick={onAddSaved}>
+          <Icon name="research" size={18} />
+          Add a saved copy
+        </button>
+        <button type="button" className="sheet-row" onClick={onForget}>
+          <Icon name="remove" size={18} />
+          Take the address off this note
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DeskWeb({ url, onAddSaved, onForget }: Props) {
   const spot = useRef<HTMLDivElement>(null);
   const [online, setOnline] = useState(() => navigator.onLine);
   /** 'view' when the desktop's own browser view shows it, 'frame' when a frame does. */

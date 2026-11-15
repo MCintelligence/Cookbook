@@ -1,4 +1,5 @@
 import { type CSSProperties, type DragEvent, type MouseEvent, useMemo, useState } from 'react';
+import { menuPress } from '../mobile';
 import { createPortal } from 'react-dom';
 import { BOOKSHELF, PANTRY_SECTIONS } from '../storage/book';
 import { LABELS } from '../storage/document';
@@ -161,7 +162,7 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
     ]);
   };
 
-  if (groups.length === 0) return <p className="mode-empty">Nothing on the Shelf yet. Right-click the Shelf to add a Group, and it becomes a column here.</p>;
+  if (groups.length === 0) return <p className="mode-empty">Nothing on the Shelf yet. {menuPress()} the Shelf to add a Group, and it becomes a column here.</p>;
   return (
     <div className="grid-board-scroll">
       <div className={`grid-board${by === 'none' ? '' : ' with-rows'}`} style={{ gridTemplateColumns: `${by === 'none' ? '' : '132px '}repeat(${groups.length}, 248px)` }} role="grid" aria-label="Board">

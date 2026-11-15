@@ -1,4 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
+import { haptic } from '../mobile';
+import { usePhone } from './usePhone';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { METERS, SEASONINGS, type SeasoningId, meterRemark, mix, tastingRemark, waitingRemark } from '../proofread/remarks';
 import { isChecking, isTastingFor, readingOf, tastePage } from '../proofread/tasting';
@@ -65,6 +67,8 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
   if (!editor || !page) return null;
 
   const showPicker = picking;
+  /** On a phone the toolbar goes: the switch moves to the heading and adding one to the end of the list. */
+  const phone = usePhone();
   const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
     // The card is drawn again in its new place; the keyboard stays on the same button or card.
     const held = document.activeElement;
@@ -145,7 +149,7 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     const start = () => {
       active = true;
       setDrag({ id, index: null });
-      navigator.vibrate?.(10);
+      haptic('lift');
     };
     // On a touch screen a long press picks the card up, so a plain swipe still scrolls.
     const timer = touch ? window.setTimeout(start, LONG_PRESS_MS) : undefined;
@@ -219,6 +223,12 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
       <div className="panel-head">
         <h2 className="panel-h">Seasonings</h2>
         <span className="panel-tools">
+          {phone && !showPicker && (
+            <label className="phone-switch">
+              <span>{paused ? 'Off' : 'On'}</span>
+              <input type="checkbox" role="switch" className="switch" aria-label="Seasonings on" checked={!paused} onChange={turn.onPick} />
+            </label>
+          )}
           <button className="icon-btn" aria-label="Close Seasonings" onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6 6 18" />
@@ -248,6 +258,11 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
         <p className="panel-quiet">Seasonings are off. Nothing is marked on the page.</p>
       ) : (
         <div className={`panel-list${drag ? ' is-sorting' : ''}${dropAt === chosen.length ? ' drop-end' : ''}`} ref={list}>
+          {phone && chosen.length < SEASONINGS.length && (
+            <button className="phone-add-row" onClick={() => setPicking(true)}>
+              <span aria-hidden="true">+</span> Add a seasoning
+            </button>
+          )}
           {chosen.map((id, at) => {
             const who = SEASONINGS.find((s) => s.id === id)!;
             const meter = METERS[id];
@@ -308,16 +323,18 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
           })}
         </div>
       )}
-      <PanelBar
-        label="Seasonings tools"
-        status={picked.length > 1 ? `${picked.length} picked` : undefined}
-        buttons={[
-          { label: turn.label, icon: BAR_ICONS.power, pressed: !paused, onClick: turn.onPick },
-          { label: 'Add a seasoning', icon: BAR_ICONS.add, disabled: showPicker, onClick: () => setPicking(true) },
-          { label: picked.length > 1 ? `Remove ${picked.length} picked` : 'Remove picked', icon: BAR_ICONS.remove, disabled: picked.length === 0, onClick: () => removeAll(picked) },
-          { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: chosen.length === 0 || showPicker, onClick: () => setMarked(everything ? [] : [...chosen]) },
-        ]}
-      />
+      {!phone && (
+        <PanelBar
+          label="Seasonings tools"
+          status={picked.length > 1 ? `${picked.length} picked` : undefined}
+          buttons={[
+            { label: turn.label, icon: BAR_ICONS.power, pressed: !paused, onClick: turn.onPick },
+            { label: 'Add a seasoning', icon: BAR_ICONS.add, disabled: showPicker, onClick: () => setPicking(true) },
+            { label: picked.length > 1 ? `Remove ${picked.length} picked` : 'Remove picked', icon: BAR_ICONS.remove, disabled: picked.length === 0, onClick: () => removeAll(picked) },
+            { label: everything ? 'Deselect all' : 'Select all', icon: BAR_ICONS.selectAll, pressed: everything, disabled: chosen.length === 0 || showPicker, onClick: () => setMarked(everything ? [] : [...chosen]) },
+          ]}
+        />
+      )}
     </aside>
   );
 }

@@ -1,4 +1,7 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
+import { fromTouch, haptic, menuPress } from '../mobile';
+import { usePhone } from '../ui/usePhone';
+import { Icon } from '../ui/Icon';
 import { createPortal } from 'react-dom';
 import { PANTRY_SECTIONS } from '../storage/book';
 import { type PantrySection, SECTION_KIND, SECTION_LABEL } from '../storage/pantry';
@@ -7,7 +10,7 @@ import { type ViewProps } from './host';
 import { type Item, type Tie, labelColor, layOut, pairTies, pantryGroups, tiesOf } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
 import { Face, Tally, ToolButton, Zoomer, cardMenu } from './shared';
-import { dragFrom, usePanZoom } from './usePanZoom';
+import { carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
 const SINGULAR: Record<PantrySection, string> = { characters: 'Character', settings: 'Setting', research: 'Material' };
 const NODE = 56;
@@ -39,7 +42,12 @@ export function Atlas({ host, tools, ask }: ViewProps) {
   // Laid out with every Item in mind, so hiding a kind doesn't shuffle the rest.
   const spots = useMemo(() => layOut(everything.map((i) => i.card.id), allTies, prefs.spots.atlas ?? {}), [everything, allTies, prefs.spots.atlas]);
   const pan = usePanZoom({ x: -480, y: -320, k: 1 });
+  const phone = usePhone();
+  /** On a phone: the open piece's bar was put away with Done (until another piece is picked). */
+  const [putAway, setPutAway] = useState<string | null>(null);
   const [moved, setMoved] = useState<{ id: string; spot: Spot } | null>(null);
+  /** The piece a finger has lifted to carry. */
+  const [held, setHeld] = useState<string | null>(null);
   const [tying, setTying] = useState<{ from: string; to: Spot } | null>(null);
   const at = (id: string): Spot => (moved?.id === id ? moved.spot : spots[id]!);
   const put = (id: string, spot: Spot) => setPrefs((now) => ({ spots: { ...now.spots, atlas: { ...(now.spots.atlas ?? {}), [id]: spot } } }));
@@ -74,6 +82,21 @@ export function Atlas({ host, tools, ask }: ViewProps) {
       other: tie ? { label: 'Remove tie', pick: () => void saveTie(a, b, '', '') } : undefined,
     });
 
+  const tieMenu = (item: Item) => {
+    const others = everything.filter((o) => o.card.id !== item.card.id).slice(0, 30);
+    return others.map((o) => ({ label: o.card.title, onPick: () => askTie(item, o, allTies.find((t) => (t.a === item.card.id && t.b === o.card.id) || (t.b === item.card.id && t.a === o.card.id)) ?? null) }));
+  };
+  const centre = (): Spot => {
+    const [x, y] = pan.toBoard(window.innerWidth / 2, window.innerHeight / 2);
+    return [Math.round(x), Math.round(y)];
+  };
+  const newHere = (spot: Spot) => PANTRY_SECTIONS.map((s) => ({ label: `New ${SINGULAR[s]}`, onPick: () => void host.newCard(s).then((id) => id && put(id, spot)) }));
+  const picked = phone && open && byId.has(open) && putAway !== open ? byId.get(open)! : null;
+  const tap = (run: () => void) => () => {
+    haptic('tick');
+    run();
+  };
+
   const toggleKind = (kind: string) => setPrefs({ atlas: { ...prefs.atlas, kinds: kinds.includes(kind) ? kinds.filter((k) => k !== kind) : [...kinds, kind] } });
 
   return (
@@ -91,7 +114,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             <ToolButton label="Show only the open Item and what it is tied to" pressed={near} onClick={() => setPrefs({ atlas: { ...prefs.atlas, near: !near } })}>
               Close ties only
             </ToolButton>
-            <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />
+            {!phone && <Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />}
             <ToolButton label="Lay the atlas out afresh" onClick={() => setPrefs((now) => ({ spots: { ...now.spots, atlas: {} } }))}>
               Tidy up
             </ToolButton>
@@ -105,7 +128,6 @@ export function Atlas({ host, tools, ask }: ViewProps) {
         className="free-board atlas"
         ref={pan.ref}
         onPointerDown={pan.onPointerDown}
-        style={{ backgroundPosition: `${-pan.look.x * pan.look.k}px ${-pan.look.y * pan.look.k}px`, backgroundSize: `${28 * pan.look.k}px ${28 * pan.look.k}px` }}
         onContextMenu={(e) => {
           if (e.target !== e.currentTarget) return;
           e.preventDefault();
@@ -117,7 +139,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
           ]);
         }}
       >
-        <div className="free-layer" style={{ transform: `scale(${pan.look.k}) translate(${-pan.look.x}px, ${-pan.look.y}px)` }}>
+        <div className="free-layer" ref={pan.layer}>
           <svg className="atlas-lines" width="1" height="1" aria-hidden="true">
             {ties.map((t) => {
               const [x1, y1] = at(t.a);
@@ -158,7 +180,7 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             return (
               <div
                 key={id}
-                className={`atlas-node${id === open ? ' chosen' : ''}${moved?.id === id ? ' lifted' : ''}`}
+                className={`atlas-node${id === open ? ' chosen' : ''}${moved?.id === id ? ' lifted' : ''}${held === id ? ' held' : ''}`}
                 data-atlas={id}
                 style={{ left: x, top: y, '--label': labelColor(item.card.label) ?? 'transparent' } as CSSProperties}
                 role="button"
@@ -168,12 +190,22 @@ export function Atlas({ host, tools, ask }: ViewProps) {
                 onPointerDown={(e) => {
                   if (e.button !== 0) return;
                   const from = spots[id]!;
+                  const el = e.currentTarget;
+                  if (e.pointerType === 'touch')
+                    return carryByTouch(e, pan, from, {
+                      onLift: (on) => setHeld(on ? id : null),
+                      onMove: (spot) => setMoved(spot ? { id, spot } : null),
+                      onDrop: (spot) => (setMoved(null), put(id, spot)),
+                      onMenu: (cx, cy) => el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: cx, clientY: cy })),
+                      onTap: () => (item.path === host.path ? host.open(item.path) : host.select(item.path)),
+                    });
+                  const per = scaleOf(pan.node) * pan.live().k;
                   dragFrom(
                     e,
-                    (dx, dy) => setMoved({ id, spot: [Math.round(from[0] + dx / pan.look.k), Math.round(from[1] + dy / pan.look.k)] }),
+                    (dx, dy) => setMoved({ id, spot: [Math.round(from[0] + dx / per), Math.round(from[1] + dy / per)] }),
                     (did, up) => {
                       setMoved(null);
-                      if (did) put(id, [Math.round(from[0] + (up.clientX - e.clientX) / pan.look.k), Math.round(from[1] + (up.clientY - e.clientY) / pan.look.k)]);
+                      if (did) put(id, [Math.round(from[0] + (up.clientX - e.clientX) / per), Math.round(from[1] + (up.clientY - e.clientY) / per)]);
                       else if (item.path !== host.path) host.select(item.path);
                     },
                   );
@@ -181,6 +213,8 @@ export function Atlas({ host, tools, ask }: ViewProps) {
                 onDoubleClick={() => host.open(item.path)}
                 onContextMenu={(e) => {
                   e.preventDefault();
+                  // A finger's own long press lifts the piece instead (carryByTouch), which opens this menu itself if it isn't carried.
+                  if (fromTouch(e) && e.nativeEvent.isTrusted) return;
                   const others = everything.filter((o) => o.card.id !== id).slice(0, 30);
                   host.menu(
                     'Pantry Item',
@@ -221,8 +255,58 @@ export function Atlas({ host, tools, ask }: ViewProps) {
             );
           })}
         </div>
-        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. Right-click here for a new Character, Setting or Material.</p>}
+        {everything.length === 0 && <p className="mode-empty">The Pantry is empty. {menuPress()} here for a new Character, Setting or Material.</p>}
       </div>
+      {phone &&
+        (picked ? (
+          // The open piece, with what can be done to it, on the board (as on the free board).
+          <div className="canvas-dock canvas-selection" role="toolbar" aria-label={picked.card.title}>
+            <div className="dock-acts">
+              <button type="button" className="dock-act" onClick={tap(() => host.open(picked.path))}>
+                <span className="dock-act-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                  </svg>
+                </span>
+                Open
+              </button>
+              <button type="button" className="dock-act" disabled={everything.length < 2} onClick={(e) => (haptic('tick'), host.menu('Tie to', 0, 0, tieMenu(picked), e.currentTarget))}>
+                <span className="dock-act-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="6" cy="12" r="3" />
+                    <circle cx="18" cy="12" r="3" />
+                    <path d="M9 12h6" />
+                  </svg>
+                </span>
+                Tie to
+              </button>
+              <button type="button" className="dock-act" onClick={tap(() => setPrefs({ atlas: { ...prefs.atlas, near: !near } }))} aria-pressed={near}>
+                <span className="dock-act-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <circle cx="12" cy="12" r="8" strokeDasharray={near ? '0' : '3 3'} />
+                  </svg>
+                </span>
+                {near ? 'Show all' : 'Close ties'}
+              </button>
+            </div>
+            <button type="button" className="dock-done" onClick={tap(() => setPutAway(open!))}>
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="canvas-dock canvas-idle">
+            <button type="button" className="dock-round" aria-label={`See the whole atlas (now ${Math.round(pan.zoom * 100)}%)`} onClick={tap(() => pan.fit(bounds()))}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+              </svg>
+              <span className="dock-zoom">{Math.round(pan.zoom * 100)}%</span>
+            </button>
+            <button type="button" className="phone-fab dock-add" aria-label="Add to the Pantry" onClick={(e) => (haptic('tick'), host.menu('New', 0, 0, newHere(centre()), e.currentTarget))}>
+              <Icon name="add" size={24} />
+            </button>
+          </div>
+        ))}
     </>
   );
 }

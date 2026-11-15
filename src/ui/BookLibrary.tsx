@@ -1,5 +1,6 @@
 import { pressed } from '../shortcuts';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { menuPress } from '../mobile';
 import { Icon as Art } from './Icon';
 import {
   type BookLocation,
@@ -614,7 +615,7 @@ export function BookLibrary(props: Props) {
                     <span>
                       {viewName} · {shown.length} {shown.length === 1 ? 'recipe' : 'recipes'}
                     </span>
-                    <span>Right-click a recipe for more</span>
+                    <span>{menuPress()} a recipe for more</span>
                   </div>
                   {shown.length === 0 ? (
                     <p className="panel-quiet">{query ? `No recipes match “${query.trim()}”.` : view === 'trash' ? 'Trash is empty.' : 'Nothing here yet.'}</p>

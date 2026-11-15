@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { historyRows, historyStats, streakOf, wordsADay } from './goals';
+import { finishAt, historyRows, historyStats, periodOf, recentPace, streakOf, wordsADay } from './goals';
 import { type WritingHistory } from './history';
 
 const history = (days: Record<string, number>): WritingHistory => new Map(Object.entries(days).map(([d, w]) => [d, { written: w, deleted: 0 }]));
@@ -56,5 +56,57 @@ describe('goals', () => {
     expect(wordsADay(90_000, 90_000, '2026-10-31', now)).toBeNull();
     expect(wordsADay(1, 90_000, undefined, now)).toBeNull();
     expect(wordsADay(1, 90_000, '2026-10-01', now)).toBeNull();
+  });
+});
+
+describe('a week, month or year at a time', () => {
+  // Thursday, October 22, 2026.
+  const h = history({ '2026-10-12': 900, '2026-10-13': 1200, '2026-10-14': 400, '2026-10-19': 1000, '2026-10-20': 300, '2026-10-22': 500, '2026-09-03': 2000 });
+
+  it('shows this week day by day, against the same days of last week', () => {
+    const p = periodOf(h, 'week', 0, goal, now);
+    expect(p.label).toBe('This week');
+    expect(p.bars.map((b) => b.label).join('')).toBe('MTWTFSS');
+    expect(p.bars.map((b) => b.words)).toEqual([1000, 300, 0, 500, 0, 0, 0]);
+    expect(p.bars[0]!.met).toBe(true);
+    expect(p.bars[3]!.today).toBe(true);
+    expect(p.bars[4]!.future).toBe(true);
+    expect(p.total).toBe(1800);
+    // Monday to Thursday of the week before, not the whole of it.
+    expect(p.before).toBe(2500);
+    expect(p.perDay).toBe(450);
+    expect(p.wrote).toBe(3);
+  });
+
+  it('pages back a week, a month or a year', () => {
+    const w = periodOf(h, 'week', -1, goal, now);
+    expect(w.label).toBe('Last week');
+    expect(w.total).toBe(2500);
+    expect(periodOf(h, 'week', -2, goal, now).label).toBe('5–11 Oct');
+    const m = periodOf(h, 'month', -1, goal, now);
+    expect(m.label).toBe('September');
+    expect(m.bars).toHaveLength(30);
+    expect(m.total).toBe(2000);
+    expect(m.start).toBe('2026-09-01');
+    expect(periodOf(h, 'month', -10, goal, now).label).toBe('December 2025');
+  });
+
+  it('shows a year month by month', () => {
+    const y = periodOf(h, 'year', 0, goal, now);
+    expect(y.label).toBe('2026');
+    expect(y.bars).toHaveLength(12);
+    expect(y.bars[8]!.words).toBe(2000);
+    expect(y.bars[9]!.words).toBe(4300);
+    expect(y.bars[9]!.today).toBe(true);
+    expect(y.bars[10]!.future).toBe(true);
+    expect(y.total).toBe(6300);
+    expect(y.before).toBe(0);
+  });
+
+  it('works out a pace and the day it reaches a target', () => {
+    expect(recentPace(h, now, 14)).toBe(Math.round(4300 / 14));
+    expect(finishAt(1000, 2000, 100, now)).toEqual(new Date(2026, 10, 1));
+    expect(finishAt(2000, 2000, 100, now)).toBeNull();
+    expect(finishAt(1000, 2000, 0, now)).toBeNull();
   });
 });

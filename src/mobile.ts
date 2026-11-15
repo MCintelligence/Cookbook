@@ -38,6 +38,8 @@ interface AndroidBridge {
   leave?: () => void;
   print?: (html: string, title: string) => void;
   haptic?: (kind: string) => void;
+  splashReady?: () => void;
+  splashShift?: () => number;
 }
 const bridge = (): AndroidBridge | undefined => (typeof window === 'undefined' ? undefined : (window as unknown as { CookbookAndroid?: AndroidBridge }).CookbookAndroid);
 
@@ -174,4 +176,22 @@ export function swallowClick(): void {
   };
   window.addEventListener('click', quiet, { capture: true, once: true });
   window.setTimeout(() => window.removeEventListener('click', quiet, true), 400);
+}
+
+/** Tells Android the page's splash is on screen, so its own can go (MainActivity.kt holds it until then). */
+export function splashReady(): void {
+  try {
+    bridge()?.splashReady?.();
+  } catch {
+    // An older shell lets its splash go by itself.
+  }
+}
+
+/** How far below the page's middle the screen's middle is, in CSS pixels before the interface zoom: 0 off Android. */
+export function splashShift(): number {
+  try {
+    return bridge()?.splashShift?.() ?? 0;
+  } catch {
+    return 0;
+  }
 }

@@ -8,6 +8,7 @@ import android.print.PrintManager
 import android.view.HapticFeedbackConstants
 import android.os.Build
 import android.view.View
+import android.view.ViewTreeObserver
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -34,6 +35,10 @@ class MainActivity : TauriActivity() {
   private var printing: WebView? = null
   /** The page, for haptics: feedback played on the view follows the phone's own touch-vibration setting. */
   private var web: WebView? = null
+  /** Whether the page has drawn its own first frame of the splash, so Android's can go (see splashReady). */
+  @Volatile private var pageReady = false
+  /** The system bars' heights in dp, top and bottom, for placing the page's splash mark where Android's was. */
+  @Volatile private var barsDp = floatArrayOf(0f, 0f)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
@@ -46,10 +51,26 @@ class MainActivity : TauriActivity() {
         WindowInsetsCompat.Type.ime()
       val bars = insets.getInsets(types)
       view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+      val density = resources.displayMetrics.density
+      barsDp = floatArrayOf(bars.top / density, bars.bottom / density)
       // The page is already clear of them, so it is told there is nothing left to avoid;
       // otherwise a newer WebView would leave the same room a second time.
       WindowInsetsCompat.Builder(insets).setInsets(types, Insets.NONE).build()
     }
+
+    // Android's splash stays until the page has drawn the same mark in the same place, so there is
+    // never a blank moment between the two; two seconds at most, should the page never say so.
+    val started = System.currentTimeMillis()
+    content.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+      override fun onPreDraw(): Boolean {
+        if (pageReady || System.currentTimeMillis() - started > 2000) {
+          content.viewTreeObserver.removeOnPreDrawListener(this)
+          return true
+        }
+        content.postInvalidateOnAnimation()
+        return false
+      }
+    })
   }
 
   override fun onWebViewCreate(webView: WebView) {
@@ -70,6 +91,17 @@ class MainActivity : TauriActivity() {
   }
 
   inner class Bridge {
+    /** The page has drawn its splash: Android's own may go. */
+    @JavascriptInterface
+    fun splashReady() {
+      pageReady = true
+      runOnUiThread { findViewById<View>(android.R.id.content).invalidate() }
+    }
+
+    /** How far below the page's middle the screen's middle is, in dp: half the bottom bar less half the top. */
+    @JavascriptInterface
+    fun splashShift(): Float = (barsDp[1] - barsDp[0]) / 2f
+
     /** The colour behind the status and navigation bars, and whether it is light (so the icons go dark). */
     @JavascriptInterface
     fun setBars(colour: String, lightBackground: Boolean) {

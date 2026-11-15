@@ -1,5 +1,6 @@
 import { type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { usePhone } from '../ui/usePhone';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF, childrenOf } from '../storage/book';
 import { LABELS } from '../storage/document';
@@ -33,8 +34,8 @@ import {
 import { type Form, type ModeHost } from './host';
 import { type Group, type Item, readingOrder } from './model';
 import { type BoardSetUp, type Spot, prefsStore, setPrefs } from './prefs';
-import { Zoomer } from './shared';
-import { fromTouch, menuPress } from '../mobile';
+import { Pick as PickBox, Zoomer } from './shared';
+import { fromTouch, haptic, menuPress } from '../mobile';
 import { type Look, carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
 /** A card on a free board, and the room each takes when they are laid out in rows. */
@@ -82,6 +83,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   const prefs = useStore(prefsStore);
   const name = pantry ? 'pboard' : 'board';
   const pan = usePanZoom();
+  const phone = usePhone();
   const looks = prefs.looks[name] ?? NO_LOOKS;
   const lines = prefs.lines[name] ?? NO_LINES;
   const byId = useMemo(() => new Map(items.map((i) => [i.card.id, i])), [items]);
@@ -614,6 +616,9 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     <>
       {tools &&
         createPortal(
+          phone ? (
+            <PhoneBoardSettings lead={lead} tally={tally} conf={conf} set={set} lineMenu={lineMenu} arrangeMenu={arrangeMenu} menu={(e, label, list) => host.menu(label, 0, 0, list, e.currentTarget)} />
+          ) : (
           <BoardTools
             chosenStore={chosenStore}
             lead={lead}
@@ -633,9 +638,31 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
             addChild={addChild}
             addSibling={addSibling}
             zoom={<Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />}
-          />,
+          />
+          ),
           tools,
         )}
+      {phone && (
+        <CanvasDock
+          chosenStore={chosenStore}
+          lines={lines}
+          looks={looks}
+          zoom={pan.zoom}
+          menu={(e, label, list) => host.menu(label, 0, 0, list, e.currentTarget)}
+          shapeMenu={shapeMenu}
+          colourMenu={colourMenu}
+          lineMenu={lineMenu}
+          addChild={addChild}
+          addSibling={addSibling}
+          onNew={(e) => host.menu('New', 0, 0, newHere(), e.currentTarget)}
+          onFit={() => pan.fit(bounds())}
+          onOpen={(id) => {
+            const item = byId.get(id);
+            if (item) host.open(item.path);
+          }}
+          onDone={() => choose([])}
+        />
+      )}
       <Canvas
         act={act}
         host={live}
@@ -815,6 +842,131 @@ function BoardTools({ chosenStore, lead, tally, zoom, conf, set, lines, looks, m
       <span className="tb-sep" />
       {zoom}
       {tally}
+    </>
+  );
+}
+
+interface DockProps {
+  chosenStore: Store<Chosen>;
+  lines: BoardLine[];
+  looks: Record<string, CardLook>;
+  zoom: number;
+  menu(e: ReactMouseEvent<HTMLButtonElement>, label: string, items: MenuItem[]): void;
+  shapeMenu(ids: string[]): MenuItem[];
+  colourMenu(ids: string[]): MenuItem[];
+  lineMenu(target: BoardLine | null): MenuItem[];
+  addChild(): void;
+  addSibling(): void;
+  onNew(e: ReactMouseEvent<HTMLButtonElement>): void;
+  onFit(): void;
+  onOpen(id: string): void;
+  onDone(): void;
+}
+
+/**
+ * The free board's controls on a phone, on the board itself where the thumb is (as Freeform and
+ * Miro do it): with nothing chosen, a button to add a card and one to see the whole board; with a
+ * card or a line chosen, a bar of what can be done to it, so nothing hides behind a long press.
+ * Moving about is a finger, zooming is a pinch, so there are no + and − to zoom.
+ */
+function CanvasDock({ chosenStore, lines, looks, zoom, menu, shapeMenu, colourMenu, lineMenu, addChild, addSibling, onNew, onFit, onOpen, onDone }: DockProps) {
+  const { cards: chosen, line } = useStore(chosenStore);
+  const chosenLine = lines.find((l) => l.id === line) ?? null;
+  const tap = (run: () => void) => () => {
+    haptic('tick');
+    run();
+  };
+  if (chosen.length > 0 || chosenLine) {
+    const one = chosen.length === 1;
+    const firstShape = looks[chosen[0] ?? '']?.shape ?? 'box';
+    const tint = chosen.length > 0 && chosen.every((id) => looks[id]?.colour === looks[chosen[0]!]?.colour) ? tintOf(looks[chosen[0]!]?.colour) : undefined;
+    const act = (label: string, icon: ReactNode, run: (e: ReactMouseEvent<HTMLButtonElement>) => void, disabled = false) => (
+      <button type="button" className="dock-act" disabled={disabled} onClick={(e) => (haptic('tick'), run(e))}>
+        <span className="dock-act-icon">{icon}</span>
+        {label}
+      </button>
+    );
+    return (
+      <div className="canvas-dock canvas-selection" role="toolbar" aria-label={chosenLine && !chosen.length ? 'The chosen line' : chosen.length === 1 ? 'The chosen card' : `${chosen.length} chosen cards`}>
+        <div className="dock-acts">
+          {chosen.length > 0 ? (
+            <>
+              {one &&
+                act(
+                  'Open',
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 4h6v6M20 4l-8 8M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+                  </svg>,
+                  () => onOpen(chosen[0]!),
+                )}
+              {act('Shape', <Icon name={SHAPE_ICON[firstShape]} size={20} />, (e) => menu(e, 'Shape', shapeMenu(chosen)))}
+              {act('Colour', <span className={`board-swatch${tint ? '' : ' empty'}`} style={tint ? { background: tint } : undefined} />, (e) => menu(e, 'Colour', colourMenu(chosen)))}
+              {act('Joined', <Icon name="addChild" size={20} />, addChild, !one)}
+              {act('Beside', <Icon name="addSibling" size={20} />, addSibling, !one)}
+            </>
+          ) : (
+            act('Line', <Icon name={ROUTE_ICON[chosenLine!.route]} size={20} />, (e) => menu(e, 'Line', lineMenu(chosenLine)))
+          )}
+        </div>
+        <button type="button" className="dock-done" onClick={tap(onDone)}>
+          Done
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="canvas-dock canvas-idle">
+      <button type="button" className="dock-round" aria-label={`See the whole board (now ${Math.round(zoom * 100)}%)`} onClick={tap(onFit)}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        </svg>
+        <span className="dock-zoom">{Math.round(zoom * 100)}%</span>
+      </button>
+      <button type="button" className="phone-fab dock-add" aria-label="Add to the board" onClick={(e) => (haptic('tick'), onNew(e))}>
+        <Icon name="add" size={24} />
+      </button>
+    </div>
+  );
+}
+
+/** The free board's settings on a phone, in the sheet under the view's settings button. */
+function PhoneBoardSettings({ lead, tally, conf, set, lineMenu, arrangeMenu, menu }: { lead: ReactNode; tally: ReactNode; conf: BoardSetUp; set(change: Partial<BoardSetUp>): void; lineMenu(target: BoardLine | null): MenuItem[]; arrangeMenu(): MenuItem[]; menu(e: ReactMouseEvent<HTMLButtonElement>, label: string, items: MenuItem[]): void }) {
+  return (
+    <>
+      <div className="sheet-field">
+        <span className="sheet-label">Layout</span>
+        {lead}
+      </div>
+      <div className="sheet-field">
+        <span className="sheet-label">Cards show</span>
+        <PickBox<BoardSetUp['cards']>
+          label="Cards"
+          value={conf.cards}
+          options={[
+            { id: 'full', name: 'Whole cards' },
+            { id: 'titles', name: 'Names only' },
+          ]}
+          onPick={(cards) => set({ cards })}
+        />
+      </div>
+      <button type="button" role="switch" aria-checked={conf.snap} className="sheet-switch" onClick={() => (haptic('tick'), set({ snap: !conf.snap }))}>
+        <span>
+          Snap to the dots
+          <span className="sheet-hint">Cards settle on the grid when set down.</span>
+        </span>
+        <span className="sheet-switch-track" aria-hidden="true">
+          <i />
+        </span>
+      </button>
+      <button type="button" className="sheet-row" aria-haspopup="menu" onClick={(e) => menu(e, 'New lines', lineMenu(null))}>
+        <Icon name={ROUTE_ICON[conf.route]} size={20} />
+        How new lines are drawn
+      </button>
+      <button type="button" className="sheet-row" aria-haspopup="menu" onClick={(e) => menu(e, 'Arrange', arrangeMenu())}>
+        <Icon name="arrange" size={20} />
+        Arrange the cards
+      </button>
+      <div className="sheet-foot">{tally}</div>
     </>
   );
 }

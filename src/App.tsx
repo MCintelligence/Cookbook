@@ -53,6 +53,7 @@ import { type BarMenu, MenuBar } from './ui/MenuBar';
 import { createPortal } from 'react-dom';
 import { PhoneBar } from './ui/PhoneBar';
 import { PhoneFab } from './ui/PhoneFab';
+import { PhoneSplash } from './ui/PhoneSplash';
 import { PhoneNav, type PhoneTab } from './ui/PhoneNav';
 import { usePhone } from './ui/usePhone';
 import { ANDROID_APP, fromTouch, haptic, isPhone, isTouch, onBack } from './mobile';
@@ -459,6 +460,8 @@ export function App() {
   const [table, setTable] = useState<'first' | 'again' | null>(null);
   /** The first recipe has been opened, or failed to: until then a phone shows only the wordmark, never a half-built app. */
   const [booted, setBooted] = useState(false);
+  /** The phone's splash has turned the mark into the logo; the app waits for that as well as for the recipe. */
+  const [splashShown, setSplashShown] = useState(false);
   /** The manual, open at a chapter. */
   const [manualAt, setManualAt] = useState<{ chapter: string; at: number } | null>(null);
   const lastSection = useRef<SettingsSection>('general');
@@ -4287,15 +4290,11 @@ export function App() {
 
   // A phone shows one thing at a time, and builds nothing it isn't showing: the wordmark until the
   // first recipe is open, then the welcome questions on their own, and only then the app.
-  if (phone && (!booted || !settled || table)) {
-    const splash = (
-      <div className="phone-splash" role="status" aria-label="Cookbook is opening">
-        <span className="brand">cookbook</span>
-      </div>
-    );
-    if (!booted || !settled || !table) return splash;
+  if (phone && (!booted || !settled || !splashShown || table)) {
+    const splash = <PhoneSplash onShown={() => setSplashShown(true)} />;
+    if (!booted || !settled || !splashShown || !table) return splash;
     return (
-      <Suspense fallback={splash}>
+      <Suspense fallback={<PhoneSplash still onShown={() => {}} />}>
         <PhoneTable first={table === 'first'} onDone={() => setTable(null)} />
       </Suspense>
     );

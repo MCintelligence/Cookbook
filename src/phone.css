@@ -48,7 +48,18 @@ html.phone { --nav-h: 56px; --phone-back: url("data:image/svg+xml,%3Csvg xmlns='
 
 /* While Cookbook opens: the wordmark alone, on the colour Android shows before the app draws, so nothing flashes. */
 .phone-splash { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bar); }
-html.phone .phone-splash .brand, .phone-splash .brand { display: block; font-size: 30px; }
+/* The mark starts where Android's splash left it (PhoneSplash.tsx sets --from) and settles into the logo. */
+.ps-logo { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--accent); }
+.ps-mark { display: block; transform: var(--from); }
+.ps-word { font-family: var(--font-display); font-size: 26px; font-weight: 700; line-height: 30px; letter-spacing: 0.01em; opacity: 0; }
+.ps-logo.still .ps-mark { transform: none; }
+.ps-logo.still .ps-word { opacity: 1; }
+.ps-logo.go .ps-mark { animation: ps-settle 0.62s 0.08s cubic-bezier(0.5, 0, 0.1, 1) forwards; }
+.ps-logo.go .ps-word { animation: ps-rise 0.45s 0.38s cubic-bezier(0.2, 0, 0, 1) forwards; }
+@keyframes ps-settle { to { transform: none; } }
+@keyframes ps-rise { from { opacity: 0; transform: translateY(-8px); clip-path: inset(0 0 100% 0); } to { opacity: 1; transform: none; clip-path: inset(0); } }
+:root[data-reduce-motion] .ps-mark, :root[data-reduce-motion] .ps-word { animation: none !important; transform: none; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .ps-mark, .ps-word { animation: none !important; transform: none !important; opacity: 1 !important; } }
 
 /*
  * The app on a phone is one place at a time, chosen from the bar along the bottom:
@@ -643,3 +654,169 @@ html.phone .pg-field :is(.goals-num, .goals-date) { width: 150px; height: 44px; 
 
 :root[data-reduce-motion] .phone-goals *, :root[data-reduce-motion] .phone-goals { animation: none !important; transition: none !important; }
 @media (prefers-reduced-motion: reduce) { .phone-goals, .phone-goals * { animation: none !important; } }
+
+/* =====================================================================================
+   Cookbook on a phone: one design language (round seven)
+   Drawn from Set the Table and Goals, and held to everywhere so every screen is the same app:
+   - Merriweather for everything; the wordmark alone keeps its own letters.
+   - A place's head: a small accent label in capitals over its name in the display face.
+   - Neutral surfaces with hairline edges; the desktop's three radii.
+   - What is picked or current says so in accent words and icons, never a filled, tinted or
+     accent-edged panel. Data (rings, bars, dots) and a chosen card on a board keep the accent.
+   - Two or three choices are a segmented row; settings live in sheets that rise from the bottom
+     with a grip, a title and Done; actions on a board sit on the board, under the thumb.
+   ===================================================================================== */
+html.phone { --font-display: 'Merriweather UI', Georgia, serif; --sheet-row: 52px; }
+html.phone :is(.brand, .ps-word, .pt-wordmark) { font-family: 'Caudex', Georgia, serif; }
+html.phone :is(button, input, select, textarea) { font-family: inherit; }
+
+/* ---- Segmented rows (Pick on a phone, the Pantry's sections, Plate, Your Recipes' views) ---- */
+.phone-seg, html.phone .segmented, html.phone .mode-seg { display: flex; flex: 1 1 auto; min-width: 0; height: 44px; padding: 0; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; box-shadow: none; overflow: hidden; }
+.phone-seg button, html.phone .segmented button, html.phone .mode-seg button { flex: 1 1 0; min-width: 0; min-height: 0; height: auto; padding: 0 8px; border: none; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone-seg button + button, html.phone .segmented button + button, html.phone .mode-seg button + button { border-left: 1px solid var(--line); }
+.phone-seg button[aria-checked='true'], html.phone .segmented button[aria-selected='true'], html.phone .mode-seg button[aria-pressed='true'] { color: var(--accent); background: transparent; box-shadow: none; font-weight: 700; }
+html.phone .segmented button[aria-selected='true']::before { display: none; }
+
+/* ---- A place's head: Cook, Prep and Plan ---- */
+html.phone .app, html.phone .app.drawer-open { grid-template-rows: 54px auto minmax(0, 1fr) auto auto; }
+html.phone .topbar { padding: 0 4px 0 6px; border-bottom: 1px solid var(--line); background: var(--bar); box-shadow: none; }
+html.phone .crumb-mode { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; min-height: 48px; padding: 0 10px; border-radius: var(--radius-control); font-family: var(--font-display); font-size: 18px; line-height: 1.25; }
+html.phone .crumb-mode::before { font-family: var(--font-label); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+html.phone .app.at-cook .crumb-mode::before { content: 'Cook'; }
+html.phone .app.at-prep .crumb-mode::before { content: 'Prep'; }
+html.phone .app.at-plan .crumb-mode::before { content: 'Plan'; }
+html.phone .crumb-mode-name { max-width: 100%; }
+html.phone .crumb-mode > svg, html.phone .crumb-mode .crumb-caret { display: none; }
+html.phone .panel-btn, html.phone .find > button:first-child, html.phone .find-toggle { width: 44px; height: 44px; color: var(--text); background: transparent; }
+html.phone .panel-btn[aria-pressed='true'] { color: var(--accent); background: transparent; }
+
+/* ---- The bottom bar ---- */
+html.phone { --nav-h: 62px; }
+.phone-nav button { gap: 4px; font-family: var(--font-label); font-size: 11.5px; font-weight: 700; letter-spacing: 0.01em; }
+.phone-nav-pill { width: 56px; height: 28px; }
+
+/* ---- The + button: Material's standard 56dp, not larger (44px here is 55 on the glass) ---- */
+.phone-fab { width: 44px; height: 44px; right: calc(14px + env(safe-area-inset-right)); bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom)); border-radius: var(--radius-pop); box-shadow: 0 3px 10px rgba(var(--shadow), 0.24); }
+.phone-fab svg { width: 24px; height: 24px; }
+
+/* ---- The Shelf ---- */
+html.phone .phone-shelf-head { padding: 6px 8px 6px; }
+html.phone .phone-recipe-name { font-size: 22px; }
+html.phone .phone-icon { color: var(--text); }
+html.phone .panel-search, html.phone .pantry-search { height: 46px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); box-shadow: none; }
+html.phone .tree .tree-folder { min-height: 48px; font-family: var(--font-display); font-size: 17px; color: var(--text); }
+html.phone .tree .tree-card, html.phone .tree .tree-recipe { min-height: 48px; border: none; background: transparent; box-shadow: none; }
+html.phone .tree .tree-card-title { font-size: 15.5px; }
+html.phone .tree li[aria-selected='true'] > :is(.tree-card, .tree-recipe) { background: transparent; border-color: transparent; box-shadow: none; }
+html.phone .tree li[aria-selected='true'] > :is(.tree-card, .tree-recipe)::before { display: none; }
+html.phone .tree li[aria-selected='true'] > .tree-card .tree-card-title, html.phone .tree li[aria-selected='true'] > .tree-recipe { color: var(--accent); font-weight: 700; }
+
+/* ---- The Pantry and Seasonings ---- */
+html.phone .panel-head { height: 56px; }
+html.phone .panel-head .panel-h { font-family: var(--font-display); font-size: 22px; font-weight: 400; }
+html.phone .pantry-panel .segmented { margin: 4px 0 10px; }
+
+/* ---- Prep: the Outline as a list, the picked Item in accent words ---- */
+html.phone .outline tr.chosen { background: transparent !important; box-shadow: none; }
+html.phone .outline tr.chosen .outline-title { color: var(--accent); font-weight: 700; }
+html.phone .outline-title { font-family: var(--font-display); font-size: 17px; }
+html.phone .outline-group th { font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); background: transparent; }
+html.phone .outline-group { background: transparent !important; }
+
+/* ---- Prep and Plan: one row, the view and its settings ---- */
+html.phone .phone-mode-bar { display: flex; align-items: center; gap: 8px; height: auto; min-height: 60px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bar); overflow: visible; }
+.phone-mode-more { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; color: var(--text); }
+.phone-mode-more[aria-expanded='true'] { color: var(--accent); }
+html.phone .mode-desk { position: relative; }
+
+/* ---- Sheets: rise from the bottom with a grip, a title and Done ---- */
+.phone-mode-sheet-wrap { position: fixed; inset: 0; z-index: 40; }
+.phone-mode-sheet-wrap[data-open='false'] { display: none; }
+.phone-mode-sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82%; display: flex; flex-direction: column; border-radius: var(--radius-pop) var(--radius-pop) 0 0; background: var(--surface); box-shadow: 0 -8px 32px rgba(var(--shadow), 0.24); outline: none; animation: phone-sheet-in 0.24s cubic-bezier(0.2, 0, 0, 1); }
+.phone-sheet-head { position: relative; flex: none; display: flex; align-items: center; gap: 8px; min-height: 60px; padding: 14px 8px 4px 20px; border-bottom: 1px solid var(--line); }
+.phone-sheet-title { flex: 1 1 auto; min-width: 0; font-family: var(--font-display); font-size: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phone-sheet-done { flex: none; min-height: 44px; padding: 0 12px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--accent); font-size: 15px; font-weight: 700; }
+.phone-mode-sheet .mode-tools { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: stretch; gap: 14px; padding: 16px 20px calc(20px + env(safe-area-inset-bottom)); }
+.phone-mode-sheet .mode-tools > .tb-sep { display: none; }
+.phone-mode-sheet .mode-tools :is(.tb-select, .mode-pick) { width: 100%; }
+.phone-mode-sheet .mode-tools select { width: 100%; height: 48px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 15px; }
+.phone-mode-sheet .mode-tools .mode-btn { min-height: 48px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 15px; gap: 10px; justify-content: flex-start; }
+.phone-mode-sheet .mode-tools .mode-btn[aria-pressed='true'] { color: var(--accent); background: transparent; }
+.phone-mode-sheet .mode-tools :is(.mode-tally, .tally) { font-size: 13px; color: var(--muted); }
+.phone-mode-sheet .mode-zoom { display: flex; align-items: center; gap: 10px; }
+.sheet-field { display: flex; flex-direction: column; gap: 8px; }
+.sheet-label { font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.sheet-row { display: flex; align-items: center; gap: 12px; min-height: var(--sheet-row); padding: 0 4px; border: none; border-top: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15.5px; text-align: left; }
+.sheet-row svg { color: var(--accent); }
+.sheet-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 60px; padding: 6px 4px; border: none; border-top: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15.5px; text-align: left; }
+.sheet-switch > span:first-child { display: flex; flex-direction: column; gap: 2px; }
+.sheet-hint { font-size: 12.5px; color: var(--muted); }
+.sheet-switch-track { flex: none; position: relative; width: 50px; height: 30px; border: 1.5px solid var(--line-strong); border-radius: 15px; }
+.sheet-switch-track i { position: absolute; top: 4px; left: 4px; width: 19px; height: 19px; border-radius: 50%; background: var(--muted); transition: transform 0.2s cubic-bezier(0.3, 1.3, 0.5, 1), background-color 0.2s; }
+.sheet-switch[aria-checked='true'] .sheet-switch-track i { transform: translateX(20px); background: var(--accent); }
+.sheet-foot { font-size: 13px; color: var(--muted); }
+
+/* Menus: the same sheet, rows a thumb can hit, nothing tinted under the finger. */
+.menu.menu-sheet { padding: 0 10px calc(12px + env(safe-area-inset-bottom)); }
+.menu-sheet-head { min-height: 60px; padding: 14px 8px 4px; }
+.menu-sheet-title { padding: 6px 12px 0; font-family: var(--font-display); font-size: 20px; font-weight: 400; }
+.menu.menu-sheet button { min-height: var(--sheet-row); padding: 0 12px; font-size: 16px; background: transparent; }
+.menu.menu-sheet button:is(:hover, :focus-visible, .menu-open) { background: transparent; }
+.menu.menu-sheet button::before { display: none !important; }
+.menu.menu-sheet button:active:not(:disabled) { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.menu.menu-sheet button[aria-checked='true'], .menu.menu-sheet button[aria-current] { color: var(--accent); font-weight: 700; }
+.menu.menu-sheet .menu-sep { margin: 6px 12px; background: var(--line); }
+.menu.menu-sheet .menu-heading { padding: 14px 12px 4px; font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+
+/* ---- The free board on a phone: controls on the board itself ---- */
+.canvas-dock { position: absolute; z-index: 6; bottom: 14px; }
+.canvas-idle { right: 14px; display: flex; align-items: flex-end; gap: 10px; }
+.canvas-idle .dock-add { position: static; }
+.dock-round { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 44px; height: 44px; padding: 0; border: 1.5px solid var(--line-strong); border-radius: var(--radius-pop); background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(var(--shadow), 0.14); }
+.dock-zoom { font-size: 9px; font-weight: 700; color: var(--muted); line-height: 1; margin-top: 1px; }
+.dock-round svg { width: 18px; height: 18px; }
+.canvas-selection { left: 10px; right: 10px; display: flex; align-items: stretch; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); box-shadow: 0 6px 22px rgba(var(--shadow), 0.2); animation: pt-pop 0.22s cubic-bezier(0.3, 1.3, 0.5, 1) both; }
+.dock-acts { flex: 1 1 auto; min-width: 0; display: flex; overflow-x: auto; scrollbar-width: none; }
+.dock-act { flex: 1 0 58px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 54px; padding: 0 4px; border: none; border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 11.5px; font-weight: 700; }
+.dock-act:disabled { color: var(--faint); opacity: 0.55; }
+.dock-act-icon { display: inline-flex; align-items: center; justify-content: center; height: 22px; color: var(--accent); }
+.dock-act:disabled .dock-act-icon { color: inherit; }
+.dock-act:active:not(:disabled), .dock-round:active { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.dock-act .board-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.dock-done { flex: none; align-self: center; min-height: 44px; padding: 0 12px; border: none; border-left: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--accent); font-size: 14.5px; font-weight: 700; }
+
+/* ---- The writing bar and the Aa sheet ---- */
+html.phone .phone-bar { height: 48px; }
+.pb-btn { height: 48px; flex: 1 0 34px; }
+.pb-btn svg { width: 21px; height: 21px; }
+/* Aa lifts the format row into a sheet of its own just above the writing bar, controls a finger can hit. */
+html.phone .app.phone-tools:not(.in-mode) .toolbar { position: fixed; left: 0; right: 0; bottom: calc(48px + var(--nav-h) + env(safe-area-inset-bottom)); z-index: 12; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; height: auto; min-height: 0; padding: 44px 16px 14px; border-top: 1px solid var(--line); border-radius: var(--radius-pop) var(--radius-pop) 0 0; background: var(--surface); box-shadow: 0 -8px 26px rgba(var(--shadow), 0.18); overflow: visible; animation: phone-sheet-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
+html.phone .app.phone-tools:not(.in-mode) .toolbar::before { content: 'Format'; position: absolute; left: 20px; top: 12px; font-family: var(--font-display); font-size: 18px; color: var(--text); }
+html.phone .app.phone-tools:not(.in-mode) .toolbar .tb-sep { display: none; }
+html.phone .app.phone-tools:not(.in-mode) .toolbar :is(.tb-select, select) { height: 44px; flex: 1 1 40%; min-width: 0; font-size: 15px; border-radius: var(--radius-control); }
+html.phone .app.phone-tools:not(.in-mode) .toolbar button { min-width: 44px; height: 44px; border-radius: var(--radius-control); }
+
+/* ---- Places' empty space and lists keep the same rhythm ---- */
+html.phone .cal-month:not(.small) .cal-num { font-family: var(--font-display); }
+html.phone .notice { font-family: var(--font-label); }
+
+@media (prefers-reduced-motion: reduce) { .phone-mode-sheet, .canvas-selection { animation: none !important; } }
+:root[data-reduce-motion] :is(.phone-mode-sheet, .canvas-selection) { animation: none !important; }
+html.phone .crumb-mode .crumb-mode-pic { display: none; }
+html.phone .crumb-mode { padding-top: 2px; }
+/* The name opens the Item's sheet: a small chevron after it says so, as the recipe's name does on the Shelf. */
+html.phone .crumb-mode-name { display: inline-flex; align-items: center; gap: 4px; }
+html.phone .crumb-mode-name::after { content: ''; flex: none; width: 16px; height: 16px; background: var(--muted); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat; }
+html.phone .phone-seg.mode-lead { border-color: var(--line); }
+html.phone .segmented { flex: none; }
+/* A pulldown in a sheet is a whole-width field; Android opens its list. */
+.phone-mode-sheet .mode-tools .tb-select { flex: none; height: 48px; padding: 0 10px 0 14px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+.phone-mode-sheet .mode-tools .tb-select select { flex: 1 1 auto; width: 100%; max-width: none; height: 44px; padding: 0; border: none; background: transparent; font-size: 15.5px; }
+html.phone .tb-select:focus-within { border-color: var(--line-strong); }
+.canvas-dock { position: fixed; bottom: calc(var(--nav-h, 0px) + 14px + env(safe-area-inset-bottom)); }
+.canvas-idle { right: calc(14px + env(safe-area-inset-right)); }
+.canvas-selection { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); }
+.dock-act .board-swatch { position: relative; display: block; flex: none; overflow: hidden; width: 20px; height: 20px; border-radius: 50%; }
+html.phone .dock-act .board-swatch.empty { padding: 0; text-align: initial; }
+.dock-act { flex: 1 0 50px; }
+.dock-act { flex: 1 0 48px; font-size: 11px; letter-spacing: -0.01em; }

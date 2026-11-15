@@ -9,6 +9,8 @@ import { Outline } from './Outline';
 import { MODES, VIEWS, type Mode, prefsStore, setPrefs, sideOf, viewOf } from './prefs';
 import { FormBox, Pick } from './shared';
 import { Timeline } from './Timeline';
+import { usePhone } from '../ui/usePhone';
+import { haptic } from '../mobile';
 import './modes.css';
 
 interface Props {
@@ -29,6 +31,17 @@ export default function ModeView({ host, mode, openIsCard }: Props) {
   const [form, setForm] = useState<Form | null>(null);
   const [desk, setDesk] = useState<HTMLElement | null>(null);
   const name = MODES.find((m) => m.id === mode)!.name;
+  const phone = usePhone();
+  /** On a phone: whether the view's settings sheet is up. */
+  const [sheet, setSheet] = useState(false);
+  // A new view or place starts with its sheet down.
+  useEffect(() => setSheet(false), [view, mode]);
+  // Back (or Escape) closes the sheet first; it is a dialog only while it shows, so goBack finds it.
+  useEffect(() => {
+    if (!sheet) return;
+    const el = document.querySelector<HTMLElement>('.phone-mode-sheet');
+    el?.focus({ preventScroll: true });
+  }, [sheet]);
   const hidden = prefs.hidden[mode];
   // Removed Items are left out of what this mode's views are given, so every view leaves them out alike.
   const cards = useMemo(() => {
@@ -54,13 +67,53 @@ export default function ModeView({ host, mode, openIsCard }: Props) {
     return () => desk.removeEventListener(SHELF_DROP, land);
   }, [desk, mode]);
   const props = { host: shown, side, tools, ask: setForm };
+  const pickView = <Pick lead label={`${name} view`} value={view} options={VIEWS[mode][side]} onPick={(id) => setPrefs((now) => ({ view: { ...now.view, [`${mode}:${side}`]: id } }))} />;
+  const viewName = VIEWS[mode][side].find((v) => v.id === view)!.name;
   return (
     <>
-      <div role="toolbar" aria-label={`${name} toolbar`} className={`toolbar mode-toolbar mode-is-${mode}`}>
-        <Pick lead label={`${name} view`} value={view} options={VIEWS[mode][side]} onPick={(id) => setPrefs((now) => ({ view: { ...now.view, [`${mode}:${side}`]: id } }))} />
-        <span className="tb-sep" />
-        <div className="mode-tools" ref={setTools} />
-      </div>
+      {phone ? (
+        // A phone keeps one row: which view, and a button for the rest of its settings, which wait
+        // in a sheet from the bottom. The sheet is always there (the view draws its settings into
+        // it) and only shown when asked for.
+        <>
+          <div role="toolbar" aria-label={`${name} toolbar`} className={`toolbar mode-toolbar phone-mode-bar mode-is-${mode}`}>
+            {pickView}
+            <button type="button" className="phone-mode-more" aria-label={`${viewName} settings`} aria-expanded={sheet} aria-haspopup="dialog" onClick={() => (haptic('tick'), setSheet(!sheet))}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+                <circle cx="16" cy="7" r="2" />
+                <circle cx="10" cy="17" r="2" />
+              </svg>
+            </button>
+          </div>
+          <div className="phone-mode-sheet-wrap" data-open={sheet}>
+            <div className="menu-sheet-shade" onClick={() => setSheet(false)} />
+            <section
+              className="phone-mode-sheet"
+              role={sheet ? 'dialog' : undefined}
+              aria-modal={sheet || undefined}
+              aria-label={`${viewName} settings`}
+              onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setSheet(false))}
+              tabIndex={-1}
+            >
+              <header className="phone-sheet-head">
+                <span className="menu-sheet-grip" />
+                <span className="phone-sheet-title">{viewName}</span>
+                <button type="button" className="phone-sheet-done" onClick={() => setSheet(false)}>
+                  Done
+                </button>
+              </header>
+              <div className="mode-tools" ref={setTools} />
+            </section>
+          </div>
+        </>
+      ) : (
+        <div role="toolbar" aria-label={`${name} toolbar`} className={`toolbar mode-toolbar mode-is-${mode}`}>
+          {pickView}
+          <span className="tb-sep" />
+          <div className="mode-tools" ref={setTools} />
+        </div>
+      )}
       <section ref={setDesk} className={`mode-desk mode-view-${view}`} aria-label={`${name}: ${VIEWS[mode][side].find((v) => v.id === view)!.name}`}>
         {view === 'outline' && <Outline {...props} />}
         {view === 'board' && <Board key="shelf" {...props} pantry={false} />}

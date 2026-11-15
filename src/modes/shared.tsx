@@ -3,6 +3,8 @@ import { LABELS, STATUSES, eventsField } from '../storage/document';
 import { type StoryDate, sayWhen } from '../storage/storyDate';
 import { type MenuItem } from '../ui/Menu';
 import { StatusIcon } from '../ui/StatusIcon';
+import { usePhone } from '../ui/usePhone';
+import { haptic } from '../mobile';
 import { type Form, type ModeHost } from './host';
 import { type Dated, type Item, labelColor, plotlineName, typedDate } from './model';
 import { prefsStore } from './prefs';
@@ -10,7 +12,7 @@ import { prefsStore } from './prefs';
 /** Two or three choices side by side, one of them on. */
 export function Seg<T extends string>({ label, value, options, onPick }: { label: string; value: T; options: { id: T; name: string }[]; onPick(id: T): void }) {
   return (
-    <span className="mode-seg" role="group" aria-label={label}>
+    <span className="mode-seg phone-seg-able" role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.id} aria-pressed={o.id === value} onClick={() => onPick(o.id)}>
           {o.name}
@@ -22,6 +24,28 @@ export function Seg<T extends string>({ label, value, options, onPick }: { label
 
 /** A pulldown in the toolbar, drawn like the Style box. */
 export function Pick<T extends string>({ label, value, options, onPick, lead }: { label: string; value: T; options: { id: T; name: string }[]; onPick(id: T): void; lead?: boolean }) {
+  const phone = usePhone();
+  // On a phone a short choice is laid out whole, a tap away, as everywhere else on the phone; a
+  // long one keeps its pulldown, which Android opens as its own list.
+  if (phone && options.length <= 3 && options.reduce((n, o) => n + o.name.length, 0) <= 34)
+    return (
+      <span className={`phone-seg${lead ? ' mode-lead' : ''}`} role="radiogroup" aria-label={label}>
+        {options.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={o.id === value}
+            onClick={() => {
+              haptic('tick');
+              onPick(o.id);
+            }}
+          >
+            {o.name}
+          </button>
+        ))}
+      </span>
+    );
   return (
     <label className={`tb-select mode-pick${lead ? ' mode-lead' : ''}`}>
       <select aria-label={label} title={label} value={value} onChange={(e) => onPick(e.target.value as T)}>

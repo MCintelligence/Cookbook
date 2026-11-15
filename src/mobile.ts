@@ -39,6 +39,7 @@ interface AndroidBridge {
   print?: (html: string, title: string) => void;
   haptic?: (kind: string) => void;
   splashReady?: () => void;
+  openWeb?: (url: string) => boolean;
   splashShift?: () => number;
 }
 const bridge = (): AndroidBridge | undefined => (typeof window === 'undefined' ? undefined : (window as unknown as { CookbookAndroid?: AndroidBridge }).CookbookAndroid);
@@ -193,5 +194,14 @@ export function splashShift(): number {
     return bridge()?.splashShift?.() ?? 0;
   } catch {
     return 0;
+  }
+}
+
+/** Opens a web page in Android's in-app browser; false off Android (or on a shell without it). */
+export function openWeb(url: string): boolean {
+  try {
+    return bridge()?.openWeb?.(url) ?? false;
+  } catch {
+    return false;
   }
 }

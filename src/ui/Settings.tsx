@@ -261,6 +261,13 @@ export function Settings(props: Props) {
       tabIndex={-1}
     >
       <header className="set-top">
+        {/* A phone heads the page as every page there is headed: a back arrow and its name. */}
+        <button type="button" className="set-back" aria-label="Back to writing" onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5M11 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="set-phone-title">Settings</span>
         <div className="set-brand">
           <span className="brand">cookbook</span>
           <span className="set-crumb">· Cookbook Settings</span>

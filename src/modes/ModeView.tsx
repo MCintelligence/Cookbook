@@ -6,7 +6,7 @@ import { Board } from './Board';
 import { CalendarView } from './CalendarView';
 import { type Form, type ModeHost, SHELF_DROP, type ShelfDrop } from './host';
 import { Outline } from './Outline';
-import { MODES, VIEWS, type Mode, prefsStore, setPrefs, sideOf, viewOf } from './prefs';
+import { MODES, VIEWS, type Mode, type Side, type ViewId, prefsStore, setPrefs, sideOf, viewOf } from './prefs';
 import { FormBox, Pick } from './shared';
 import { Timeline } from './Timeline';
 import { usePhone } from '../ui/usePhone';
@@ -23,15 +23,40 @@ interface Props {
  * Prep or Plan, in place of the page and its toolbar. The toolbar's first box, where Cook has
  * the Style box, picks the view; the rest of the toolbar belongs to the view that is showing.
  */
+/**
+ * A place's three views on a phone, each with the view it is on either side, in one order for both
+ * places: the view on both sides first (Board, Calendar), then the Shelf's, then the Pantry's.
+ */
+const PHONE_VIEWS: Record<Exclude<Mode, 'cook'>, { key: string; name: string; ids: Partial<Record<Side, ViewId>> }[]> = {
+  prep: [
+    { key: 'board', name: 'Board', ids: { shelf: 'board', pantry: 'pboard' } },
+    { key: 'outline', name: 'Outline', ids: { shelf: 'outline' } },
+    { key: 'atlas', name: 'Atlas', ids: { pantry: 'atlas' } },
+  ],
+  plan: [
+    { key: 'calendar', name: 'Calendar', ids: { shelf: 'calendar', pantry: 'pcalendar' } },
+    { key: 'timeline', name: 'Timeline', ids: { shelf: 'timeline' } },
+    { key: 'arcs', name: 'Arcs', ids: { pantry: 'arcs' } },
+  ],
+};
+
 export default function ModeView({ host, mode, openIsCard }: Props) {
   const prefs = useStore(prefsStore);
-  const side = sideOf(openIsCard);
+  const phone = usePhone();
+  const natural = sideOf(openIsCard);
+  /**
+   * On a phone all three of a place's views are offered whatever is open (Outline, Board, Atlas;
+   * Calendar, Timeline, Arcs). Picking one that belongs to the other kind of file shows that side
+   * until a file of the other kind is opened.
+   */
+  const [forced, setForced] = useState<Side | null>(null);
+  useEffect(() => setForced(null), [openIsCard]);
+  const side = phone && forced ? forced : natural;
   const view = viewOf(prefs, mode, side);
   const [tools, setTools] = useState<HTMLElement | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [desk, setDesk] = useState<HTMLElement | null>(null);
   const name = MODES.find((m) => m.id === mode)!.name;
-  const phone = usePhone();
   /** On a phone: whether the view's settings sheet is up. */
   const [sheet, setSheet] = useState(false);
   // A new view or place starts with its sheet down.
@@ -67,7 +92,26 @@ export default function ModeView({ host, mode, openIsCard }: Props) {
     return () => desk.removeEventListener(SHELF_DROP, land);
   }, [desk, mode]);
   const props = { host: shown, side, tools, ask: setForm };
-  const pickView = <Pick lead label={`${name} view`} value={view} options={VIEWS[mode][side]} onPick={(id) => setPrefs((now) => ({ view: { ...now.view, [`${mode}:${side}`]: id } }))} />;
+  const showView = (target: Side, id: ViewId) => {
+    setForced(phone && target !== natural ? target : null);
+    setPrefs((now) => ({ view: { ...now.view, [`${mode}:${target}`]: id } }));
+  };
+  const threes = PHONE_VIEWS[mode];
+  const pickView = phone ? (
+    <Pick
+      lead
+      label={`${name} view`}
+      value={threes.find((t) => t.ids[side] === view)?.key ?? threes[0]!.key}
+      options={threes.map((t) => ({ id: t.key, name: t.name }))}
+      onPick={(key) => {
+        const t = threes.find((x) => x.key === key)!;
+        const target: Side = t.ids[side] ? side : t.ids.shelf ? 'shelf' : 'pantry';
+        showView(target, t.ids[target]!);
+      }}
+    />
+  ) : (
+    <Pick lead label={`${name} view`} value={view} options={VIEWS[mode][side]} onPick={(id) => showView(side, id)} />
+  );
   const viewName = VIEWS[mode][side].find((v) => v.id === view)!.name;
   return (
     <>

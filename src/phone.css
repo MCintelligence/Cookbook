@@ -335,7 +335,7 @@ html.phone .phone-table .pt-goal-n input { width: 100%; border: none; outline: n
 :root[data-reduce-motion] .pt-done svg path { stroke-dashoffset: 0; }
 
 /* ---- Switches, buttons and fields everywhere on a phone ---- */
-html.phone input.switch { width: 40px; height: 22px; }
+
 html.phone .btn { min-height: 38px; padding: 0 14px; border-radius: var(--radius-control); font-size: 14px; }
 html.phone .icon-btn { min-width: 38px; height: 38px; border-radius: var(--radius-control); }
 html.phone :is(input[type='text'], input[type='search'], input[type='number'], input:not([type]), select, textarea) { font-size: max(1em, 14px); }
@@ -416,7 +416,7 @@ html.phone .manual-page { font-size: 15px; }
 html.phone .shelf-backdrop { padding: calc(8px + env(safe-area-inset-top)) 8px 8px; }
 html.phone .shelf { max-height: 80%; }
 html.phone .new-foot { min-height: 56px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); gap: 8px; }
-html.phone .lib input[type='checkbox'] { width: 20px; height: 20px; }
+html.phone .lib input[type='checkbox']:not(.switch) { width: 20px; height: 20px; }
 
 /* Settings: one long page, its sections a row of chips that scrolls sideways under the header. */
 html.phone .settings { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; font-size: 14px; animation: phone-push-in 0.22s cubic-bezier(0.2, 0, 0, 1); }
@@ -434,7 +434,7 @@ html.phone .set-section { scroll-margin-top: 100px; }
 html.phone .set-h2 { scroll-margin-top: 104px; }
 html.phone :is(.set-sel, .set-search, .set-num, .set-text) { min-height: 36px; font-size: 14px; }
 html.phone .set-sel { height: 36px; }
-html.phone .settings input[type='checkbox'] { width: 20px; height: 20px; }
+html.phone .settings input[type='checkbox']:not(.switch) { width: 20px; height: 20px; }
 
 /* ---- Prep and Plan ---- */
 html.phone .mode-tools, html.phone .in-mode .toolbar { gap: 6px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
@@ -456,7 +456,7 @@ html.phone .plate-btn { height: 36px; padding: 0 14px; border-radius: var(--radi
 html.phone .plate-menu { top: 40px; width: min(240px, calc(100% - 16px)); }
 html.phone .plate-menu button { min-height: 40px; font-size: 14px; }
 html.phone .plate-stagebar { height: auto; min-height: 40px; flex-wrap: wrap; gap: 6px 12px; padding: 4px 8px; }
-html.phone .plate-side input[type='checkbox'] { width: 20px; height: 20px; }
+html.phone .plate-side input[type='checkbox']:not(.switch) { width: 20px; height: 20px; }
 
 /* The Outline: a table on a computer, a list on a phone: each Item's name, its synopsis under it, and where it stands under that. */
 html.phone .outline table, html.phone .outline tbody, html.phone .outline tr { display: block; width: auto; }
@@ -820,3 +820,148 @@ html.phone .tb-select:focus-within { border-color: var(--line-strong); }
 html.phone .dock-act .board-swatch.empty { padding: 0; text-align: initial; }
 .dock-act { flex: 1 0 50px; }
 .dock-act { flex: 1 0 48px; font-size: 11px; letter-spacing: -0.01em; }
+
+/* ---- A web page in a Research note, on a phone ---- */
+.phone-web { display: flex; flex-direction: column; gap: 6px; padding: 18px 18px 8px; }
+.phone-web-label { font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+.phone-web-host { font-family: var(--font-display); font-size: 24px; line-height: 1.2; overflow-wrap: anywhere; }
+.phone-web-path { font-size: 13px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.phone-web-read { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; margin: 12px 0 4px; border: none; border-radius: var(--radius-control); background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 700; }
+.phone-web-read:disabled { background: transparent; border: 1.5px solid var(--line-strong); color: var(--muted); }
+.phone-web-note { margin: 0; font-size: 13px; color: var(--muted); }
+.phone-web-rows { display: flex; flex-direction: column; margin-top: 8px; }
+.phone-web-rows .sheet-row svg { flex: none; }
+
+/* ---- The Format sheet (Toolbar.tsx on a phone): styles, font, size, lines, alignment, colour ---- */
+html.phone .app.phone-tools:not(.in-mode) .toolbar.phone-format { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 0; padding: 0 0 6px; max-height: 62%; overflow-y: auto; overscroll-behavior: contain; }
+html.phone .app.phone-tools:not(.in-mode) .toolbar.phone-format::before { content: none; }
+.pf-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 20px 8px; }
+.pf-title { font-family: var(--font-display); font-size: 19px; }
+.pf-style-name { font-size: 13px; color: var(--muted); }
+.pf-chips { display: flex; gap: 8px; padding: 2px 20px 12px; overflow-x: auto; scrollbar-width: none; }
+.pf-chips button { flex: none; min-height: 40px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 14.5px; white-space: nowrap; }
+.pf-chips button[aria-checked='true'] { color: var(--accent); font-weight: 700; }
+.pf-chips .pf-chip-act { border-style: dashed; color: var(--muted); }
+html.phone .phone-format .style-name, html.phone .phone-format .tb-style-name { margin: 0 20px 12px; }
+.pf-row { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0; padding: 0 20px; border: none; border-top: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15.5px; text-align: left; width: 100%; }
+.pf-label { flex: none; width: 4.2em; color: var(--muted); font-size: 14px; }
+.pf-field { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
+html.phone .phone-format .pf-field select { flex: 1 1 auto; width: 100%; min-width: 0; height: 44px; padding: 0 30px 0 12px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); color: var(--text); font-size: 15.5px; appearance: none; }
+.pf-field > svg { position: absolute; right: 10px; pointer-events: none; color: var(--muted); }
+.pf-stepper { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+html.phone .phone-format .pf-stepper button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1.5px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--accent); }
+.pf-stepper output { min-width: 4.4em; text-align: center; font-family: var(--font-display); font-size: 18px; font-variant-numeric: tabular-nums; }
+html.phone .phone-format .pf-align { flex: none; margin: 8px 20px 10px; }
+html.phone .phone-format .pf-align button { width: auto; height: auto; border-radius: 0; }
+.pf-colour { justify-content: flex-start; }
+.pf-ink { width: 24px; height: 24px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 1.5px var(--line-strong); }
+.pf-colour-name { flex: 1 1 auto; color: var(--muted); font-size: 14px; }
+.pf-colour > svg { color: var(--muted); }
+.pf-colour[aria-expanded='true'] > svg { transform: rotate(180deg); }
+.pf-wheel { display: flex; justify-content: center; padding: 6px 20px 10px; }
+html.phone .phone-format button:disabled { opacity: 0.45; }
+/* Arcs: the open Item's column and the open Pantry Item's row say so in accent words, not a tint or a bar. */
+html.phone .arcs-items button:hover { background: transparent; }
+html.phone .arcs-items button.chosen { background: transparent; color: var(--accent); font-weight: 700; }
+html.phone .arcs-name.chosen { box-shadow: none; color: var(--accent); }
+/* What lasts on screen says "picked" in accent words, never a tint: toggles, marked rows, the current Plate. */
+html.phone .beat-levels button[aria-checked='true'], html.phone .wheel-auto[aria-checked='true'], html.phone .find-opt[aria-pressed='true'] { background: transparent; color: var(--accent); font-weight: 700; }
+html.phone .find-opt[aria-pressed='true'] { border-color: var(--line); }
+html.phone .wheel-auto[aria-checked='true'] { border-color: var(--line); }
+html.phone .tree .is-marked, html.phone .tree .is-marked:hover { background: transparent; }
+html.phone .tree .is-marked :is(.tree-card-title, .tree-folder-name), html.phone .tree .is-marked.tree-folder { color: var(--accent); font-weight: 700; }
+html.phone .sc.is-marked { border-color: var(--line); box-shadow: none; }
+html.phone .sc.is-marked .sc-head { color: var(--accent); }
+html.phone .plate-row.cur { background: transparent; color: var(--accent); font-weight: 700; }
+html.phone .plate-menu button:not(:disabled):hover { background: transparent; }
+html.phone .tree-flag.tree-from { background: transparent; padding: 0; color: var(--accent); }
+html.phone .archive .tree-card.from-pantry { box-shadow: none; }
+html.phone .arcs-cell:hover { background: transparent; }
+
+/* ---- Settings on a phone: a page like every other, a flat list of rows ---- */
+html.phone .set-top { flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 0; padding: 0 12px 10px 4px; border-bottom: 1px solid var(--line); background: var(--bar); }
+html.phone .set-back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 52px; padding: 0; border: none; background: transparent; color: var(--text); }
+html.phone .set-phone-title { display: block; flex: 1 1 auto; font-family: var(--font-display); font-size: 21px; }
+html.phone .set-top-actions { flex: 1 1 100%; padding-left: 8px; }
+html.phone .set-top-actions > .set-btn { display: none; }
+html.phone .set-search { flex: 1 1 auto; height: 46px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+html.phone .set-nav { top: 0; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+html.phone .set-nav .set-nav-item { min-height: 40px; padding: 0 10px; background: transparent; box-shadow: none; color: var(--muted); font-weight: 700; }
+html.phone .set-nav .set-nav-item.on { background: transparent; box-shadow: none; color: var(--accent); }
+html.phone .set-nav .set-scope { font-family: var(--font-label); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); padding-left: 10px; }
+html.phone .set-nav .set-note { display: none; }
+html.phone .set-body { padding: 0 18px 40%; }
+html.phone .set-h2 { margin: 28px 0 4px; font-family: var(--font-display); font-size: 24px; font-weight: 400; }
+html.phone .set-h3 { margin: 22px 0 2px; font-family: var(--font-label); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+html.phone .set-card, html.phone .set-card-plain { padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; }
+html.phone .set-row { flex-wrap: wrap; gap: 10px 16px; min-height: 60px; padding: 14px 0; }
+html.phone .set-row-text { flex: 1 1 60%; min-width: 0; gap: 3px; }
+html.phone .set-row-title { font-size: 15.5px; font-weight: 700; }
+html.phone .set-row-help { font-size: 13px; line-height: 1.5; color: var(--muted); }
+html.phone .set-row > :is(.set-sel, .set-num, .set-text, .set-seg, .set-actions) { flex: 1 1 100%; }
+html.phone :is(.set-sel, .set-num, .set-text) { height: 48px; min-height: 48px; padding: 0 12px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); font-size: 15.5px; }
+html.phone .set-num { flex: 0 1 140px !important; }
+html.phone .set-btn { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--line-strong); border-radius: var(--radius-control); background: transparent; color: var(--text); font-size: 15px; font-weight: 700; }
+/* Switches: the same as on the Goals page and in sheets: an outlined track, the knob goes orange. */
+html.phone .set-sw, html.phone input.switch { flex: none; width: 50px; height: 30px; border: 1.5px solid var(--line-strong); border-radius: 15px; background: transparent; }
+html.phone .set-sw::after, html.phone input.switch::after { top: 4px; left: 4px; width: 19px; height: 19px; background: var(--muted); box-shadow: none; transition: left 0.2s cubic-bezier(0.3, 1.3, 0.5, 1), background-color 0.2s; }
+html.phone .set-sw[aria-checked='true'], html.phone input.switch:checked { background: transparent; }
+html.phone .set-sw[aria-checked='true']::after, html.phone input.switch:checked::after { left: 24px; background: var(--accent); }
+/* Segmented rows, as everywhere. */
+html.phone :is(.set-seg, .plate-seg) { display: flex; height: 44px; padding: 0; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; overflow: hidden; }
+html.phone :is(.set-seg, .plate-seg) button { flex: 1 1 0; min-width: 0; height: auto; padding: 0 8px; border: none; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); font-size: 14.5px; font-weight: 700; }
+html.phone :is(.set-seg, .plate-seg) button + button { border-left: 1px solid var(--line); }
+html.phone .set-seg button[aria-pressed='true'], html.phone .plate-seg button[aria-selected='true'] { background: transparent; box-shadow: none; color: var(--accent); }
+html.phone .set-seg button[aria-pressed='true']::after { display: none; }
+/* Themes: the picked one says so under its picture, in accent words. */
+html.phone .set-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+html.phone .set-theme { padding: 0; border: none; background: transparent; box-shadow: none; color: var(--muted); font-weight: 700; }
+html.phone .set-theme[aria-pressed='true'] { border: none; box-shadow: none; color: var(--accent); }
+html.phone .set-theme-pic { border: 1px solid var(--line-strong); border-radius: var(--radius-pop); }
+html.phone .set-theme[aria-pressed='true'] .set-theme-pic { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+html.phone .set-chip { min-height: 40px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; }
+html.phone .set-chip[aria-pressed='true'] { color: var(--accent); border-color: var(--line); background: transparent; }
+
+/* ---- Plate on a phone ---- */
+html.phone .plate-top { gap: 6px; height: 60px; padding: 0 12px 0 4px; border-bottom: 1px solid var(--line); }
+html.phone .plate-back { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 52px; padding: 0; border: none; background: transparent; color: var(--text); }
+html.phone .plate-phone-head { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+html.phone .plate-phone-head span { font-family: var(--font-label); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); }
+html.phone .plate-phone-head b { font-family: var(--font-display); font-size: 19px; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.phone :is(.plate-brand, .plate-crumb, .plate-top-gap) { display: none; }
+html.phone .plate-top > .plate-btn:not(.primary) { display: none; }
+html.phone .plate-btn.primary { min-height: 44px; padding: 0 16px; border-radius: var(--radius-control); font-size: 15.5px; }
+html.phone .plate-panes { gap: 0; padding: 8px 12px; }
+html.phone .plate-panes button { min-height: 44px; border: 1.5px solid var(--line); border-radius: 0; font-weight: 700; }
+html.phone .plate-panes button:first-child { border-radius: var(--radius-control) 0 0 var(--radius-control); }
+html.phone .plate-panes button:last-child { border-radius: 0 var(--radius-control) var(--radius-control) 0; }
+html.phone .plate-panes button + button { border-left: none; }
+html.phone .plate-row.cur, html.phone .plate-tpl.on { border-color: var(--line); box-shadow: none; }
+html.phone .plate-tpl.on { color: var(--accent); }
+html.phone .plate-menu { border-radius: var(--radius-pop); }
+html.phone .plate-sec, html.phone .plate-lbl { font-family: var(--font-label); }
+/* Settings: the section chips scroll with the page under the sticky head. */
+html.phone .set-nav { position: static; }
+
+/* ---- Your Recipes and New Recipe ---- */
+html.phone .recipes-head .panel-h { font-family: var(--font-display); font-size: 22px; font-weight: 400; }
+html.phone .recipes-head .panel-h::after { display: none; }
+html.phone .recipes-nav-item { min-height: 40px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: transparent; box-shadow: none; }
+html.phone .recipes-nav-item[aria-current='true'] { background: transparent; box-shadow: none; border-color: var(--line); color: var(--accent); font-weight: 700; }
+html.phone .recipes-nav-item[aria-current='true']::before { display: none; }
+html.phone .tpl-nav .recipes-nav-item { border: none; }
+html.phone .recipe-card { border: 1px solid var(--line); border-radius: var(--radius-pop); background: var(--surface); }
+html.phone .recipe-card.open { border-color: var(--line); box-shadow: none; }
+html.phone .recipe-card.open::before, html.phone .recipe-row.open td:first-child::before { display: none; }
+html.phone .recipe-title { font-family: var(--font-display); font-size: 18px; }
+html.phone .new-input, html.phone .recipes-search { min-height: 46px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+html.phone .new-input:focus { border-color: var(--line-strong); }
+html.phone .recipes-views { flex: 1 1 auto; }
+html.phone .recipes-views button { flex: 1 1 0; }
+html.phone .lib .btn { min-height: 44px; border-radius: var(--radius-control); }
+html.phone .set-top { flex: none; min-height: 52px; }
+/* Plate's panes are headed in the display face, as every page's sections are. */
+html.phone .plate-side h2 { margin: 6px 0 8px; font-family: var(--font-display); font-size: 22px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+html.phone .plate-side h2::after { display: none; }
+html.phone .plate-side select { height: 46px; padding: 0 10px; border: 1.5px solid var(--line); border-radius: var(--radius-control); background: var(--surface); font-size: 15px; }
+html.phone .plate-trow { min-height: 60px; }

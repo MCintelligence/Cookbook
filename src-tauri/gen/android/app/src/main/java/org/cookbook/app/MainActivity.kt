@@ -7,12 +7,18 @@ import android.print.PrintAttributes
 import android.print.PrintManager
 import android.view.HapticFeedbackConstants
 import android.os.Build
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.view.View
+import androidx.browser.customtabs.CustomTabColorSchemeParams
+import androidx.browser.customtabs.CustomTabsIntent
 import android.view.ViewTreeObserver
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -91,6 +97,34 @@ class MainActivity : TauriActivity() {
   }
 
   inner class Bridge {
+    /**
+     * Opens a web page (a Research note's address) in Android's in-app browser: the writer's own
+     * browser slides over Cookbook with their sign-ins and reader view, and Back returns here.
+     * Without a browser that offers it, the page opens in whatever browser there is.
+     */
+    @JavascriptInterface
+    fun openWeb(url: String): Boolean {
+      val uri = Uri.parse(url)
+      if (uri.scheme != "https" && uri.scheme != "http") return false
+      runOnUiThread {
+        val bar = ContextCompat.getColor(this@MainActivity, R.color.cookbook_bar)
+        val tab = CustomTabsIntent.Builder()
+          .setShowTitle(true)
+          .setShareState(CustomTabsIntent.SHARE_STATE_ON)
+          .setDefaultColorSchemeParams(CustomTabColorSchemeParams.Builder().setToolbarColor(bar).setNavigationBarColor(bar).build())
+          .build()
+        try {
+          tab.launchUrl(this@MainActivity, uri)
+        } catch (e: ActivityNotFoundException) {
+          try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+          } catch (e: ActivityNotFoundException) {
+          }
+        }
+      }
+      return true
+    }
+
     /** The page has drawn its splash: Android's own may go. */
     @JavascriptInterface
     fun splashReady() {

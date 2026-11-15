@@ -1734,3 +1734,5 @@ h3.mise-item-name { font-weight: 400; line-height: 1.4; }
 .research-pdf-page .textLayer .markedContent { display: contents; }
 .research-pdf-page .textLayer ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .research-pdf-page .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
+.set-back, .set-phone-title { display: none; }
+.plate-back, .plate-phone-head { display: none; }

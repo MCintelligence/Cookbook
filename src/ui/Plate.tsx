@@ -307,6 +307,16 @@ export function Plate({ fs, title, shelf, settings: s, onChange, bookId, onClose
     <div className="plate" role="dialog" aria-label="Plate">
       <style>{plateCss(s) + pageCss(s)}</style>
       <header className="plate-top">
+        {/* On a phone: a back arrow and the place's label over the recipe's name, as every page there. */}
+        <button type="button" className="plate-back" aria-label="Cancel" onClick={onClose}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M19 12H5M11 5l-7 7 7 7" />
+          </svg>
+        </button>
+        <span className="plate-phone-head">
+          <span>Plate</span>
+          <b>{title}</b>
+        </span>
         <span className="plate-brand">cookbook</span>
         <span className="plate-crumb">{title} · Plate</span>
         <span className="plate-top-gap" />

@@ -5,6 +5,7 @@ import { BODY_STYLE } from '../editor/markdown';
 import { paragraphFormatOf } from '../editor/format';
 import { dropTakenFormat, selectedParagraphs, selectionBlock, setParagraphFormat, setTextFormat, textFormatAt } from '../editor/extensions';
 import { ColourWheel } from './ColourWheel';
+import { usePhone } from './usePhone';
 import { askForSystemFonts, refreshSystemFonts, useFontList } from '../systemFonts';
 import { MAX_SIZE, MAX_SPACING, MIN_SIZE, MIN_SPACING, matchStyles, parseSize, parseSpacing, stepSize, stepSpacing } from './combo';
 
@@ -65,6 +66,7 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
   const [open, setOpen] = useState<'colour' | 'align' | null>(null);
   const [openTucked, setOpenTucked] = useState(false);
   const [more, setMore] = useState(false);
+  const phone = usePhone();
 
   // A paragraph in a style the book no longer has is edited as Body, which is how it looks.
   const styleId = current && sheet.paragraph.some((s) => s.id === current) ? current : BODY_STYLE;
@@ -237,6 +239,107 @@ export const Toolbar = memo(function Toolbar({ editor, sheet, onEditStyle, onAdd
       </>
     );
   };
+
+  if (phone) {
+    // A phone gets the same controls laid out for a thumb, in a sheet above the writing bar. Every
+    // button keeps the cursor in the page (pointerdown does not take focus), so the keyboard stays.
+    const keep = { onPointerDown: (e: { preventDefault(): void }) => e.preventDefault() };
+    const sizeNow = Number(size) || 12;
+    return (
+      <div role="toolbar" aria-label="Format" className="toolbar phone-format">
+        <div className="pf-head">
+          <span className="pf-title">Format</span>
+          <span className="pf-style-name">{named}</span>
+        </div>
+        {naming ? (
+          <StyleName initial={naming === 'rename' ? named : `${named} 2`} label={naming === 'rename' ? `Rename ${named}` : `New style based on ${named}`} onDone={finishNaming} />
+        ) : (
+          <div className="pf-chips" role="radiogroup" aria-label="Paragraph style">
+            {sheet.paragraph.map((s) => (
+              <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} disabled={disabled} {...keep} onClick={() => applyStyle(s.id)}>
+                {s.name}
+              </button>
+            ))}
+            {handSet && (
+              <button type="button" className="pf-chip-act" disabled={disabled} {...keep} onClick={updateStyle}>
+                Update “{named}”
+              </button>
+            )}
+            <button type="button" className="pf-chip-act" disabled={disabled} onClick={() => setNaming('new')}>
+              New style…
+            </button>
+            <button type="button" className="pf-chip-act" disabled={disabled} onClick={() => setNaming('rename')}>
+              Rename…
+            </button>
+          </div>
+        )}
+        <label className="pf-row">
+          <span className="pf-label">Font</span>
+          <span className="pf-field">
+            <select aria-label="Font" value={font} disabled={textDisabled} onChange={(e) => words({ font: e.target.value })}>
+              {font && !fonts.some((f) => f.id === font) && <option value={font}>{font}</option>}
+              {fonts.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <Chevron />
+          </span>
+        </label>
+        <div className="pf-row">
+          <span className="pf-label">Size</span>
+          <span className="pf-stepper">
+            <button type="button" aria-label="Smaller" disabled={textDisabled} {...keep} onClick={() => words({ size: stepSize(sizeNow, false) }, true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
+            </button>
+            <output aria-live="polite">{text.size === 'mixed' ? '–' : `${sizeNow} pt`}</output>
+            <button type="button" aria-label="Larger" disabled={textDisabled} {...keep} onClick={() => words({ size: stepSize(sizeNow, true) }, true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>
+            </button>
+          </span>
+        </div>
+        <div className="pf-row">
+          <span className="pf-label">Lines</span>
+          <span className="pf-stepper">
+            <button type="button" aria-label="Closer lines" disabled={disabled} {...keep} onClick={() => paragraphs({ lineSpacing: stepSpacing(lineSpacing, false) }, true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
+            </button>
+            <output aria-live="polite">{lineSpacing}</output>
+            <button type="button" aria-label="Wider lines" disabled={disabled} {...keep} onClick={() => paragraphs({ lineSpacing: stepSpacing(lineSpacing, true) }, true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>
+            </button>
+          </span>
+        </div>
+        <div className="pf-align phone-seg" role="radiogroup" aria-label="Alignment">
+          {ALIGNMENTS.map((a) => (
+            <button key={a.value} type="button" role="radio" aria-checked={align === a.value} aria-label={a.label} disabled={disabled} {...keep} onClick={() => paragraphs({ align: a.value }, true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d={a.lines} />
+              </svg>
+            </button>
+          ))}
+        </div>
+        <button type="button" className="pf-row pf-colour" aria-expanded={open === 'colour'} disabled={textDisabled} {...keep} onClick={() => setOpen(open === 'colour' ? null : 'colour')}>
+          <span className="pf-label">Colour</span>
+          <span className="pf-ink" style={{ '--ink': color } as CSSProperties} aria-hidden="true" />
+          <span className="pf-colour-name">{text.color === null ? 'As the style' : 'Set by hand'}</span>
+          <Chevron />
+        </button>
+        {open === 'colour' && (
+          <div className="pf-wheel" {...keep}>
+            <ColourWheel
+              value={color}
+              automatic={text.color === null}
+              autoColour={style.color}
+              onPick={(color) => words({ color }, true)}
+              onAutomatic={() => words({ color: null }, true)}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div role="toolbar" aria-label="Paragraph style" className="toolbar">

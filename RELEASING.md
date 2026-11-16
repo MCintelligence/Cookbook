@@ -64,6 +64,56 @@ You need Node.js on your own computer: version 22 or newer (any current version 
    see the update: each checks a few seconds after opening and every six
    hours, and asks before installing. It saves the writer's work first.
 
+## Android
+
+The Release workflow also builds the Android app, as `Cookbook_<version>_android.apk`
+for ARM phones and tablets, and adds it to the same draft release. Android only
+installs an update over an app signed with the same key, so the APK needs a key of
+its own. Until it is set up the workflow skips the APK with a warning and the
+desktop release goes ahead as before.
+
+### Once: make the Android key
+
+You need Java's `keytool`, which comes with Android Studio and any JDK.
+
+1. Make the key, with a password you will remember:
+
+   ```sh
+   keytool -genkey -v -keystore cookbook-android.jks -keyalg RSA -keysize 2048 -validity 10000 -alias cookbook
+   ```
+
+2. Keep `cookbook-android.jks` and its password safe, somewhere other than this
+   computer. **If either is lost, nobody can update the Android app again**: people
+   would have to uninstall it (losing recipes they haven't backed up) to install a
+   copy signed with a new key. Never commit it.
+
+3. In the repository on GitHub, open Settings → Secrets and variables → Actions,
+   and add three repository secrets:
+   - `ANDROID_KEYSTORE_BASE64`: the key file as text, from `base64 -w 0 cookbook-android.jks`
+     (on a Mac, `base64 -i cookbook-android.jks`)
+   - `ANDROID_KEY_PASSWORD`: its password
+   - `ANDROID_KEY_ALIAS`: `cookbook`
+
+To build a signed APK on your own computer instead, write
+`src-tauri/gen/android/keystore.properties` (it is never committed) with
+`storeFile=/full/path/to/cookbook-android.jks`, `keyAlias=cookbook` and
+`password=…`, then run `npm run tauri android build -- --apk`.
+
+### Trying a build before it is released
+
+Every pull request builds a test APK (CI › Android app). Download
+`Cookbook-android-test` from the run's Artifacts, unzip it, and open the APK on
+a phone. It is signed with a throwaway key, so uninstall it before installing a
+released version.
+
+### Installing and updating
+
+The APK is installed by opening it on the phone; Android asks once to allow
+installs from the browser or file manager used. The app does not update itself:
+a newer APK from the releases page installs over the old one and keeps every
+recipe. The version Android compares comes from the app's version, which
+`npm run set-version` already sets.
+
 ## What updates itself
 
 | Download | Updates itself |
@@ -72,6 +122,7 @@ You need Node.js on your own computer: version 22 or newer (any current version 
 | Windows `.msi` and `-setup.exe` | Yes |
 | Linux `.AppImage` | Yes |
 | Linux `.deb` and `.rpm` | Yes, asking for the admin password to install |
+| Android `.apk` | No: install the newer APK over it |
 
 ## Not covered yet
 

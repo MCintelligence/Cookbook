@@ -173,6 +173,7 @@
 .cal-day.out .cal-num { color: var(--faint); }
 .cal-day.drop-into, .cal-day.shelf-over { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .cal-num { padding: 0 8px 1px; font-family: var(--font-display); font-size: 13px; color: var(--muted); }
+.cal-day.today .cal-num { color: var(--accent); font-weight: 700; }
 .cal-chip { display: block; margin: 0 6px; padding: 2px 7px; min-height: 22px; border: 1px solid var(--line-strong); border-left: 3px solid var(--faint); border-radius: 4px; background: var(--card); color: var(--text); font-family: var(--font-text); font-size: 12.5px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; }
 .cal-chip:hover { border-color: var(--accent); }
 .cal-chip.chosen { box-shadow: 0 0 0 1.5px var(--accent); }
@@ -200,6 +201,8 @@
 .tl-major { position: absolute; top: 5px; padding-left: 6px; border-left: 1px solid var(--line-strong); height: 41px; font-family: var(--font-display); font-size: 13px; font-weight: 700; white-space: nowrap; pointer-events: none; }
 .tl-minor { position: absolute; top: 27px; font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; pointer-events: none; padding-left: 3px; }
 .tl-lane { position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
+/* What moves when the timeline is dragged: one transform, set while it moves and cleared when it is drawn again where it went (Timeline.tsx). */
+.tl-track { position: absolute; inset: 0; transform: translateX(var(--tl-shift, 0px)); }
 .tl-lane:nth-child(even) { background: color-mix(in srgb, var(--text) 2.5%, transparent); }
 .tl-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); pointer-events: none; }
 .tl-lane-head { position: absolute; left: 0; top: 0; bottom: 0; z-index: 3; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 10px 10px 0 14px; background: var(--bar); border-right: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 13px; font-weight: 700; box-shadow: inset 4px 0 0 var(--label, transparent); cursor: default; }
@@ -213,7 +216,7 @@
 .tl-bar.pantry { border-style: dashed; background: transparent; --label: var(--green); }
 .tl-bar.pantry .tl-bar-name { font-style: italic; }
 .tl-bar.chosen, .tl-bar:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
-.tl-bar.lifted { cursor: grabbing; z-index: 2; opacity: 0.85; }
+.tl-bar[data-lifted] { cursor: grabbing; z-index: 2; opacity: 0.85; }
 .tl-bar-end { position: absolute; right: -4px; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
 .tl-empty { position: absolute; left: 148px; right: 0; top: 90px; pointer-events: none; }
 

@@ -85,4 +85,20 @@ describe('How to Cook', () => {
     expect(learnedBefore(storage)).toBe(true);
     expect(learnToCookLocation(storage)).toEqual({ kind: 'browser', name: 'How to Cook' });
   });
+
+  it('on a touch screen, adds a page that says where the menus are and what a right-click is', async () => {
+    expect(shelfOf(mac)[0]!.items.map((i) => i.title)).toEqual(['Welcome']);
+    expect(shelfOf(() => '', true)[0]!.items.map((i) => i.title)).toEqual(['Welcome', 'On a phone or tablet']);
+    const fs = new MemoryAdapter();
+    await makeLearnToCook(fs, () => '', true);
+    const page = await readDocument(fs, 'bookshelf/Start here/On a phone or tablet.md');
+    expect(page.body).toContain('press and hold');
+  });
+
+  it('on a touch screen, the welcome sends nobody to a menu a phone does not have', () => {
+    const welcome = shelfOf(() => '', true)[0]!.items[0]!.body;
+    expect(welcome).toContain('bar at the bottom');
+    expect(welcome).not.toMatch(/View menu|File ›|Help ›|right-click|[Cc]lick/);
+    expect(shelfOf(mac)[0]!.items[0]!.body).toContain('File › New Recipe');
+  });
 });

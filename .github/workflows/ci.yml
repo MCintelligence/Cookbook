@@ -46,3 +46,43 @@ jobs:
       - run: npm run build
       - name: Check the Rust shell compiles
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+
+  # Builds the Android app the way a release does, for 64-bit ARM phones only to keep the check quick.
+  # Without the release key it is signed with a throwaway debug key: download it from the run's
+  # Artifacts to try a pull request on a phone.
+  android:
+    name: Android app (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: android
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the APK
+        run: |
+          export NDK_HOME="$ANDROID_NDK_LATEST_HOME"
+          npx tauri android build --apk --target aarch64 --ci
+      - name: Find the APK
+        id: apk
+        run: |
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' | head -n 1)
+          test -n "$apk"
+          cp "$apk" Cookbook-android-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cookbook-android-test
+          path: Cookbook-android-test.apk
+          retention-days: 14

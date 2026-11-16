@@ -69,7 +69,62 @@ interface Card {
 /** "press Ctrl+K" or, when the writer has taken the shortcut off, the menu way there. */
 const press = (k: KeyLabel, id: string, otherwise: string) => (k(id) ? `press ${k(id)}` : otherwise);
 
-export function shelfOf(k: KeyLabel): Group[] {
+/** The page that Learn to Cook gains on a touch screen, where the rest of it speaks of clicks, right-clicks and menus along the top. */
+const TOUCH_PAGE: Page = {
+  title: 'On a phone or tablet',
+  synopsis: 'Getting around with the bar at the bottom, what a right-click is, and carrying Items.',
+  body: `# On a phone or tablet
+
+The pages after this one are shared with Cookbook on a computer, so they speak of clicks and of menus along the top. Everything in them works here; this page says where each thing is on a phone.
+
+- **The bar along the bottom** is how you get around: the **Shelf**, then this Item as **Cook** (the page), **Prep** (outline and board) and **Plan** (calendar and timeline), then the **Pantry**.
+- **The recipe's name** at the top of the Shelf opens everything about the recipe: Your Recipes, exporting, printing, backing up, Trash, Goals and the Manual. The cog beside it is Settings. Where a page here says "the File menu" or "the Recipe menu", look there.
+- **The Item's name** at the top of the page opens everything about the Item: renaming, labels, drafts, snapshots, and how the page behaves.
+- **New things** come from the round **+** in the corner of the Shelf and the Pantry.
+- **Seasonings** is the button beside Search at the top of the page.
+- **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf to pick it up (you'll feel it), then move your finger to put it somewhere else on the Shelf. Let go without moving to see what you can do with it.
+- **To put an Item on a day**, go to **Plan**, press and hold the day on the calendar (or a lane on the timeline) and choose **Add from the Shelf** or **Add from the Pantry**. Every Item is on the board already.
+- **On the Board and the Atlas**, one finger moves the board and two fingers pinch to zoom. Press and hold a card to carry it.
+- **In the page**, press and hold picks a word, with your phone's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
+- **The writing bar** sits on top of the keyboard while you type: undo and redo, **B**, *I* and U, the paragraph's style (¶), things to insert (+), and **Aa** for fonts and spacing. Its last button puts the keyboard away.
+- **Back** closes whatever is open, then returns to the page, and only then leaves Cookbook. Your words are saved as you type.
+- **Bigger or smaller**: Settings › Appearance › Interface size.
+- **Your recipes are kept inside the app**, not in a folder you can browse. To keep a copy somewhere else, tap the recipe's name, then **Back up as a zip…**, or one of the exports.
+`,
+};
+
+/** The first page of Learn to Cook as a phone reads it: the same welcome, with the things to try said the way they are done by hand. */
+const TOUCH_WELCOME = `# Welcome to Cookbook
+
+This is **Learn to Cook**, a recipe made for trying things out. Everything in it is yours to change: type anywhere, move things about, break it. Nothing here is precious.
+
+A *Recipe* is one piece of writing: a novel, a story, a thesis. Its **Shelf**, the first place in the bar at the bottom, is where the writing lives, in **Groups** (like folders or chapters) and **Items** (the pages you write on). Each Group on this Shelf shows one part of Cookbook. Read them in order, or jump to the one you need.
+
+Try these as you go:
+
+- [ ] Tap **Shelf** in the bar at the bottom, then the next Item, **On a phone or tablet**.
+- [ ] Tap **Pantry** in the bar and find Mama Lou.
+- [ ] Tap the sprig at the top of this page to open **Seasonings**, and let Salty Sam find a spelling mistake.
+- [ ] Tap this page's name at the top and turn on **Chef Mode** to write without distractions.
+- [ ] On the Shelf, press and hold an Item until you feel it lift, and move it somewhere else on the Shelf.
+- [ ] Start a recipe of your own: on the Shelf, tap the recipe's name, then **Your Recipes**.
+
+Tick a box by tapping it. Cookbook saves as you type, so there is no Save button to remember.
+
+When you’re finished, delete this recipe like any other. Open a recipe of your own first, then in **Your Recipes** press and hold Learn to Cook and choose **Delete**. You can always have a fresh copy: tap the recipe's name on the Shelf, then **Learn to Cook**.
+`;
+
+/** The Shelf of Learn to Cook. On a touch screen (`touch`) it starts with a page on how the rest translates to fingers. */
+export function shelfOf(k: KeyLabel, touch = false): Group[] {
+  const groups = shelfFor(k);
+  if (touch) {
+    groups[0]!.items[0]!.body = TOUCH_WELCOME;
+    groups[0]!.items.push(TOUCH_PAGE);
+  }
+  return groups;
+}
+
+function shelfFor(k: KeyLabel): Group[] {
   return [
     {
       title: 'Start here',
@@ -531,14 +586,14 @@ export const FIRST_ITEM = joinPath(BOOKSHELF, 'Start here', 'Welcome.md');
 const SEASONINGS_ITEM = joinPath(BOOKSHELF, 'Seasonings', 'Meet the seasonings.md');
 
 /** Lays out How to Cook in an empty folder. Run inside makeBookOrUndo. */
-export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel): Promise<BookInfo> {
+export async function makeLearnToCook(fs: StorageAdapter, k: KeyLabel, touch = false): Promise<BookInfo> {
   const info: BookInfo = {
     ...(await createBook(fs, LEARN_TO_COOK)),
     // Sam is picked, so a misspelling shows at once; the writer adds the others on the Seasonings page.
     seasonings: { chosen: ['sam'], tracked: [SEASONINGS_ITEM], gone: [] },
   };
   const order: Record<string, string[]> = { [BOOKSHELF]: [] };
-  for (const group of shelfOf(k)) {
+  for (const group of shelfOf(k, touch)) {
     const folder = joinPath(BOOKSHELF, fileNameFor(group.title));
     await fs.makeFolder(folder);
     order[BOOKSHELF]!.push(fileNameFor(group.title));

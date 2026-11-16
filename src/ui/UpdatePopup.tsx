@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NotesMarkdown } from './notesMarkdown';
 import { isTauri } from '../storage/platform';
+import { ANDROID_APP } from '../mobile';
 import { getSettings } from '../settings';
 import { checkDue, lastGoodCheck, untilMidnight, putOff, rememberGoodCheck, rememberLater } from './updateSchedule';
 
@@ -56,6 +57,8 @@ let announce: ((ready: Ready) => void) | null = null;
 
 /** Looks for a new version now, from Settings, and says what it found. */
 export async function checkForUpdates(): Promise<string> {
+  // The Android app is updated the way it was installed: by a newer download from Cookbook's releases page.
+  if (ANDROID_APP) return 'On Android, Cookbook updates when you install a newer version from its releases page. Your recipes stay where they are.';
   if (isTauri()) {
     const ready = await checkDesktop();
     rememberGoodCheck();
@@ -104,6 +107,8 @@ export function UpdatePopup({ beforeRestart }: Props) {
   };
 
   useEffect(() => {
+    // The Android app is updated by installing a newer APK; it never looks for one itself.
+    if (ANDROID_APP) return;
     let live = true;
     let busy = false;
     let lastTry = 0;

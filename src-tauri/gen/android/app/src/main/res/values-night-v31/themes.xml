@@ -1,0 +1,14 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Android 12 and later draw a splash screen of their own before the app. Cookbook's is the bare
+      orange mark on the app's own background, no white disc, and the page then starts from the very
+      same mark in the very same place (PhoneSplash.tsx) and turns it into the logo, so it reads as one.
+    -->
+    <style name="Theme.cookbook" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/cookbook_bar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowSplashScreenBackground">@color/cookbook_bar</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+    </style>
+</resources>

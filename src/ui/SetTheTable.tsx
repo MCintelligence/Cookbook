@@ -264,7 +264,7 @@ export function SetTheTable({ first, onDone }: { first: boolean; onDone: () => v
   );
 }
 
-const SEASONING_BLURBS: Record<string, string> = {
+export const SEASONING_BLURBS: Record<string, string> = {
   sam: 'Spelling, in your English.',
   pete: 'Grammar and punctuation.',
   daniel: 'How much of the page is dialogue.',

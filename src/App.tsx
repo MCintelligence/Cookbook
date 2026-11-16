@@ -59,6 +59,7 @@ import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLear
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { getSchema } from '@tiptap/core';
 import { cookbookExtensions } from './editor/extensions';
+import { posAtPoint } from './editor/pointAt';
 import { SceneText } from './ui/SceneText';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
@@ -1951,10 +1952,11 @@ export function App() {
     if (!ed || !ed.view.dom.contains(target)) return;
     e.preventDefault();
     const { clientX: x, clientY: y } = e;
-    const at = ed.view.posAtCoords({ left: x, top: y });
+    // Asked of the engine, not measured: on a zoomed page the measuring put every click past the paragraph's end.
+    const at = posAtPoint(ed.view, x, y);
     const { from, to } = ed.state.selection;
     // A right-click outside the selection moves the cursor there, as a left-click would.
-    if (at && (at.pos < from || at.pos > to) && !('$anchorCell' in ed.state.selection)) ed.commands.setTextSelection(at.pos);
+    if (at !== null && (at < from || at > to) && !('$anchorCell' in ed.state.selection)) ed.commands.setTextSelection(at);
     const run = (fn: (c: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => void fn(ed.chain().focus()).run();
 
     const issueEl = target.closest('.cb-issue:not(.cb-issue-sentence)');

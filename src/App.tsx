@@ -73,7 +73,7 @@ import { LiveGoals, MiseCount, type SaveState, SavedStatus } from './ui/LiveCoun
 import { createStore, useStore } from './ui/store';
 import { ModeSwitch, goToMode, modeItems } from './modes/ModeSwitch';
 import { type ModeHost, SHELF_DROP, type ShelfDrop } from './modes/host';
-import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, setPrefs, sideOf } from './modes/prefs';
+import { MODES, flushPrefs, loadPrefs, modeStore, prefsStore, setPrefs } from './modes/prefs';
 const ModeView = lazy(() => import('./modes/ModeView'));
 import { useStable } from './ui/useStable';
 import { type DeskZone, deskZone } from './ui/deskDrop';
@@ -3703,7 +3703,7 @@ export function App() {
         : []),
       ...(canMise ? [cmd('mise', miseShown ? 'Show this item on its own page' : 'Mise en Place: show this item’s group as one page', toggleMise, 'View', keysFor('mise'), 'mise en place group one page whole chapter')] : []),
       ...(isTauri() && !IS_MAC && !ANDROID_APP ? [cmd('fullscreen', fullScreen ? 'Leave full screen' : 'Full screen', toggleFullScreen, 'View', keysFor('fullscreen'), 'full screen fullscreen maximise maximize window')] : []),
-      ...MODES.map((m) => cmd(m.shortcut, `${m.name}: ${m.hint[modeSide].toLowerCase()}`, () => goToMode(m.id), 'View', keysFor(m.shortcut), 'mode cook prep plan outline board corkboard calendar timeline atlas arcs relationships')),
+      ...MODES.map((m) => cmd(m.shortcut, `${m.name}: ${m.hint.toLowerCase()}`, () => goToMode(m.id), 'View', keysFor(m.shortcut), 'mode cook prep plan outline board corkboard calendar plots timeline plotlines atlas arcs relationships')),
       cmd('typewriter', settings.typewriter ? 'Typewriter scrolling off' : 'Typewriter scrolling on', () => setSettings({ typewriter: !settings.typewriter }), 'View'),
       cmd('draft', page.view === 'page' ? 'Show pages as Draft' : 'Show pages as Paper', () => updateBook({ page: { ...page, view: page.view === 'page' ? 'draft' : 'page' } }), 'View'),
       ...ZOOMS.map((z) => cmd(`zoom${z}`, `Zoom: ${zoomLabel(z)}`, () => updateBook({ page: { ...page, zoom: z } }), 'View')),
@@ -3951,7 +3951,7 @@ export function App() {
       items: () => {
         const page = pageOf(book?.page);
         return [
-          ...(book ? [...modeItems(modeSide).map((m) => ('hint' in m && m.hint ? { ...m, hint: keysFor(MODES.find((x) => x.name === m.label)!.shortcut), binding: binding(MODES.find((x) => x.name === m.label)!.shortcut), icon: undefined } : m)), { separator: true as const }] : []),
+          ...(book ? [...modeItems().map((m) => ('hint' in m && m.hint ? { ...m, hint: keysFor(MODES.find((x) => x.name === m.label)!.shortcut), binding: binding(MODES.find((x) => x.name === m.label)!.shortcut), icon: undefined } : m)), { separator: true as const }] : []),
           { label: 'Chef Mode', hint: keysFor('focus'), binding: binding('focus'), checked: settings.focus, onPick: toggleFocus },
           { label: 'Typewriter scrolling', checked: settings.typewriter, onPick: () => setSettings({ typewriter: !settings.typewriter }) },
           { label: 'Mise en Place (the whole group)', hint: keysFor('mise'), binding: binding('mise'), checked: !!miseShown, disabled: !canMise, onPick: toggleMise },
@@ -4218,7 +4218,6 @@ export function App() {
     return () => window.removeEventListener('resize', keep);
   }, [phone, editor]);
 
-  const modeSide = sideOf(isCard(doc?.kind));
   const inMode = mode !== 'cook' && !!book && !!fs;
   useEffect(() => {
     // Prep and Plan need the Shelf and their toolbar, which Chef Mode puts away.
@@ -4399,7 +4398,7 @@ export function App() {
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
-            {book && <ModeSwitch title={doc?.title ?? null} openIsCard={isCard(doc?.kind)} showMenu={showMenu} expanded={menu?.label === 'Mode' || (phone && !!menu && menu.label === (doc?.title || 'Item'))} onPhone={phone ? phoneItemSheet : undefined} />}
+            {book && <ModeSwitch title={doc?.title ?? null} showMenu={showMenu} expanded={menu?.label === 'Mode' || (phone && !!menu && menu.label === (doc?.title || 'Item'))} onPhone={phone ? phoneItemSheet : undefined} />}
           </span>
         </div>
         <div className="top-actions">

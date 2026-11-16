@@ -40,8 +40,8 @@ export const SHORTCUTS: Shortcut[] = [
   { id: 'mise', label: 'Mise en Place (the whole group)', key: 'Mod-Shift-G' },
   // The three ways to look at a recipe. Mod+1 to 5 already go round the window, so these add Shift.
   { id: 'modeCook', label: 'Cook (the page)', key: 'Mod-Shift-1' },
-  { id: 'modePrep', label: 'Prep (outline and board)', key: 'Mod-Shift-2' },
-  { id: 'modePlan', label: 'Plan (calendar and timeline)', key: 'Mod-Shift-3' },
+  { id: 'modePrep', label: 'Prep (outline, board and atlas)', key: 'Mod-Shift-2' },
+  { id: 'modePlan', label: 'Plan (calendar, plots and arcs)', key: 'Mod-Shift-3' },
   // Drafts: ⌥ on a Mac. The three keys sit together at the bottom left, older to the left of newer.
   { id: 'draft', label: 'Draft this item', key: 'Alt-X' },
   { id: 'olderDraft', label: 'Older draft', key: 'Alt-Z' },

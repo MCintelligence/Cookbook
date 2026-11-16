@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { keysFor } from '../shortcuts';
 import { type MenuItem } from '../ui/Menu';
 import { useStore } from '../ui/store';
-import { MODES, type Mode, type Side, modeStore, sideOf } from './prefs';
+import { MODES, type Mode, modeStore } from './prefs';
 
 const svg = (children: ReactNode, size = 16) => (
   <svg className="mode-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -47,15 +47,14 @@ export function goToMode(mode: Mode): void {
 }
 
 /** The modes as a menu's items, for the top bar's switch and the View menu. */
-export function modeItems(side: Side): MenuItem[] {
+export function modeItems(): MenuItem[] {
   const mode = modeStore.get();
-  return MODES.map((m) => ({ label: m.name, hint: [m.hint[side], keysFor(m.shortcut)].filter(Boolean).join('   '), icon: <ModeIcon mode={m.id} />, checked: m.id === mode, onPick: () => goToMode(m.id) }));
+  return MODES.map((m) => ({ label: m.name, hint: [m.hint, keysFor(m.shortcut)].filter(Boolean).join('   '), icon: <ModeIcon mode={m.id} />, checked: m.id === mode, onPick: () => goToMode(m.id) }));
 }
 
 interface Props {
   /** The open file's name, or null when nothing is open. */
   title: string | null;
-  openIsCard: boolean;
   showMenu(label: string, x: number, y: number, items: MenuItem[], opener: HTMLElement): void;
   expanded: boolean;
   /** On a phone, the name opens one sheet for the Item and the modes, built by the app. */
@@ -66,9 +65,8 @@ interface Props {
  * The open Item's name in the top bar, which is also the switch between Cook, Prep and Plan:
  * the picture before the name is the mode that is on, and a click lists all three.
  */
-export function ModeSwitch({ title, openIsCard, showMenu, expanded, onPhone }: Props) {
+export function ModeSwitch({ title, showMenu, expanded, onPhone }: Props) {
   const mode = useStore(modeStore);
-  const side = sideOf(openIsCard);
   const name = MODES.find((m) => m.id === mode)!.name;
   return (
     <button
@@ -76,11 +74,11 @@ export function ModeSwitch({ title, openIsCard, showMenu, expanded, onPhone }: P
       aria-haspopup="menu"
       aria-expanded={expanded}
       aria-label={`${name} mode${title ? `, ${title}` : ''}. Change mode`}
-      title={`${name}: ${MODES.find((m) => m.id === mode)!.hint[side].toLowerCase()}`}
+      title={`${name}: ${MODES.find((m) => m.id === mode)!.hint.toLowerCase()}`}
       onClick={(e) => {
         if (onPhone) return onPhone(e.currentTarget);
         const box = e.currentTarget.getBoundingClientRect();
-        showMenu('Mode', box.left, box.bottom + 4, modeItems(side), e.currentTarget);
+        showMenu('Mode', box.left, box.bottom + 4, modeItems(), e.currentTarget);
       }}
     >
       {/* The mode's picture carries the pulldown mark under it, so the name needs no arrow of its own. */}

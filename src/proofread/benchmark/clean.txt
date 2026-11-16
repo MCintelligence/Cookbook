@@ -1,0 +1,150 @@
+# Correct sentences that look like mistakes. Every flag here is a false alarm.
+He had had enough, and he knew that that was the end of it.
+Do it this way.
+Have a seat by the fire.
+Had I known, I would have stayed.
+Should you need me, ring the bell.
+The news was good.
+Mathematics is hard.
+Well done, everyone.
+No one came to the door.
+However hard he tried, the dough would not rise.
+However it happened, the cake was gone.
+The man who lived next door was kind.
+The book that I read was long.
+Every one of the cooks was tired.
+She lets him go.
+Whose coat is this?
+Who's there?
+Twenty-one candles burned on the cake.
+The boy was five years old.
+He said that he was hungry.
+"I'm hungry," he said.
+He said, "Come in."
+What a day it was.
+How lovely you look.
+Was he tired? Yes.
+Did he go? No, he didn't.
+Could you pass the salt?
+The well was deep.
+He knew the man well.
+She ran quickly.
+It was a really good cake.
+The real problem was the oven.
+The will was read aloud.
+His will was strong.
+May was warm that year.
+Will you come with us?
+The can was empty.
+To go now would be rude.
+She wanted to go.
+I could go tomorrow.
+He used to live here.
+The fish were swimming in the pond.
+Neither of them was ready.
+If I were you, I'd wait.
+Half past nine.
+Not now, she thought.
+Me? Never.
+And then it rained.
+But she stayed.
+The oven, which was old, still worked.
+The oven that was old still worked.
+Yes, I will come.
+However, the soup was cold.
+No, I won't.
+Well, I don't know.
+Oh, I see.
+"Are you coming?" she asked.
+"Come here," he said.
+Let's go home.
+The dog wagged its tail.
+It's a lovely day.
+The apples were ripe.
+The Smiths came to dinner.
+Their house was small.
+They're coming at six.
+You're welcome to stay.
+He is taller than his brother.
+The rain will affect the harvest.
+Don't lose your keys.
+Everyone came except Tom.
+She walked past the bakery.
+The cake was too sweet.
+I don't have any money.
+We waited for an hour.
+It was a useful tool.
+These apples are sour.
+Each of the cooks was tired.
+The list of ingredients is long.
+There were many people at the table.
+She doesn't like onions.
+The bowls on the shelf are blue.
+I saw it yesterday.
+The book is lying on the table.
+They will go tomorrow.
+He had eaten already.
+She should have known.
+It was a well-known recipe.
+He had a five-year-old son.
+The recipe was well known.
+He ran really fast.
+She sings well.
+He spoke quietly to the child.
+This one is better.
+She is the tallest girl.
+The team are winning.
+The data are clear.
+The committee has decided.
+A number of guests were late.
+The number of guests was small.
+More than one guest was late.
+Ten pounds is too much for a cake.
+Bread and butter is my favorite supper.
+The children, along with their teacher, were late.
+The teacher, along with the children, was late.
+There is a cake and two pies on the table.
+There's bread in the tin.
+He let the cat out.
+She lay on the bed.
+She laid the book on the bed.
+They have lain there for years.
+He's been gone a week.
+Who are you talking to?
+What are you waiting for?
+I wonder where the salt is.
+He asked where the salt was.
+Ask him what he wants.
+The man I met was kind.
+The woman whose car was stolen called.
+The house where I was born is gone.
+The day when we met was cold.
+The reason why he left is clear.
+Whom did you see?
+It is I.
+She is taller than me.
+Between you and me, it burned.
+He and I went to the market.
+Him? He left an hour ago.
+Running down the stairs, she dropped the bread.
+Exhausted, he fell asleep.
+The bread rose; the oven warmed.
+He cooked, she cleaned, and they both ate.
+She bought eggs, flour, and butter.
+She bought eggs, flour and butter.
+He could have gone.
+She might not have known.
+We must go now.
+He will have finished by noon.
+To boldly go is a famous split.
+They want to really understand it.
+He took a five-minute break.
+It was a long, cold night.
+It was a well-made bed.
+The oven was well built.
+The soup on the stove was hot.
+She sat on the chair by the window in the kitchen.
+I have lived here for five years.
+I lived in Paris in 2019.
+She has worked here since March.
+He opened the door and saw a cat.

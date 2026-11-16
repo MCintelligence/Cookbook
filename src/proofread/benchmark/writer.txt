@@ -1,0 +1,73 @@
+# One mistake per line, marked [[wrong|right]], in the categories of Word's published
+# Grammar Settings list. Written for Cookbook.
+capitalization	We left on [[monday|Monday]] morning.
+capitalization	She speaks [[french|French]] at home.
+capitalization	The oven was hot. [[the|The]] bread was warm.
+capitalization	My friend and [[i|I]] cooked dinner.
+capitalization	[[THe|The]] oven was hot.
+capitalization	We flew to [[london|London]] in June.
+fragment	The bread burned. [[Because the oven was too hot.|Because the oven was too hot, the bread burned.]]
+fragment	She waited by the door. [[Which was a mistake.|That was a mistake.]]
+run-on	[[It was late she was tired.|It was late. She was tired.]]
+run-on	[[The soup was cold, nobody ate it.|The soup was cold, so nobody ate it.]]
+misused-word	[[Your|You're]] welcome to stay.
+misused-word	[[Their|They're]] coming at six.
+misused-word	He is taller [[then|than]] his brother.
+misused-word	The rain will [[effect|affect]] the harvest.
+misused-word	Don't [[loose|lose]] your keys.
+misused-word	Everyone came [[accept|except]] Tom.
+misused-word	I could [[of|have]] been a cook.
+misused-word	He bought [[alot|a lot]] of flour.
+misused-word	She walked [[passed|past]] the bakery.
+misused-word	The cake was [[to|too]] sweet.
+negation	I [[don't have no|don't have any]] money.
+negation	She [[can't hardly|can hardly]] see the road.
+negation	We didn't see [[nobody|anybody]] at the market.
+noun-phrase	We waited for [[a|an]] hour.
+noun-phrase	It was [[an|a]] useful tool.
+noun-phrase	He was [[a|an]] honest man.
+noun-phrase	[[This|These]] apples are sour.
+possessive-plural	The [[apple's|apples]] were ripe.
+possessive-plural	The [[Smith's|Smiths]] came to dinner.
+possessive-plural	The dog wagged [[it's|its]] tail.
+possessive-plural	[[Who's|Whose]] coat is this?
+possessive-plural	[[Its|It's]] a lovely day.
+punctuation	"I'm hungry[[.|,]]" he said.
+punctuation	He [[said|said,]] "Come in."
+punctuation	"Are you coming[[.|?]]" she asked.
+punctuation	[[However|However,]] the soup was cold.
+punctuation	[[Yes|Yes,]] I will come.
+punctuation	She smiled[[ ,|,]] then left.
+punctuation	He took [[bread,butter|bread, butter]] and jam.
+punctuation	The soup was hot.[[  | ]]Then it cooled.
+punctuation	"Come here,[[" He|" he]] said.
+punctuation	[[Lets|Let's]] go home.
+question	Do you know where the salt is[[.|?]]
+question	Why did you leave the door open[[.|?]]
+question	He asked where [[was the salt|the salt was]].
+question	[[Whose|Who's]] going to the party?
+relative-clause	The man [[which|who]] lived next door was kind.
+relative-clause	The oven[[, that|, which]] was old, still worked.
+agreement	Each of the cooks [[were|was]] tired.
+agreement	The list of ingredients [[are|is]] long.
+agreement	Neither the cook nor the waiters [[was|were]] ready.
+agreement	There [[was|were]] many people at the table.
+agreement	She [[don't|doesn't]] like onions.
+agreement	The bowls on the shelf [[is|are]] blue.
+verb-phrase	I [[seen|saw]] it yesterday.
+verb-phrase	The book is [[laying|lying]] on the table.
+verb-phrase	They will [[goes|go]] tomorrow.
+verb-phrase	He [[had ate|had eaten]] already.
+verb-phrase	She should [[of|have]] known.
+verb-phrase	He didn't [[knew|know]] the answer.
+hyphenation	There were [[twenty one|twenty-one]] candles.
+hyphenation	He had a [[five year old|five-year-old]] son.
+hyphenation	It was a [[well known|well-known]] recipe.
+adverb	He ran [[real|really]] fast.
+adverb	She sings [[good|well]].
+adverb	He spoke [[quiet|quietly]] to the child.
+repeated-word	He went to [[the the|the]] shop.
+repeated-word	It [[was was|was]] late.
+comparison	This one is [[more better|better]].
+comparison	She is the [[most tallest|tallest]] girl.
+spacing	The soup was hot[[ .|.]]

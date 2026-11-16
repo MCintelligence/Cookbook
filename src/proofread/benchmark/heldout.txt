@@ -1,0 +1,57 @@
+# Held out: written after the checks were finished and scored once, with no tuning afterwards.
+# Same categories as learner.txt, new sentences.
+tense-aspect	We [[have finished|finished]] the soup an hour ago.
+tense-aspect	Last summer they [[have travelled|travelled]] to Spain.
+tense-aspect	He [[is living|has lived]] in Leeds since 2015.
+tense-aspect	I [[know|have known]] her for six years.
+verb-form	She has [[ate|eaten]] all the biscuits.
+verb-form	They should [[cleaned|clean]] the kitchen.
+verb-form	He made us [[to sit|sit]] in the corner.
+verb-form	We avoided [[to talk|talking]] about money.
+verb-form	The window was [[break|broken]] in the storm.
+verb-form	He might [[went|go]] to the market later.
+agreement	My aunt [[cook|cooks]] every Sunday.
+agreement	The dogs [[barks|bark]] all night.
+agreement	There [[was|were]] four plates on the shelf.
+agreement	Each of the girls [[have|has]] a bicycle.
+tense-shift	She picked up the knife and [[cuts|cut]] the bread.
+plural	We bought three [[loaf|loaves]] of bread.
+plural	Several [[guest|guests]] arrived early.
+plural	I met many [[student|students]] at the fair.
+plural	She has two [[brother|brothers]] and a sister.
+plural	He gave me some useful [[informations|information]].
+plural	Both of the [[cup|cups]] were cracked.
+possessive	That is my [[fathers|father's]] hat.
+possessive	The [[cooks|cook's]] apron was dirty.
+pronoun	[[Him|He]] and his brother ran away.
+pronoun	The cook handed the bowl to [[I|me]].
+pronoun	The dog chased [[it's|its]] tail.
+wrong-preposition	She depends [[of|on]] her sister.
+wrong-preposition	He was afraid [[from|of]] the dark.
+wrong-preposition	We met [[in|on]] Friday.
+wrong-preposition	She is responsible [[of|for]] the bakery.
+wrong-preposition	He has worked there [[since|for]] three years.
+missing-preposition	We [[listened|listened to]] the band all evening.
+missing-preposition	They were [[waiting|waiting for]] the train.
+extra-preposition	The team [[discussed about|discussed]] the menu.
+extra-preposition	She [[emphasized on|emphasized]] the cost.
+word-order	Where [[he is going|is he going]]?
+word-order	I asked her where [[was the bakery|the bakery was]].
+word-order	She has [[a dog black|a black dog]].
+word-order	He [[likes very much tea|likes tea very much]].
+word-order	What time [[it is|is it]]?
+word-order	Why [[you are|are you]] laughing?
+word-form	He walked very [[slow|slowly]] home.
+word-form	She hopes to [[improvement|improve]] her baking.
+word-form	The children played [[noisy|noisily]].
+word-form	It was a [[beauty|beautiful]] morning.
+determiner	He is [[teacher|a teacher]].
+determiner	She plays [[the tennis|tennis]] on Fridays.
+determiner	We ate [[a rice|some rice]] with the fish.
+determiner	I have [[less|fewer]] eggs than I need.
+determiner	There wasn't [[some|any]] bread in the tin.
+determiner	He speaks [[the Spanish|Spanish]] well.
+determiner	I saw [[a|an]] owl in the barn.
+relative-clause	The girl [[which|who]] baked this is my niece.
+relative-clause	The car [[who|that]] hit the fence was red.
+relative-clause	Students [[which|who]] study hard pass.

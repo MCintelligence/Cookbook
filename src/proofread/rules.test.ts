@@ -27,11 +27,11 @@ describe('proofreader switches', () => {
   });
 
   it('starts run-ons and the Oxford comma off, and keeps a writer’s choice either way', () => {
-    expect(effectiveOff([])).toEqual(['run-on', 'OxfordComma']);
-    expect(effectiveOff(['adverb'])).toEqual(['adverb', 'run-on', 'OxfordComma']);
+    expect(effectiveOff([])).toEqual(['run-on', 'OxfordComma', 'gendered-word', 'conjunction-start']);
+    expect(effectiveOff(['adverb'])).toEqual(['adverb', 'run-on', 'OxfordComma', 'gendered-word', 'conjunction-start']);
     const on = storedOff([], 'run-on', true);
     expect(on).toEqual(['+run-on']);
-    expect(effectiveOff(on)).toEqual(['OxfordComma']);
+    expect(effectiveOff(on)).toEqual(['OxfordComma', 'gendered-word', 'conjunction-start']);
     expect(ruleGroup({ kind: 'style', rule: 'OxfordComma' })).toBe('OxfordComma');
     expect(storedOff(on, 'run-on', false)).toEqual([]);
     expect(storedOff(['adverb'], 'adverb', true)).toEqual([]);

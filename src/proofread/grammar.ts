@@ -75,6 +75,8 @@ function misreads(rule: string, text: string, from: number, to: number): boolean
   // "It’s no use", "it’s not fair": Harper takes these for "its".
   if (rule === 'ItsPossessive' && /^\s+(?:no|not|never)\b/i.test(after)) return true;
   if (rule === 'ItsContraction') return /^\s+being\b/i.test(after) && PREPOSITIONS.has(lastWord(before));
+  // "Every one of the cooks" is right; only "every one" standing alone means "everyone".
+  if (rule === 'Everyone') return /^\s+of\b/i.test(after);
   if (rule === 'WhomSubjectOfVerb') return PREPOSITIONS.has(lastWord(before)) || AUX_THEN_SUBJECT.test(after);
   return false;
 }

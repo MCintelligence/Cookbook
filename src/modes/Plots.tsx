@@ -11,7 +11,7 @@ import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, dayText, labelColor, pantryGroups, plotlineName, shelfGroups } from './model';
 import { backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
 import { MAX_PX, MIN_PX, prefsStore, setPrefs } from './prefs';
-import { Face, Pick, Seg, Tally, ToolButton, datedMenu, whenField } from './shared';
+import { Face, Pick, Seg, Tally, ToolButton, datedMenu, shortWhen, whenField } from './shared';
 import { dragFrom, scaleOf } from './usePanZoom';
 
 /** The width of the lane names down the left, the height of the ruler, and of one row of a lane. */
@@ -190,40 +190,99 @@ export function Plots({ host, tools, ask }: ViewProps) {
     held.current = null;
   }, [dated]);
 
+  /**
+   * Gives a dated Item a new date, a new plotline, or both, and says so with an Undo. Every
+   * change Plots makes goes through here, so a slip of the hand is always one click from undone.
+   */
+  const change = (d: Dated, next: { date?: StoryDate; line?: Lane }, said: string) => {
+    const before = { when: d.event === null ? whenField(d.card.dates[0] ?? null) : undefined, label: d.card.label || undefined };
+    void (async () => {
+      if (next.date) await host.setField(d.path, 'when', whenField(next.date));
+      if (next.line) await host.setField(d.path, 'label', next.line.id || undefined);
+    })();
+    host.say(said, () =>
+      void (async () => {
+        if (next.date) await host.setField(d.path, 'when', before.when);
+        if (next.line) await host.setField(d.path, 'label', before.label);
+      })(),
+    );
+  };
+  const movedTo = (d: Dated, date: StoryDate, line?: Lane) => `Moved “${d.title}” to ${sayWhen(date)}${line ? `, on ${line.title}` : ''}.`;
+
+  /** The note that rides above a mark being carried, saying where it will land. Drawn by hand, like the mark. */
+  const tip = useRef<HTMLDivElement | null>(null);
+  const showTip = (text: string | null, x = 0, y = 0) => {
+    const el = tip.current;
+    if (!el) return;
+    if (text === null) return void (el.hidden = true);
+    el.hidden = false;
+    el.textContent = text;
+    el.style.left = `${HEAD + x}px`;
+    el.style.top = `${y}px`;
+  };
+  /** Marks the line a carried mark will join, if it is not its own. */
+  const lightLane = (at: number | null) => sheet.current?.querySelectorAll<HTMLElement>('.pl-lane').forEach((el, i) => (i === at ? (el.dataset.drop = '') : delete el.dataset.drop));
+
   /** Carries a mark from where the pointer took hold of it: along the days, and in plotline lanes from one line to another. */
   const carry = (el: HTMLElement, spot: Spot, lane: number, stretch: boolean, x0: number) => {
     const { d } = spot;
     const from = dayAt(x0);
     let days = 0;
     let to = lane;
+    const dateFor = (n: number): StoryDate => (stretch ? { ...d.date, to: d.last + n > d.first ? dayText(d.last + n) : undefined } : shifted(d.date, n));
+    const done = () => {
+      showTip(null);
+      lightLane(null);
+    };
     return {
       move(m: { clientX: number; clientY: number }): boolean {
-        const { scale, tops, by } = now.current;
+        const { scale, tops, by, lanes } = now.current;
         const moved = stretch ? Math.max(dayAt(m.clientX) - from, d.first - d.last) : dayAt(m.clientX) - from;
         const over = stretch || by !== 'label' ? lane : (laneAt(m.clientY) ?? to);
         if (moved === days && over === to) return false;
         [days, to] = [moved, over];
         el.dataset.lifted = '';
+        const half = d.last > d.first ? 0 : 0.5;
+        const dx = stretch ? 0 : scale.xOf(d.first + days + half) - scale.xOf(d.first + half);
+        const dy = to === lane ? 0 : tops[to]! + PAD + ROW / 2 - spot.y;
         if (stretch) el.style.setProperty('--w', `${Math.max(scale.xOf(d.last + days + 1) - scale.xOf(d.first), DOT)}px`);
-        else {
-          const half = d.last > d.first ? 0 : 0.5;
-          const dy = to === lane ? 0 : tops[to]! + PAD + ROW / 2 - spot.y;
-          el.style.transform = `translate(${scale.xOf(d.first + days + half) - scale.xOf(d.first + half)}px, ${dy}px)`;
-        }
+        else el.style.transform = `translate(${dx}px, ${dy}px)`;
+        lightLane(to === lane ? null : to);
+        const line = to === lane ? '' : ` · ${lanes[to]!.title}`;
+        showTip(`${shortWhen(dateFor(days))}${line}`, spot.x + dx, spot.y + dy - ROW / 2 - 22);
         return true;
       },
       drop() {
+        done();
         const line = to === lane ? undefined : now.current.lanes[to];
         if (days === 0 && !line) return letGo(el);
         held.current = el;
         window.setTimeout(() => held.current === el && (letGo(el), (held.current = null)), 1500);
-        const date: StoryDate = stretch ? { ...d.date, to: d.last + days > d.first ? dayText(d.last + days) : undefined } : shifted(d.date, days);
-        void (async () => {
-          if (days !== 0) await host.setField(d.path, 'when', whenField(date));
-          if (line) await host.setField(d.path, 'label', line.id || undefined);
-        })();
+        const date = dateFor(days);
+        change(d, { ...(days !== 0 ? { date } : {}), line }, stretch ? `“${d.title}” now runs ${sayWhen(date)}.` : movedTo(d, date, line));
+      },
+      cancel() {
+        done();
+        letGo(el);
       },
     };
+  };
+
+  /** Arrow keys move the stop that has the focus: a day, or a week with Shift; Alt and up or down moves it to the next plotline. */
+  const keyMove = (e: React.KeyboardEvent<HTMLElement>, d: Dated, lane: number) => {
+    if (e.key === 'Enter') return host.open(d.path);
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (step !== 0 && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const date = shifted(d.date, step * (e.shiftKey ? 7 : 1));
+      return change(d, { date }, movedTo(d, date));
+    }
+    const up = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+    if (up !== 0 && e.altKey && by === 'label') {
+      e.preventDefault();
+      const line = lanes[lane + up];
+      if (line) change(d, { line }, `Moved “${d.title}” to ${line.title}.`);
+    }
   };
 
   /**
@@ -270,7 +329,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
         haptic('drop');
         hand.drop();
       } else if (was === 'lift') {
-        letGo(el);
+        hand.cancel();
         menu(u.clientX, u.clientY);
       } else if (was === 'press' && spot.d.path !== host.path) host.select(spot.d.path);
     };
@@ -278,7 +337,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
       if (c.pointerId !== id) return;
       const was = state;
       finish();
-      if (was !== 'press') letGo(el);
+      if (was !== 'press') hand.cancel();
     };
     window.addEventListener('pointermove', move, true);
     window.addEventListener('pointerup', up, true);
@@ -307,11 +366,10 @@ export function Plots({ host, tools, ask }: ViewProps) {
   landRef.current = ({ path, card, x, y }) => {
     if (card?.kind !== 'scene') return;
     const at = laneAt(y);
-    const line = by === 'label' && at !== null && !card.label ? lanes[at]?.id : '';
-    void (async () => {
-      await host.setField(path, 'when', dayText(dayAt(x)));
-      if (line) await host.setField(path, 'label', line);
-    })();
+    const line = by === 'label' && at !== null && !card.label ? lanes[at] : undefined;
+    const date = { on: dayText(dayAt(x)) };
+    const d: Dated = { key: card.id, path, title: card.title, date, first: 0, last: 0, event: null, card, group: '' };
+    change(d, { date, line: line?.id ? line : undefined }, `Dated “${card.title}” ${sayWhen(date)}${line?.id ? `, on ${line.title}` : ''}.`);
   };
   useEffect(() => {
     const node = main.current;
@@ -458,8 +516,10 @@ export function Plots({ host, tools, ask }: ViewProps) {
           </div>
           {lanes.map((lane, li) => {
             const spots = laid[li]!;
-            const inTime = [...spots].sort((p, q) => p.d.first - q.d.first || p.x - q.x);
-            const lineY = (s: Spot) => s.y - tops[li]!;
+            // The line runs straight along the lane's first row, from its first stop to its last; a stop
+            // put on a lower row to make room hangs from it by a short stem, so crowded days never zigzag.
+            const base = PAD + ROW / 2;
+            const ends = spots.length > 0 ? [Math.min(...spots.map((s) => s.x + DOT / 2)), Math.max(...spots.map((s) => s.x + s.w - DOT / 2))] : null;
             return (
               <div key={lane.id} className="pl-lane" style={{ height: (tops[li + 1] ?? height) - tops[li]!, '--label': lane.color ?? 'var(--muted)' } as CSSProperties} onContextMenu={(e) => laneMenu(e, lane)}>
                 <div className="pl-head" style={{ width: HEAD }} onContextMenu={(e) => headMenu(e, lane)} title={by === 'label' ? `${lane.title}: ${menuPress().toLowerCase()} to name plotlines` : lane.title}>
@@ -469,7 +529,8 @@ export function Plots({ host, tools, ask }: ViewProps) {
                 </div>
                 <div className="pl-track" style={{ left: HEAD }}>
                   <svg className="pl-path" width="1" height="1" aria-hidden="true">
-                    {inTime.length > 1 && <polyline points={inTime.flatMap((s) => [`${s.x + DOT / 2},${lineY(s)}`, `${s.x + s.w - DOT / 2},${lineY(s)}`]).join(' ')} />}
+                    {ends && ends[1]! > ends[0]! && <line x1={ends[0]} x2={ends[1]} y1={base} y2={base} />}
+                    {spots.map((s) => s.row > 0 && <line key={s.d.key} className="pl-stem" x1={s.x + DOT / 2} x2={s.x + DOT / 2} y1={base} y2={s.y - tops[li]!} />)}
                   </svg>
                   {spots.map((spot) => {
                     const { d } = spot;
@@ -483,7 +544,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
                       dragFrom(
                         e,
                         (_dx, _dy, m) => void hand.move(m),
-                        (did) => (did ? hand.drop() : (letGo(el), d.path !== host.path && host.select(d.path))),
+                        (did) => (did ? hand.drop() : (hand.cancel(), d.path !== host.path && host.select(d.path))),
                       );
                     };
                     return (
@@ -491,12 +552,13 @@ export function Plots({ host, tools, ask }: ViewProps) {
                         key={d.key}
                         className={`pl-node${d.last > d.first ? ' long' : ''}${d.path === host.path ? ' chosen' : ''}`}
                         style={{ left: spot.x, top: PAD + spot.row * ROW, height: ROW, '--w': `${spot.w}px`, ...(by !== 'label' ? { '--label': labelColor(d.card.label) ?? 'var(--muted)' } : {}) } as CSSProperties}
-                        title={`${d.title} · ${sayWhen(d.date)}${d.card.synopsis ? `\n${d.card.synopsis}` : ''}`}
+                        title={`${d.title} · ${sayWhen(d.date)}${d.card.synopsis ? `\n${d.card.synopsis}` : ''}\n${by === 'label' ? 'Drag to another day or another plotline' : 'Drag to another day'}; arrow keys move it too`}
+                        aria-label={`${d.title}, ${sayWhen(d.date)}`}
                         role="button"
                         tabIndex={0}
                         onPointerDown={(e) => grab(e, false)}
                         onDoubleClick={() => host.open(d.path)}
-                        onKeyDown={(e) => e.key === 'Enter' && host.open(d.path)}
+                        onKeyDown={(e) => keyMove(e, d, li)}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -506,7 +568,12 @@ export function Plots({ host, tools, ask }: ViewProps) {
                         }}
                       >
                         <span className="pl-mark" />
-                        <span className="pl-end" title="Drag to make it longer or shorter" onPointerDown={(e) => grab(e, true)} />
+                        <span
+                          className="pl-end"
+                          title="Drag to make it last longer or shorter"
+                          // A fingertip is wider than the handle: on a touch screen the handle only stretches the chosen stop, and elsewhere a touch on it is a touch on the stop.
+                          onPointerDown={(e) => (e.pointerType !== 'touch' || d.path === host.path) && grab(e, true)}
+                        />
                         <span className="pl-name" style={spot.room !== null ? { maxWidth: spot.room } : undefined}>
                           {d.title}
                         </span>
@@ -534,6 +601,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
               })}
             </svg>
           )}
+          <div className="pl-tip" ref={tip} hidden aria-hidden="true" />
           {dated.length === 0 && <p className="mode-empty pl-empty">No Item has a story date yet. {hint}</p>}
           {dated.length > 0 && lanes.length === 0 && <p className="mode-empty pl-empty">No Character is named in an Item that has a story date.</p>}
         </div>

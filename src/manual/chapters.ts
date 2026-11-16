@@ -35,7 +35,7 @@ export const CHAPTERS: Chapter[] = [
 | **Pantry** | Everything that isn't the writing itself: Characters, Settings (places) and Materials (research). |
 | **Seasonings** | The proofreader: four characters who each read for one thing. |
 | **Mise en Place** | A whole Group set out as one page. |
-| **Cook**, **Prep** and **Plan** | Three ways to look at a recipe: the page, the outline and board, and the calendar and timeline. |
+| **Cook**, **Prep** and **Plan** | Three ways to look at a recipe: the page, the outline and board, and the calendar and plots. |
 | **Chef Mode** | Focus mode. |
 | **Plate** and **Serve** | Setting the finished book like a real one, and making the e-book or PDF. |
 
@@ -284,10 +284,10 @@ Every character's and place's name counts as a word. Your own words go in \`dict
   {
     id: 'views',
     title: 'Cook, Prep and Plan',
-    summary: 'The page, the outline and board, and the calendar and timeline.',
+    summary: 'The page, the outline and board, and the calendar and plots.',
     body: `A recipe can be looked at three ways. **Cook** is the page you write on. **Prep** sets the Items out to be put in order. **Plan** sets them in story time. The name of the open Item in the top bar is the switch: the small picture before it is a pot for Cook, a chopping board for Prep or a calendar page for Plan, and a click lists all three. They are in the View menu too: {key:modeCook|View › Cook}, {key:modePrep|View › Prep} and {key:modePlan|View › Plan}.
 
-In Prep and Plan the toolbar changes. Its first box, where Cook has the Style box, picks the view. A click on anything picks it, as on the Shelf; a double-click opens it in Cook. New things come from the right-click menu.
+In Prep and Plan the toolbar changes. Its first box, where Cook has the Style box, picks the view. Prep always offers **Outline**, **Board** and **Atlas**, and Plan always offers **Calendar**, **Plots** and **Arcs**, whatever is open; the view you pick stays as you open other Items. A click on anything picks it, as on the Shelf; a double-click opens it in Cook. New things come from the right-click menu.
 
 ## Prep
 
@@ -301,7 +301,7 @@ A **plotline** is a label colour with a name of your own. Right-click a row's na
 Plan works on **story dates**: when an Item happens in the story, as one day or a stretch of days. Any year from 1 to 99999 will do. Set one from an Item's right-click menu, or drag the Item from the Shelf onto a day.
 
 - **Calendar** shows a month, or the whole year. Drag an Item to another day to re-date it, or drag one from the Shelf onto a day to date it. Drag a Pantry Item from the Pantry onto a day to give it a date of its own.
-- **Timeline** runs story time left to right with no ends, a lane for each Group or plotline. Drag a bar to move it and its right edge to make it longer, or drag an Item from the Shelf onto the timeline to date it there. Drag the timeline itself to move along it; − and + show more or less time, from days to centuries.
+- **Plots** draws each plotline as a line through story time, with every dated Item a stop on it. Drag a stop to another day, or onto another plotline's line; drag its right edge to make it last longer; drag an Item from the Shelf onto a line to date it there. **Folded** tucks away the stretches where nothing is dated and says how long each is, so a story with years between its parts still fits the window; **To scale** gives every day the same room. **Telling** goes by the order the Shelf reads the Items in, and draws an arrow for each step the story takes back in time. The first box gives a line to each plotline, each Group, or each Character (through the Items that name them). − and + show more or less time, from days to centuries. Right-click a plotline's name to name it or start another.
 
 ## Taking something out of a view
 
@@ -309,7 +309,7 @@ Plan works on **story dates**: when an Item happens in the story, as one day or 
 
 ## The Pantry's own Prep and Plan
 
-Open a Pantry Item and the same switch shows the Pantry's views, shared by the whole Pantry.
+The Pantry's views are shared by the whole Pantry. Atlas and Arcs are in the view box whatever is open; Board and Calendar show the Pantry's side while a Pantry Item is open.
 
 - **Atlas** (Prep) draws who and what is tied to whom: Characters are round, Settings square, Materials a diamond, and each relationship is a line with its words on it. Drag a mark where it reads best. To tie two, drag from the small ring at a mark's edge to the other, or right-click and choose **Tie to**.
 - **Board** (Prep) is the Pantry as cards, a column each for Characters, Settings and Materials.

@@ -5,8 +5,10 @@ import { type BoardLine, type CardLook, type CardSize, type Ends, type Flow, typ
 /**
  * Cook, Prep and Plan: the three ways to look at a recipe. Cook is the page being written;
  * Prep lays the Items out to be put in order (an outline and a board); Plan sets them in
- * story time (a calendar and a timeline). The Pantry has its own Prep (an atlas of ties and
- * a board) and its own Plan (arcs and a calendar), shared by the whole Pantry.
+ * story time (a calendar and plots). The Pantry has its own Prep (an atlas of ties and
+ * a board) and its own Plan (arcs and a calendar), shared by the whole Pantry. Each of Prep
+ * and Plan offers all three of its views whatever is open: the board and the calendar show the
+ * side of the open Item, and the other four are always the Shelf's or always the Pantry's.
  *
  * Which mode is on is kept for the sitting only. How the views are set up (which view,
  * where the cards of a free board lie, what the plotlines are called) is kept with the
@@ -15,42 +17,39 @@ import { type BoardLine, type CardLook, type CardSize, type Ends, type Flow, typ
 export type Mode = 'cook' | 'prep' | 'plan';
 /** Whose views are showing: the Shelf's, or the Pantry's while a Pantry Item is open. */
 export type Side = 'shelf' | 'pantry';
-export type ViewId = 'outline' | 'board' | 'atlas' | 'pboard' | 'calendar' | 'timeline' | 'arcs' | 'pcalendar';
+export type ViewId = 'outline' | 'board' | 'atlas' | 'pboard' | 'calendar' | 'plots' | 'arcs' | 'pcalendar';
 
-export const MODES: { id: Mode; name: string; hint: Record<Side, string>; shortcut: string }[] = [
-  { id: 'cook', name: 'Cook', hint: { shelf: 'The page', pantry: 'The page' }, shortcut: 'modeCook' },
-  { id: 'prep', name: 'Prep', hint: { shelf: 'Outline and board', pantry: 'Atlas and board' }, shortcut: 'modePrep' },
-  { id: 'plan', name: 'Plan', hint: { shelf: 'Calendar and timeline', pantry: 'Arcs and calendar' }, shortcut: 'modePlan' },
+/** What a view is called, whichever side of it shows: the three choices each of Prep and Plan offers. */
+export type ViewKey = 'outline' | 'board' | 'atlas' | 'calendar' | 'plots' | 'arcs';
+
+export const MODES: { id: Mode; name: string; hint: string; shortcut: string }[] = [
+  { id: 'cook', name: 'Cook', hint: 'The page', shortcut: 'modeCook' },
+  { id: 'prep', name: 'Prep', hint: 'Outline, board and atlas', shortcut: 'modePrep' },
+  { id: 'plan', name: 'Plan', hint: 'Calendar, plots and arcs', shortcut: 'modePlan' },
 ];
 
-export const VIEWS: Record<Exclude<Mode, 'cook'>, Record<Side, { id: ViewId; name: string }[]>> = {
-  prep: {
-    shelf: [
-      { id: 'outline', name: 'Outline' },
-      { id: 'board', name: 'Board' },
-    ],
-    pantry: [
-      { id: 'atlas', name: 'Atlas' },
-      { id: 'pboard', name: 'Board' },
-    ],
-  },
-  plan: {
-    shelf: [
-      { id: 'calendar', name: 'Calendar' },
-      { id: 'timeline', name: 'Timeline' },
-    ],
-    pantry: [
-      { id: 'arcs', name: 'Arcs' },
-      { id: 'pcalendar', name: 'Calendar' },
-    ],
-  },
+/**
+ * The views of Prep and of Plan, with the view each is on either side. One with both sides (the
+ * board, the calendar) follows the open Item; one with a single side is that side's whatever is open.
+ */
+export const VIEWS: Record<Exclude<Mode, 'cook'>, { key: ViewKey; name: string; ids: Partial<Record<Side, ViewId>> }[]> = {
+  prep: [
+    { key: 'outline', name: 'Outline', ids: { shelf: 'outline' } },
+    { key: 'board', name: 'Board', ids: { shelf: 'board', pantry: 'pboard' } },
+    { key: 'atlas', name: 'Atlas', ids: { pantry: 'atlas' } },
+  ],
+  plan: [
+    { key: 'calendar', name: 'Calendar', ids: { shelf: 'calendar', pantry: 'pcalendar' } },
+    { key: 'plots', name: 'Plots', ids: { shelf: 'plots' } },
+    { key: 'arcs', name: 'Arcs', ids: { pantry: 'arcs' } },
+  ],
 };
 
 export type Spot = [number, number];
 
 export interface ModePrefs {
-  /** The view last used, by "prep:shelf", "plan:pantry" and so on. */
-  view: Record<string, ViewId>;
+  /** The view last used in "prep" and in "plan", by its key. (Older files kept one for each side, as "prep:shelf".) */
+  view: Record<string, string>;
   outline: { columns: string[] };
   board: BoardSetUp & { rows: 'none' | 'label' | 'status' };
   pboard: BoardSetUp & { rows: 'none' | 'label' };
@@ -62,7 +61,8 @@ export interface ModePrefs {
   looks: Record<string, Record<string, CardLook>>;
   atlas: { kinds: string[]; near: boolean };
   calendar: { span: 'month' | 'year'; at: string | null };
-  timeline: { lanes: 'group' | 'label'; px: number };
+  /** Plots: what gets a line, how wide a day is, whether empty time is folded away, and whether the telling is threaded through. */
+  plots: { lanes: 'label' | 'group' | 'who'; px: number; fold: boolean; thread: boolean };
   arcs: { kinds: string[]; quiet: boolean };
   /** The writer's names for the label colours when they stand for plotlines. */
   plotlines: Record<string, string>;
@@ -107,7 +107,7 @@ export const DEFAULT_PREFS: ModePrefs = {
   looks: {},
   atlas: { kinds: ['character', 'setting', 'research'], near: false },
   calendar: { span: 'month', at: null },
-  timeline: { lanes: 'group', px: 18 },
+  plots: { lanes: 'label', px: 18, fold: true, thread: false },
   arcs: { kinds: ['character'], quiet: false },
   plotlines: {},
   hidden: { prep: [], plan: [] },
@@ -128,7 +128,9 @@ export function readPrefs(text: string): ModePrefs {
   }
   if (!isRecord(raw)) return DEFAULT_PREFS;
   const part = <K extends keyof ModePrefs>(key: K): ModePrefs[K] => (isRecord(raw[key]) && isRecord(DEFAULT_PREFS[key]) ? ({ ...(DEFAULT_PREFS[key] as object), ...(raw[key] as object) } as ModePrefs[K]) : DEFAULT_PREFS[key]);
-  const px = Number(part('timeline').px);
+  // Plots was the timeline once: how close in it was is kept, and the rest starts as Plots does.
+  const px = Number(isRecord(raw.plots) ? raw.plots.px : isRecord(raw.timeline) ? raw.timeline.px : NaN);
+  const lanes = part('plots').lanes;
   return {
     view: part('view'),
     outline: { columns: Array.isArray(part('outline').columns) ? part('outline').columns.filter((c) => typeof c === 'string') : DEFAULT_PREFS.outline.columns },
@@ -139,14 +141,14 @@ export function readPrefs(text: string): ModePrefs {
     looks: readLooks(raw.looks),
     atlas: part('atlas'),
     calendar: part('calendar'),
-    timeline: { ...part('timeline'), px: Number.isFinite(px) ? Math.max(MIN_PX, Math.min(MAX_PX, px)) : DEFAULT_PREFS.timeline.px },
+    plots: { lanes: lanes === 'group' || lanes === 'who' ? lanes : 'label', px: Number.isFinite(px) ? Math.max(MIN_PX, Math.min(MAX_PX, px)) : DEFAULT_PREFS.plots.px, fold: part('plots').fold !== false, thread: part('plots').thread === true },
     arcs: part('arcs'),
     plotlines: part('plotlines'),
     hidden: { prep: ids(part('hidden').prep), plan: ids(part('hidden').plan) },
   };
 }
 
-/** How wide a day is on the timeline, at its closest and furthest. */
+/** How wide a day is in Plots, at its closest and furthest. */
 export const MIN_PX = 0.05;
 export const MAX_PX = 96;
 
@@ -199,9 +201,15 @@ export function sideOf(openIsCard: boolean): Side {
   return openIsCard ? 'pantry' : 'shelf';
 }
 
-/** The view to show: the one last used here, if this side still has it. */
-export function viewOf(prefs: ModePrefs, mode: Exclude<Mode, 'cook'>, side: Side): ViewId {
-  const views = VIEWS[mode][side];
-  const last = prefs.view[`${mode}:${side}`];
-  return views.some((v) => v.id === last) ? last! : views[0]!.id;
+/** The view each mode begins on, before one is picked: as it was when each side had only its own two. */
+const FIRST: Record<Exclude<Mode, 'cook'>, Record<Side, ViewKey>> = { prep: { shelf: 'outline', pantry: 'atlas' }, plan: { shelf: 'calendar', pantry: 'arcs' } };
+
+/** The view to show, and whose: the one last picked in this mode, or to begin with the first that belongs to the open Item's side. */
+export function viewOf(prefs: ModePrefs, mode: Exclude<Mode, 'cook'>, open: Side): { key: ViewKey; name: string; id: ViewId; side: Side } {
+  const views = VIEWS[mode];
+  // A file from before the views were offered together remembers one for each side.
+  const old = prefs.view[`${mode}:${open}`];
+  const pick = views.find((v) => v.key === prefs.view[mode]) ?? views.find((v) => old !== undefined && v.ids[open] === old) ?? views.find((v) => v.key === FIRST[mode][open])!;
+  const side: Side = pick.ids[open] ? open : pick.ids.shelf ? 'shelf' : 'pantry';
+  return { key: pick.key, name: pick.name, id: pick.ids[side]!, side };
 }

@@ -148,7 +148,7 @@ export function redate(host: ModeHost, d: Dated, date: StoryDate | null): void {
   void host.setField(d.path, 'events', eventsField(events));
 }
 
-/** The right-click menu of something on the calendar or the timeline. */
+/** The right-click menu of something on the calendar or in Plots. */
 export function datedMenu(host: ModeHost, d: Dated, ask: (form: Form) => void): MenuItem[] {
   if (d.event === null) return itemMenu(host, { path: d.path, card: d.card, group: d.group }, ask);
   return [

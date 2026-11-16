@@ -128,7 +128,8 @@ describe('mode set-up', () => {
     // The old "Shelf and Pantry together" switch is gone; a modes.json that still has it reads as if it didn't.
     expect('together' in read).toBe(false);
     expect(read.board).toEqual({ layout: 'free', rows: 'none', cards: 'full', snap: false, route: 'curved', ends: 'end', flow: 'auto' });
-    expect(read.timeline.px).toBe(96);
+    // What was the timeline is Plots: how close in it was is kept, and the rest starts as Plots does.
+    expect(read.plots).toEqual({ lanes: 'label', px: 96, fold: true, thread: false });
     expect(read.outline.columns).toEqual(['words']);
     expect(read.atlas).toEqual(DEFAULT_PREFS.atlas);
   });
@@ -143,11 +144,25 @@ describe('mode set-up', () => {
     expect(sideOf(true)).toBe('pantry');
   });
 
-  it('opens the view last used on each side, or the first', () => {
-    expect(viewOf(DEFAULT_PREFS, 'prep', 'shelf')).toBe('outline');
-    expect(viewOf(DEFAULT_PREFS, 'plan', 'pantry')).toBe('arcs');
-    const prefs = { ...DEFAULT_PREFS, view: { 'prep:shelf': 'board' as const, 'plan:shelf': 'atlas' as const } };
-    expect(viewOf(prefs, 'prep', 'shelf')).toBe('board');
-    expect(viewOf(prefs, 'plan', 'shelf')).toBe('calendar');
+  it('starts on the open Item’s own view, then keeps the view picked whatever is open', () => {
+    expect(viewOf(DEFAULT_PREFS, 'prep', 'shelf')).toMatchObject({ key: 'outline', id: 'outline', side: 'shelf' });
+    expect(viewOf(DEFAULT_PREFS, 'prep', 'pantry')).toMatchObject({ key: 'atlas', id: 'atlas', side: 'pantry' });
+    expect(viewOf(DEFAULT_PREFS, 'plan', 'shelf')).toMatchObject({ key: 'calendar', id: 'calendar' });
+    expect(viewOf(DEFAULT_PREFS, 'plan', 'pantry')).toMatchObject({ key: 'arcs', id: 'arcs' });
+    const prefs = { ...DEFAULT_PREFS, view: { prep: 'board', plan: 'plots' } };
+    // The board and the calendar turn to the side of the open Item.
+    expect(viewOf(prefs, 'prep', 'shelf')).toMatchObject({ id: 'board', side: 'shelf' });
+    expect(viewOf(prefs, 'prep', 'pantry')).toMatchObject({ id: 'pboard', side: 'pantry' });
+    // Plots is the Shelf's and Arcs the Pantry's, whichever kind of Item is open.
+    expect(viewOf(prefs, 'plan', 'pantry')).toMatchObject({ id: 'plots', side: 'shelf' });
+    expect(viewOf({ ...prefs, view: { plan: 'arcs' } }, 'plan', 'shelf')).toMatchObject({ id: 'arcs', side: 'pantry' });
+  });
+
+  it('reads the views an older modes.json remembers for each side', () => {
+    const old = { ...DEFAULT_PREFS, view: { 'prep:shelf': 'board', 'plan:pantry': 'pcalendar', 'plan:shelf': 'timeline' } };
+    expect(viewOf(old, 'prep', 'shelf').id).toBe('board');
+    expect(viewOf(old, 'plan', 'pantry').id).toBe('pcalendar');
+    // The timeline is gone: Plan opens on the calendar until Plots is picked.
+    expect(viewOf(old, 'plan', 'shelf').id).toBe('calendar');
   });
 });

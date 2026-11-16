@@ -8,7 +8,7 @@ import { type Side } from './prefs';
 /**
  * Sent to the element under the pointer when a Shelf or Pantry row is let go over Prep or Plan,
  * with a ShelfDrop as its detail. The mode brings the Item back if it was removed, and a view
- * may do more with it: the calendar and timeline date it to the day it landed on.
+ * may do more with it: the calendar and Plots date it to the day it landed on.
  */
 export const SHELF_DROP = 'cookbook:shelf-drop';
 export interface ShelfDrop {

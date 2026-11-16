@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>zoom probe</title>
+<style>body{margin:0;font:18px Georgia,serif} #page{margin:40px;width:600px;padding:30px;background:#fee} p{margin:0 0 1em}</style></head>
+<body><div id="ui"><div id="page"><p id="t" contenteditable="true">The quick brown fox jumps over the lazy dog and keeps on running far away from here.</p><div id="pm"></div></div></div>
+<pre id="out" style="font:12px monospace;margin:10px"></pre>
+<script>
+const q = new URLSearchParams(location.search);
+const UI = +(q.get('ui') || 1), PAGE = +(q.get('page') || 1);
+if (UI !== 1) document.getElementById('ui').style.zoom = UI;
+document.getElementById('page').style.zoom = PAGE;
+const t = document.getElementById('t').firstChild;
+const send = (o) => { o = { ui: UI, page: PAGE, ...o }; document.getElementById('out').textContent += JSON.stringify(o) + '\n'; fetch('http://localhost:5198/log', { method: 'POST', body: JSON.stringify(o) }).catch(() => {}); };
+const rectOf = (i) => { const r = document.createRange(); r.setStart(t, i); r.setEnd(t, i + 1); const b = r.getBoundingClientRect(); return { x: +b.left.toFixed(1), y: +b.top.toFixed(1), w: +b.width.toFixed(1), h: +b.height.toFixed(1) }; };
+const hit = (x, y) => { const c = document.caretRangeFromPoint ? document.caretRangeFromPoint(x, y) : null; return c && c.startContainer === t ? c.startOffset : (c ? 'other:' + c.startContainer.nodeName : null); };
+const pg = document.getElementById('page');
+const pb = pg.getBoundingClientRect();
+const self = [];
+for (const i of [0, 10, 20, 40, 60, 80]) { const r = rectOf(i); self.push({ i, rect: r, hitAtRectCentre: hit(r.x + r.w / 2, r.y + r.h / 2) }); }
+send({ kind: 'static', ua: navigator.userAgent, dpr: devicePixelRatio, pageRect: [pb.left, pb.top, pb.width, pb.height], offsetWidth: pg.offsetWidth, computedZoom: getComputedStyle(pg).zoom, self,
+  targets: [10, 40, 70].map((i) => ({ i, rect: rectOf(i) })) });
+document.addEventListener('mousedown', (e) => {
+  const at = hit(e.clientX, e.clientY);
+  send({ kind: 'click', button: e.button, clientX: e.clientX, clientY: e.clientY, pageX: e.pageX, screenX: e.screenX, el: document.elementFromPoint(e.clientX, e.clientY)?.id, caretAt: at, rectOfCaretChar: typeof at === 'number' ? rectOf(Math.min(at, t.length - 1)) : null });
+}, true);
+</script>
+<script type="module">
+import { EditorState } from 'https://esm.sh/prosemirror-state@1.4.3';
+import { EditorView } from 'https://esm.sh/prosemirror-view@1.42.6';
+import { schema } from 'https://esm.sh/prosemirror-schema-basic@1.2.3';
+const doc = schema.node('doc', null, [schema.node('paragraph', null, [schema.text('Second line for ProseMirror: the quick brown fox jumps over the lazy dog again.')])]);
+const view = new EditorView(document.getElementById('pm'), { state: EditorState.create({ doc }) });
+window.pmView = view;
+document.addEventListener('mousedown', (e) => {
+  const c = document.caretRangeFromPoint && document.caretRangeFromPoint(e.clientX, e.clientY);
+  let viaCaret = null; try { if (c && view.dom.contains(c.startContainer)) viaCaret = view.posAtDOM(c.startContainer, c.startOffset); } catch {}
+  const p = view.posAtCoords({ left: e.clientX, top: e.clientY });
+  fetch('http://localhost:5198/log', { method: 'POST', body: JSON.stringify({ kind: 'pm', clientX: e.clientX, clientY: e.clientY, posAtCoords: p && p.pos, viaCaretRange: viaCaret }) }).catch(() => {});
+  document.getElementById('out').textContent += JSON.stringify({ pm: p && p.pos, viaCaret }) + '\n';
+}, true);
+const r = document.createRange(); const tn = view.dom.querySelector('p').firstChild;
+const marks = [5, 30, 60].map((i) => { r.setStart(tn, i); r.setEnd(tn, i + 1); const b = r.getBoundingClientRect(); return { i, pos: i + 1, x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+fetch('http://localhost:5198/log', { method: 'POST', body: JSON.stringify({ kind: 'pmtargets', marks }) }).catch(() => {});
+</script></body></html>

@@ -1,7 +1,10 @@
 import { dialogueRanges } from '../editor/dialogue';
 import { type Issue, words } from './check';
 import { type Counts } from './context';
+import { LEARNER_RULES, learnerIssues } from './learner';
 import { lookalikes } from './lookalikes';
+import { MECHANICS_RULES, SPEECH_TOO, mechanicsIssues } from './mechanics';
+import { MORE_OPT_IN } from './styleMore';
 import { isPast } from './verbs';
 
 /**
@@ -30,10 +33,12 @@ export const PETE_RULES: { id: string; label: string }[] = [
   { id: 'capitals', label: 'Missing capitals (monday, english, a sentence’s first word)' },
   { id: 'usage', label: 'Words to avoid (irregardless, alright)' },
   { id: 'run-on', label: 'Run-ons and comma splices (off at first: novelists use them on purpose)' },
+  ...MECHANICS_RULES,
+  ...LEARNER_RULES,
 ];
 
 /** Checks that start switched off: the writer turns them on in Cookbook Settings › Seasonings. */
-export const OPT_IN_RULES = ['run-on', 'OxfordComma'];
+export const OPT_IN_RULES = ['run-on', 'OxfordComma', ...MORE_OPT_IN];
 
 /** Something that says whether a word is in the dictionary. */
 export type IsWord = (word: string) => boolean;
@@ -572,10 +577,15 @@ export function peteIssues(text: string, isWord: IsWord, counts: Counts[] = []):
   doubleNegatives(ts, out);
   runOns(text, ts, out);
   out.push(...lookalikes(text, counts));
+  out.push(...mechanicsIssues(text, isWord));
+  out.push(...learnerIssues(text, isWord));
+  // "A number of guests were late", "a lot of them are": the amount is many, whatever its first word.
+  const amount = /\ban?\s+(?:number|lot|couple|handful|bunch|majority|variety|host|range|total|pair|group)\s+of\b[^.!?,;]*$/iu;
+  for (let n = out.length - 1; n >= 0; n--) if (out[n]!.rule === 'agreement' && amount.test(text.slice(0, out[n]!.from))) out.splice(n, 1);
   const kept: Issue[] = [];
   for (const i of out.sort((a, b) => a.from - b.from || b.to - a.to)) {
-    // A look-alike is a slip of the pen even in speech; the rest may be how a character talks.
-    if ((inSpeech(i) && i.rule !== 'look-alike') || kept.some((k) => i.from < k.to && i.to > k.from)) continue;
+    // A look-alike or a punctuation slip is a slip of the pen even in speech; the rest may be how a character talks.
+    if ((inSpeech(i) && !SPEECH_TOO.has(i.rule)) || kept.some((k) => i.from < k.to && i.to > k.from)) continue;
     kept.push(i);
   }
   return kept;

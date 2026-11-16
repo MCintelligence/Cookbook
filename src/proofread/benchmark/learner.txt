@@ -1,0 +1,131 @@
+# One mistake per line, marked [[wrong|right]]. Written for Cookbook in the categories of the
+# 129-sentence set in John & Woll (2020), whose own sentences are not published.
+tense-aspect	I [[have lived|lived]] in Paris in 2019.
+tense-aspect	She [[is working|has worked]] here since March.
+tense-aspect	When I was young, I [[am going|went]] to the market every Saturday.
+tense-aspect	Yesterday we [[have visited|visited]] our grandmother.
+tense-aspect	I [[know|have known]] him for ten years.
+tense-aspect	Last night he [[is cooking|cooked]] a big dinner for us.
+tense-aspect	By the time we arrived, the film [[already started|had already started]].
+tense-aspect	I [[am living|have lived]] in this town since I was a child.
+tense-aspect	Tomorrow she [[visited|will visit]] her aunt.
+verb-form	She [[teached|taught]] the children to bake bread.
+verb-form	We were [[expose|exposed]] to the cold all night.
+verb-form	He has [[went|gone]] to the shop.
+verb-form	I can [[to swim|swim]] very well.
+verb-form	She made me [[to wait|wait]] for an hour.
+verb-form	He [[buyed|bought]] a new coat.
+verb-form	I am interested in [[learn|learning]] French.
+verb-form	The cake was [[eat|eaten]] before noon.
+verb-form	She enjoys [[to cook|cooking]] for her friends.
+verb-form	He didn't [[went|go]] to school today.
+verb-form	We must [[finished|finish]] the work tonight.
+verb-form	I have [[saw|seen]] that film twice.
+verb-form	She could [[went|go]] home early.
+agreement	My brother [[live|lives]] in Lyon.
+agreement	The children [[plays|play]] in the garden after school.
+agreement	There [[is|are]] three apples on the table.
+agreement	Everybody [[have|has]] a ticket.
+agreement	One of my friends [[are|is]] a nurse.
+agreement	The price of these shoes [[are|is]] too high.
+tense-shift	He opened the door and [[sees|saw]] a cat on the step.
+tense-shift	She was tired, so she [[goes|went]] to bed early.
+plural	I bought two [[book|books]] yesterday.
+plural	There are many [[informations|pieces of information]] on the website.
+plural	She gave me some good [[advices|advice]].
+plural	We have three [[child|children]].
+plural	He has a lot of [[furnitures|furniture]] in his flat.
+plural	Many [[person|people]] came to the party.
+plural	I need two [[knifes|knives]] for the table.
+plural	All the [[student|students]] passed the exam.
+plural	The [[womans|women]] were talking in the kitchen.
+plural	We bought new [[equipments|equipment]] for the kitchen.
+plural	She has two [[cat|cats]] and a dog.
+plural	I did my [[homeworks|homework]] after dinner.
+plural	Several [[tooth|teeth]] were missing.
+plural	Both of my [[sister|sisters]] live in Quebec.
+plural	He ate three [[sandwich|sandwiches]].
+plural	There are five [[mouses|mice]] in the barn.
+plural	The [[luggages|luggage]] was too heavy.
+plural	Many [[family|families]] live on this street.
+plural	We saw a lot of [[sheeps|sheep]] in the field.
+plural	I have many [[friend|friends]] in Montreal.
+possessive	This is my [[sisters|sister's]] car.
+possessive	The [[teacher|teacher's]] desk was covered in papers.
+possessive	I borrowed [[John|John's]] bicycle.
+possessive	The [[childrens|children's]] toys were everywhere.
+pronoun	[[Me|I]] and my friend went to the cinema.
+pronoun	She gave the book to [[I|me]].
+pronoun	[[Him|He]] and his wife arrived late.
+pronoun	Between you and [[I|me]], the soup was cold.
+pronoun	The cat licked [[it's|its]] paw.
+wrong-preposition	I am married [[with|to]] a teacher.
+wrong-preposition	She is good [[in|at]] maths.
+wrong-preposition	We arrived [[to|in]] Paris at noon.
+wrong-preposition	It depends [[of|on]] the weather.
+wrong-preposition	He is afraid [[from|of]] dogs.
+wrong-preposition	I am interested [[about|in]] history.
+wrong-preposition	She is responsible [[of|for]] the kitchen.
+wrong-preposition	I will see you [[in|on]] Monday.
+wrong-preposition	He was angry [[on|with]] me.
+wrong-preposition	I have lived here [[since|for]] five years.
+missing-preposition	I am [[waiting|waiting for]] the bus.
+missing-preposition	She [[listened|listened to]] the radio all morning.
+missing-preposition	We [[went|went to]] the beach last summer.
+missing-preposition	I [[depend|depend on]] my parents for money.
+extra-preposition	We [[discussed about|discussed]] the plan.
+extra-preposition	She [[entered into|entered]] the room quietly.
+extra-preposition	He [[married with|married]] a nurse.
+extra-preposition	I [[called to|called]] my mother last night.
+extra-preposition	They [[reached to|reached]] the station at noon.
+extra-preposition	Please [[answer to|answer]] the question.
+extra-preposition	We [[visited to|visited]] the museum yesterday.
+word-order	I [[like very much chocolate|like chocolate very much]].
+word-order	She [[speaks very well English|speaks English very well]].
+word-order	Where [[you are going|are you going]]?
+word-order	He asked me where [[was the station|the station was]].
+word-order	I [[always am|am always]] late.
+word-order	We have [[a car red|a red car]].
+word-order	Can you tell me what time [[is it|it is]]?
+word-order	They [[visit often their|often visit their]] parents.
+word-order	What [[you did|did you do]] yesterday?
+word-order	I don't know what [[does he want|he wants]].
+word-order	He [[enough is old|is old enough]] to drive.
+word-order	Why [[she is|is she]] crying?
+word-order	I [[saw yesterday your brother|saw your brother yesterday]].
+word-order	It is a [[house big|big house]].
+word-order	How [[much it costs|much does it cost]]?
+word-order	She bought [[a dress beautiful|a beautiful dress]].
+word-order	[[Always he|He always]] eats breakfast at seven.
+word-order	Do you know where [[is the bank|the bank is]]?
+word-form	There is a lot of [[obeseness|obesity]] in the city.
+word-form	He drove very [[careful|carefully]].
+word-form	She is a very [[beauty|beautiful]] woman.
+word-form	The film was really [[bored|boring]].
+word-form	I am [[boring|bored]] in this class.
+word-form	He gave a [[success|successful]] speech.
+word-form	We need to [[decision|decide]] now.
+word-form	Her [[explain|explanation]] was clear.
+word-form	She sings [[good|well]].
+word-form	It was a [[danger|dangerous]] road.
+determiner	I saw [[a|an]] elephant at the zoo.
+determiner	She is [[doctor|a doctor]].
+determiner	[[The life|Life]] is short.
+determiner	He plays [[the football|football]] every day.
+determiner	I need [[a|an]] umbrella.
+determiner	I have [[much|many]] books.
+determiner	There isn't [[some|any]] milk left.
+determiner	He bought [[a bread|some bread]].
+determiner	I went to [[the bed|bed]] early.
+determiner	[[An university|A university]] is near here.
+determiner	She speaks [[the English|English]] fluently.
+determiner	I have [[less|fewer]] friends than you.
+determiner	She drank [[a|]] water.
+relative-clause	The man [[which|who]] lives next door is a cook.
+relative-clause	This is the book [[who|that]] I told you about.
+relative-clause	The woman [[what|who]] called you is my aunt.
+relative-clause	The house [[where|that]] I bought is old.
+relative-clause	I have a friend [[who he|who]] lives in Rome.
+relative-clause	The town [[that|where]] I was born is small.
+relative-clause	The cake [[that she baked it|that she baked]] was delicious.
+relative-clause	People [[which|who]] work hard deserve a rest.

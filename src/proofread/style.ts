@@ -1,5 +1,6 @@
 import { dialogueRanges } from '../editor/dialogue';
 import { type Issue, words } from './check';
+import { MORE_STYLE_RULES, moreStyleIssues } from './styleMore';
 import { CLICHES, FILLERS, FILLER_AFTER_GUARDS, FILLER_GUARDS, NOT_ECHOES, NOT_MANNER, NOT_PASSIVE, REDUNDANCIES, WORDY, listRegExp, shorterWay } from './styleLists';
 
 /**
@@ -19,6 +20,7 @@ export const STYLE_RULES: { id: string; label: string; why: string }[] = [
   { id: 'cliche', label: 'Clichés', why: 'A phrase readers have seen many times slides past them. Something of your own will stick.' },
   { id: 'redundancy', label: 'Redundancies', why: 'Part of this phrase repeats the rest. The shorter version means the same.' },
   { id: 'OxfordComma', label: 'Oxford comma', why: 'A comma before the “and” that ends a list: “bread, butter, and jam”. Some house styles want it and some don’t, so this starts off.' },
+  ...MORE_STYLE_RULES,
   { id: 'own-pattern', label: 'Your own list', why: 'You put this on your own list in Cookbook Settings › Seasonings.' },
 ];
 
@@ -178,6 +180,7 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   const open = unclosedQuote(text);
   if (open) out.push(open);
   out.push(...strayCapitals(text, names));
+  out.push(...moreStyleIssues(text, inSpeech));
 
   // Echoes: the same telling word again within a few words. Names, glue and
   // short words don't count, and nor does a word that starts a sentence in capitals.
@@ -193,8 +196,8 @@ export function styleIssues(text: string, names: string[] = []): Issue[] {
   });
 
   // One issue per stretch of text: the more specific rules win over adverbs and crutch words.
-  const order = ['redundancy', 'cliche', 'simpler-word', 'passive', 'crutch-word', 'adverb', 'echo'];
-  const sentenceRules = new Set(['sticky-sentence']);
+  const order = ['loud-punctuation', 'gendered-word', 'redundancy', 'cliche', 'simpler-word', 'passive', 'split-infinitive', 'crutch-word', 'adverb', 'echo', 'conjunction-start'];
+  const sentenceRules = new Set(['sticky-sentence', 'preposition-chain']);
   const kept: Issue[] = [];
   for (const i of [...out].sort((a, b) => order.indexOf(a.rule) - order.indexOf(b.rule))) {
     if (!sentenceRules.has(i.rule) && kept.some((k) => !sentenceRules.has(k.rule) && i.from < k.to && i.to > k.from)) continue;
@@ -239,4 +242,4 @@ export function strayCapitals(text: string, names: string[] = []): Issue[] {
   return out;
 }
 
-export const isSentenceRule = (rule: string) => rule === 'sticky-sentence';
+export const isSentenceRule = (rule: string) => rule === 'sticky-sentence' || rule === 'preposition-chain';

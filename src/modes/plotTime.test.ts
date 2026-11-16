@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayNumber } from '../storage/storyDate';
-import { FOLD_W, backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plots';
+import { FOLD_W, backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
 
 const day = (y: number, m: number, d: number) => dayNumber({ y, m, d });
 

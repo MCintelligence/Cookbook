@@ -9,7 +9,7 @@ import { useStore } from '../ui/store';
 import { usePhone } from '../ui/usePhone';
 import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, dayText, labelColor, pantryGroups, plotlineName, shelfGroups } from './model';
-import { backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plots';
+import { backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
 import { MAX_PX, MIN_PX, prefsStore, setPrefs } from './prefs';
 import { Face, Pick, Seg, Tally, ToolButton, datedMenu, whenField } from './shared';
 import { dragFrom, scaleOf } from './usePanZoom';

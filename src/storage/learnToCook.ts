@@ -77,13 +77,13 @@ const TOUCH_PAGE: Page = {
 
 The pages after this one are shared with Cookbook on a computer, so they speak of clicks and of menus along the top. Everything in them works here; this page says where each thing is on a phone.
 
-- **The bar along the bottom** is how you get around: the **Shelf**, then this Item as **Cook** (the page), **Prep** (outline and board) and **Plan** (calendar and timeline), then the **Pantry**.
+- **The bar along the bottom** is how you get around: the **Shelf**, then this Item as **Cook** (the page), **Prep** (outline, board and atlas) and **Plan** (calendar, plots and arcs), then the **Pantry**.
 - **The recipe's name** at the top of the Shelf opens everything about the recipe: Your Recipes, exporting, printing, backing up, Trash, Goals and the Manual. The cog beside it is Settings. Where a page here says "the File menu" or "the Recipe menu", look there.
 - **The Item's name** at the top of the page opens everything about the Item: renaming, labels, drafts, snapshots, and how the page behaves.
 - **New things** come from the round **+** in the corner of the Shelf and the Pantry.
 - **Seasonings** is the button beside Search at the top of the page.
 - **Click** means tap, and **right-click** means **press and hold**. Press and hold an Item on the Shelf to pick it up (you'll feel it), then move your finger to put it somewhere else on the Shelf. Let go without moving to see what you can do with it.
-- **To put an Item on a day**, go to **Plan**, press and hold the day on the calendar (or a lane on the timeline) and choose **Add from the Shelf** or **Add from the Pantry**. Every Item is on the board already.
+- **To put an Item on a day**, go to **Plan**, press and hold the day on the calendar (or a line in Plots) and choose **Add from the Shelf** or **Add from the Pantry**. Every Item is on the board already.
 - **On the Board and the Atlas**, one finger moves the board and two fingers pinch to zoom. Press and hold a card to carry it.
 - **In the page**, press and hold picks a word, with your phone's own Cut, Copy and Paste. Tap a word with a wavy underline to see what a Seasoning suggests.
 - **The writing bar** sits on top of the keyboard while you type: undo and redo, **B**, *I* and U, the paragraph's style (¶), things to insert (+), and **Aa** for fonts and spacing. Its last button puts the keyboard away.
@@ -373,18 +373,18 @@ Which checks run, and American or British spelling, are in Cookbook Settings ›
       items: [
         {
           title: 'Three ways to look',
-          synopsis: 'The page, the outline and board, and the calendar and timeline.',
+          synopsis: 'The page, the outline and board, and the calendar and plots.',
           body: `# Three ways to look
 
 You are in **Cook**: the page. A recipe can be looked at two more ways, and the switch is this Item’s name in the top bar. Click it and choose:
 
 - **Prep**${k('modePrep') ? ` (${k('modePrep')})` : ''} sets the Items out to be put in order. Its **Outline** lists them with their synopses; its **Board** shows them as cards, in a **Grid** with a column for each Group, or **Free** on a board with no edges.
-- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and a **Timeline**. Right-click an Item and choose **Set story date**, or drag it from the Shelf onto a day.
+- **Plan**${k('modePlan') ? ` (${k('modePlan')})` : ''} sets them in story time, on a **Calendar** and in **Plots**, where each plotline is a line through the days. Right-click an Item and choose **Set story date**, or drag it from the Shelf onto a day.
 - **Cook**${k('modeCook') ? ` (${k('modeCook')})` : ''} brings you back to the page. So does a double-click on anything in Prep or Plan.
 
 Try it now: open Prep, choose Board, and drag a card to another Group. The Shelf follows. New things come from the right-click menu.
 
-Open a Pantry Item and the same switch shows the **Pantry’s** own views: an **Atlas** of who is tied to whom and a Board in Prep, **Arcs** and a Calendar in Plan.
+The **Pantry** has views of its own in the same boxes: an **Atlas** of who is tied to whom in Prep, **Arcs** in Plan, and its own side of the Board and the Calendar whenever a Pantry Item is open.
 
 Right-click anything in Prep or Plan and choose **Remove** to take it out of that view. The Item itself stays as it is; drag it in from the Shelf to bring it back.
 `,

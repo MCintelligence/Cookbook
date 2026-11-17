@@ -180,7 +180,7 @@ export function layOut(ids: string[], ties: { a: string; b: string }[], placed: 
   return at;
 }
 
-/** Something with a date, as the calendar and timeline draw it. */
+/** Something with a date, as the calendar and Plots draw it. */
 export interface Dated {
   key: string;
   path: string;

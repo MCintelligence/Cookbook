@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { ARC_LEVELS, type ArcBeat } from '../storage/document';
 import { useStore } from '../ui/store';
+import { placeAt } from '../ui/zoom';
 import { type ViewProps } from './host';
 import { type Item, pantryGroups, shelfGroups } from './model';
 import { prefsStore, setPrefs } from './prefs';
@@ -164,6 +165,13 @@ function BeatBox({ editing, beat, onBeat, onClose }: { editing: Editing; beat: A
     window.addEventListener('pointerdown', away, true);
     return () => window.removeEventListener('pointerdown', away, true);
   }, []);
+  // Placed in the window's own measure, so it opens by the click at any interface size, and is kept on screen.
+  const place = ({ x, y }: { x: number; y: number }) => {
+    const parent = box.current?.parentElement ?? document.body;
+    const at = placeAt(parent, { left: x + 8, top: y + 8 });
+    const most = placeAt(parent, { left: window.innerWidth, top: window.innerHeight });
+    return { left: Math.max(0, Math.min(at.left, most.left - 248)), top: Math.max(0, Math.min(at.top, most.top - 300)) };
+  };
   const saveNote = () => beat && note.trim() !== beat.note && onBeat({ ...beat, note: note.trim() });
   return (
     <div
@@ -171,7 +179,7 @@ function BeatBox({ editing, beat, onBeat, onClose }: { editing: Editing; beat: A
       className="beat-box"
       role="dialog"
       aria-label={`${editing.who.card.title} in ${editing.scene.card.title}`}
-      style={{ left: Math.min(editing.x + 8, window.innerWidth - 248), top: Math.min(editing.y + 8, window.innerHeight - 300) }}
+      style={place(editing)}
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.stopPropagation();

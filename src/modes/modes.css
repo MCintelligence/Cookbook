@@ -193,32 +193,54 @@
 .cal-month.small .cal-day.busy { color: var(--on-accent); font-weight: 700; background: var(--accent); border-radius: 50%; width: 22px; height: 22px; margin: auto; }
 
 /* ---------- Timeline ---------- */
-.timeline { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tl-main { flex: 1; position: relative; overflow-x: hidden; overflow-y: auto; cursor: grab; touch-action: pan-y; }
-.tl-main.panning { cursor: grabbing; }
-.tl-ruler { position: sticky; top: 0; z-index: 4; height: 46px; background: var(--bar); border-bottom: 1px solid var(--line-strong); overflow: hidden; }
-.tl-corner { position: absolute; left: 0; top: 0; bottom: 0; z-index: 2; background: var(--bar); border-right: 1px solid var(--line-strong); }
-.tl-major { position: absolute; top: 5px; padding-left: 6px; border-left: 1px solid var(--line-strong); height: 41px; font-family: var(--font-display); font-size: 13px; font-weight: 700; white-space: nowrap; pointer-events: none; }
-.tl-minor { position: absolute; top: 27px; font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; pointer-events: none; padding-left: 3px; }
-.tl-lane { position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
-/* What moves when the timeline is dragged: one transform, set while it moves and cleared when it is drawn again where it went (Timeline.tsx). */
-.tl-track { position: absolute; inset: 0; transform: translateX(var(--tl-shift, 0px)); }
-.tl-lane:nth-child(even) { background: color-mix(in srgb, var(--text) 2.5%, transparent); }
-.tl-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); pointer-events: none; }
-.tl-lane-head { position: absolute; left: 0; top: 0; bottom: 0; z-index: 3; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; padding: 10px 10px 0 14px; background: var(--bar); border-right: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 13px; font-weight: 700; box-shadow: inset 4px 0 0 var(--label, transparent); cursor: default; }
-.tl-lane-head span:first-child { overflow: hidden; text-overflow: ellipsis; }
-.tl-bar { position: absolute; height: 22px; border-radius: 11px; background: color-mix(in srgb, var(--label) 78%, var(--card)); border: 1px solid color-mix(in srgb, var(--label) 70%, var(--text)); cursor: grab; outline: none; }
-.tl-bar-name { position: absolute; left: 14px; top: 2px; font-size: 12.5px; line-height: 16px; white-space: nowrap; color: var(--text); pointer-events: none; }
-.tl-bar:not(.long) { width: 12px !important; height: 12px; margin-top: 5px; border-radius: 50%; }
-.tl-bar:not(.long) .tl-bar-name { left: 18px; top: -3px; }
-.tl-bar.long.tight .tl-bar-name { left: calc(100% + 6px); font-weight: 400; }
-.tl-bar.long .tl-bar-name { left: 9px; text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg); font-weight: 600; }
-.tl-bar.pantry { border-style: dashed; background: transparent; --label: var(--green); }
-.tl-bar.pantry .tl-bar-name { font-style: italic; }
-.tl-bar.chosen, .tl-bar:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
-.tl-bar[data-lifted] { cursor: grabbing; z-index: 2; opacity: 0.85; }
-.tl-bar-end { position: absolute; right: -4px; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
-.tl-empty { position: absolute; left: 148px; right: 0; top: 90px; pointer-events: none; }
+.plots { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pl-main { flex: 1; position: relative; overflow: auto; cursor: grab; }
+.pl-main.panning { cursor: grabbing; user-select: none; }
+.pl-sheet { position: relative; min-width: 100%; min-height: 100%; box-sizing: border-box; }
+/* The months' lines and the folds, drawn once behind every lane. */
+.pl-grid { position: absolute; top: 0; bottom: 0; right: 0; pointer-events: none; }
+.pl-line { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.pl-fold { position: absolute; top: 0; bottom: 0; box-sizing: border-box; border-left: 1px dashed var(--line-strong); border-right: 1px dashed var(--line-strong); background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--text) 5%, transparent) 5px 6px); }
+.pl-ruler { position: sticky; top: 0; z-index: 5; background: var(--bar); border-bottom: 1px solid var(--line-strong); box-sizing: border-box; }
+.pl-corner { position: sticky; left: 0; z-index: 2; height: 100%; box-sizing: border-box; background: var(--bar); border-right: 1px solid var(--line-strong); }
+.pl-major { position: absolute; top: 4px; bottom: 0; padding-left: 6px; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; border-left: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 13px; font-weight: 700; white-space: nowrap; pointer-events: none; }
+.pl-minor { position: absolute; top: 25px; font-size: 11px; color: var(--muted); text-align: center; white-space: nowrap; pointer-events: none; padding-left: 3px; box-sizing: border-box; }
+.pl-gap { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 0 3px; background: var(--bar); border-left: 1px dashed var(--line-strong); border-right: 1px dashed var(--line-strong); font-size: 11px; line-height: 1.15; text-align: center; color: var(--muted); font-style: italic; cursor: default; }
+.pl-lane { position: relative; box-sizing: border-box; border-bottom: 1px solid var(--line); }
+.pl-head { position: sticky; left: 0; z-index: 4; height: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 7px; padding: 0 10px 0 12px; background: var(--bar); border-right: 1px solid var(--line-strong); font-family: var(--font-display); font-size: 13px; font-weight: 700; cursor: default; }
+.pl-swatch { flex: none; width: 14px; height: 4px; border-radius: 2px; background: var(--label); }
+.pl-head-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-track { position: absolute; top: 0; bottom: 0; right: 0; }
+.pl-path, .pl-thread { position: absolute; top: 0; overflow: visible; pointer-events: none; }
+.pl-path line { stroke: var(--label); stroke-width: 2; stroke-linecap: round; opacity: 0.5; }
+.pl-path line.pl-stem { stroke-width: 1.5; opacity: 0.4; }
+.pl-node { position: absolute; z-index: 2; display: flex; align-items: center; gap: 7px; cursor: grab; outline: none; }
+.pl-mark { flex: none; box-sizing: border-box; width: var(--w); height: 12px; border-radius: 6px; background: var(--label); border: 2px solid var(--bg); box-shadow: 0 0 0 1px color-mix(in srgb, var(--label) 70%, var(--text)); }
+.pl-node.long .pl-mark { height: 10px; border-width: 1px; }
+.pl-name { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; border-radius: 3px; background: var(--bg); font-size: 12.5px; line-height: 16px; color: var(--text); pointer-events: none; }
+.pl-node:hover .pl-name { max-width: none !important; position: relative; padding: 0 6px; background: var(--surface); box-shadow: 0 1px 6px rgba(var(--shadow), 0.22), 0 0 0 1px var(--line); }
+.pl-node:hover, .pl-node:focus-visible { z-index: 3; }
+.pl-node.chosen .pl-mark, .pl-node:focus-visible .pl-mark { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.pl-node.chosen .pl-name { font-weight: 600; }
+.pl-node[data-lifted] { cursor: grabbing; z-index: 3; opacity: 0.9; }
+.pl-node[data-lifted] .pl-mark { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 4px 10px rgba(var(--shadow), 0.35); }
+/* The handle that stretches a mark sits just past its right end, over the gap before the name. */
+.pl-end { position: absolute; left: calc(var(--w) - 2px); top: 3px; bottom: 3px; width: 9px; cursor: ew-resize; }
+/* The handle shows as a small grip at the right end of a stop under the pointer, or the chosen one. */
+.pl-end::after { content: ''; position: absolute; left: 3px; top: 50%; width: 3px; height: 12px; margin-top: -6px; border-radius: 2px; background: var(--text); opacity: 0; transition: opacity 0.12s; }
+.pl-node:hover .pl-end::after, .pl-node.chosen .pl-end::after, .pl-node:focus-visible .pl-end::after { opacity: 0.55; }
+.pl-end:hover::after { opacity: 0.9 !important; }
+.pl-node:not(.long) .pl-end { left: calc(var(--w) - 1px); }
+/* While a stop is carried, the name steps aside for the note that says where it will land. */
+.pl-node[data-lifted] .pl-name { opacity: 0.35; }
+.pl-tip { position: absolute; z-index: 6; transform: translateX(-4px); padding: 2px 7px; border-radius: 5px; background: var(--text); color: var(--bg); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(var(--shadow), 0.3); }
+.pl-tip[hidden] { display: none; }
+.pl-lane[data-drop] { background: color-mix(in srgb, var(--label) 12%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--label) 70%, transparent); }
+/* Under the stops, whose names have a background, so an arrow never crosses a word. */
+.pl-thread { z-index: 1; }
+.pl-thread path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linecap: round; opacity: 0.85; }
+.pl-thread marker path { fill: var(--accent); stroke: none; }
+.pl-empty { position: sticky; left: 168px; width: fit-content; margin: 56px auto 0; pointer-events: none; }
 
 /* ---------- Arcs ---------- */
 .arcs { flex: 1; overflow: auto; display: flex; }
@@ -270,7 +292,5 @@
 .mode-form-fields label.wide { grid-column: 1 / -1; }
 .mode-form-note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
 .mode-form-note.wrong { color: var(--danger-text); }
-/* A single day is too small to hold its own handle, so the handle sits just past it. */
-.tl-bar:not(.long) .tl-bar-end { right: -10px; width: 9px; top: -4px; bottom: -4px; }
-/* A Shelf or Pantry row dragged over Prep or Plan: let go to bring it back, or to date it on the calendar and timeline. */
+/* A Shelf or Pantry row dragged over Prep or Plan: let go to bring it back, or to date it on the calendar and in Plots. */
 .app.mode-drop .mode-desk { box-shadow: inset 0 0 0 2px var(--accent); }

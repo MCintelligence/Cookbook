@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { boardHistory } from './boardUndo';
+import { type Kept, boardHistory } from './boardUndo';
 import { DEFAULT_PREFS, prefsStore, setPrefs } from './prefs';
 
 const spotOf = (id: string) => prefsStore.get().spots.board?.[id];
@@ -57,5 +57,27 @@ describe('board undo', () => {
     prefsStore.set({ ...DEFAULT_PREFS, spots: { board: { z: [9, 9] } } });
     expect(h.undo()).toBe(false);
     expect(spotOf('z')).toEqual([9, 9]);
+  });
+});
+
+describe('board-only cards in modes.json', () => {
+  it('keeps well-formed board cards and drops the rest', async () => {
+    const { readPrefs } = await import('./prefs');
+    const read = readPrefs(JSON.stringify({ notes: { board: { 'note-a': { title: 'Idea', text: 'More' }, 'note-b': { title: 'Bare', text: '' }, x: { title: 'Not a note id' }, 'note-c': { text: 'no title' } }, pboard: 'nonsense' } }));
+    expect(read.notes).toEqual({ board: { 'note-a': { title: 'Idea', text: 'More' }, 'note-b': { title: 'Bare' } } });
+    expect(readPrefs('{}').notes).toEqual({});
+  });
+
+  it('puts a deleted board card and an Item taken off the board back in one step', () => {
+    prefsStore.set(DEFAULT_PREFS);
+    const kept: Kept[] = ['spots', 'lines', 'looks', 'notes', ['hidden', 'prep']];
+    const h = boardHistory('board', kept);
+    setPrefs({ notes: { board: { 'note-a': { title: 'Idea' } } }, spots: { board: { 'note-a': [1, 2] } } });
+    setPrefs((now) => ({ notes: { board: {} }, spots: { board: {} }, hidden: { ...now.hidden, prep: ['item-1'] } }));
+    expect(h.undo()).toBe(true);
+    expect(prefsStore.get().notes.board).toEqual({ 'note-a': { title: 'Idea' } });
+    expect(prefsStore.get().spots.board).toEqual({ 'note-a': [1, 2] });
+    expect(prefsStore.get().hidden.prep).toEqual([]);
+    h.stop();
   });
 });

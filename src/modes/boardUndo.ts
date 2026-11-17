@@ -1,8 +1,13 @@
 import { useEffect } from 'react';
 import { type ModePrefs, onPrefsEdit, prefsStore, setPrefs } from './prefs';
 
-/** What a board keeps of its own in modes.json: where cards lie, the lines, and the shapes and colours. */
-export type Kept = 'spots' | 'lines' | 'looks';
+/**
+ * What a board keeps of its own in modes.json: a part of the prefs (where cards lie, the lines,
+ * the shapes and colours, the board-only cards) and, for those kept by mode rather than by board,
+ * which key of it (the free board's Items taken out of Prep are `['hidden', 'prep']`).
+ */
+export type Kept = 'spots' | 'lines' | 'looks' | 'notes' | ['hidden', 'prep' | 'plan'];
+const partOf = (k: Kept, name: string): [keyof ModePrefs, string] => (Array.isArray(k) ? k : [k, name]);
 type Snapshot = unknown[];
 
 /** How many steps back a board remembers. */
@@ -10,15 +15,19 @@ const DEPTH = 100;
 
 /** A board's own part of the prefs, as one snapshot. */
 export function snapshotOf(prefs: ModePrefs, name: string, kept: Kept[]): Snapshot {
-  return kept.map((k) => (prefs[k] as Record<string, unknown>)[name]);
+  return kept.map((k) => {
+    const [part, key] = partOf(k, name);
+    return (prefs[part] as unknown as Record<string, unknown>)[key];
+  });
 }
 
 /** The prefs with a board's part put back to `snap`. */
 export function restoreOf(prefs: ModePrefs, name: string, kept: Kept[], snap: Snapshot): Partial<ModePrefs> {
   const out: Record<string, unknown> = {};
   kept.forEach((k, i) => {
-    const { [name]: _was, ...rest } = prefs[k] as Record<string, unknown>;
-    out[k] = snap[i] === undefined ? rest : { ...rest, [name]: snap[i] };
+    const [part, key] = partOf(k, name);
+    const { [key]: _was, ...rest } = (out[part] ?? prefs[part]) as Record<string, unknown>;
+    out[part] = snap[i] === undefined ? rest : { ...rest, [key]: snap[i] };
   });
   return out as Partial<ModePrefs>;
 }

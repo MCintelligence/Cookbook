@@ -60,6 +60,8 @@
 .prep-card { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 116px; padding: 9px 12px 8px 14px; background: var(--card); color: var(--text); border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: 0 1px 2px rgba(var(--shadow), 0.07); cursor: grab; user-select: none; -webkit-user-select: none; }
 .prep-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 5px 0 0 5px; background: var(--label, transparent); }
 .prep-card header { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.card-title-box { width: 100%; min-width: 0; margin: -2px -4px; padding: 1px 4px; border: 1px solid var(--accent); border-radius: 4px; background: var(--field); color: var(--text); font-family: var(--font-display); font-size: 14px; font-weight: 700; line-height: 1.25; outline: none; }
+.prep-card-note { color: var(--faint); font-style: italic; }
 .prep-card h3 { margin: 0; font-family: var(--font-display); font-size: 14px; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prep-card .mode-synopsis { flex: 1 0 auto; font-size: 13px; }
 /*
@@ -95,6 +97,7 @@ html:not(.touch) .prep-card:not(.chosen) .mode-synopsis { pointer-events: none; 
 .grid-cell.drop-into { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 
 /* ---------- Free board and atlas ---------- */
+.free-board:focus { outline: none; }
 .free-board { flex: 1; position: relative; overflow: hidden; cursor: grab; touch-action: none; background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 16%, transparent) 1px, transparent 1.4px); }
 .free-board.panning { cursor: grabbing; }
 .free-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }

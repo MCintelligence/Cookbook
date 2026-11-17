@@ -60,6 +60,8 @@ export interface ModePrefs {
   lines: Record<string, BoardLine[]>;
   /** The shapes and colours given to cards on the free boards, by board and then by the Item's id. */
   looks: Record<string, Record<string, CardLook>>;
+  /** Cards that live only on a free board, not on the Shelf or in the Pantry, by board and then by id. */
+  notes: Record<string, Record<string, BoardNote>>;
   atlas: { kinds: string[]; near: boolean };
   calendar: { span: 'month' | 'year'; at: string | null };
   timeline: { lanes: 'group' | 'label'; px: number };
@@ -71,6 +73,32 @@ export interface ModePrefs {
    * Item itself is untouched, and dragging it in from the Shelf or Pantry brings it back.
    */
   hidden: { prep: string[]; plan: string[] };
+}
+
+/** A card that lives only on its free board: a name and a few words, nothing on the Shelf. */
+export interface BoardNote {
+  title: string;
+  text?: string;
+}
+
+/** Ids of board-only cards start with this, so they can never be taken for an Item's. */
+export const NOTE_PREFIX = 'note-';
+export const isNoteId = (id: string) => id.startsWith(NOTE_PREFIX);
+
+/** The board-only cards of a modes.json, keeping only what is well formed. */
+function readNotes(v: unknown): ModePrefs['notes'] {
+  if (!isRecord(v)) return {};
+  const out: ModePrefs['notes'] = {};
+  for (const [board, notes] of Object.entries(v)) {
+    if (!isRecord(notes)) continue;
+    const mine: Record<string, BoardNote> = {};
+    for (const [id, n] of Object.entries(notes)) {
+      if (!isNoteId(id) || !isRecord(n) || typeof n.title !== 'string') continue;
+      mine[id] = typeof n.text === 'string' && n.text ? { title: n.title, text: n.text } : { title: n.title };
+    }
+    out[board] = mine;
+  }
+  return out;
 }
 
 /** How a board is set up. Everything after `layout` is for the free board, as a mindmap or flowchart. */
@@ -105,6 +133,7 @@ export const DEFAULT_PREFS: ModePrefs = {
   spots: {},
   lines: {},
   looks: {},
+  notes: {},
   atlas: { kinds: ['character', 'setting', 'research'], near: false },
   calendar: { span: 'month', at: null },
   timeline: { lanes: 'group', px: 18 },
@@ -137,6 +166,7 @@ export function readPrefs(text: string): ModePrefs {
     spots: part('spots'),
     lines: readLines(raw.lines),
     looks: readLooks(raw.looks),
+    notes: readNotes(raw.notes),
     atlas: part('atlas'),
     calendar: part('calendar'),
     timeline: { ...part('timeline'), px: Number.isFinite(px) ? Math.max(MIN_PX, Math.min(MAX_PX, px)) : DEFAULT_PREFS.timeline.px },

@@ -4299,6 +4299,7 @@ export function App() {
     newCard: (section, fields) => addForMode(CARD_TEMPLATES.find((t) => t.folder === section)!, joinPath(PANTRY, section), fields),
     newGroup: () => void addFolderIn(BOOKSHELF),
     rename: (p) => setRenaming(p),
+    retitle: (p, title) => retitle(p, title).catch((e: unknown) => setError(friendlyError(e))),
     menu: showMenu,
     loadPicture,
     say,

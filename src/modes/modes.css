@@ -47,6 +47,7 @@
 .outline tbody tr:not(.outline-group):hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
 .outline tr.chosen { background: color-mix(in srgb, var(--accent) 10%, transparent) !important; box-shadow: inset 3px 0 0 var(--accent); }
 .outline tr.drop-before > * { box-shadow: inset 0 2px 0 var(--accent); }
+.outline tr.drop-after > * { box-shadow: inset 0 -2px 0 var(--accent); }
 .outline tr.drop-into > * { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 .outline-title { border: none; background: transparent; color: var(--text); font: inherit; font-weight: 600; text-align: left; padding: 3px 0 3px 14px; }
 .outline tbody th { width: 24%; min-width: 180px; }
@@ -59,8 +60,16 @@
 .prep-card { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 116px; padding: 9px 12px 8px 14px; background: var(--card); color: var(--text); border: 1px solid var(--line-strong); border-radius: 5px; box-shadow: 0 1px 2px rgba(var(--shadow), 0.07); cursor: grab; user-select: none; -webkit-user-select: none; }
 .prep-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 5px 0 0 5px; background: var(--label, transparent); }
 .prep-card header { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.card-title-box { width: 100%; min-width: 0; margin: -2px -4px; padding: 1px 4px; border: 1px solid var(--accent); border-radius: 4px; background: var(--field); color: var(--text); font-family: var(--font-display); font-size: 14px; font-weight: 700; line-height: 1.25; outline: none; }
+.prep-card-note { color: var(--faint); font-style: italic; }
 .prep-card h3 { margin: 0; font-family: var(--font-display); font-size: 14px; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prep-card .mode-synopsis { flex: 1 0 auto; font-size: 13px; }
+/*
+ * With a mouse, a card that isn't chosen is the card all over: a click on its synopsis chooses it
+ * and a drag from there moves it, as on a corkboard. Once chosen, a click on the synopsis types in it.
+ * (A finger has its own rules, in FreeBoard and phone.css.)
+ */
+html:not(.touch) .prep-card:not(.chosen) .mode-synopsis { pointer-events: none; }
 .prep-card.free .mode-synopsis { max-height: calc(1.4em * 4 + 6px); }
 .prep-card footer { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .prep-card footer > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -69,6 +78,7 @@
 .prep-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line-strong)); }
 .prep-card.chosen { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px rgba(var(--shadow), 0.12); }
 .prep-card.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+.prep-card.drop-after { box-shadow: 0 3px 0 var(--accent); }
 .prep-card.lifted { cursor: grabbing; box-shadow: 0 10px 24px rgba(var(--shadow), 0.22); z-index: 5; transform: rotate(-0.6deg); }
 :root[data-theme='sepia'] .prep-card { --text: var(--page-text); --muted: #6f5f4b; --faint: var(--page-muted); --line: var(--page-line); --line-strong: #cbbba0; --field: #f7f0e2; background: var(--paper); }
 :root[data-theme='sepia'] .prep-card .status-icon { color: #6f5f4b; }
@@ -87,6 +97,7 @@
 .grid-cell.drop-into { background: color-mix(in srgb, var(--accent) 9%, transparent); }
 
 /* ---------- Free board and atlas ---------- */
+.free-board:focus { outline: none; }
 .free-board { flex: 1; position: relative; overflow: hidden; cursor: grab; touch-action: none; background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 16%, transparent) 1px, transparent 1.4px); }
 .free-board.panning { cursor: grabbing; }
 .free-layer { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }

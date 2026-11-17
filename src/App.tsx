@@ -148,7 +148,7 @@ import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, likel
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
-import { getSettings, setSettings, useSettings } from './settings';
+import { UI_ZOOM, getSettings, setSettings, useSettings } from './settings';
 import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
 import { type Backup, BackupCheckError, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
@@ -209,7 +209,6 @@ const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
 const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
-const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 /** On a phone the whole interface is larger, for fingers (phone.css), and Small, Medium and Large step from there. */
 const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
 /** How large the page's words are on a phone, against a computer's: larger, though not as much as the buttons. */
@@ -3386,11 +3385,35 @@ export function App() {
   /** The text that Home, End and the page keys go to from outside it (see scrollKeys). */
   const keysPage = useRef<EditorView | null>(null);
   keysPage.current = editor && !editor.isDestroyed && doc ? editor.view : null;
+  /** True while Prep or Plan covers the page: the page is still there, out of sight, and must not be edited. */
+  const pageHidden = useRef(false);
   useEffect(() => {
     // Caught on the way down, before the Shelf or a list can take them for itself.
-    const onKey = (e: KeyboardEvent) => void pageKeyAnywhere(e, keysPage.current, desk.current);
+    const onKey = (e: KeyboardEvent) => void (pageHidden.current || pageKeyAnywhere(e, keysPage.current, desk.current));
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+  useEffect(() => {
+    // With Prep or Plan up, ⌘Z and ⌘⇧Z (Ctrl+Y) outside a text box would reach the hidden page: the
+    // browser's own undo (and the Mac's Edit menu) changes it, and the writer never sees what went.
+    // A text box in the view keeps its own undo.
+    const inBox = (t: EventTarget | null) => t instanceof Element && !!t.closest('input, textarea, select, [contenteditable="true"]:not(.ProseMirror)');
+    const onKey = (e: KeyboardEvent) => {
+      if (!pageHidden.current || !(e.metaKey || e.ctrlKey) || e.altKey || inBox(e.target)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' || k === 'y') e.preventDefault();
+    };
+    const onInput = (e: Event) => {
+      if (!pageHidden.current || !(e.target instanceof Element) || !e.target.closest('.desk')) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('beforeinput', onInput, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('beforeinput', onInput, true);
+    };
   }, []);
   /** Zooms the open page one step in or out. */
   const zoomPage = useRef<(dir: 1 | -1) => void>(() => {});
@@ -3925,7 +3948,8 @@ export function App() {
     {
       label: 'Edit',
       items: () => {
-        const ed = editor;
+        // Prep and Plan cover the page, so these never reach it unseen.
+        const ed = pageHidden.current ? null : editor;
         const none = !ed;
         const empty = !ed || ed.state.selection.empty;
         return [
@@ -4220,6 +4244,7 @@ export function App() {
 
   const modeSide = sideOf(isCard(doc?.kind));
   const inMode = mode !== 'cook' && !!book && !!fs;
+  pageHidden.current = inMode;
   useEffect(() => {
     // Prep and Plan need the Shelf and their toolbar, which Chef Mode puts away.
     if (mode !== 'cook' && getSettings().focus) setSettings({ focus: false });
@@ -4274,6 +4299,7 @@ export function App() {
     newCard: (section, fields) => addForMode(CARD_TEMPLATES.find((t) => t.folder === section)!, joinPath(PANTRY, section), fields),
     newGroup: () => void addFolderIn(BOOKSHELF),
     rename: (p) => setRenaming(p),
+    retitle: (p, title) => retitle(p, title).catch((e: unknown) => setError(friendlyError(e))),
     menu: showMenu,
     loadPicture,
     say,

@@ -6,7 +6,7 @@ import { sayWhen } from '../storage/storyDate';
 import { StatusIcon } from '../ui/StatusIcon';
 import { useStore } from '../ui/store';
 import { type ViewProps } from './host';
-import { type Item, dropPlace, plotlineName, shelfGroups } from './model';
+import { type Item, dropPlace, onLowerHalf, plotlineName, shelfGroups } from './model';
 import { OUTLINE_COLUMNS, prefsStore, setPrefs } from './prefs';
 import { LabelDot, Pick, Synopsis, Tally, itemMenu } from './shared';
 
@@ -22,9 +22,15 @@ export function Outline({ host, tools, ask }: ViewProps) {
   const [scope, setScope] = useState('');
   const [status, setStatus] = useState('');
   const [over, setOver] = useState<string | null>(null);
+  // Whether the drop goes after the row it is over (its lower half) rather than before it.
+  const [after, setAfter] = useState(false);
   const columns = OUTLINE_COLUMNS.filter((c) => prefs.outline.columns.includes(c.id));
   const has = (id: string) => columns.some((c) => c.id === id);
-  const shown = groups.filter((g) => !scope || g.path === scope).map((g) => ({ ...g, items: g.items.filter((i) => !status || i.card.status === status) }));
+  const shown = groups
+    .filter((g) => !scope || g.path === scope)
+    .map((g) => ({ ...g, items: g.items.filter((i) => !status || i.card.status === status) }))
+    // Picking a status lists only the Groups that have an Item at it.
+    .filter((g) => !status || g.items.length > 0);
   const all = shown.flatMap((g) => g.items);
   const words = all.reduce((sum, i) => sum + i.card.words, 0);
 
@@ -33,14 +39,16 @@ export function Outline({ host, tools, ask }: ViewProps) {
     setOver(null);
     if (!from || from === before) return;
     e.preventDefault();
-    const place = dropPlace(host.tree, group, before);
+    const place = dropPlace(host.tree, group, before, before !== null && onLowerHalf(e));
     void host.move(from, place.folder, place.at);
   };
-  const allow = (e: React.DragEvent, key: string) => {
+  const allow = (e: React.DragEvent, key: string, row = false) => {
     if (!e.dataTransfer.types.includes(DRAG)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (over !== key) setOver(key);
+    const lower = row && onLowerHalf(e);
+    if (after !== lower) setAfter(lower);
   };
 
   const columnsMenu = (e: React.MouseEvent<HTMLElement>) => {
@@ -56,13 +64,14 @@ export function Outline({ host, tools, ask }: ViewProps) {
   const row = (item: Item) => (
     <tr
       key={item.path}
-      className={`${item.path === host.path ? 'chosen' : ''}${over === item.path ? ' drop-before' : ''}`}
+      className={`${item.path === host.path ? 'chosen' : ''}${over === item.path ? (after ? ' drop-after' : ' drop-before') : ''}`}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG, item.path);
         e.dataTransfer.effectAllowed = 'move';
       }}
-      onDragOver={(e) => allow(e, item.path)}
+      onDragOver={(e) => allow(e, item.path, true)}
+      onDragEnd={() => setOver(null)}
       onDrop={(e) => drop(e, item.group, item.path)}
       onClick={() => item.path !== host.path && host.select(item.path)}
       onDoubleClick={(e) => !(e.target instanceof HTMLTextAreaElement) && host.open(item.path)}
@@ -118,6 +127,10 @@ export function Outline({ host, tools, ask }: ViewProps) {
         )}
       {all.length === 0 && groups.length === 0 ? (
         <p className="mode-empty">Nothing on the Shelf yet. {menuPress()} the Shelf to add a Group or an Item, and it will be listed here.</p>
+      ) : status && shown.length === 0 ? (
+        <p className="mode-empty">
+          No Items {scope ? 'in this Group ' : ''}are marked {STATUSES.find((s) => s.id === status)?.label ?? status}.
+        </p>
       ) : (
         <table>
           <thead>

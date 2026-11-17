@@ -38,4 +38,14 @@ describe('board zoom', () => {
     expect(lookAt([0, 0, 100, 100], 900, 700).k).toBe(1);
     expect(lookAt([0, 0, 20000, 20000], 900, 700).k).toBe(0.5);
   });
+
+  it('starts from the top left of a board too big to fit, and centres one that fits', () => {
+    // A tall column of cards: centred across, but its first card just inside the top.
+    const tall = lookAt([0, 0, 200, 4000], 900, 700);
+    expect(tall.k).toBe(0.5);
+    expect(tall.y).toBeCloseTo(0 - 56 / 0.5);
+    expect(tall.x).toBeCloseTo(100 - 450 / 0.5);
+    const small = lookAt([0, 0, 100, 100], 900, 700);
+    expect(small).toEqual({ k: 1, x: 50 - 450, y: 50 - 350 });
+  });
 });

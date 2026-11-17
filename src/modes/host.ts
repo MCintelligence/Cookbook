@@ -43,6 +43,8 @@ export interface ModeHost {
   newCard(section: PantrySection, fields?: Record<string, unknown>): Promise<string | null>;
   newGroup(): void;
   rename(path: string): void;
+  /** Gives an Item a new name straight away, as typed on a card. */
+  retitle(path: string, title: string): Promise<void>;
   /** Takes an Item out of the mode showing (Prep or Plan), leaving the Item itself alone. Set by the mode, not the app. */
   remove(path: string): void;
   /** Shows a menu; given the button that opens it, a second press of the button closes it. */

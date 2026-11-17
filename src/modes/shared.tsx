@@ -322,7 +322,10 @@ export function Synopsis({ value, label, onSave, placeholder = 'What happens her
       placeholder={placeholder}
       onChange={(e) => setText(e.target.value)}
       // A finger on a synopsis not yet open for typing is the card's (or the board's, for a swipe): the card decides, and a tap opens it for typing.
-      onPointerDown={(e) => (e.pointerType !== 'touch' || e.currentTarget === document.activeElement) && e.stopPropagation()}
+      // Shift and a drag from a synopsis not being typed in draws the board's selection box, as from anywhere else on the card.
+      onPointerDown={(e) => (e.currentTarget === document.activeElement || (e.pointerType !== 'touch' && !e.shiftKey)) && e.stopPropagation()}
+      // …and the box isn't opened for typing on the way.
+      onMouseDown={(e) => e.shiftKey && e.currentTarget !== document.activeElement && e.preventDefault()}
       onClick={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onBlur={() => text.trim() !== value && onSave(text.trim())}

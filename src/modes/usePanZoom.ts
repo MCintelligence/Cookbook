@@ -44,7 +44,10 @@ export function lookAt(box: [number, number, number, number], width: number, hei
   const fits = Math.min(1, (width - pad * 2) / Math.max(1, r - l), (height - pad * 2) / Math.max(1, b - t));
   // Down to the step below, so everything still fits; never below 50%.
   const k = clamp(Math.floor(fits / STEP + 1e-6) * STEP);
-  return { k, x: (l + r) / 2 - width / 2 / k, y: (t + b) / 2 - height / 2 / k };
+  // Centred where it fits; where it doesn't even at 50%, it starts from the top left, so the
+  // first cards are on screen rather than cut off above the window.
+  const along = (lo: number, hi: number, room: number) => ((hi - lo) * k <= room - pad * 2 ? (lo + hi) / 2 - room / 2 / k : lo - pad / k);
+  return { k, x: along(l, r, width), y: along(t, b, height) };
 }
 
 /** `look` zoomed to `k`, keeping the board's point at (px, py) in the window where it is. */

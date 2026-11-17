@@ -33,7 +33,9 @@ import {
 } from './diagram';
 import { type Form, type ModeHost } from './host';
 import { type Group, type Item, readingOrder } from './model';
-import { type BoardSetUp, type Spot, prefsStore, setPrefs } from './prefs';
+import { type BoardNote, type BoardSetUp, NOTE_PREFIX, type Spot, isNoteId, prefsStore, setPrefs } from './prefs';
+import { type CardSummary } from '../storage/index';
+import { type Kept, restoreOf, snapshotOf, useBoardUndo } from './boardUndo';
 import { Pick as PickBox, Zoomer } from './shared';
 import { fromTouch, haptic, menuPress } from '../mobile';
 import { type Look, carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
@@ -47,6 +49,19 @@ const ROUTE_ICON: Record<Route, IconName> = { straight: 'lineStraight', elbow: '
 const tintOf = (colour: string | undefined) => LABELS.find((l) => l.id === colour)?.color;
 const NO_LOOKS: Record<string, CardLook> = {};
 const NO_LINES: BoardLine[] = [];
+const NO_NOTES: Record<string, BoardNote> = {};
+/** What a board-only card is called until it is named. */
+const NEW_NOTE = 'New card';
+
+/** A board-only card as the board draws it: an Item in shape, with a path that is no file's. */
+function noteItem(id: string, note: BoardNote): Item {
+  const card = { id, title: note.title, kind: 'scene', words: 0, synopsis: note.text ?? '', status: 'not-started', aka: [], dates: [] } as unknown as CardSummary;
+  return { path: `${NOTE_PREFIX}${id}`, card, group: '' };
+}
+const isNote = (item: Item) => isNoteId(item.card.id);
+/** What ⌘Z steps back through on a free board, and what a Delete puts back. */
+const KEPT: Kept[] = ['spots', 'lines', 'looks', 'notes', ['hidden', 'prep']];
+const newNoteId = () => `${NOTE_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 /** What is chosen on the board: cards, or one line. */
 interface Chosen {
@@ -79,9 +94,14 @@ interface Props {
  * line drawn, a shape picked. Choosing a card, dragging one and drawing a line as it goes are
  * done straight on the page, so the board stays still under the pointer and costs nothing.
  */
-export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, newHere, tools, lead, tally }: Props) {
+export function FreeBoard({ host, ask, pantry, groups, items: shelfItems, ties, conf, set, newHere, tools, lead, tally }: Props) {
   const prefs = useStore(prefsStore);
   const name = pantry ? 'pboard' : 'board';
+  // ⌘Z steps back through moves, lines, shapes and colours, board-only cards, and Items taken off the board.
+  useBoardUndo(name, KEPT);
+  const notes = prefs.notes[name] ?? NO_NOTES;
+  // The board's own cards lie among the Shelf's (or the Pantry's), and are moved, joined and shaped the same way.
+  const items = useMemo(() => [...shelfItems, ...Object.entries(notes).map(([id, n]) => noteItem(id, n))], [shelfItems, notes]);
   const pan = usePanZoom();
   const phone = usePhone();
   const looks = prefs.looks[name] ?? NO_LOOKS;
@@ -110,8 +130,10 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
       g.items.forEach((item, i) => at.set(item.card.id, saved[item.card.id] ?? [(i % CARD.across) * dx, (row + Math.floor(i / CARD.across)) * dy]));
       row += Math.max(1, Math.ceil(g.items.length / CARD.across));
     }
+    // Board-only cards are always put somewhere when made; one that lost its place goes after the rows.
+    Object.keys(notes).forEach((id, i) => at.set(id, saved[id] ?? [(i % CARD.across) * dx, (row + Math.floor(i / CARD.across)) * dy]));
     return at;
-  }, [groups, prefs.spots, name, conf.cards]);
+  }, [groups, notes, prefs.spots, name, conf.cards]);
   // Whole cards grow with their words, so each tells the board its height once it is drawn.
   const measured = useRef(new Map<string, [number, number]>());
   const [measures, setMeasures] = useState(0);
@@ -138,10 +160,16 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   const openId = host.path ? host.cards.get(host.path)?.id : undefined;
   const chosenStore = useMemo(() => createStore<Chosen>({ cards: openId && byId.has(openId) ? [openId] : [], line: null }), []);
   const choose = (cards: string[], line: string | null = null) => chosenStore.set({ cards, line });
+  /** The card whose name is being typed in place. */
+  const [renaming, setRenaming] = useState<string | null>(null);
   const chosenNow = () => chosenStore.get().cards.filter((id) => byId.has(id));
   // Picking an Item on the Shelf (or making a new one) chooses its card here too.
+  // Only when another Item is picked: a card made or deleted on the board leaves the choice alone.
+  const seenOpen = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (openId && byId.has(openId) && !chosenStore.get().cards.includes(openId)) choose([openId]);
+    if (!openId || !byId.has(openId) || seenOpen.current === openId) return;
+    seenOpen.current = openId;
+    if (!chosenStore.get().cards.includes(openId)) choose([openId]);
   }, [openId, byId]);
   /** Marks what is chosen straight on the page, without drawing the board again. */
   const paintChosen = () => {
@@ -159,7 +187,6 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   // ---------- Saving where cards go ----------
 
   const putMany = (moves: Map<string, Spot>) => setPrefs((now) => ({ spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), ...Object.fromEntries(moves) } } }));
-  const put = (id: string, spot: Spot) => putMany(new Map([[id, conf.snap ? snap(spot) : spot]]));
   /** Moves cards in one go, with Undo in the notice. */
   const arrange = (moves: Map<string, Spot>, said: string, fit = false) => {
     if (moves.size === 0) return;
@@ -217,7 +244,12 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     if (e.button !== 0) return;
     const id = item.card.id;
     const chosen = chosenNow();
-    if (e.shiftKey || e.metaKey || e.ctrlKey) return choose(chosen.includes(id) ? chosen.filter((s) => s !== id) : [...chosen, id]);
+    const toggle = () => choose(chosen.includes(id) ? chosen.filter((s) => s !== id) : [...chosen, id]);
+    // Shift and a drag draws a box from wherever it starts, over a card too; Shift and a click adds the card or takes it out.
+    if (e.shiftKey && e.pointerType !== 'touch') return boxFrom(e, toggle);
+    if (e.shiftKey || e.metaKey || e.ctrlKey) return toggle();
+    // A click on the name of the card already chosen (and only it) is for typing a new name.
+    const onName = !!(e.target as Element).closest('h3') && chosen.length === 1 && chosen[0] === id;
     const group = chosen.includes(id) && chosen.length > 1 ? chosen : [id];
     // Pointer pixels to board units: the view's zoom as it is now, and the interface's own (larger on a phone).
     const k = pan.live().k * scaleOf(e.currentTarget.closest('.free-board'));
@@ -228,8 +260,9 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
       return [sx - ox, sy - oy];
     };
     const tap = () => {
+      if (onName) return setRenaming(id);
       choose([id]);
-      if (item.path !== host.path) host.select(item.path);
+      if (!isNote(item) && item.path !== host.path) host.select(item.path);
     };
     const setDown = (mx: number, my: number) => {
       if (mx === 0 && my === 0) {
@@ -288,7 +321,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         if (!over) {
           const [bx, by] = pan.toBoard(up.clientX, up.clientY);
           const [nw, nh] = newSize();
-          grow(item, [Math.round(bx - nw / 2), Math.round(by - Math.min(nh, 60) / 2)], id);
+          grow(item, [Math.round(bx - nw / 2), Math.round(by - Math.min(nh, 60) / 2)], [id]);
         }
       },
     );
@@ -296,8 +329,9 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
 
   const marquee = useRef<HTMLDivElement | null>(null);
   const surfaceDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || e.target !== e.currentTarget) return;
-    if (!e.shiftKey) {
+    // The bare board: the surface itself, or the layer and the lines' sheet lying over it.
+    if (e.button !== 0 || (e.target as Element).closest('[data-card], [data-line], [data-line-label]')) return;
+    if (!e.shiftKey || e.pointerType === 'touch') {
       // A click on the bare board lets go of what is chosen; a drag moves the view.
       const from = [e.clientX, e.clientY];
       const up = (u: PointerEvent) => {
@@ -305,9 +339,15 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         if (Math.hypot(u.clientX - from[0]!, u.clientY - from[1]!) < 4) choose([]);
       };
       window.addEventListener('pointerup', up);
-      return pan.onPointerDown(e);
+      return pan.panFrom(e.nativeEvent, e.currentTarget);
     }
-    // Shift and drag draws a box, and every card it touches is chosen.
+    boxFrom(e);
+  };
+  /** Shift and a drag: a box is drawn, and every card it touches is chosen as well. Without a drag, `tapped` instead. */
+  const boxFrom = (e: ReactPointerEvent<Element>, tapped?: () => void) => {
+    // No text is picked out along the way.
+    e.preventDefault();
+    e.stopPropagation();
     const a = pan.toBoard(e.clientX, e.clientY);
     const before = chosenNow();
     const rect = (b: Spot) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])] as const;
@@ -318,8 +358,9 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         const box = marquee.current;
         if (box) Object.assign(box.style, { display: 'block', left: `${l}px`, top: `${t}px`, width: `${r - l}px`, height: `${b - t}px` });
       },
-      (_did, up) => {
+      (did, up) => {
         if (marquee.current) marquee.current.style.display = 'none';
+        if (!did) return tapped?.();
         const [l, t, r, btm] = rect(pan.toBoard(up.clientX, up.clientY));
         const caught = items
           .map((i) => i.card.id)
@@ -330,6 +371,70 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         choose([...new Set([...before, ...caught])]);
       },
     );
+  };
+
+  // ---------- Names, board-only cards, and taking cards off ----------
+
+  const setNote = (id: string, change: Partial<BoardNote>) =>
+    setPrefs((now) => {
+      const mine = now.notes[name] ?? {};
+      if (!mine[id]) return {};
+      const next: BoardNote = { ...mine[id], ...change };
+      if (!next.text) delete next.text;
+      return { notes: { ...now.notes, [name]: { ...mine, [id]: next } } };
+    });
+  /** A new card that lives only on this board, at `spot`, joined on from each of `from`; its name is ready to type. */
+  const addNote = (spot: Spot, from: string[] = []) => {
+    const id = newNoteId();
+    const at = conf.snap ? snap(spot) : spot;
+    setPrefs((now) => ({
+      notes: { ...now.notes, [name]: { ...(now.notes[name] ?? {}), [id]: { title: NEW_NOTE } } },
+      spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: at } },
+      ...(from.length > 0 ? { lines: { ...now.lines, [name]: [...(now.lines[name] ?? []), ...from.map((f) => ({ id: lineId(), from: f, to: id, route: conf.route, ends: conf.ends }))] } } : {}),
+    }));
+    choose([id]);
+    setRenaming(id);
+  };
+  /** The name typed on a card: a board-only card keeps it here, an Item takes it as its own. */
+  const retitle = (item: Item, title: string | null) => {
+    setRenaming(null);
+    const next = title?.trim();
+    if (!next || next === item.card.title) return;
+    if (isNote(item)) setNote(item.card.id, { title: next });
+    else void host.retitle(item.path, next);
+  };
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : `${n} ${many}`);
+  /**
+   * Delete (or Backspace) on the chosen cards. A board-only card is deleted, with its lines; an
+   * Item is only taken off the board (Prep leaves it out, as Remove does) and is never deleted.
+   * One Undo, or ⌘Z, puts it all back.
+   */
+  const deleteChosen = () => {
+    const chosen = chosenNow();
+    if (chosen.length === 0) return;
+    const gone = chosen.filter(isNoteId);
+    const off = chosen.filter((id) => !isNoteId(id));
+    const before = snapshotOf(prefsStore.get(), name, KEPT);
+    const drop = new Set(gone);
+    setPrefs((now) => {
+      const without = <T,>(all: Record<string, T> | undefined) => Object.fromEntries(Object.entries(all ?? {}).filter(([id]) => !drop.has(id)));
+      return {
+        notes: { ...now.notes, [name]: without(now.notes[name]) },
+        spots: { ...now.spots, [name]: without(now.spots[name]) },
+        looks: { ...now.looks, [name]: without(now.looks[name]) },
+        lines: { ...now.lines, [name]: (now.lines[name] ?? []).filter((l) => !drop.has(l.from) && !drop.has(l.to)) },
+        hidden: off.length > 0 ? { ...now.hidden, prep: [...new Set([...now.hidden.prep, ...off])] } : now.hidden,
+      };
+    });
+    choose([]);
+    const title = (id: string) => `“${byId.get(id)?.card.title ?? ''}”`;
+    const said = [
+      gone.length > 0 ? `Deleted ${plural(gone.length, title(gone[0]!), 'board cards')}` : '',
+      off.length > 0 ? `${gone.length > 0 ? 'took' : 'Took'} ${plural(off.length, title(off[0]!), pantry ? 'Pantry Items' : 'Items')} off the board` : '',
+    ]
+      .filter(Boolean)
+      .join(' and ');
+    host.say(`${said}.`, () => setPrefs((now) => restoreOf(now, name, KEPT, before)));
   };
 
   // ---------- Lines ----------
@@ -379,6 +484,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     ];
   };
   const lineDown = (e: ReactPointerEvent<Element>, l: BoardLine) => {
+    if (e.button === 0 && e.shiftKey && e.pointerType !== 'touch') return boxFrom(e);
     e.stopPropagation();
     if (e.button === 0) choose([], l.id);
   };
@@ -404,14 +510,23 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     const [w, h] = fixedSize('box', conf.cards);
     return [w, h ?? CARD.h];
   };
-  /** A new Item (or Pantry Item of the same kind) beside `from`, at `spot`, joined to `joinTo` when given. */
-  const grow = (from: Item, spot: Spot, joinTo: string | null) => {
+  /**
+   * A new card beside `from`, at `spot`, joined on from each of `joinTo`: a board-only card when it
+   * grows from one, otherwise a new Item (or Pantry Item of the same kind). Its name is ready to type.
+   */
+  const grow = (from: Item, spot: Spot, joinTo: string[]) => {
+    if (isNote(from)) return addNote(spot, joinTo);
     const made = pantry ? host.newCard(sectionOfGroup(from.group)) : host.newItem(parentOf(from.path) || BOOKSHELF);
     void made.then((id) => {
       if (!id) return;
-      put(id, spot);
-      if (joinTo) join(joinTo, id);
+      const at = conf.snap ? snap(spot) : spot;
+      // Where it lies and its lines are one step for ⌘Z.
+      setPrefs((now) => ({
+        spots: { ...now.spots, [name]: { ...(now.spots[name] ?? {}), [id]: at } },
+        lines: { ...now.lines, [name]: [...(now.lines[name] ?? []), ...joinTo.map((f) => ({ id: lineId(), from: f, to: id, route: conf.route, ends: conf.ends }))] },
+      }));
       choose([id]);
+      setRenaming(id);
     });
   };
   const kidsOf = (id: string) => lines.filter((l) => l.from === id && byId.has(l.to)).map((l) => l.to);
@@ -428,10 +543,27 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     const kids = kidsOf(id).map((k) => boxOf(k));
     if (flowsDown(id)) {
       const x = kids.length ? Math.max(...kids.map((k) => k.x + k.w)) + 32 : me.x + me.w / 2 - w / 2;
-      return grow(one, [Math.round(x), Math.round(me.y + me.h + 72)], id);
+      return grow(one, [Math.round(x), Math.round(me.y + me.h + 72)], [id]);
     }
     const y = kids.length ? Math.max(...kids.map((k) => k.y + k.h)) + 20 : me.y + me.h / 2 - h / 2;
-    grow(one, [Math.round(me.x + me.w + 96), Math.round(y)], id);
+    grow(one, [Math.round(me.x + me.w + 96), Math.round(y)], [id]);
+  };
+  /**
+   * A new card joined on to every chosen card: with one chosen, as Tab always did; with several,
+   * past them all, level with their middle (below them on a flowchart). It is a board-only card
+   * unless every chosen card is an Item.
+   */
+  const addJoined = () => {
+    const chosen = chosenNow();
+    if (chosen.length <= 1) return addChild();
+    const boxes = chosen.map((id) => boxOf(id));
+    const [w, h] = newSize();
+    const [l, t, r, b] = [Math.min(...boxes.map((x) => x.x)), Math.min(...boxes.map((x) => x.y)), Math.max(...boxes.map((x) => x.x + x.w)), Math.max(...boxes.map((x) => x.y + x.h))];
+    const down = chosen.every((id) => flowsDown(id));
+    const spot: Spot = down ? [Math.round((l + r) / 2 - w / 2), Math.round(b + 72)] : [Math.round(r + 96), Math.round((t + b) / 2 - h / 2)];
+    const sources = chosen.map((id) => byId.get(id)!);
+    if (sources.some(isNote)) return addNote(spot, chosen);
+    grow(sources[0]!, spot, chosen);
   };
   const addSibling = () => {
     const one = theOne();
@@ -440,8 +572,8 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     const me = boxOf(id);
     const parent = lines.find((l) => l.to === id && byId.has(l.from))?.from ?? null;
     const fellows = (parent ? kidsOf(parent) : [id]).map((k) => boxOf(k));
-    if (parent && flowsDown(id)) return grow(one, [Math.round(Math.max(...fellows.map((k) => k.x + k.w)) + 32), Math.round(me.y)], parent);
-    grow(one, [Math.round(me.x), Math.round(Math.max(...fellows.map((k) => k.y + k.h)) + 20)], parent);
+    if (parent && flowsDown(id)) return grow(one, [Math.round(Math.max(...fellows.map((k) => k.x + k.w)) + 32), Math.round(me.y)], [parent]);
+    grow(one, [Math.round(me.x), Math.round(Math.max(...fellows.map((k) => k.y + k.h)) + 20)], parent ? [parent] : []);
   };
 
   // ---------- Shapes and colours ----------
@@ -474,7 +606,19 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     const chosen = chosenNow();
     const them = chosen.includes(id) ? chosen : [id];
     if (!chosen.includes(id)) choose([id]);
-    host.menu('Item', cx, cy, menuOf({ host, ask, item, pantry, ties }, [{ label: 'Shape', items: shapeMenu(them) }, { label: 'Colour', items: colourMenu(them) }, { separator: true }]));
+    const looksOf: MenuItem[] = [
+      ...(them.length > 1 ? [{ label: `New card joined to these ${them.length}`, hint: 'Tab', onPick: addJoined }, { separator: true as const }] : []),
+      { label: 'Shape', items: shapeMenu(them) },
+      { label: 'Colour', items: colourMenu(them) },
+      { separator: true },
+    ];
+    if (isNote(item))
+      return host.menu('Card', cx, cy, [
+        ...looksOf,
+        { label: 'Rename', onPick: () => (choose([id]), setRenaming(id)) },
+        { label: them.length > 1 ? 'Delete these' : 'Delete', hint: 'Delete', danger: true, onPick: deleteChosen },
+      ]);
+    host.menu('Item', cx, cy, menuOf({ host, ask, item, pantry, ties }, looksOf));
   };
 
   // ---------- Laying out ----------
@@ -546,8 +690,10 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     e.preventDefault();
     const [x, y] = pan.toBoard(e.clientX, e.clientY);
     const [w] = newSize();
+    const here: Spot = [Math.round(x - w / 2), Math.round(y - 20)];
     host.menu('Board', e.clientX, e.clientY, [
-      ...newHere([Math.round(x - w / 2), Math.round(y - 20)]),
+      { label: 'New card here', hint: 'on this board only', onPick: () => addNote(here) },
+      ...newHere(here),
       { separator: true },
       { label: 'Choose all', disabled: ids.length === 0, onPick: () => choose(ids) },
       { label: 'Fit all', onPick: () => pan.fit(bounds()) },
@@ -563,15 +709,21 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
     if (at?.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('[role="menu"]') || e.altKey || e.metaKey || e.ctrlKey) return;
     const { line } = chosenStore.get();
     const one = theOne();
-    if (e.key === 'Tab' && !e.shiftKey && one) {
+    if (e.key === 'Tab' && !e.shiftKey && chosenNow().length > 0) {
       e.preventDefault();
-      addChild();
+      addJoined();
     } else if (e.key === 'Enter' && !e.shiftKey && one) {
       e.preventDefault();
       addSibling();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && line) {
       e.preventDefault();
       deleteLine(line);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && chosenNow().length > 0) {
+      e.preventDefault();
+      deleteChosen();
+    } else if (e.key === 'F2' && one) {
+      e.preventDefault();
+      setRenaming(one.card.id);
     } else if (e.key === 'Escape' && (chosenNow().length > 0 || line)) choose([]);
   };
   useEffect(() => {
@@ -585,6 +737,15 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
   const act = useRef<Acts>(null as unknown as Acts);
   act.current = {
     cardDown,
+    cardTwice: (e, item) => {
+      if (isNote(item) || (e.target as Element).closest('h3')) {
+        choose([item.card.id]);
+        return setRenaming(item.card.id);
+      }
+      host.open(item.path);
+    },
+    retitle,
+    noteText: (id, text) => setNote(id, { text }),
     cardMenu: cardMenuAt,
     handleDown,
     lineDown,
@@ -635,7 +796,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
             colourMenu={colourMenu}
             lineMenu={lineMenu}
             arrangeMenu={arrangeMenu}
-            addChild={addChild}
+            addChild={addJoined}
             addSibling={addSibling}
             zoom={<Zoomer k={pan.zoom} onZoom={pan.zoomStep} onFit={() => pan.fit(bounds())} />}
           />
@@ -652,9 +813,14 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
           shapeMenu={shapeMenu}
           colourMenu={colourMenu}
           lineMenu={lineMenu}
-          addChild={addChild}
+          addChild={addJoined}
           addSibling={addSibling}
-          onNew={(e) => host.menu('New', 0, 0, newHere(), e.currentTarget)}
+          onNew={(e) => {
+            const [w, h] = newSize();
+            const { x, y, k } = pan.live();
+            const middle: Spot = [Math.round(x + pan.size[0] / 2 / k - w / 2), Math.round(y + pan.size[1] / 2 / k - h / 2)];
+            host.menu('New', 0, 0, [{ label: 'New card', hint: 'on this board only', onPick: () => addNote(middle) }, ...newHere()], e.currentTarget);
+          }}
           onFit={() => pan.fit(bounds())}
           onOpen={(id) => {
             const item = byId.get(id);
@@ -681,6 +847,7 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
         layer={layerRef}
         ghost={ghost}
         marquee={marquee}
+        renaming={renaming}
       />
     </>
   );
@@ -688,6 +855,10 @@ export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, n
 
 interface Acts {
   cardDown(e: ReactPointerEvent<HTMLElement>, item: Item): void;
+  /** A double-click on a card: its name for typing, or the Item opened in Cook from anywhere else on it. */
+  cardTwice(e: ReactMouseEvent<HTMLElement>, item: Item): void;
+  retitle(item: Item, title: string | null): void;
+  noteText(id: string, text: string): void;
   cardMenu(e: ReactMouseEvent<HTMLElement>, item: Item): void;
   handleDown(e: ReactPointerEvent<HTMLElement>, item: Item): void;
   lineDown(e: ReactPointerEvent<Element>, l: BoardLine): void;
@@ -718,6 +889,8 @@ interface CanvasProps {
   layer(node: HTMLDivElement | null): void;
   ghost: RefObject<SVGPathElement | null>;
   marquee: RefObject<HTMLDivElement | null>;
+  /** The card whose name is being typed. */
+  renaming: string | null;
 }
 
 /**
@@ -725,12 +898,18 @@ interface CanvasProps {
  * shows has changed (where cards lie, their looks, the lines, the view), never because a card
  * was chosen or is being dragged, which are shown straight on the page.
  */
-const Canvas = memo(function Canvas({ act, host, ask, pantry, items, ties, spots, looks, drawn, cards, snapping, look, size, surface, layer, ghost, marquee }: CanvasProps) {
+const Canvas = memo(function Canvas({ act, host, ask, pantry, items, ties, spots, looks, drawn, cards, snapping, look, size, surface, layer, ghost, marquee, renaming }: CanvasProps) {
   useLayoutEffect(() => act.current!.drawn());
   return (
     <div
       className={`free-board${snapping ? ' snapping' : ''}`}
       ref={surface}
+      // The keyboard comes to the board when it is pointed at, so Delete, Tab and the arrows work here
+      // even after a toolbar button was clicked. A text box on a card keeps it.
+      tabIndex={-1}
+      onPointerDownCapture={(e) => {
+        if (!(e.target as Element).closest('input, textarea') && document.activeElement !== e.currentTarget) e.currentTarget.focus({ preventScroll: true });
+      }}
       onPointerDown={(e) => act.current!.surfaceDown(e)}
       onContextMenu={(e) => act.current!.surfaceMenu(e)}
     >
@@ -772,7 +951,7 @@ const Canvas = memo(function Canvas({ act, host, ask, pantry, items, ties, spots
           // again while the view moves, so a screen's worth on every side is drawn too, ready for a swipe or a pinch out.
           const [vw, vh] = [size[0] / look.k, size[1] / look.k];
           if (x + w < look.x - vw || y + h < look.y - vh || x > look.x + vw * 2 || y > look.y + vh * 2) return null;
-          return <FreeCard key={id} act={act} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} shape={shape} titles={cards === 'titles'} tint={tintOf(looks[id]?.colour)} />;
+          return <FreeCard key={id} act={act} host={host} ask={ask} item={item} pantry={pantry} ties={ties} x={x} y={y} shape={shape} titles={cards === 'titles'} tint={tintOf(looks[id]?.colour)} renaming={renaming === id} />;
         })}
         <div ref={marquee} className="board-marquee" style={{ display: 'none' }} />
       </div>
@@ -827,7 +1006,7 @@ function BoardTools({ chosenStore, lead, tally, zoom, conf, set, lines, looks, m
         <Icon name={ROUTE_ICON[chosenLine?.route ?? conf.route]} size={17} />
       </MenuButton>
       <span className="tb-sep" />
-      <button className="mode-btn" title="Add a card joined on to the chosen one (Tab)" aria-label="Add a card joined on to the chosen one" disabled={!one} onClick={addChild}>
+      <button className="mode-btn" title="Add a card joined on to the chosen ones (Tab)" aria-label="Add a card joined on to the chosen ones" disabled={none} onClick={addChild}>
         <Icon name="addChild" size={17} />
       </button>
       <button className="mode-btn" title="Add a card beside the chosen one, from the same card (Enter)" aria-label="Add a card beside the chosen one" disabled={!one} onClick={addSibling}>
@@ -901,7 +1080,7 @@ function CanvasDock({ chosenStore, lines, looks, zoom, menu, shapeMenu, colourMe
                 )}
               {act('Shape', <Icon name={SHAPE_ICON[firstShape]} size={20} />, (e) => menu(e, 'Shape', shapeMenu(chosen)))}
               {act('Colour', <span className={`board-swatch${tint ? '' : ' empty'}`} style={tint ? { background: tint } : undefined} />, (e) => menu(e, 'Colour', colourMenu(chosen)))}
-              {act('Joined', <Icon name="addChild" size={20} />, addChild, !one)}
+              {act('Joined', <Icon name="addChild" size={20} />, addChild, chosen.length === 0)}
               {act('Beside', <Icon name="addSibling" size={20} />, addSibling, !one)}
             </>
           ) : (
@@ -993,10 +1172,11 @@ interface FreeCardProps {
   shape: Shape;
   titles: boolean;
   tint: string | undefined;
+  renaming: boolean;
 }
 
 const FreeCard = memo(function FreeCard(props: FreeCardProps) {
-  const { act, host, item, x, y, shape, titles, tint } = props;
+  const { act, host, item, x, y, shape, titles, tint, renaming } = props;
   const id = item.card.id;
   const [w, h] = fixedSize(shape, titles ? 'titles' : 'full');
   const el = useRef<HTMLElement | null>(null);
@@ -1018,7 +1198,7 @@ const FreeCard = memo(function FreeCard(props: FreeCardProps) {
       className={`prep-card free shape-${shape}${titles ? ' titles' : ''}${tint ? ' tinted' : ''}`}
       style={{ ...cardStyle(item), ...(tint ? { '--tint': tint } : {}), left: x, top: y, width: w, ...(h ? { height: h, minHeight: 0 } : {}) } as CSSProperties}
       onPointerDown={(e) => act.current!.cardDown(e, item)}
-      onDoubleClick={() => host.open(item.path)}
+      onDoubleClick={(e) => act.current!.cardTwice(e, item)}
       onContextMenu={(e) => act.current!.cardMenu(e, item)}
     >
       {shape === 'diamond' && (
@@ -1026,7 +1206,18 @@ const FreeCard = memo(function FreeCard(props: FreeCardProps) {
           <polygon points="50,1 99,50 50,99 1,50" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
-      <CardFace host={host} ask={props.ask} item={item} pantry={props.pantry} ties={props.ties} fit={fit} titles={titles} />
+      <CardFace
+        host={host}
+        ask={props.ask}
+        item={item}
+        pantry={props.pantry}
+        ties={props.ties}
+        fit={fit}
+        titles={titles}
+        renaming={renaming}
+        onRetitle={(title) => act.current!.retitle(item, title)}
+        note={isNote(item) ? { onText: (text) => act.current!.noteText(id, text) } : undefined}
+      />
       <span className="card-handle" title="Drag to another card to draw a line, or to a bare spot for a new card" onPointerDown={(e) => act.current!.handleDown(e, item)} />
     </article>
   );

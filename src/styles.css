@@ -177,9 +177,13 @@
 /* The ink bar sits on the dark toolbar, so it gets a parchment rim to stay visible. */
 :root[data-theme='sepia'] .tb-ink { box-shadow: 0 0 0 1px var(--paper); }
 
-/* Interface size scales everything; the page keeps the book's own zoom (see App). */
-:root[data-size='small'] { zoom: 0.9; }
-:root[data-size='large'] { zoom: 1.12; }
+/*
+ * Interface size scales everything; the page keeps the book's own zoom (see App). The desktop app
+ * zooms the window itself instead (settings.ts, sizeWindow), because the Mac's WebKit hit-tests CSS
+ * zoom differently from how it measures it. Never put CSS zoom back on the desktop app.
+ */
+:root[data-size='small']:not(:where([data-ui-zoom='window'])) { zoom: 0.9; }
+:root[data-size='large']:not(:where([data-ui-zoom='window'])) { zoom: 1.12; }
 
 :root[data-reduce-motion] *, :root[data-reduce-motion] *::before, :root[data-reduce-motion] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 

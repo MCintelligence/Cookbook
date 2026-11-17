@@ -62,6 +62,12 @@
 .prep-card header { display: flex; align-items: center; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .prep-card h3 { margin: 0; font-family: var(--font-display); font-size: 14px; font-weight: 700; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prep-card .mode-synopsis { flex: 1 0 auto; font-size: 13px; }
+/*
+ * With a mouse, a card that isn't chosen is the card all over: a click on its synopsis chooses it
+ * and a drag from there moves it, as on a corkboard. Once chosen, a click on the synopsis types in it.
+ * (A finger has its own rules, in FreeBoard and phone.css.)
+ */
+html:not(.touch) .prep-card:not(.chosen) .mode-synopsis { pointer-events: none; }
 .prep-card.free .mode-synopsis { max-height: calc(1.4em * 4 + 6px); }
 .prep-card footer { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .prep-card footer > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

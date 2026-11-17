@@ -53,7 +53,13 @@ export function Atlas({ host, tools, ask }: ViewProps) {
   const [held, setHeld] = useState<string | null>(null);
   const [tying, setTying] = useState<{ from: string; to: Spot } | null>(null);
   const at = (id: string): Spot => (moved?.id === id ? moved.spot : spots[id]!);
-  const put = (id: string, spot: Spot) => setPrefs((now) => ({ spots: { ...now.spots, atlas: { ...(now.spots.atlas ?? {}), [id]: spot } } }));
+  // Putting one piece down pins the rest where they are seen, so they don't shift round it as the
+  // layout makes room (only pieces never placed are laid out afresh).
+  const put = (id: string, spot: Spot) =>
+    setPrefs((now) => {
+      const seen = Object.fromEntries(Object.entries(spots).map(([k, [x, y]]) => [k, [Math.round(x), Math.round(y)] as Spot]));
+      return { spots: { ...now.spots, atlas: { ...seen, ...(now.spots.atlas ?? {}), [id]: spot } } };
+    });
   const bounds = (): [number, number, number, number] | null =>
     items.length === 0 ? null : [Math.min(...items.map((i) => at(i.card.id)[0])) - 70, Math.min(...items.map((i) => at(i.card.id)[1])) - 50, Math.max(...items.map((i) => at(i.card.id)[0])) + 70, Math.max(...items.map((i) => at(i.card.id)[1])) + 70];
   const fitted = useRef(false);

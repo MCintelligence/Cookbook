@@ -64,11 +64,12 @@ export function Seasonings({ editor, chosen, onChosen, unchecked, onUnchecked, o
     editor,
     selector: ({ editor }) => (editor ? tastePage(editor.state) : null),
   });
+  /** On a phone the toolbar goes: the switch moves to the heading and adding one to the end of the list. */
+  // Before the early return: a hook after it crashed the window when the editor went (a Group opened as Mise en Place).
+  const phone = usePhone();
   if (!editor || !page) return null;
 
   const showPicker = picking;
-  /** On a phone the toolbar goes: the switch moves to the heading and adding one to the end of the list. */
-  const phone = usePhone();
   const move = (id: SeasoningId, to: 'top' | 'up' | 'down' | 'bottom') => {
     // The card is drawn again in its new place; the keyboard stays on the same button or card.
     const held = document.activeElement;

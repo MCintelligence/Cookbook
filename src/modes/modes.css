@@ -47,6 +47,7 @@
 .outline tbody tr:not(.outline-group):hover { background: color-mix(in srgb, var(--text) 3%, transparent); }
 .outline tr.chosen { background: color-mix(in srgb, var(--accent) 10%, transparent) !important; box-shadow: inset 3px 0 0 var(--accent); }
 .outline tr.drop-before > * { box-shadow: inset 0 2px 0 var(--accent); }
+.outline tr.drop-after > * { box-shadow: inset 0 -2px 0 var(--accent); }
 .outline tr.drop-into > * { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
 .outline-title { border: none; background: transparent; color: var(--text); font: inherit; font-weight: 600; text-align: left; padding: 3px 0 3px 14px; }
 .outline tbody th { width: 24%; min-width: 180px; }
@@ -69,6 +70,7 @@
 .prep-card:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line-strong)); }
 .prep-card.chosen { border-color: var(--accent); box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px rgba(var(--shadow), 0.12); }
 .prep-card.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+.prep-card.drop-after { box-shadow: 0 3px 0 var(--accent); }
 .prep-card.lifted { cursor: grabbing; box-shadow: 0 10px 24px rgba(var(--shadow), 0.22); z-index: 5; transform: rotate(-0.6deg); }
 :root[data-theme='sepia'] .prep-card { --text: var(--page-text); --muted: #6f5f4b; --faint: var(--page-muted); --line: var(--page-line); --line-strong: #cbbba0; --field: #f7f0e2; background: var(--paper); }
 :root[data-theme='sepia'] .prep-card .status-icon { color: #6f5f4b; }

@@ -56,16 +56,23 @@ export function pantryGroups(tree: TreeNode[], cards: Map<string, CardSummary>):
 }
 
 /**
- * Where a Shelf Item dropped in a Group goes: just before `before`, or at the Group's end.
+ * Where a Shelf Item dropped in a Group goes: just before `before` (just after it when `after`,
+ * for a drop on the lower half of a row or card), or at the Group's end.
  * The answer is what the Shelf's own move takes: a folder, and a place among what it holds.
  */
-export function dropPlace(tree: TreeNode[], group: string, before: string | null): { folder: string; at: number } {
+export function dropPlace(tree: TreeNode[], group: string, before: string | null, after = false): { folder: string; at: number } {
   if (before) {
     const folder = parentOf(before);
     const at = childrenOf(tree, BOOKSHELF, folder).findIndex((n) => n.path === before);
-    if (at !== -1) return { folder, at };
+    if (at !== -1) return { folder, at: after ? at + 1 : at };
   }
   return { folder: group, at: childrenOf(tree, BOOKSHELF, group).length };
+}
+
+/** Whether a drag over `el` is on its lower half, so the drop goes after it rather than before. */
+export function onLowerHalf(e: { clientY: number; currentTarget: Element }): boolean {
+  const box = e.currentTarget.getBoundingClientRect();
+  return e.clientY > box.top + box.height / 2;
 }
 
 export interface Row {

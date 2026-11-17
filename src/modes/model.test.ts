@@ -45,6 +45,11 @@ describe('the Shelf and Pantry as the views show them', () => {
     expect(dropPlace(tree, 'bookshelf/Two', null)).toEqual({ folder: 'bookshelf/Two', at: 0 });
   });
 
+  it('puts an Item dropped on the lower half of another just after it', () => {
+    expect(dropPlace(tree, 'bookshelf/One', 'bookshelf/One/c.md', true)).toEqual({ folder: 'bookshelf/One', at: 3 });
+    expect(dropPlace(tree, 'bookshelf/One', 'bookshelf/One/Inner/b.md', true)).toEqual({ folder: 'bookshelf/One/Inner', at: 1 });
+  });
+
   it('makes board rows from plotlines in use or named', () => {
     const items = shelfGroups(tree, cards).flatMap((g) => g.items);
     expect(boardRows('none', items, {})).toHaveLength(1);

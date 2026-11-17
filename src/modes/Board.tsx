@@ -10,7 +10,7 @@ import { CardFace, SINGULAR, cardStyle, menuOf, sectionOfGroup } from './BoardCa
 import { snap } from './diagram';
 import { FreeBoard } from './FreeBoard';
 import { type Form, type ModeHost, type ViewProps } from './host';
-import { type Group, type Item, boardRows, dropPlace, pantryGroups, rowOf, shelfGroups } from './model';
+import { type Group, type Item, boardRows, dropPlace, onLowerHalf, pantryGroups, rowOf, shelfGroups } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
 import { Pick, Seg, Tally } from './shared';
 
@@ -101,9 +101,11 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
   const { plotlines } = useStore(prefsStore);
   const rows = boardRows(by, items, pantry ? {} : plotlines);
   const [over, setOver] = useState<string | null>(null);
+  // Whether the drop goes after the card it is over (its lower half) rather than before it.
+  const [after, setAfter] = useState(false);
   const field = by === 'status' ? 'status' : 'label';
 
-  const allow = (e: DragEvent, key: string, group: string) => {
+  const allow = (e: DragEvent, key: string, group: string, card = false) => {
     if (!e.dataTransfer.types.includes(DRAG)) return;
     // A Pantry Item stays in its own section: a Character doesn't become a Setting by being dragged.
     if (pantry && !e.dataTransfer.types.includes(`${DRAG}+${group}`)) return;
@@ -111,6 +113,8 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     if (over !== key) setOver(key);
+    const lower = card && onLowerHalf(e);
+    if (after !== lower) setAfter(lower);
   };
   const drop = async (e: DragEvent, group: string, row: string, before: string | null) => {
     const from = e.dataTransfer.getData(DRAG);
@@ -120,7 +124,7 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
     e.stopPropagation();
     let path = from;
     if (!pantry && from !== before) {
-      const place = dropPlace(host.tree, group, before);
+      const place = dropPlace(host.tree, group, before, before !== null && onLowerHalf(e));
       path = (await host.move(from, place.folder, place.at)) ?? from;
     }
     const card = host.cards.get(from);
@@ -208,7 +212,7 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
                   {cell.map((item) => (
                     <article
                       key={item.path}
-                      className={`prep-card${item.path === host.path ? ' chosen' : ''}${over === item.path ? ' drop-before' : ''}`}
+                      className={`prep-card${item.path === host.path ? ' chosen' : ''}${over === item.path ? (after ? ' drop-after' : ' drop-before') : ''}`}
                       style={cardStyle(item)}
                       draggable
                       onDragStart={(e) => {
@@ -216,7 +220,7 @@ function GridBoard({ host, ask, pantry, groups, items, rows: by, ties }: GridPro
                         e.dataTransfer.setData(`${DRAG}+${g.path}`, '1');
                         e.dataTransfer.effectAllowed = 'move';
                       }}
-                      onDragOver={(e) => !pantry && allow(e, item.path, g.path)}
+                      onDragOver={(e) => !pantry && allow(e, item.path, g.path, true)}
                       onDrop={(e) => !pantry && void drop(e, g.path, row.id, item.path)}
                       onDragEnd={() => setOver(null)}
                       onClick={() => item.path !== host.path && host.select(item.path)}

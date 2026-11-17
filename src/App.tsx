@@ -66,6 +66,7 @@ import { FIRST_ITEM, LEARN_TO_COOK, learnToCookLocation, learnedBefore, makeLear
 import { type NodeJSON, parseMarkdown, plainText, serializeMarkdown } from './editor/markdown';
 import { getSchema } from '@tiptap/core';
 import { cookbookExtensions } from './editor/extensions';
+import { PageFrame, scaledPage } from './ui/PageFrame';
 import { SceneText } from './ui/SceneText';
 import { friendlyError } from './storage/errors';
 import { type Goals } from './ui/GoalsPopup';
@@ -3818,9 +3819,25 @@ export function App() {
   const asDraft = page.view === 'draft' || small;
   // The page is zoomed apart from the interface around it, so the interface's own zoom is taken back out.
   const uiZoom = phone ? PHONE_ZOOM[settings.size] : UI_ZOOM[settings.size];
-  const pageZoom = asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) / uiZoom : page.zoom / 100 / uiZoom;
+  // How big the page shows on screen.
+  // In Chef Mode the reader's own text size scales the page instead of its zoom, at the interface's size
+  // (it used to be CSS zoom on the text, which threw the Mac's clicks off the same way the page zoom did).
+  const chefScale = settings.focus ? uiZoom * (settings.chef.size / 100) : null;
+  const pageScale = chefScale ?? (asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) : page.zoom / 100);
+  const pageZoom = pageScale / uiZoom;
   zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom, dir) } });
-  const pageStyle: CSSProperties = asDraft ? { zoom: pageZoom } : { zoom: pageZoom, width: pageSize.width * 96, minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 };
+  // The frame undoes the interface size, so inside it a pixel is a pixel; the page is scaled in it (see PageFrame).
+  const frameStyle: CSSProperties = {
+    zoom: 1 / uiZoom,
+    ...(settings.focus
+      ? // Chef Mode's column: as wide as the reader set it, whatever the text size.
+        { width: settings.chef.width * uiZoom, maxWidth: '100%' }
+      : asDraft
+        ? { width: '100%', maxWidth: 760 * pageScale }
+        : { width: pageSize.width * 96 * pageScale, maxWidth: '100%' }),
+    '--page-scale': pageScale,
+  } as CSSProperties & Record<'--page-scale', number>;
+  const pageStyle: CSSProperties = scaledPage(pageScale, asDraft ? {} : { minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 });
   // The cards above the page are as wide as the page itself, at any size and zoom.
   const cardStyle: CSSProperties = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };
 
@@ -4635,6 +4652,7 @@ export function App() {
         )}
         {miseShown && fs ? (
           <div className="page-row">
+            <PageFrame scale={pageScale} style={frameStyle}>
             <MiseEnPlace
               key={`${miseShown.anchor}:${miseRound}`}
               fs={fs}
@@ -4654,6 +4672,7 @@ export function App() {
               onPageMenu={pageMenu}
               onItemMenu={readerMenu}
             />
+            </PageFrame>
           </div>
         ) : (
           <>
@@ -4692,6 +4711,7 @@ export function App() {
           )}
           <div className={`page-row${besideLeft ? ' beside-left' : ''}`}>
           {doc && path && draftOpen?.path === path ? (
+            <PageFrame scale={pageScale} style={frameStyle} key={`draft-${draftOpen.n}`}>
             <article className={`cb-page draft-version${asDraft ? ' draft' : ''} eased`} key={`draft-${draftOpen.n}`} style={pageStyle} aria-label={`Draft ${draftOpen.n} of ${draftOpen.title}`}>
               <div className="draft-version-bar">
                 <span className="draft-version-name">
@@ -4706,8 +4726,10 @@ export function App() {
               </div>
               {draftSchema && <SceneText schema={draftSchema} body={draftOpen.body} />}
             </article>
+            </PageFrame>
           ) : null}
           {doc && path ? (
+            <PageFrame scale={pageScale} style={frameStyle} key={path} hidden={draftOpen?.path === path}>
             <article
               className={`cb-page${asDraft ? ' draft' : ''}${isCard(doc.kind) || fileOf(doc.fields) ? ' card-page' : ''} eased`}
               key={path}
@@ -4720,6 +4742,7 @@ export function App() {
             >
               {pageBody()}
             </article>
+            </PageFrame>
           ) : null}
           {doc && path && beside && beside !== path ? (
             <Suspense fallback={null}><Beside path={beside} load={loadCard} version={indexVersion} onWrite={(p) => void swapBeside(p)} onKeep={(p) => void keepOnly(p)} onClose={() => setBeside(null)} /></Suspense>

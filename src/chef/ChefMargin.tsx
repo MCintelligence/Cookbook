@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
 import { type MenuItem } from '../ui/Menu';
+import { zoomOf } from '../ui/zoom';
 import { type ChefNote, changeNote, deleteNote, newId, notesState, pickNote } from './notes';
 
 interface Props {
@@ -44,6 +45,8 @@ export function ChefMargin({ editor, writer, showResolved, onMenu }: Props) {
     const s = notesState(editor);
     if (!margin || !s || editor.isDestroyed) return;
     const top0 = margin.getBoundingClientRect().top;
+    // Boxes are measured on screen; the cards are placed in the page's own (unscaled) pixels.
+    const scale = zoomOf(margin) || 1;
     const size = editor.state.doc.content.size;
     const placed = s.notes
       .map((n) => {
@@ -51,7 +54,7 @@ export function ChefMargin({ editor, writer, showResolved, onMenu }: Props) {
         if (!el) return null;
         let want = 0;
         try {
-          want = editor.view.coordsAtPos(Math.min(n.from, size), 1).top - top0;
+          want = (editor.view.coordsAtPos(Math.min(n.from, size), 1).top - top0) / scale;
         } catch {
           // A place the page can't show yet stays where it was.
           want = el.offsetTop;

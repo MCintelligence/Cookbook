@@ -5,6 +5,7 @@ import { Icon } from './Icon';
 import { isTauri } from '../storage/platform';
 import { openWeb } from '../mobile';
 import { usePhone } from './usePhone';
+import { windowZoom } from '../settings';
 
 interface Props {
   url: string;
@@ -24,9 +25,13 @@ interface Box {
 /** What the app shows over a page: a live web view must step aside for these. */
 const OVER = '.menu, [role="menu"], [role="dialog"], [role="listbox"], [role="alertdialog"], .tb-popover, .plate-menu, .modal, .backdrop';
 
-const boxOf = (r: DOMRect): Box => ({ x: r.left, y: r.top, width: r.width, height: r.height });
+/** CSS pixels to the window's points: the desktop app's interface size zooms the window itself (settings.ts). */
+const boxOf = (r: { left: number; top: number; width: number; height: number }): Box => {
+  const z = windowZoom();
+  return { x: r.left * z, y: r.top * z, width: r.width * z, height: r.height * z };
+};
 const sameBox = (a: Box | null, b: Box) => !!a && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
-const meets = (a: DOMRect, b: Box) => a.right > b.x && a.left < b.x + b.width && a.bottom > b.y && a.top < b.y + b.height;
+const meets = (a: Box, b: Box) => a.x + a.width > b.x && a.x < b.x + b.width && a.y + a.height > b.y && a.y < b.y + b.height;
 
 /** Where the page in the view has been, so Back and Forward know when there is somewhere to go. */
 function useTrail(start: string) {
@@ -194,13 +199,13 @@ function DeskWeb({ url, onAddSaved, onForget }: Props) {
       const r = desk.getBoundingClientRect();
       const top = Math.max(0, r.top);
       const left = Math.max(0, r.left);
-      return { x: left, y: top, width: Math.max(0, Math.min(window.innerWidth, r.left + desk.clientWidth) - left), height: Math.max(0, Math.min(window.innerHeight, r.top + desk.clientHeight) - top) };
+      return boxOf({ left, top, width: Math.max(0, Math.min(window.innerWidth, r.left + desk.clientWidth) - left), height: Math.max(0, Math.min(window.innerHeight, r.top + desk.clientHeight) - top) });
     };
     const covered = (page: Box) => {
       for (const over of document.querySelectorAll(OVER)) {
         if (el.contains(over)) continue;
         const r = over.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0 && meets(r, page)) return true;
+        if (r.width > 0 && r.height > 0 && meets(boxOf(r), page)) return true;
       }
       return false;
     };

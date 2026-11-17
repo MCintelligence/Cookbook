@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { type BookLocation } from './storage/platform';
+import { type BookLocation, isTauri } from './storage/platform';
 import { type English, isEnglish } from './proofread/english';
 import { type WriterKind, isWriterKind } from './writers';
 import { type ChefLook, DEFAULT_LOOK, parseLook } from './chef/look';
@@ -265,6 +265,7 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   const theme = s.theme === 'system' ? (systemDark ? 'dark' : 'light') : s.theme;
   root.dataset.theme = theme;
   root.dataset.size = s.size;
+  sizeWindow(s.size, root);
   root.dataset.paper = s.paper;
   root.toggleAttribute('data-reduce-motion', s.reduceMotion);
   root.toggleAttribute('data-hyphenate', s.hyphenate);
@@ -273,6 +274,42 @@ export function applyLook(s: AppSettings, root: HTMLElement = document.documentE
   root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
   const bar = { light: '#FAFAF9', dark: '#181818', sepia: '#28221D' }[theme];
   for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) meta.content = bar;
+}
+
+/** How much the interface size scales the computer's interface; the page takes it back out (App). */
+export const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
+
+/**
+ * In the desktop app the interface size is the window's own zoom, the one a browser's ⌘+ uses,
+ * not CSS `zoom`. The Mac's WebKit measures CSS zoom one way and hit-tests it another:
+ * `getBoundingClientRect` and range rects leave the zoom out while `elementFromPoint`,
+ * `caretRangeFromPoint` and the pointer put it in (measured in Safari 26.2). At Small or Large
+ * every click, drag, drop and menu that turns a pointer into a place was off by the zoom: on the
+ * Board, the Atlas, the calendars and the page. The window's zoom keeps them all in one kind of
+ * pixel on every engine. `data-ui-zoom="window"` turns the stylesheet's CSS zoom off while it is
+ * in use; browsers and the phone apps (phone.css) keep CSS zoom.
+ */
+let sizing = 0;
+
+/**
+ * Screen points per CSS pixel from the window's own zoom (1 when CSS zoom does the sizing), for
+ * anything native placed over the app by its CSS position, such as Research's browser view.
+ */
+export function windowZoom(root: HTMLElement = document.documentElement): number {
+  return root.dataset.uiZoom === 'window' ? UI_ZOOM[current.size] : 1;
+}
+
+function sizeWindow(size: AppSettings['size'], root: HTMLElement): void {
+  if (!isTauri() || /Android|iPhone|iPad/i.test(navigator.userAgent)) return;
+  const asked = ++sizing;
+  // Off first, so the interface is never zoomed twice; a moment at Medium is the worst case.
+  root.dataset.uiZoom = 'window';
+  void import('@tauri-apps/api/webview')
+    .then((v) => v.getCurrentWebview().setZoom(UI_ZOOM[size]))
+    .catch(() => {
+      // No zoom for the window (an old build without the permission): CSS zoom, as before.
+      if (asked === sizing) delete root.dataset.uiZoom;
+    });
 }
 
 /** Keeps the look in step with the settings and with the system's light or dark mode. */

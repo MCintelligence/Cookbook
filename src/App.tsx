@@ -148,7 +148,7 @@ import { type FoundIssue, applySuggestion, aroundIssue, issueAt, issuesOf, likel
 import { RULE_GROUPS } from './proofread/rules';
 import { clip, pasteInto, selectedWords } from './editor/pageActions';
 import { IS_MAC, binding, commandFor, keys, keysFor } from './shortcuts';
-import { getSettings, setSettings, useSettings } from './settings';
+import { UI_ZOOM, getSettings, setSettings, useSettings } from './settings';
 import { type SettingsSection } from './ui/Settings';
 import { MARGINS, PAGE_SIZES, ZOOMS, pageOf, zoomLabel, zoomStep } from './storage/page';
 import { type Backup, BackupCheckError, listBackups, markClosed, markOpen, restoreBackup } from './storage/autoBackup';
@@ -209,7 +209,6 @@ const ManualWindow = lazy(() => import('./ui/Manual').then((m) => ({ default: m.
 /** The interface size's zoom, which the page takes back out so it keeps the book's own zoom. */
 /** The right-hand panel's column; matches --drawer-w in styles.css. */
 const drawerWidth = () => Math.round(Math.min(320, Math.max(280, window.innerWidth * 0.24)));
-const UI_ZOOM = { small: 0.9, medium: 1, large: 1.12 } as const;
 /** On a phone the whole interface is larger, for fingers (phone.css), and Small, Medium and Large step from there. */
 const PHONE_ZOOM = { small: 1.12, medium: 1.25, large: 1.4 } as const;
 /** How large the page's words are on a phone, against a computer's: larger, though not as much as the buttons. */

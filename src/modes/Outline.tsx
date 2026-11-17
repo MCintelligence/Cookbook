@@ -26,7 +26,11 @@ export function Outline({ host, tools, ask }: ViewProps) {
   const [after, setAfter] = useState(false);
   const columns = OUTLINE_COLUMNS.filter((c) => prefs.outline.columns.includes(c.id));
   const has = (id: string) => columns.some((c) => c.id === id);
-  const shown = groups.filter((g) => !scope || g.path === scope).map((g) => ({ ...g, items: g.items.filter((i) => !status || i.card.status === status) }));
+  const shown = groups
+    .filter((g) => !scope || g.path === scope)
+    .map((g) => ({ ...g, items: g.items.filter((i) => !status || i.card.status === status) }))
+    // Picking a status lists only the Groups that have an Item at it.
+    .filter((g) => !status || g.items.length > 0);
   const all = shown.flatMap((g) => g.items);
   const words = all.reduce((sum, i) => sum + i.card.words, 0);
 
@@ -123,6 +127,10 @@ export function Outline({ host, tools, ask }: ViewProps) {
         )}
       {all.length === 0 && groups.length === 0 ? (
         <p className="mode-empty">Nothing on the Shelf yet. {menuPress()} the Shelf to add a Group or an Item, and it will be listed here.</p>
+      ) : status && shown.length === 0 ? (
+        <p className="mode-empty">
+          No Items {scope ? 'in this Group ' : ''}are marked {STATUSES.find((s) => s.id === status)?.label ?? status}.
+        </p>
       ) : (
         <table>
           <thead>

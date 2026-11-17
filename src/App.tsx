@@ -3820,14 +3820,23 @@ export function App() {
   // The page is zoomed apart from the interface around it, so the interface's own zoom is taken back out.
   const uiZoom = phone ? PHONE_ZOOM[settings.size] : UI_ZOOM[settings.size];
   // How big the page shows on screen.
-  const pageScale = asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) : page.zoom / 100;
+  // In Chef Mode the reader's own text size scales the page instead of its zoom, at the interface's size
+  // (it used to be CSS zoom on the text, which threw the Mac's clicks off the same way the page zoom did).
+  const chefScale = settings.focus ? uiZoom * (settings.chef.size / 100) : null;
+  const pageScale = chefScale ?? (asDraft && small ? (phone ? PHONE_PAGE[settings.size] : 1) : page.zoom / 100);
   const pageZoom = pageScale / uiZoom;
   zoomPage.current = (dir) => updateBook({ page: { ...page, zoom: zoomStep(page.zoom, dir) } });
   // The frame undoes the interface size, so inside it a pixel is a pixel; the page is scaled in it (see PageFrame).
   const frameStyle: CSSProperties = {
     zoom: 1 / uiZoom,
-    ...(asDraft ? { width: '100%', maxWidth: 760 * pageScale } : { width: pageSize.width * 96 * pageScale, maxWidth: '100%' }),
-  };
+    ...(settings.focus
+      ? // Chef Mode's column: as wide as the reader set it, whatever the text size.
+        { width: settings.chef.width * uiZoom, maxWidth: '100%' }
+      : asDraft
+        ? { width: '100%', maxWidth: 760 * pageScale }
+        : { width: pageSize.width * 96 * pageScale, maxWidth: '100%' }),
+    '--page-scale': pageScale,
+  } as CSSProperties & Record<'--page-scale', number>;
   const pageStyle: CSSProperties = scaledPage(pageScale, asDraft ? {} : { minHeight: pageSize.height * 96, padding: MARGINS[page.margins].inches * 96 });
   // The cards above the page are as wide as the page itself, at any size and zoom.
   const cardStyle: CSSProperties = asDraft ? { width: '100%', maxWidth: 760 * pageZoom } : { width: pageSize.width * 96 * pageZoom };

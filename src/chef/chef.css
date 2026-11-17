@@ -23,12 +23,12 @@
 /* ---------- The page as a reader shows it ---------- */
 :root .app.focus .desk { padding: 56px 32px 120px; background: var(--paper); }
 :root .app.focus.chef-paper .desk { background: var(--chef-paper); }
-.app.focus .desk > .page-row > .cb-page,
-.app.focus .desk > .page-row > .cb-page.draft {
-  width: min(var(--chef-w), 100%) !important; min-height: 0 !important; padding: 0 !important; zoom: 1 !important;
+/* The page's frame (PageFrame) sets the column's width and scales the text to the reader's size; never CSS zoom (see PageFrame). */
+.app.focus .desk > .page-row > .page-frame > .cb-page {
+  min-height: 0 !important; padding: 0 !important;
   border: none; box-shadow: none; background: transparent !important; border-radius: 0;
 }
-.app.focus .cb-page .cb-prose { zoom: var(--chef-size, 1); min-height: 60vh; }
+.app.focus .cb-page .cb-prose { min-height: 60vh; }
 .app.focus.chef-paper .cb-page, .app.focus.chef-ink .cb-page { --paper: var(--chef-paper, var(--paper)); }
 .app.focus.chef-ink .cb-page { --page-text: var(--chef-ink); --page-muted: color-mix(in srgb, var(--chef-ink) 38%, var(--chef-paper, var(--paper))); }
 .app.focus.chef-ink .cb-page .cb-prose :is(p, li, h1, h2, h3, h4, blockquote, td, th, span[data-char]) { color: var(--chef-ink); }
@@ -122,7 +122,7 @@
 .cb-prose .chef-pin { display: inline-block; width: 0; height: 1em; border-left: 2px solid var(--accent); margin: 0 -1px; vertical-align: text-bottom; }
 .cb-prose .chef-pin.on { border-left-width: 3px; }
 /* The page makes room for the margin beside it. */
-.app.focus .desk > .page-row > .cb-page:has(> .chef-margin) { margin-right: 300px; }
+.app.focus .desk > .page-row > .page-frame:has(> .cb-page > .chef-margin) { margin-right: calc(300px * var(--page-scale, 1)); }
 .chef-margin { position: absolute; top: 0; left: calc(100% + 36px); width: 264px; font-family: var(--font-text); }
 .chef-card {
   position: absolute; top: 0; left: 0; right: 0; padding: 9px 11px 10px; border-radius: 8px;
@@ -160,7 +160,7 @@
 .chef-act:disabled { opacity: 0.5; }
 /* A narrow window has no room beside the page: the cards sit over its right edge, the picked one on top. */
 @media (max-width: 1100px) {
-  .app.focus .desk > .page-row > .cb-page:has(> .chef-margin) { margin-right: 0; }
+  .app.focus .desk > .page-row > .page-frame:has(> .cb-page > .chef-margin) { margin-right: 0; }
   .chef-margin { left: auto; right: -24px; width: 240px; }
   .chef-card:not(.on) { opacity: 0.94; }
 }

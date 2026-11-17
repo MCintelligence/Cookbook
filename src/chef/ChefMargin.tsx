@@ -143,6 +143,15 @@ function NoteCard({ note, editor, writer, active, fresh, onMenu, onSize, refEl }
   useEffect(() => {
     if (editing) setDraft(note.text);
   }, [editing]);
+  // A new card is hidden until the margin has placed it (after this card's refs are set), and a hidden
+  // box can't take the keyboard. So the box is focused again once it shows, or the first key typed
+  // after "New Chef note" replaced the words the note was on.
+  useEffect(() => {
+    if (editing && document.activeElement !== area.current) area.current?.focus({ preventScroll: true });
+  }, [editing]);
+  useEffect(() => {
+    if (replying && document.activeElement !== replyArea.current) replyArea.current?.focus({ preventScroll: true });
+  }, [replying]);
   const gone = !!note.quote && note.to <= note.from;
 
   const save = () => {

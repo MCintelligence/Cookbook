@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayNumber } from '../storage/storyDate';
-import { FOLD_W, backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
+import { FOLD_W, backSteps, markWidth, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
 
 const day = (y: number, m: number, d: number) => dayNumber({ y, m, d });
 
@@ -101,5 +101,22 @@ describe('a lane', () => {
       { x0: 300, x1: 312, name: 100 },
     ]);
     expect(placed.map((p) => p.row)).toEqual([0, 1, 0]);
+  });
+});
+
+describe('the ruler over a short flashback', () => {
+  it('keeps the year where a stretch is too short for the next month to be named in it', () => {
+    // 1 March 1921 alone, thirty-three years before the rest: the stretch runs from late February to early March.
+    const spans: [number, number][] = [
+      [dayNumber({ y: 1921, m: 3, d: 1 }), dayNumber({ y: 1921, m: 3, d: 1 })],
+      [dayNumber({ y: 1954, m: 9, d: 3 }), dayNumber({ y: 1954, m: 9, d: 3 })],
+    ];
+    const scale = timeScale(spans, 18, true, [0, 30]);
+    const first = scale.stretches.find((s) => !s.folded)!;
+    const { majors } = stretchMarks(scale, first, 18, 0, scale.width);
+    expect(majors.map((m) => m.text)).toEqual(['February 1921']);
+    // It is said short where the full name would run past the stretch.
+    expect(majors[0]!.room).toBe(first.w);
+    expect(majors[0]!.room).toBeGreaterThanOrEqual(markWidth(majors[0]!.short!));
   });
 });

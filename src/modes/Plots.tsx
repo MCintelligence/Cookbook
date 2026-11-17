@@ -4,12 +4,12 @@ import { fromTouch, haptic, menuPress, swallowClick } from '../mobile';
 import { parentOf } from '../storage/adapter';
 import { BOOKSHELF } from '../storage/book';
 import { LABELS } from '../storage/document';
-import { type StoryDate, dayNumber, daysInMonth, sayWhen, shifted } from '../storage/storyDate';
+import { type StoryDate, dayNumber, daysInMonth, fromDayNumber, movedTo, sayWhen, shifted } from '../storage/storyDate';
 import { useStore } from '../ui/store';
 import { usePhone } from '../ui/usePhone';
 import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, dayText, labelColor, pantryGroups, plotlineName, shelfGroups } from './model';
-import { backSteps, fitPx, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
+import { backSteps, fitPx, markWidth, placeLane, sayStretch, stretchMarks, timeScale } from './plotTime';
 import { MAX_PX, MIN_PX, prefsStore, setPrefs } from './prefs';
 import { Face, Pick, Seg, Tally, ToolButton, datedMenu, shortWhen, whenField } from './shared';
 import { dragFrom, scaleOf } from './usePanZoom';
@@ -49,6 +49,10 @@ interface Spot {
 }
 
 const nameWidth = (title: string) => title.length * 6.7 + 8;
+/** The gap between a mark and its name, with a little room after the name. */
+const NAME_ROOM = 7 + 16;
+/** The most of a name Fit all keeps room for after the last day. */
+const FIT_NAME = 200;
 
 /**
  * Plots: every plotline a line through story time, with each dated Item a stop on it. It is the
@@ -86,8 +90,10 @@ export function Plots({ host, tools, ask }: ViewProps) {
   const scale = useMemo(() => timeScale(spans, px, fold, blank), [spans, px, fold, blank]);
 
   // Each lane's rows, and where on the sheet everything lands.
-  const { laid, tops, height } = useMemo(() => {
+  const { laid, tops, height, reach } = useMemo(() => {
     let top = RULER;
+    // How far right the names reach: the sheet runs on far enough for the last of them to be read.
+    let reach = 0;
     const tops: number[] = [];
     const laid = lanes.map((lane) => {
       const shapes = lane.things.map((d) => {
@@ -99,11 +105,12 @@ export function Plots({ host, tools, ask }: ViewProps) {
       const placed = placeLane(shapes.map((s) => ({ x0: s.x, x1: s.x + s.w, name: nameWidth(s.d.title) })));
       const rows = Math.max(1, ...placed.map((p) => p.row + 1));
       const spots: Spot[] = shapes.map((s, i) => ({ ...s, ...placed[i]!, y: top + PAD + placed[i]!.row * ROW + ROW / 2 }));
+      for (const s of spots) reach = Math.max(reach, s.x + s.w + NAME_ROOM + (s.room ?? nameWidth(s.d.title)));
       tops.push(top);
       top += PAD * 2 + rows * ROW + 1;
       return spots;
     });
-    return { laid, tops, height: top };
+    return { laid, tops, height: top, reach };
   }, [lanes, scale]);
 
   const main = useRef<HTMLDivElement | null>(null);
@@ -152,10 +159,13 @@ export function Plots({ host, tools, ask }: ViewProps) {
   const zoomTo = (next: number, aboutClientX?: number) => {
     const node = main.current;
     if (!node) return;
+    const px = Math.max(MIN_PX, Math.min(MAX_PX, next));
+    // Already as close (or as far) as it goes: nothing will be drawn again, so there is no day to hold still.
+    if (Math.abs(px - now.current.px) < 1e-9) return;
     const box = node.getBoundingClientRect();
     const about = aboutClientX ?? box.left + (HEAD * scaleOf(node) + box.width) / 2;
     keep.current = { day: now.current.scale.dayAt(sheetX(about)), at: (about - box.left) / scaleOf(node) };
-    setPrefs((p) => ({ plots: { ...p.plots, px: Math.max(MIN_PX, Math.min(MAX_PX, next)) } }));
+    setPrefs((p) => ({ plots: { ...p.plots, px } }));
   };
   useLayoutEffect(() => {
     if (!keep.current || !main.current) return;
@@ -164,7 +174,16 @@ export function Plots({ host, tools, ask }: ViewProps) {
   }, [scale]);
   const fit = () => {
     if (!main.current || spans.length === 0) return;
-    setPrefs((p) => ({ plots: { ...p.plots, px: fitPx(spans, fold, main.current!.clientWidth - HEAD - 8, MIN_PX, MAX_PX) } }));
+    // Names run on past their marks, so the room is taken in until the furthest of them ends inside it too.
+    const room = main.current.clientWidth - HEAD - 8;
+    let fitted = fitPx(spans, fold, room, MIN_PX, MAX_PX);
+    for (let i = 0; i < 4; i++) {
+      const t = timeScale(spans, fitted, fold, blank);
+      const reach = Math.max(...dated.map((d) => t.xOf(d.last + 1) + NAME_ROOM + Math.min(FIT_NAME, nameWidth(d.title))));
+      if (reach <= room || fitted <= MIN_PX) break;
+      fitted = fitPx(spans, fold, room - (reach - t.width), MIN_PX, MAX_PX);
+    }
+    setPrefs((p) => ({ plots: { ...p.plots, px: fitted } }));
     main.current.scrollLeft = 0;
   };
   // Opens on the Item that is open, when it has a day.
@@ -185,9 +204,18 @@ export function Plots({ host, tools, ask }: ViewProps) {
     el.style.removeProperty('--w');
     delete el.dataset.lifted;
   };
+  // A change can come in more than one write (a day, then a plotline), so the stop is looked for after each, for a moment.
+  const refocus = useRef<{ key: string; until: number } | null>(null);
   useLayoutEffect(() => {
     if (held.current) letGo(held.current);
     held.current = null;
+    const want = refocus.current;
+    if (!want) return;
+    if (Date.now() > want.until) return void (refocus.current = null);
+    const el = [...(sheet.current?.querySelectorAll<HTMLElement>('.pl-node') ?? [])].find((n) => n.dataset.key === want.key);
+    // Only taken back when nothing else has been given the focus meanwhile.
+    const lost = document.activeElement === document.body || !document.activeElement?.isConnected;
+    if (el && document.activeElement !== el && lost) el.focus({ preventScroll: true });
   }, [dated]);
 
   /**
@@ -195,6 +223,8 @@ export function Plots({ host, tools, ask }: ViewProps) {
    * change Plots makes goes through here, so a slip of the hand is always one click from undone.
    */
   const change = (d: Dated, next: { date?: StoryDate; line?: Lane }, said: string) => {
+    // A stop moved from the keyboard keeps the focus, even when it lands on another line (and so is drawn anew there).
+    if (sheet.current?.contains(document.activeElement) && (document.activeElement as HTMLElement).dataset.key === d.key) refocus.current = { key: d.key, until: Date.now() + 2000 };
     const before = { when: d.event === null ? whenField(d.card.dates[0] ?? null) : undefined, label: d.card.label || undefined };
     void (async () => {
       if (next.date) await host.setField(d.path, 'when', whenField(next.date));
@@ -207,7 +237,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
       })(),
     );
   };
-  const movedTo = (d: Dated, date: StoryDate, line?: Lane) => `Moved “${d.title}” to ${sayWhen(date)}${line ? `, on ${line.title}` : ''}.`;
+  const sayMoved = (d: Dated, date: StoryDate, line?: Lane) => `Moved “${d.title}” to ${sayWhen(date)}${line ? `, on ${line.title}` : ''}.`;
 
   /** The note that rides above a mark being carried, saying where it will land. Drawn by hand, like the mark. */
   const tip = useRef<HTMLDivElement | null>(null);
@@ -259,7 +289,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
         held.current = el;
         window.setTimeout(() => held.current === el && (letGo(el), (held.current = null)), 1500);
         const date = dateFor(days);
-        change(d, { ...(days !== 0 ? { date } : {}), line }, stretch ? `“${d.title}” now runs ${sayWhen(date)}.` : movedTo(d, date, line));
+        change(d, { ...(days !== 0 ? { date } : {}), line }, stretch ? `“${d.title}” now runs ${sayWhen(date)}.` : sayMoved(d, date, line));
       },
       cancel() {
         done();
@@ -275,7 +305,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
     if (step !== 0 && !e.altKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       const date = shifted(d.date, step * (e.shiftKey ? 7 : 1));
-      return change(d, { date }, movedTo(d, date));
+      return change(d, { date }, sayMoved(d, date));
     }
     const up = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
     if (up !== 0 && e.altKey && by === 'label') {
@@ -367,7 +397,9 @@ export function Plots({ host, tools, ask }: ViewProps) {
     if (card?.kind !== 'scene') return;
     const at = laneAt(y);
     const line = by === 'label' && at !== null && !card.label ? lanes[at] : undefined;
-    const date = { on: dayText(dayAt(x)) };
+    // One that already has a stretch of days keeps its length, starting on the day it landed on.
+    const had = card.dates[0];
+    const date: StoryDate = had ? movedTo(had, fromDayNumber(dayAt(x))) : { on: dayText(dayAt(x)) };
     const d: Dated = { key: card.id, path, title: card.title, date, first: 0, last: 0, event: null, card, group: '' };
     change(d, { date, line: line?.id ? line : undefined }, `Dated “${card.title}” ${sayWhen(date)}${line?.id ? `, on ${line.title}` : ''}.`);
   };
@@ -487,7 +519,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
           tools,
         )}
       <div className="pl-main" ref={main} onPointerDown={pan}>
-        <div className="pl-sheet" ref={sheet} style={{ width: HEAD + scale.width, minHeight: height }}>
+        <div className="pl-sheet" ref={sheet} style={{ width: HEAD + Math.max(scale.width, reach), minHeight: height }}>
           <div className="pl-grid" style={{ left: HEAD }} aria-hidden="true">
             {scale.stretches.map((s, i) => (s.folded ? <i key={`f${s.d0}`} className="pl-fold" style={{ left: s.x0, width: s.w }} /> : ruler[i]!.majors.map((m) => <i key={m.n} className="pl-line" style={{ left: m.x }} />)))}
           </div>
@@ -501,8 +533,9 @@ export function Plots({ host, tools, ask }: ViewProps) {
               ) : (
                 [
                   ...ruler[i]!.majors.map((m) => (
-                    <span key={`M${m.n}`} className="pl-major" style={{ left: HEAD + m.x }}>
-                      {m.text}
+                    // A name with little room before the next (or a fold) is said shorter, and cut short only if it must be.
+                    <span key={`M${m.n}`} className="pl-major" style={{ left: HEAD + m.x, maxWidth: m.room }} title={m.text}>
+                      {m.short && m.room < markWidth(m.text) ? m.short : m.text}
                     </span>
                   )),
                   ...ruler[i]!.minors.map((m) => (
@@ -553,6 +586,7 @@ export function Plots({ host, tools, ask }: ViewProps) {
                         className={`pl-node${d.last > d.first ? ' long' : ''}${d.path === host.path ? ' chosen' : ''}`}
                         style={{ left: spot.x, top: PAD + spot.row * ROW, height: ROW, '--w': `${spot.w}px`, ...(by !== 'label' ? { '--label': labelColor(d.card.label) ?? 'var(--muted)' } : {}) } as CSSProperties}
                         title={`${d.title} · ${sayWhen(d.date)}${d.card.synopsis ? `\n${d.card.synopsis}` : ''}\n${by === 'label' ? 'Drag to another day or another plotline' : 'Drag to another day'}; arrow keys move it too`}
+                        data-key={d.key}
                         aria-label={`${d.title}, ${sayWhen(d.date)}`}
                         role="button"
                         tabIndex={0}

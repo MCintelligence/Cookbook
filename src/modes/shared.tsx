@@ -143,9 +143,17 @@ export const whenField = (date: StoryDate | null): string | undefined => (date ?
 
 /** Gives something dated another date, or none: a Shelf Item's own day, or one of a Pantry Item's events. */
 export function redate(host: ModeHost, d: Dated, date: StoryDate | null): void {
-  if (d.event === null) return void host.setField(d.path, 'when', whenField(date));
-  const events = d.card.dates.flatMap((e, i) => (i === d.event ? (date ? [{ ...date, what: e.what }] : []) : [e]));
+  // Said with an Undo, as Plots says its moves: a date dropped on the wrong day, or taken off, is one click from back.
+  const said = date ? `Moved “${d.title}” to ${sayWhen(date)}.` : `Took the date off “${d.title}”.`;
+  if (d.event === null) {
+    const was = whenField(d.card.dates[0] ?? null);
+    void host.setField(d.path, 'when', whenField(date));
+    return host.say(said, () => void host.setField(d.path, 'when', was));
+  }
+  const was = d.card.dates;
+  const events = was.flatMap((e, i) => (i === d.event ? (date ? [{ ...date, what: e.what }] : []) : [e]));
   void host.setField(d.path, 'events', eventsField(events));
+  host.say(said, () => void host.setField(d.path, 'events', eventsField(was)));
 }
 
 /** The right-click menu of something on the calendar or in Plots. */

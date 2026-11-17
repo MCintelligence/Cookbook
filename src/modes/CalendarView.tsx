@@ -9,7 +9,7 @@ import { usePhone } from '../ui/usePhone';
 import { SHELF_DROP, type ShelfDrop, type ViewProps } from './host';
 import { type Dated, type Item, datedOf, labelColor, pantryGroups, readDay, shelfGroups } from './model';
 import { prefsStore, setPrefs } from './prefs';
-import { Seg, Tally, ToolButton, askDate, datedMenu, redate } from './shared';
+import { Seg, Tally, ToolButton, askDate, datedMenu, redate, whenField } from './shared';
 
 const DRAG = 'application/x-cookbook-dated';
 
@@ -71,7 +71,8 @@ export function CalendarView({ host, side, tools, ask }: ViewProps) {
     if (!cell || !card) return;
     const on = fromDayNumber(Number(cell.dataset.day));
     if (card.kind === 'scene') {
-      if (showShelf) void host.setField(path, 'when', formatDay(on));
+      // One that already has a stretch of days keeps its length, starting on this day.
+      if (showShelf) void host.setField(path, 'when', whenField(card.dates[0] ? movedTo(card.dates[0], on) : { on: formatDay(on) }));
     } else if (showPantry) addEvent({ path, card, group: '' }, on);
   };
   useEffect(() => {

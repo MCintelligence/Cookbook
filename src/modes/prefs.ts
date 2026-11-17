@@ -185,9 +185,17 @@ export function flushPrefs(): void {
 }
 
 /** Changes the set-up and writes it a moment later, so dragging a card about is one write, not fifty. */
+/** Told of every change the writer makes (not a recipe being read in), with the prefs as they were: for undo. */
+const edits = new Set<(before: ModePrefs) => void>();
+export function onPrefsEdit(listener: (before: ModePrefs) => void): () => void {
+  edits.add(listener);
+  return () => edits.delete(listener);
+}
+
 export function setPrefs(change: Partial<ModePrefs> | ((now: ModePrefs) => Partial<ModePrefs>)): void {
   const now = prefsStore.get();
   prefsStore.set({ ...now, ...(typeof change === 'function' ? change(now) : change) });
+  for (const l of edits) l(now);
   const fs = home;
   if (!fs) return;
   if (saving) window.clearTimeout(saving.timer);

@@ -9,6 +9,7 @@ import { useStore } from '../ui/store';
 import { type ViewProps } from './host';
 import { type Item, type Tie, labelColor, layOut, pairTies, pantryGroups, tiesOf } from './model';
 import { type Spot, prefsStore, setPrefs } from './prefs';
+import { useBoardUndo } from './boardUndo';
 import { Face, Tally, ToolButton, Zoomer, cardMenu } from './shared';
 import { carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
 
@@ -23,6 +24,8 @@ const NODE = 56;
  */
 export function Atlas({ host, tools, ask }: ViewProps) {
   const prefs = useStore(prefsStore);
+  // ⌘Z puts moved cards back. Ties are kept in the Pantry Items, not here.
+  useBoardUndo('atlas', ['spots']);
   const { kinds, near } = prefs.atlas;
   const everything = useMemo(() => pantryGroups(host.pantryTree, host.cards).flatMap((g) => g.items), [host.pantryTree, host.cards]);
   const links = useMemo(() => host.links(), [host.indexVersion]);

@@ -34,6 +34,7 @@ import {
 import { type Form, type ModeHost } from './host';
 import { type Group, type Item, readingOrder } from './model';
 import { type BoardSetUp, type Spot, prefsStore, setPrefs } from './prefs';
+import { useBoardUndo } from './boardUndo';
 import { Pick as PickBox, Zoomer } from './shared';
 import { fromTouch, haptic, menuPress } from '../mobile';
 import { type Look, carryByTouch, dragFrom, scaleOf, usePanZoom } from './usePanZoom';
@@ -82,6 +83,8 @@ interface Props {
 export function FreeBoard({ host, ask, pantry, groups, items, ties, conf, set, newHere, tools, lead, tally }: Props) {
   const prefs = useStore(prefsStore);
   const name = pantry ? 'pboard' : 'board';
+  // ⌘Z steps back through moves, lines, shapes and colours.
+  useBoardUndo(name, ['spots', 'lines', 'looks']);
   const pan = usePanZoom();
   const phone = usePhone();
   const looks = prefs.looks[name] ?? NO_LOOKS;

@@ -11,3 +11,10 @@ A mistake is found when an underline touches its marked words, and fixed when th
 
 Word's figures come only from published sources, never from running Word or its files:
 John, P., & Woll, N. (2020). Using grammar checkers in an ESL context: An investigation of automatic corrective feedback. *CALICO Journal*, 37(2), 169–192. https://doi.org/10.1558/cj.36523
+
+## Sets written by others
+
+Our own sentences can't settle a comparison, since the same hand wrote the checks and the tests. Two harnesses score Seasonings on text nobody at Cookbook wrote. Neither corpus is kept in the repo.
+
+- `jfleg.test.ts`: JFLEG (Napoles, Sakaguchi & Tetreault 2017), 1,501 sentences by English learners, each corrected by four annotators. CC BY-NC-SA 4.0, from https://github.com/keisks/jfleg. Tune on `dev` only; `test` is for a final score. `SEASONINGS_ON=opening-comma,missing-article` switches on the checks that start off; `CORE_OFF=1` leaves out Pete's grammar core for a before-and-after.
+- `novels.test.ts`: every underline Pete's grammar core makes on a folder of public-domain novels, to be read by hand for false alarms.

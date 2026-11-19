@@ -1,16 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import nspell from 'nspell';
-import { LocalLinter } from 'harper.js';
-import { slimBinary } from 'harper.js/slimBinary';
-import { type Issue, checkSpelling, rankSuggestions } from './check';
-import { type Counts, parseCounts } from './context';
-import { grammarIssues, setUpLinter } from './grammar';
-import { parsedIssues } from './parse';
-import { combine, peteIssues } from './pete';
-import { effectiveOff, ruleGroup } from './rules';
-import { isSentenceRule, styleIssues } from './style';
-import { supplementEntries } from './supplement';
+import { type Issue } from './check';
+import { marks, review, setUp } from './benchmark/review';
 
 /**
  * Seasonings against a labelled test set (src/proofread/benchmark), with every check at its
@@ -45,27 +36,6 @@ function cases(file: string): Case[] {
     });
 }
 
-const speller = nspell({
-  aff: readFileSync('public/dictionaries/en-US.aff'),
-  dic: readFileSync('public/dictionaries/en-US.dic'),
-});
-for (const [word, model] of supplementEntries()) speller.add(word, model);
-const counts: Counts[] = [parseCounts(readFileSync('public/dictionaries/word-pairs.txt', 'utf8'))];
-const linter = new LocalLinter({ binary: slimBinary });
-let why: Record<string, string> = {};
-const off = new Set(effectiveOff([]));
-
-async function review(text: string): Promise<Issue[]> {
-  const spelling = checkSpelling(text, speller, []);
-  const harper = (await grammarIssues(linter, [text], [spelling], why))[0]!;
-  const pete = peteIssues(text, (w) => speller.correct(w), counts);
-  const parsed = parsedIssues(text).filter((p) => !pete.some((i) => p.from < i.to && p.to > i.from));
-  // Sam works out spelling suggestions only when the card opens; do the same here.
-  for (const s of spelling) if (s.suggestions.length === 0) s.suggestions = rankSuggestions(text.slice(s.from, s.to), speller.suggest(text.slice(s.from, s.to)), 6);
-  return combine(spelling, harper, [...pete, ...parsed], styleIssues(text), isSentenceRule).filter((i) => !off.has(ruleGroup(i)));
-}
-
-const marks = (issues: Issue[]) => issues.filter((i) => i.kind !== 'style');
 /** An empty span (a missing word) counts as touched by an underline right beside it. */
 const touches = (i: Issue, c: Case) => (c.from === c.to ? i.from <= c.to && i.to >= c.from : i.from < c.to && i.to > c.from);
 const plain = (s: string) => s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
@@ -110,8 +80,7 @@ const total = (ss: Score[]) =>
 
 describe('Seasonings benchmark', () => {
   beforeAll(async () => {
-    await setUpLinter(linter, 'en-US', []);
-    why = await linter.getLintDescriptions();
+    await setUp();
   }, 30_000);
 
   it('finds most mistakes and raises no false alarms on correct sentences', async () => {
@@ -164,4 +133,4 @@ describe('Seasonings benchmark', () => {
 });
 
 /** Where Seasonings stands now, so a change that makes it worse fails. */
-const BAR = { learner: 0.75, writer: 0.95, heldout: 0.8, alarms: 0 };
+const BAR = { learner: 0.88, writer: 0.95, heldout: 0.85, alarms: 0 };

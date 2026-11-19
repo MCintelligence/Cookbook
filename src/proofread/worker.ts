@@ -4,6 +4,7 @@ import { type LocalLinter } from 'harper.js';
 import { type Dialect, type Issue, checkSpelling, rankSuggestions } from './check';
 import { type Around, type Counts, countText, emptyCounts, fitter, parseCounts } from './context';
 import { combine, peteIssues } from './pete';
+import { useDictionary } from './core/lexicon';
 import { NO_PATTERNS, type OwnPatterns, compilePatterns, ownPatternIssues, spareExceptions, withOwn } from './ownPatterns';
 import { isSentenceRule, styleIssues } from './style';
 import { supplementEntries } from './supplement';
@@ -24,6 +25,8 @@ export type Request =
 export type Response = { id: number; result: unknown } | { id: number; error: string };
 
 type Speller = ReturnType<typeof nspell>;
+/** The speller whose dictionary Pete's grammar last read its word classes from. */
+let grammarWords: Speller | null = null;
 
 const loaded = new Map<Dialect, Promise<{ aff: string; dic: string }>>();
 let ready: Promise<{ speller: Speller; names: string[] }> | null = null;
@@ -146,9 +149,14 @@ async function handle(req: Request): Promise<unknown> {
       const found = await g.grammarIssues(g.linter, todo, spelling, g.why);
       const counts = [await loadPairs(), book];
       const isWord = (w: string) => speller.correct(w);
+      // Pete's grammar reads word classes from the same dictionary Sam spells with.
+      if (grammarWords !== speller) {
+        useDictionary((await files(config.dialect)).dic, isWord);
+        grammarWords = speller;
+      }
       const reviewed = todo.map((text, i) => {
         const style = withOwn(styleIssues(text, names), ownPatternIssues(text, own));
-        return spareExceptions(text, combine(spelling[i]!, found[i]!, ownGrammar(peteIssues(text, isWord, counts), g.parsedIssues(text)), style, isSentenceRule), own);
+        return spareExceptions(text, combine(spelling[i]!, found[i]!, ownGrammar(peteIssues(text, isWord, counts), g.parsedIssues(text, isWord, counts)), style, isSentenceRule), own);
       });
       todo.forEach((text, i) => remember(answers.review, text, reviewed[i]!, from));
       const fresh = new Map(todo.map((t, i) => [t, reviewed[i]!]));

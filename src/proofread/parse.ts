@@ -1,7 +1,9 @@
 import nlp from 'compromise/two';
 import { dialogueRanges } from '../editor/dialogue';
 import { type Issue } from './check';
+import { type Counts } from './context';
 import { isPast } from './verbs';
+import { coreIssues } from './core/grammar';
 
 /**
  * Peppery Pete's sentence reader. A small part-of-speech tagger (compromise,
@@ -14,7 +16,7 @@ import { isPast } from './verbs';
 
 // The switches for these checks are listed with Pete's in pete.ts, so the main window never loads the tagger.
 
-interface Term {
+export interface Term {
   word: string;
   lower: string;
   from: number;
@@ -24,7 +26,7 @@ interface Term {
   post: string;
 }
 
-interface Sentence {
+export interface Sentence {
   from: number;
   to: number;
   terms: Term[];
@@ -33,9 +35,14 @@ interface Sentence {
 function read(text: string): Sentence[] {
   const out: Sentence[] = [];
   for (const s of nlp(text).json({ offset: true }) as { terms: { text: string; post: string; tags: string[]; offset: { start: number; length: number } }[] }[]) {
-    const terms = s.terms
-      .filter((t) => t.offset.length > 0 && /\p{L}/u.test(t.text))
-      .map((t) => ({ word: t.text, lower: t.text.toLowerCase().replace(/’/g, "'"), from: t.offset.start, to: t.offset.start + t.offset.length, tags: new Set(t.tags), post: t.post }));
+    const terms: Term[] = [];
+    for (const t of s.terms) {
+      if (t.offset.length > 0 && /\p{L}/u.test(t.text)) terms.push({ word: t.text, lower: t.text.toLowerCase().replace(/’/g, "'"), from: t.offset.start, to: t.offset.start + t.offset.length, tags: new Set(t.tags), post: t.post });
+      // "didn't" is read as "did" and an unwritten "not", which carries the punctuation after it.
+      else if (terms.length > 0 && t.offset.length === 0) terms[terms.length - 1]!.post += t.post;
+      // An opening bracket or quote before a word pauses the sentence as much as one after the word before.
+      if (terms.length > 1 && t.offset.length > 0 && /[([{"“‘]/.test((t as { pre?: string }).pre ?? '')) terms[terms.length - 2]!.post += (t as { pre?: string }).pre;
+    }
     if (terms.length === 0) continue;
     const last = s.terms.at(-1)!;
     out.push({ from: terms[0]!.from, to: last.offset.start + last.offset.length + last.post.trimEnd().length, terms });
@@ -264,8 +271,8 @@ function mixups(sentences: Sentence[], out: Issue[]) {
   }
 }
 
-/** What Pete reads from whole sentences in one paragraph. */
-export function parsedIssues(text: string): Issue[] {
+/** What Pete reads from whole sentences in one paragraph. isWord is Sam's dictionary, counts the word-pair counts. */
+export function parsedIssues(text: string, _isWord: (word: string) => boolean = () => true, counts: Counts[] = []): Issue[] {
   if (!/\p{L}/u.test(text)) return [];
   const speech = dialogueRanges(text);
   const inSpeech = (i: Issue) => speech.some(([a, b]) => i.from < b && i.to > a);
@@ -276,5 +283,13 @@ export function parsedIssues(text: string): Issue[] {
   tenseShifts(sentences, out);
   capitals(text, sentences, out);
   mixups(sentences, out);
+  out.push(...coreIssues(sentences, counts));
   return out.filter((i) => !inSpeech(i) || i.rule === 'capitals').sort((a, b) => a.from - b.from);
+}
+
+/** Only what the grammar core (core/grammar.ts) finds, outside speech: for measuring it on its own. */
+export function coreOnly(text: string, counts: Counts[] = []): Issue[] {
+  if (!/\p{L}/u.test(text)) return [];
+  const speech = dialogueRanges(text);
+  return coreIssues(read(text), counts).filter((i) => !speech.some(([a, b]) => i.from < b && i.to > a));
 }

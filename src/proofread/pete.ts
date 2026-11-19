@@ -32,13 +32,16 @@ export const PETE_RULES: { id: string; label: string }[] = [
   { id: 'tense-shift', label: 'Tense slips (he went to the store and buys milk)' },
   { id: 'capitals', label: 'Missing capitals (monday, english, a sentence’s first word)' },
   { id: 'usage', label: 'Words to avoid (irregardless, alright)' },
+  { id: 'possessive', label: 'Missing ’s (my sisters car, John bicycle)' },
   { id: 'run-on', label: 'Run-ons and comma splices (off at first: novelists use them on purpose)' },
+  { id: 'missing-article', label: 'Missing a or the (off at first: works in factory)' },
+  { id: 'opening-comma', label: 'Comma after a long opening (off at first: In the case of young people the best way…)' },
   ...MECHANICS_RULES,
   ...LEARNER_RULES,
 ];
 
 /** Checks that start switched off: the writer turns them on in Cookbook Settings › Seasonings. */
-export const OPT_IN_RULES = ['run-on', 'OxfordComma', ...MORE_OPT_IN];
+export const OPT_IN_RULES = ['run-on', 'opening-comma', 'missing-article', 'OxfordComma', ...MORE_OPT_IN];
 
 /** Something that says whether a word is in the dictionary. */
 export type IsWord = (word: string) => boolean;
